@@ -1,0 +1,30 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f0f12;
+  --bg-card: #1a1a1e;
+  --bg-input: #252529;
+  --purple: #7C72E8;
+  --purple-dim: #4a4490;
+  --green: #1D9E75;
+  --red: #E85555;
+  --text: #F2F2F2;
+  --text-muted: #888888;
+  --border: #2a2a2e;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
