@@ -8,6 +8,7 @@ interface Props {
   sets: Array<{ weight: number; reps: number }>;
   difficulty: Difficulty | null;
   onLogSet: (weight: number, reps: number) => void;
+  onDeleteSet: (index: number) => void;
   onRateDifficulty: (d: Difficulty) => void;
 }
 
@@ -17,7 +18,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   hard: 'Hard',
 };
 
-export default function ExerciseCard({ exercise, sets, difficulty, onLogSet, onRateDifficulty }: Props) {
+export default function ExerciseCard({ exercise, sets, difficulty, onLogSet, onDeleteSet, onRateDifficulty }: Props) {
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
 
@@ -31,7 +32,7 @@ export default function ExerciseCard({ exercise, sets, difficulty, onLogSet, onR
     if (!isFinite(w) || !isFinite(r) || w <= 0 || r <= 0) return;
     onLogSet(w, r);
     setReps('');
-    // Keep weight pre-filled for the next set — saves re-entry
+    // Keep weight pre-filled for the next set
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -52,6 +53,13 @@ export default function ExerciseCard({ exercise, sets, difficulty, onLogSet, onR
               <span className="set-num">Set {i + 1}</span>
               <span className="set-weight">{s.weight} lbs</span>
               <span className="set-reps">{s.reps} reps</span>
+              <button
+                className="delete-set-btn"
+                onClick={() => onDeleteSet(i)}
+                aria-label={`Delete set ${i + 1}`}
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>

@@ -79,3 +79,22 @@ export function getWeekNumber(): number {
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   return Math.max(1, Math.floor((now.getTime() - start.getTime()) / msPerWeek) + 1);
 }
+
+export function getWeekDateRange(): string {
+  const now = new Date();
+  const day = now.getDay(); // 0 = Sun, 1 = Mon …
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const monthName = (d: Date) => d.toLocaleString('en-US', { month: 'long' });
+
+  if (monday.getMonth() === sunday.getMonth()) {
+    return `${monthName(monday)} ${monday.getDate()}–${sunday.getDate()}`;
+  }
+  return `${monthName(monday)} ${monday.getDate()}–${monthName(sunday)} ${sunday.getDate()}`;
+}

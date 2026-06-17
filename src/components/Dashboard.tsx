@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PROGRAM, getWeekNumber } from '../data/program';
+import { PROGRAM, getWeekNumber, getWeekDateRange } from '../data/program';
 import { getCompletedSessionsForWeek } from '../db/database';
 import DayCard from './DayCard';
 import './Dashboard.css';
@@ -21,7 +21,7 @@ export default function Dashboard({ onStartWorkout }: Props) {
   return (
     <div className="dashboard">
       <div className="week-header">
-        <span className="week-label">Week {weekNumber}</span>
+        <span className="week-label">{getWeekDateRange()}</span>
         <span className="week-progress">{completedDayIds.length} of 4 done</span>
       </div>
       <div className="day-list">

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getWeekNumber } from '../data/program';
 import {
@@ -20,43 +20,45 @@ interface Props {
 type SetEntry = { weight: number; reps: number };
 
 export default function WorkoutView({ day, onBack, onComplete }: Props) {
-  const [sessionId, setSessionId] = useState<number | null>(null);
   const [sets, setSets] = useState<Record<string, SetEntry[]>>({});
   const [difficulties, setDifficulties] = useState<Record<string, Difficulty>>({});
   const [finishing, setFinishing] = useState(false);
 
-  // Use a ref to hold the in-flight createSession promise so concurrent calls
-  // don't create duplicate sessions (e.g. two rapid taps on "Log Set").
-  const sessionPromise = useRef<Promise<number> | null>(null);
-
-  function ensureSession(): Promise<number> {
-    if (!sessionPromise.current) {
-      sessionPromise.current = createSession(day.id, getWeekNumber());
-      sessionPromise.current.then(setSessionId);
-    }
-    return sessionPromise.current;
+  function handleLogSet(exerciseId: string, weight: number, reps: number) {
+    setSets(prev => ({
+      ...prev,
+      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps }],
+    }));
   }
 
-  async function handleLogSet(exerciseId: string, weight: number, reps: number) {
-    const sid = await ensureSession();
-    setSets(prev => {
-      const existing = prev[exerciseId] ?? [];
-      const setNumber = existing.length + 1;
-      addSetLog(sid, exerciseId, setNumber, weight, reps);
-      return { ...prev, [exerciseId]: [...existing, { weight, reps }] };
-    });
+  function handleDeleteSet(exerciseId: string, index: number) {
+    setSets(prev => ({
+      ...prev,
+      [exerciseId]: (prev[exerciseId] ?? []).filter((_, i) => i !== index),
+    }));
   }
 
-  async function handleRateDifficulty(exerciseId: string, difficulty: Difficulty) {
-    const sid = await ensureSession();
-    await saveExerciseDifficulty(sid, exerciseId, difficulty);
+  function handleRateDifficulty(exerciseId: string, difficulty: Difficulty) {
     setDifficulties(prev => ({ ...prev, [exerciseId]: difficulty }));
   }
 
   async function handleFinish() {
-    if (!sessionId || finishing) return;
+    if (finishing) return;
     setFinishing(true);
-    await completeSession(sessionId);
+
+    const sid = await createSession(day.id, getWeekNumber());
+
+    for (const [exerciseId, exerciseSets] of Object.entries(sets)) {
+      for (let i = 0; i < exerciseSets.length; i++) {
+        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps);
+      }
+    }
+
+    for (const [exerciseId, difficulty] of Object.entries(difficulties)) {
+      await saveExerciseDifficulty(sid, exerciseId, difficulty);
+    }
+
+    await completeSession(sid);
     onComplete();
   }
 
@@ -82,6 +84,7 @@ export default function WorkoutView({ day, onBack, onComplete }: Props) {
             sets={sets[ex.id] ?? []}
             difficulty={difficulties[ex.id] ?? null}
             onLogSet={(w, r) => handleLogSet(ex.id, w, r)}
+            onDeleteSet={(i) => handleDeleteSet(ex.id, i)}
             onRateDifficulty={(d) => handleRateDifficulty(ex.id, d)}
           />
         ))}
