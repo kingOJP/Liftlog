@@ -5,6 +5,8 @@ import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import HistoryView from './components/HistoryView';
 import DayEditView from './components/DayEditView';
+import ExerciseListView from './components/ExerciseListView';
+import ExerciseMetaView from './components/ExerciseMetaView';
 import './App.css';
 
 type View =
@@ -12,7 +14,9 @@ type View =
   | { screen: 'workout'; dayId: number }
   | { screen: 'history' }
   | { screen: 'edit-session'; sessionId: number; dayId: number }
-  | { screen: 'edit-day'; dayId: number };
+  | { screen: 'edit-day'; dayId: number }
+  | { screen: 'exercise-list' }
+  | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string };
 
 function App() {
   const [view, setView] = useState<View>({ screen: 'dashboard' });
@@ -79,6 +83,31 @@ function App() {
     );
   }
 
+  if (view.screen === 'exercise-list') {
+    return (
+      <div className="app">
+        <ExerciseListView
+          onBack={() => setView({ screen: 'dashboard' })}
+          onSelectExercise={(exerciseId, exerciseName) =>
+            setView({ screen: 'exercise-meta', exerciseId, exerciseName })
+          }
+        />
+      </div>
+    );
+  }
+
+  if (view.screen === 'exercise-meta') {
+    return (
+      <div className="app">
+        <ExerciseMetaView
+          exerciseId={view.exerciseId}
+          exerciseName={view.exerciseName}
+          onBack={() => setView({ screen: 'exercise-list' })}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -90,6 +119,7 @@ function App() {
           onStartWorkout={dayId => setView({ screen: 'workout', dayId })}
           onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
           onViewHistory={() => setView({ screen: 'history' })}
+          onViewExercises={() => setView({ screen: 'exercise-list' })}
         />
       </main>
     </div>

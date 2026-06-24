@@ -10,9 +10,10 @@ interface Props {
   onStartWorkout: (dayId: number) => void;
   onEditDay: (dayId: number) => void;
   onViewHistory: () => void;
+  onViewExercises: () => void;
 }
 
-export default function Dashboard({ program, onStartWorkout, onEditDay, onViewHistory }: Props) {
+export default function Dashboard({ program, onStartWorkout, onEditDay, onViewHistory, onViewExercises }: Props) {
   const weekNumber = getWeekNumber();
   const [completedDayIds, setCompletedDayIds] = useState<number[]>([]);
 
@@ -41,6 +42,9 @@ export default function Dashboard({ program, onStartWorkout, onEditDay, onViewHi
       </div>
       <button className="history-btn" onClick={onViewHistory}>
         View History
+      </button>
+      <button className="history-btn" onClick={onViewExercises}>
+        Exercise List
       </button>
     </div>
   );

@@ -1,5 +1,66 @@
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
+export type MuscleGroup =
+  | 'Chest' | 'Upper Back' | 'Lats' | 'Lower Back'
+  | 'Front Delts' | 'Side Delts' | 'Rear Delts'
+  | 'Triceps' | 'Biceps' | 'Forearms' | 'Traps'
+  | 'Quads' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Abs';
+
+export type WorkoutType =
+  | 'Chest Press' | 'Row' | 'Pull Down' | 'Overhead Press'
+  | 'Curl' | 'Tricep Extension' | 'Lateral Raise' | 'Fly'
+  | 'Squat' | 'Hip Hinge' | 'Leg Press' | 'Leg Curl'
+  | 'Leg Extension' | 'Calf Raise' | 'Hip Thrust' | 'Face Pull'
+  | 'Pull Up' | 'Push Up';
+
+export type Equipment =
+  | 'Bench' | 'Cable Machine' | 'Squat Rack' | 'Leg Press Machine'
+  | 'Smith Machine' | 'Pull Up Bar' | 'None';
+
+export type WeightType =
+  | 'Barbell' | 'Dumbbell' | 'Cable' | 'Machine' | 'Bodyweight'
+  | 'EZ Bar' | 'Kettlebell' | 'Resistance Band';
+
+export const MUSCLE_GROUPS: MuscleGroup[] = [
+  'Chest', 'Upper Back', 'Lats', 'Lower Back',
+  'Front Delts', 'Side Delts', 'Rear Delts',
+  'Triceps', 'Biceps', 'Forearms', 'Traps',
+  'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Abs',
+];
+
+export const WORKOUT_TYPES: WorkoutType[] = [
+  'Chest Press', 'Row', 'Pull Down', 'Overhead Press',
+  'Curl', 'Tricep Extension', 'Lateral Raise', 'Fly',
+  'Squat', 'Hip Hinge', 'Leg Press', 'Leg Curl',
+  'Leg Extension', 'Calf Raise', 'Hip Thrust', 'Face Pull',
+  'Pull Up', 'Push Up',
+];
+
+export const EQUIPMENT_OPTIONS: Equipment[] = [
+  'Bench', 'Cable Machine', 'Squat Rack', 'Leg Press Machine',
+  'Smith Machine', 'Pull Up Bar', 'None',
+];
+
+export const WEIGHT_TYPES: WeightType[] = [
+  'Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight',
+  'EZ Bar', 'Kettlebell', 'Resistance Band',
+];
+
+export interface ExerciseMuscles {
+  exerciseId: string;
+  primaryMuscle: MuscleGroup | null;
+  secondaryMuscle1: MuscleGroup | null;
+  secondaryMuscle2: MuscleGroup | null;
+  secondaryMuscle3: MuscleGroup | null;
+}
+
+export interface ExerciseDetails {
+  exerciseId: string;
+  workoutType: WorkoutType | null;
+  equipment: Equipment | null;
+  weightType: WeightType | null;
+}
+
 export interface Session {
   id?: number;
   dayId: number;
@@ -37,19 +98,27 @@ let _db: IDBDatabase | null = null;
 function openDB(): Promise<IDBDatabase> {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('liftlog', 1);
+    const request = indexedDB.open('liftlog', 2);
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const { oldVersion } = event;
 
-      const sessions = db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
-      sessions.createIndex('weekNumber', 'weekNumber');
+      if (oldVersion < 1) {
+        const sessions = db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
+        sessions.createIndex('weekNumber', 'weekNumber');
 
-      const setLogs = db.createObjectStore('setLogs', { keyPath: 'id', autoIncrement: true });
-      setLogs.createIndex('sessionId', 'sessionId');
+        const setLogs = db.createObjectStore('setLogs', { keyPath: 'id', autoIncrement: true });
+        setLogs.createIndex('sessionId', 'sessionId');
 
-      const exerciseLogs = db.createObjectStore('exerciseLogs', { keyPath: 'id', autoIncrement: true });
-      exerciseLogs.createIndex('sessionId', 'sessionId');
+        const exerciseLogs = db.createObjectStore('exerciseLogs', { keyPath: 'id', autoIncrement: true });
+        exerciseLogs.createIndex('sessionId', 'sessionId');
+      }
+
+      if (oldVersion < 2) {
+        db.createObjectStore('exerciseMuscles', { keyPath: 'exerciseId' });
+        db.createObjectStore('exerciseDetails', { keyPath: 'exerciseId' });
+      }
     };
 
     request.onsuccess = () => { _db = request.result; resolve(request.result); };
@@ -193,4 +262,38 @@ export async function deleteExerciseLogsForSession(sessionId: number): Promise<v
   for (const log of logs) {
     await idbReq(store.delete(log.id!));
   }
+}
+
+// ── Exercise muscles ─────────────────────────────────────────────────────────
+
+export async function getExerciseMuscles(exerciseId: string): Promise<ExerciseMuscles | null> {
+  const db = await openDB();
+  const result = await idbReq<ExerciseMuscles | undefined>(
+    db.transaction('exerciseMuscles', 'readonly').objectStore('exerciseMuscles').get(exerciseId),
+  );
+  return result ?? null;
+}
+
+export async function saveExerciseMuscles(data: ExerciseMuscles): Promise<void> {
+  const db = await openDB();
+  await idbReq(
+    db.transaction('exerciseMuscles', 'readwrite').objectStore('exerciseMuscles').put(data),
+  );
+}
+
+// ── Exercise details ─────────────────────────────────────────────────────────
+
+export async function getExerciseDetails(exerciseId: string): Promise<ExerciseDetails | null> {
+  const db = await openDB();
+  const result = await idbReq<ExerciseDetails | undefined>(
+    db.transaction('exerciseDetails', 'readonly').objectStore('exerciseDetails').get(exerciseId),
+  );
+  return result ?? null;
+}
+
+export async function saveExerciseDetails(data: ExerciseDetails): Promise<void> {
+  const db = await openDB();
+  await idbReq(
+    db.transaction('exerciseDetails', 'readwrite').objectStore('exerciseDetails').put(data),
+  );
 }
