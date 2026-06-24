@@ -297,3 +297,45 @@ export async function saveExerciseDetails(data: ExerciseDetails): Promise<void> 
     db.transaction('exerciseDetails', 'readwrite').objectStore('exerciseDetails').put(data),
   );
 }
+
+// ── Backup / restore ─────────────────────────────────────────────────────────
+
+export async function dumpIDB(): Promise<{
+  sessions: Session[];
+  setLogs: SetLog[];
+  exerciseLogs: ExerciseLog[];
+  exerciseMuscles: ExerciseMuscles[];
+  exerciseDetails: ExerciseDetails[];
+}> {
+  const db = await openDB();
+  const [sessions, setLogs, exerciseLogs, exerciseMuscles, exerciseDetails] = await Promise.all([
+    idbReq<Session[]>(db.transaction('sessions', 'readonly').objectStore('sessions').getAll()),
+    idbReq<SetLog[]>(db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll()),
+    idbReq<ExerciseLog[]>(db.transaction('exerciseLogs', 'readonly').objectStore('exerciseLogs').getAll()),
+    idbReq<ExerciseMuscles[]>(db.transaction('exerciseMuscles', 'readonly').objectStore('exerciseMuscles').getAll()),
+    idbReq<ExerciseDetails[]>(db.transaction('exerciseDetails', 'readonly').objectStore('exerciseDetails').getAll()),
+  ]);
+  return { sessions, setLogs, exerciseLogs, exerciseMuscles, exerciseDetails };
+}
+
+export async function restoreIDB(data: Awaited<ReturnType<typeof dumpIDB>>): Promise<void> {
+  const db = await openDB();
+
+  // Clear all stores first
+  for (const store of ['sessions', 'setLogs', 'exerciseLogs', 'exerciseMuscles', 'exerciseDetails']) {
+    await idbReq(db.transaction(store, 'readwrite').objectStore(store).clear());
+  }
+
+  // Restore — use put to preserve original IDs and referential integrity
+  const putAll = async <T>(storeName: string, records: T[]) => {
+    for (const record of records) {
+      await idbReq(db.transaction(storeName, 'readwrite').objectStore(storeName).put(record));
+    }
+  };
+
+  await putAll('sessions', data.sessions);
+  await putAll('setLogs', data.setLogs);
+  await putAll('exerciseLogs', data.exerciseLogs);
+  await putAll('exerciseMuscles', data.exerciseMuscles);
+  await putAll('exerciseDetails', data.exerciseDetails);
+}
