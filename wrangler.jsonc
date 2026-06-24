@@ -1,5 +1,5 @@
 {
-  "name": "lifelog",
+  "name": "liftlog",
   "compatibility_date": "2026-06-23",
   "main": "worker/index.ts",
   "assets": {
@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "lifelog",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_name": "liftlog",
+      "database_id": "01a26bef-c428-4e51-a283-a5baf8ce4925"
     }
   ]
 }
