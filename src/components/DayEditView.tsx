@@ -88,10 +88,19 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
           <span className="day-edit-field-label">Exercises</span>
           <div className="exercise-edit-list">
             {exercises.map((ex, idx) => (
-              <div key={ex.id} className="exercise-edit-row">
-                <div className="exercise-edit-info">
-                  <span className="exercise-edit-name">{ex.name}</span>
-                  <span className="exercise-edit-meta">{ex.sets} sets · {ex.repLow}–{ex.repHigh} reps</span>
+              <div key={ex.id} className="exercise-edit-item">
+                <div className="exercise-edit-row">
+                  <div className="exercise-edit-info">
+                    <span className="exercise-edit-name">{ex.name}</span>
+                    <span className="exercise-edit-meta">{ex.sets} sets · {ex.repLow}–{ex.repHigh} reps</span>
+                  </div>
+                  <button
+                    className="exercise-remove-btn"
+                    onClick={() => handleRemove(ex.id)}
+                    aria-label={`Remove ${ex.name}`}
+                  >
+                    ×
+                  </button>
                 </div>
                 <div className="exercise-reorder-btns">
                   <button
@@ -107,13 +116,6 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                     aria-label={`Move ${ex.name} down`}
                   >▼</button>
                 </div>
-                <button
-                  className="exercise-remove-btn"
-                  onClick={() => handleRemove(ex.id)}
-                  aria-label={`Remove ${ex.name}`}
-                >
-                  ×
-                </button>
               </div>
             ))}
 
