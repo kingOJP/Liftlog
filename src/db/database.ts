@@ -46,21 +46,6 @@ export const WEIGHT_TYPES: WeightType[] = [
   'EZ Bar', 'Kettlebell', 'Resistance Band',
 ];
 
-export interface ExerciseMuscles {
-  exerciseId: string;
-  primaryMuscle: MuscleGroup | null;
-  secondaryMuscle1: MuscleGroup | null;
-  secondaryMuscle2: MuscleGroup | null;
-  secondaryMuscle3: MuscleGroup | null;
-}
-
-export interface ExerciseDetails {
-  exerciseId: string;
-  workoutType: WorkoutType | null;
-  equipment: Equipment | null;
-  weightType: WeightType | null;
-}
-
 export interface Session {
   id?: number;
   dayId: number;
@@ -98,7 +83,7 @@ let _db: IDBDatabase | null = null;
 function openDB(): Promise<IDBDatabase> {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('liftlog', 2);
+    const request = indexedDB.open('liftlog', 3);
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -118,6 +103,12 @@ function openDB(): Promise<IDBDatabase> {
       if (oldVersion < 2) {
         db.createObjectStore('exerciseMuscles', { keyPath: 'exerciseId' });
         db.createObjectStore('exerciseDetails', { keyPath: 'exerciseId' });
+      }
+
+      // v3: exercise metadata moved to localStorage — remove the IDB stores
+      if (oldVersion < 3) {
+        if (db.objectStoreNames.contains('exerciseMuscles')) db.deleteObjectStore('exerciseMuscles');
+        if (db.objectStoreNames.contains('exerciseDetails')) db.deleteObjectStore('exerciseDetails');
       }
     };
 
@@ -264,97 +255,29 @@ export async function deleteExerciseLogsForSession(sessionId: number): Promise<v
   }
 }
 
-// ── Exercise muscles ─────────────────────────────────────────────────────────
-
-export async function getExerciseMuscles(exerciseId: string): Promise<ExerciseMuscles | null> {
-  const db = await openDB();
-  const result = await idbReq<ExerciseMuscles | undefined>(
-    db.transaction('exerciseMuscles', 'readonly').objectStore('exerciseMuscles').get(exerciseId),
-  );
-  return result ?? null;
-}
-
-export async function saveExerciseMuscles(data: ExerciseMuscles): Promise<void> {
-  const db = await openDB();
-  await idbReq(
-    db.transaction('exerciseMuscles', 'readwrite').objectStore('exerciseMuscles').put(data),
-  );
-}
-
-// ── Exercise details ─────────────────────────────────────────────────────────
-
-export async function getExerciseDetails(exerciseId: string): Promise<ExerciseDetails | null> {
-  const db = await openDB();
-  const result = await idbReq<ExerciseDetails | undefined>(
-    db.transaction('exerciseDetails', 'readonly').objectStore('exerciseDetails').get(exerciseId),
-  );
-  return result ?? null;
-}
-
-export async function saveExerciseDetails(data: ExerciseDetails): Promise<void> {
-  const db = await openDB();
-  await idbReq(
-    db.transaction('exerciseDetails', 'readwrite').objectStore('exerciseDetails').put(data),
-  );
-}
-
-// ── Exercise ID migration ──────────────────────────────────────────────────────
-
-// Old day-suffixed IDs that were consolidated to shared IDs. Set logs recorded
-// under the old IDs are remapped so history and metrics line up with the program.
-const EXERCISE_ID_MIGRATIONS: Record<string, string> = {
-  'cable-lateral-raises-d1': 'cable-lateral-raises',
-  'face-pulls-d2':           'face-pulls',
-  'face-pulls-d4':           'face-pulls',
-  'lat-pulldown-d2':         'lat-pull-down',
-  'tricep-pushdowns-d4':     'tricep-cable-pushdown',
-};
-
-// Idempotent — safe to run on every startup. Returns the number of logs updated.
-export async function migrateExerciseIds(): Promise<number> {
-  const db = await openDB();
-  const logs = await idbReq<SetLog[]>(
-    db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
-  );
-  const toFix = logs.filter(l => EXERCISE_ID_MIGRATIONS[l.exerciseId]);
-  if (toFix.length === 0) return 0;
-
-  const store = db.transaction('setLogs', 'readwrite').objectStore('setLogs');
-  for (const log of toFix) {
-    await idbReq(store.put({ ...log, exerciseId: EXERCISE_ID_MIGRATIONS[log.exerciseId] }));
-  }
-  return toFix.length;
-}
-
 // ── Backup / restore ─────────────────────────────────────────────────────────
 
 export async function dumpIDB(): Promise<{
   sessions: Session[];
   setLogs: SetLog[];
   exerciseLogs: ExerciseLog[];
-  exerciseMuscles: ExerciseMuscles[];
-  exerciseDetails: ExerciseDetails[];
 }> {
   const db = await openDB();
-  const [sessions, setLogs, exerciseLogs, exerciseMuscles, exerciseDetails] = await Promise.all([
+  const [sessions, setLogs, exerciseLogs] = await Promise.all([
     idbReq<Session[]>(db.transaction('sessions', 'readonly').objectStore('sessions').getAll()),
     idbReq<SetLog[]>(db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll()),
     idbReq<ExerciseLog[]>(db.transaction('exerciseLogs', 'readonly').objectStore('exerciseLogs').getAll()),
-    idbReq<ExerciseMuscles[]>(db.transaction('exerciseMuscles', 'readonly').objectStore('exerciseMuscles').getAll()),
-    idbReq<ExerciseDetails[]>(db.transaction('exerciseDetails', 'readonly').objectStore('exerciseDetails').getAll()),
   ]);
-  return { sessions, setLogs, exerciseLogs, exerciseMuscles, exerciseDetails };
+  return { sessions, setLogs, exerciseLogs };
 }
 
 export async function restoreIDB(data: Awaited<ReturnType<typeof dumpIDB>>): Promise<void> {
   const db = await openDB();
 
-  // Clear all stores first
-  for (const store of ['sessions', 'setLogs', 'exerciseLogs', 'exerciseMuscles', 'exerciseDetails']) {
+  for (const store of ['sessions', 'setLogs', 'exerciseLogs']) {
     await idbReq(db.transaction(store, 'readwrite').objectStore(store).clear());
   }
 
-  // Restore — use put to preserve original IDs and referential integrity
   const putAll = async <T>(storeName: string, records: T[]) => {
     for (const record of records) {
       await idbReq(db.transaction(storeName, 'readwrite').objectStore(storeName).put(record));
@@ -364,6 +287,4 @@ export async function restoreIDB(data: Awaited<ReturnType<typeof dumpIDB>>): Pro
   await putAll('sessions', data.sessions);
   await putAll('setLogs', data.setLogs);
   await putAll('exerciseLogs', data.exerciseLogs);
-  await putAll('exerciseMuscles', data.exerciseMuscles);
-  await putAll('exerciseDetails', data.exerciseDetails);
 }

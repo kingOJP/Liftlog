@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   MUSCLE_GROUPS, WORKOUT_TYPES, EQUIPMENT_OPTIONS, WEIGHT_TYPES,
   type MuscleGroup, type WorkoutType, type Equipment, type WeightType,
-  getExerciseMuscles, saveExerciseMuscles,
-  getExerciseDetails, saveExerciseDetails,
 } from '../db/database';
+import { getExerciseMeta, saveExerciseMeta } from '../data/exercises';
 import './ExerciseMetaView.css';
 
 interface Props {
@@ -15,74 +14,34 @@ interface Props {
 }
 
 export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onSaved }: Props) {
-  const [primaryMuscle, setPrimaryMuscle] = useState<MuscleGroup | ''>('');
-  const [secondary1, setSecondary1] = useState<MuscleGroup | ''>('');
-  const [secondary2, setSecondary2] = useState<MuscleGroup | ''>('');
-  const [secondary3, setSecondary3] = useState<MuscleGroup | ''>('');
-  const [workoutType, setWorkoutType] = useState<WorkoutType | ''>('');
-  const [equipment, setEquipment] = useState<Equipment | ''>('');
-  const [weightType, setWeightType] = useState<WeightType | ''>('');
-  const [loading, setLoading] = useState(true);
+  const initial = getExerciseMeta(exerciseId);
+
+  const [primaryMuscle, setPrimaryMuscle] = useState<MuscleGroup | ''>(initial.primaryMuscle ?? '');
+  const [secondary1, setSecondary1] = useState<MuscleGroup | ''>(initial.secondaryMuscle1 ?? '');
+  const [secondary2, setSecondary2] = useState<MuscleGroup | ''>(initial.secondaryMuscle2 ?? '');
+  const [secondary3, setSecondary3] = useState<MuscleGroup | ''>(initial.secondaryMuscle3 ?? '');
+  const [workoutType, setWorkoutType] = useState<WorkoutType | ''>(initial.workoutType ?? '');
+  const [equipment, setEquipment] = useState<Equipment | ''>(initial.equipment ?? '');
+  const [weightType, setWeightType] = useState<WeightType | ''>(initial.weightType ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      getExerciseMuscles(exerciseId),
-      getExerciseDetails(exerciseId),
-    ]).then(([muscles, details]) => {
-      if (muscles) {
-        setPrimaryMuscle(muscles.primaryMuscle ?? '');
-        setSecondary1(muscles.secondaryMuscle1 ?? '');
-        setSecondary2(muscles.secondaryMuscle2 ?? '');
-        setSecondary3(muscles.secondaryMuscle3 ?? '');
-      }
-      if (details) {
-        setWorkoutType(details.workoutType ?? '');
-        setEquipment(details.equipment ?? '');
-        setWeightType(details.weightType ?? '');
-      }
-      setLoading(false);
-    });
-  }, [exerciseId]);
-
-  async function handleSave() {
+  function handleSave() {
     if (saving) return;
     setSaving(true);
-    await Promise.all([
-      saveExerciseMuscles({
-        exerciseId,
-        primaryMuscle: primaryMuscle || null,
-        secondaryMuscle1: secondary1 || null,
-        secondaryMuscle2: secondary2 || null,
-        secondaryMuscle3: secondary3 || null,
-      }),
-      saveExerciseDetails({
-        exerciseId,
-        workoutType: workoutType || null,
-        equipment: equipment || null,
-        weightType: weightType || null,
-      }),
-    ]);
+    saveExerciseMeta(exerciseId, {
+      primaryMuscle:    primaryMuscle || null,
+      secondaryMuscle1: secondary1   || null,
+      secondaryMuscle2: secondary2   || null,
+      secondaryMuscle3: secondary3   || null,
+      workoutType:      workoutType  || null,
+      equipment:        equipment    || null,
+      weightType:       weightType   || null,
+    });
     setSaving(false);
     setSaved(true);
     onSaved?.();
     setTimeout(() => setSaved(false), 2000);
-  }
-
-  if (loading) {
-    return (
-      <div className="exercise-meta-view">
-        <header className="exercise-meta-header">
-          <button className="back-btn" onClick={onBack} aria-label="Back">&#8592;</button>
-          <div className="exercise-meta-title-group">
-            <span className="exercise-meta-eyebrow">Exercise</span>
-            <span className="exercise-meta-name">{exerciseName}</span>
-          </div>
-        </header>
-        <p className="exercise-meta-loading">Loading…</p>
-      </div>
-    );
   }
 
   return (

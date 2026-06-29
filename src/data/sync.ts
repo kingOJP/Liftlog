@@ -1,5 +1,5 @@
 import { dumpIDB, restoreIDB } from '../db/database';
-import type { Session, SetLog, ExerciseLog, ExerciseMuscles, ExerciseDetails } from '../db/database';
+import type { Session, SetLog, ExerciseLog } from '../db/database';
 import { getStoredProgram, saveStoredProgram, getExerciseLibrary, saveExerciseLibrary } from './programStore';
 import type { WorkoutDay, Exercise } from './program';
 
@@ -9,13 +9,11 @@ export interface SyncUser {
 }
 
 interface SyncPayload {
-  sessions:        Session[];
-  setLogs:         SetLog[];
-  exerciseLogs:    ExerciseLog[];
-  exerciseMuscles: ExerciseMuscles[];
-  exerciseDetails: ExerciseDetails[];
-  program:         WorkoutDay[];
-  exercises:       Exercise[];
+  sessions:     Session[];
+  setLogs:      SetLog[];
+  exerciseLogs: ExerciseLog[];
+  program:      WorkoutDay[];
+  exercises:    Exercise[];
 }
 
 function getCookie(name: string): string | null {
@@ -47,7 +45,7 @@ export async function pushSync(): Promise<void> {
     body:    JSON.stringify(payload),
   });
 
-  if (res.status === 401) return; // not logged in — skip silently
+  if (res.status === 401) return;
   if (!res.ok) throw new Error(`Sync push failed: ${res.status}`);
 }
 
@@ -58,24 +56,20 @@ export async function pullSync(): Promise<boolean> {
   if (!res.ok) throw new Error(`Sync pull failed: ${res.status}`);
 
   const data = await res.json() as {
-    sessions:        Session[];
-    setLogs:         SetLog[];
-    exerciseLogs:    ExerciseLog[];
-    exerciseMuscles: ExerciseMuscles[];
-    exerciseDetails: ExerciseDetails[];
-    program:         WorkoutDay[] | null;
-    exercises:       Exercise[]   | null;
+    sessions:     Session[];
+    setLogs:      SetLog[];
+    exerciseLogs: ExerciseLog[];
+    program:      WorkoutDay[] | null;
+    exercises:    Exercise[]   | null;
   };
 
   const hasData = data.sessions.length > 0 || data.setLogs.length > 0;
   if (!hasData) return false;
 
   await restoreIDB({
-    sessions:        data.sessions,
-    setLogs:         data.setLogs,
-    exerciseLogs:    data.exerciseLogs,
-    exerciseMuscles: data.exerciseMuscles,
-    exerciseDetails: data.exerciseDetails,
+    sessions:     data.sessions,
+    setLogs:      data.setLogs,
+    exerciseLogs: data.exerciseLogs,
   });
 
   if (data.program)   saveStoredProgram(data.program);
