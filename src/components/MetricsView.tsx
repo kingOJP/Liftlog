@@ -68,6 +68,19 @@ export default function MetricsView({ onBack }: Props) {
               </div>
             </div>
 
+            {/* ── Unclassified-exercise notice ── */}
+            {metrics.unclassifiedExercises.length > 0 && (
+              <div className="metric-warning">
+                <span className="metric-warning-title">
+                  ⚠ {metrics.unclassifiedExercises.length} exercise{metrics.unclassifiedExercises.length !== 1 ? 's' : ''} missing a primary muscle
+                </span>
+                <span className="metric-warning-body">
+                  These show under “Other” in the muscle breakdown. Set a primary muscle from the Exercise list to include them:
+                </span>
+                <span className="metric-warning-list">{metrics.unclassifiedExercises.join(', ')}</span>
+              </div>
+            )}
+
             {/* ── Weekly volume ── */}
             <section className="metric-section">
               <h2 className="metric-heading">Weekly Volume</h2>

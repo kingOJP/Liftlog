@@ -42,6 +42,7 @@ export interface Metrics {
   exercises: ExerciseSeries[];     // most-tracked first (for the default selection)
   muscleSets: MuscleSets[];
   muscleWeekLabel: string;
+  unclassifiedExercises: string[]; // logged exercises with no primary muscle (the "Other" bucket)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ export async function computeMetrics(): Promise<Metrics> {
     exercises: [],
     muscleSets: [],
     muscleWeekLabel: '',
+    unclassifiedExercises: [],
   };
   if (completed.length === 0 || setLogs.length === 0) return empty;
 
@@ -192,6 +194,15 @@ export async function computeMetrics(): Promise<Metrics> {
     .map(([muscle, sets]) => ({ muscle, sets }))
     .sort((a, b) => b.sets - a.sets);
 
+  // Logged exercises with no primary muscle — these fall into the "Other" bucket
+  const unclassifiedIds = new Set<string>();
+  for (const log of setLogs) {
+    if (!muscleMap.has(log.exerciseId)) unclassifiedIds.add(log.exerciseId);
+  }
+  const unclassifiedExercises = [...unclassifiedIds]
+    .map(id => getExerciseName(id))
+    .sort((a, b) => a.localeCompare(b));
+
   return {
     hasData: true,
     summary: {
@@ -205,5 +216,6 @@ export async function computeMetrics(): Promise<Metrics> {
     exercises,
     muscleSets,
     muscleWeekLabel: muscleWeek === currentWeek ? 'This week' : shortDate(weekBuckets.get(muscleWeek)!.latestTs),
+    unclassifiedExercises,
   };
 }
