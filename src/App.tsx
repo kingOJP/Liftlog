@@ -30,20 +30,33 @@ function App() {
   const [user]                = useState<SyncUser | null>(() => getLoggedInUser());
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
-  // The exercise-ID migration runs independently of pull so a sync failure can't
-  // skip it; any remapped logs are pushed back up.
+  // Run local ID migration immediately so recommendations work before sync completes.
+  // Sync runs after; if any logs were remapped, the corrected data is pushed back up.
   useEffect(() => {
     if (!user) return;
     (async () => {
-      let didPull = false;
+      // Migrate first — this is fast (pure IDB read+write) and must finish before
+      // WorkoutView reads set logs, otherwise old IDs won't match current exercise IDs.
+      let migrated = 0;
       try {
-        didPull = await pullSync();
-        if (didPull) setProgram(getStoredProgram());
+        migrated = await migrateExerciseIds();
       } catch (err) {
         console.error(err);
       }
+
+      let didPull = false;
       try {
-        const migrated = await migrateExerciseIds();
+        didPull = await pullSync();
+        if (didPull) {
+          setProgram(getStoredProgram());
+          // Pull may have restored old IDs from the server — re-run migration.
+          migrated += await migrateExerciseIds();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      try {
         if (!didPull || migrated > 0) await pushSync();
       } catch (err) {
         console.error(err);
