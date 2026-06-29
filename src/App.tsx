@@ -9,6 +9,7 @@ import HistoryView from './components/HistoryView';
 import DayEditView from './components/DayEditView';
 import ExerciseListView from './components/ExerciseListView';
 import ExerciseMetaView from './components/ExerciseMetaView';
+import MetricsView from './components/MetricsView';
 import LoginView from './components/LoginView';
 import './App.css';
 
@@ -19,7 +20,8 @@ type View =
   | { screen: 'edit-session'; sessionId: number; dayId: number }
   | { screen: 'edit-day'; dayId: number }
   | { screen: 'exercise-list' }
-  | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string };
+  | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
+  | { screen: 'metrics' };
 
 function App() {
   const [view, setView]       = useState<View>({ screen: 'dashboard' });
@@ -129,6 +131,14 @@ function App() {
     );
   }
 
+  if (view.screen === 'metrics') {
+    return (
+      <div className="app">
+        <MetricsView onBack={() => setView({ screen: 'dashboard' })} />
+      </div>
+    );
+  }
+
   if (view.screen === 'exercise-meta') {
     return (
       <div className="app">
@@ -155,6 +165,7 @@ function App() {
           onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
           onViewHistory={() => setView({ screen: 'history' })}
           onViewExercises={() => setView({ screen: 'exercise-list' })}
+          onViewMetrics={() => setView({ screen: 'metrics' })}
         />
       </main>
     </div>
