@@ -1,7 +1,9 @@
 import type { ExerciseMuscles, ExerciseDetails, MuscleGroup } from '../db/database';
 
-// Fill in null values and call seedExerciseData() once to populate IndexedDB.
-// Existing records are never overwritten — safe to run multiple times.
+// Source-of-truth seed data. seedExerciseData() (run on app startup) writes any
+// missing entries into IndexedDB so the exercise editor, metrics, and the
+// missing-muscle flag all read consistent data. Existing records are never
+// overwritten — safe to run multiple times.
 
 export const EXERCISE_MUSCLES_SEED: ExerciseMuscles[] = [
   // Chest
