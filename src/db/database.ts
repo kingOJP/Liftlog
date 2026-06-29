@@ -42,7 +42,7 @@ export const EQUIPMENT_OPTIONS: Equipment[] = [
 ];
 
 export const WEIGHT_TYPES: WeightType[] = [
-  'Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight',
+  'Barbell', 'Dumbbell', 'Machine', 'Bodyweight',
   'EZ Bar', 'Kettlebell', 'Resistance Band',
 ];
 
