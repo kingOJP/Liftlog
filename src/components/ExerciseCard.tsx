@@ -151,9 +151,11 @@ export default function ExerciseCard({
             />
           </div>
         </div>
-        <button className="log-btn" disabled={!weight || !reps} onClick={handleLogSet}>
-          Log Set {nextSetNum}
-        </button>
+        {reps !== '' && (
+          <button className="log-btn" disabled={!weight || !reps} onClick={handleLogSet}>
+            Log Set {nextSetNum}
+          </button>
+        )}
       </div>
 
     </div>
