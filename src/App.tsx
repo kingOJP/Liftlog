@@ -30,14 +30,20 @@ function App() {
   const [user]                = useState<SyncUser | null>(() => getLoggedInUser());
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
-  // Run the exercise-ID migration after pulling so any remapped logs sync back up.
+  // The exercise-ID migration runs independently of pull so a sync failure can't
+  // skip it; any remapped logs are pushed back up.
   useEffect(() => {
     if (!user) return;
     (async () => {
+      let didPull = false;
       try {
-        const didPull = await pullSync();
-        const migrated = await migrateExerciseIds();
+        didPull = await pullSync();
         if (didPull) setProgram(getStoredProgram());
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        const migrated = await migrateExerciseIds();
         if (!didPull || migrated > 0) await pushSync();
       } catch (err) {
         console.error(err);
