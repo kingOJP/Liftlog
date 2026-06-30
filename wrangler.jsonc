@@ -6,6 +6,9 @@
     "directory": "./dist",
     "binding": "ASSETS"
   },
+  "vars": {
+    "GOOGLE_CLIENT_ID": "109541002587-cj4v8kjgkrq83g2n3a0ks8i0un8ovctf.apps.googleusercontent.com"
+  },
   "d1_databases": [
     {
       "binding": "DB",
