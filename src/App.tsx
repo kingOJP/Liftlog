@@ -35,16 +35,20 @@ function App() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      let didPull = false;
       try {
-        didPull = await pullSync();
+        await migrateExerciseIds();
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        const didPull = await pullSync();
         if (didPull) setProgram(getStoredProgram());
       } catch (err) {
         console.error(err);
       }
       try {
-        const migrated = await migrateExerciseIds();
-        if (!didPull || migrated > 0) await pushSync();
+        await migrateExerciseIds();
+        await pushSync();
       } catch (err) {
         console.error(err);
       }
