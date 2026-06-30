@@ -3,6 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
+import { getPendingSessions } from './data/pendingSessions';
 import { migrateExerciseIds } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -65,6 +66,12 @@ function App() {
         if (didPull) setProgram(getStoredProgram());
       } catch {
         // silent — background refresh is best-effort
+      }
+      // If pending sessions were re-applied to IDB by pullSync, push them now
+      try {
+        if (getPendingSessions().length > 0) await pushSync();
+      } catch {
+        // silent
       }
     }
 
