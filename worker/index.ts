@@ -14,8 +14,9 @@ export default {
         return await handleSync(request, env);
       }
     } catch (err) {
-      console.error('Worker error:', err);
-      return Response.json({ error: 'Internal server error' }, { status: 500 });
+      const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+      console.error('Worker error:', message);
+      return Response.json({ error: 'Internal server error', detail: message }, { status: 500 });
     }
 
     return env.ASSETS.fetch(request);

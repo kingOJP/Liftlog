@@ -55,6 +55,29 @@ function App() {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pull fresh data when the tab regains focus or every 60 s while visible
+  useEffect(() => {
+    if (!user) return;
+
+    async function backgroundPull() {
+      try {
+        const didPull = await pullSync();
+        if (didPull) setProgram(getStoredProgram());
+      } catch {
+        // silent — background refresh is best-effort
+      }
+    }
+
+    function onFocus() { backgroundPull(); }
+
+    const interval = setInterval(backgroundPull, 60_000);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user]);
+
   function sync() {
     if (user) pushSync().catch(console.error);
   }
