@@ -79,12 +79,15 @@ export function getExerciseName(id: string): string {
 // First Monday of your current training block — make this user-configurable later
 export const PROGRAM_START = new Date('2026-06-09');
 
-export function getWeekNumber(): number {
-  const now = new Date();
+export function getWeekNumberForDate(date: Date): number {
   const start = new Date(PROGRAM_START);
   start.setHours(0, 0, 0, 0);
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  return Math.max(1, Math.floor((now.getTime() - start.getTime()) / msPerWeek) + 1);
+  return Math.max(1, Math.floor((date.getTime() - start.getTime()) / msPerWeek) + 1);
+}
+
+export function getWeekNumber(): number {
+  return getWeekNumberForDate(new Date());
 }
 
 export function getWeekDateRange(): string {

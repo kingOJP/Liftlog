@@ -150,6 +150,31 @@ export async function addSetLog(
   );
 }
 
+export async function getSession(sessionId: number): Promise<Session | undefined> {
+  const db = await openDB();
+  return idbReq<Session | undefined>(
+    db.transaction('sessions', 'readonly').objectStore('sessions').get(sessionId),
+  );
+}
+
+// Move a completed session to a new date. weekNumber is recomputed by the caller
+// (which owns PROGRAM_START) so weekly metrics bucket the session correctly.
+export async function updateSessionDate(
+  sessionId: number,
+  completedAt: number,
+  weekNumber: number,
+): Promise<void> {
+  const db = await openDB();
+  const session = await idbReq<Session | undefined>(
+    db.transaction('sessions', 'readonly').objectStore('sessions').get(sessionId),
+  );
+  if (!session) return;
+  session.completedAt = completedAt;
+  session.startedAt = Math.min(session.startedAt, completedAt);
+  session.weekNumber = weekNumber;
+  await idbReq(db.transaction('sessions', 'readwrite').objectStore('sessions').put(session));
+}
+
 export async function getCompletedSessionsForWeek(weekNumber: number): Promise<Session[]> {
   const db = await openDB();
   const all = await idbReq<Session[]>(

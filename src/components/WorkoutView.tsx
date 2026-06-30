@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
-import { getWeekNumber } from '../data/program';
+import { getWeekNumber, getWeekNumberForDate } from '../data/program';
 import {
   createSession,
   completeSession,
@@ -8,6 +8,8 @@ import {
   getSetLogsForSession,
   deleteSetLogsForSession,
   getLastCompletedSessionForDay,
+  getSession,
+  updateSessionDate,
 } from '../db/database';
 import { calculateRecommendation } from '../data/recommendations';
 import type { WeightRec } from '../data/recommendations';
@@ -25,6 +27,24 @@ interface Props {
 
 type SetEntry = { weight: number; reps: number };
 
+// Local-time yyyy-mm-dd for an <input type="date"> value
+function toDateInputValue(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Combine a yyyy-mm-dd value with the original session's time-of-day, so re-dating
+// a workout keeps its clock time (and within-day ordering) intact.
+function dateInputToTimestamp(value: string, originalTs: number): number {
+  const [y, m, d] = value.split('-').map(Number);
+  const orig = new Date(originalTs);
+  return new Date(
+    y, m - 1, d,
+    orig.getHours(), orig.getMinutes(), orig.getSeconds(), orig.getMilliseconds(),
+  ).getTime();
+}
+
 export default function WorkoutView({ day, existingSessionId, onBack, onComplete }: Props) {
   const isEditMode = existingSessionId !== undefined;
   const [sets, setSets] = useState<Record<string, SetEntry[]>>({});
@@ -33,6 +53,10 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
   const [loading, setLoading] = useState(isEditMode);
   // Increments on every logged set to (re)start the rest timer. Edit mode skips it.
   const [restRunId, setRestRunId] = useState(0);
+  // Edit mode only: the session's original completedAt + the (editable) date.
+  const [originalCompletedAt, setOriginalCompletedAt] = useState<number | null>(null);
+  const [dateInput, setDateInput] = useState('');
+  const [maxDate] = useState(() => toDateInputValue(Date.now())); // can't re-date into the future
 
   useEffect(() => {
     if (isEditMode) return;
@@ -51,6 +75,11 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
 
   useEffect(() => {
     if (!existingSessionId) return;
+    getSession(existingSessionId).then(session => {
+      const ts = session?.completedAt ?? session?.startedAt ?? Date.now();
+      setOriginalCompletedAt(ts);
+      setDateInput(toDateInputValue(ts));
+    });
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
       for (const sl of setLogs) {
@@ -96,6 +125,13 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
 
     if (isEditMode) {
       await deleteSetLogsForSession(sid);
+      // Persist a re-dated session if the date was changed
+      if (dateInput && originalCompletedAt != null) {
+        const newCompletedAt = dateInputToTimestamp(dateInput, originalCompletedAt);
+        if (newCompletedAt !== originalCompletedAt) {
+          await updateSessionDate(sid, newCompletedAt, getWeekNumberForDate(new Date(newCompletedAt)));
+        }
+      }
     }
 
     for (const [exerciseId, exerciseSets] of Object.entries(sets)) {
@@ -151,6 +187,19 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
         className="exercise-list"
         style={restRunId > 0 ? { paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' } : undefined}
       >
+        {isEditMode && dateInput && (
+          <div className="workout-date-field">
+            <label className="workout-date-label" htmlFor="workout-date">Workout date</label>
+            <input
+              id="workout-date"
+              className="workout-date-input"
+              type="date"
+              value={dateInput}
+              max={maxDate}
+              onChange={e => setDateInput(e.target.value)}
+            />
+          </div>
+        )}
         {day.exercises.map(ex => (
           <ExerciseCard
             key={ex.id}
