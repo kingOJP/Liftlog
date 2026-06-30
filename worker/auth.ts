@@ -1,14 +1,17 @@
 import type { Env, User } from './types';
 
-const REDIRECT_URI = 'https://liftlog.thisisntowen.workers.dev/api/auth/google/callback';
 const COOKIE_SESSION = 'liftlog_session';
 const COOKIE_USER = 'liftlog_user';
 const COOKIE_STATE = 'oauth_state';
 const SESSION_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
+function getRedirectUri(url: URL): string {
+  return `${url.protocol}//${url.host}/api/auth/google/callback`;
+}
+
 export async function handleAuth(request: Request, env: Env, url: URL): Promise<Response> {
   switch (url.pathname) {
-    case '/api/auth/google':          return startOAuth(env);
+    case '/api/auth/google':          return startOAuth(env, url);
     case '/api/auth/google/callback': return handleCallback(request, env, url);
     case '/api/auth/me':              return getMe(request, env);
     case '/api/auth/logout':          return logout(request, env);
@@ -16,11 +19,11 @@ export async function handleAuth(request: Request, env: Env, url: URL): Promise<
   }
 }
 
-function startOAuth(env: Env): Response {
+function startOAuth(env: Env, url: URL): Response {
   const state = crypto.randomUUID();
   const params = new URLSearchParams({
     client_id:     env.GOOGLE_CLIENT_ID,
-    redirect_uri:  REDIRECT_URI,
+    redirect_uri:  getRedirectUri(url),
     response_type: 'code',
     scope:         'openid email profile',
     state,
@@ -54,7 +57,7 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
       code,
       client_id:     env.GOOGLE_CLIENT_ID,
       client_secret: env.GOOGLE_CLIENT_SECRET,
-      redirect_uri:  REDIRECT_URI,
+      redirect_uri:  getRedirectUri(url),
       grant_type:    'authorization_code',
     }),
   });
