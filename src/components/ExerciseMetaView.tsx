@@ -4,6 +4,8 @@ import {
   type MuscleGroup, type WorkoutType, type Equipment, type WeightType,
 } from '../db/database';
 import { getExerciseMeta, saveExerciseMeta } from '../data/exercises';
+import { archiveExercise, deleteExerciseFromLibrary } from '../data/programStore';
+import { hasSetLogsForExercise, deleteSetLogsByExerciseId } from '../db/database';
 import './ExerciseMetaView.css';
 
 interface Props {
@@ -11,9 +13,12 @@ interface Props {
   exerciseName: string;
   onBack: () => void;
   onSaved?: () => void;
+  onDeleted?: () => void;
 }
 
-export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onSaved }: Props) {
+type Modal = 'confirm-delete' | 'confirm-history';
+
+export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onSaved, onDeleted }: Props) {
   const initial = getExerciseMeta(exerciseId);
 
   const [primaryMuscle, setPrimaryMuscle] = useState<MuscleGroup | ''>(initial.primaryMuscle ?? '');
@@ -25,6 +30,8 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
   const [weightType, setWeightType] = useState<WeightType | ''>(initial.weightType ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [modal, setModal] = useState<Modal | null>(null);
+  const [working, setWorking] = useState(false);
 
   function handleSave() {
     if (saving) return;
@@ -42,6 +49,24 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
     setSaved(true);
     onSaved?.();
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleDeletePressed() {
+    const hasHistory = await hasSetLogsForExercise(exerciseId);
+    setModal(hasHistory ? 'confirm-history' : 'confirm-delete');
+  }
+
+  async function handleArchive() {
+    setWorking(true);
+    archiveExercise(exerciseId);
+    onDeleted?.();
+  }
+
+  async function handleDelete() {
+    setWorking(true);
+    await deleteSetLogsByExerciseId(exerciseId);
+    deleteExerciseFromLibrary(exerciseId);
+    onDeleted?.();
   }
 
   return (
@@ -132,6 +157,10 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
             </select>
           </div>
         </section>
+
+        <button className="meta-delete-btn" onClick={handleDeletePressed}>
+          Delete Exercise
+        </button>
       </div>
 
       <div className="exercise-meta-footer">
@@ -143,6 +172,44 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
           {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
         </button>
       </div>
+
+      {/* ── First confirmation (no history) ── */}
+      {modal === 'confirm-delete' && (
+        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
+          <div className="meta-modal" onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title">Delete "{exerciseName}"?</p>
+            <p className="meta-modal-body">This exercise will be permanently removed.</p>
+            <div className="meta-modal-actions">
+              <button className="meta-modal-cancel" onClick={() => setModal(null)}>Cancel</button>
+              <button className="meta-modal-danger" onClick={handleDelete} disabled={working}>
+                {working ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Second confirmation (has history) ── */}
+      {modal === 'confirm-history' && (
+        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
+          <div className="meta-modal" onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title">"{exerciseName}" has workout history</p>
+            <p className="meta-modal-body">
+              <strong>Archive</strong> keeps it in your history but hides it from the exercise list.<br /><br />
+              <strong>Delete</strong> permanently removes it and all associated history.
+            </p>
+            <div className="meta-modal-actions meta-modal-actions--three">
+              <button className="meta-modal-cancel" onClick={() => setModal(null)} disabled={working}>Cancel</button>
+              <button className="meta-modal-archive" onClick={handleArchive} disabled={working}>
+                {working ? '…' : 'Archive'}
+              </button>
+              <button className="meta-modal-danger" onClick={handleDelete} disabled={working}>
+                {working ? '…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

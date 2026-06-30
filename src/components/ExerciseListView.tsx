@@ -9,7 +9,7 @@ interface Props {
 
 export default function ExerciseListView({ onBack, onSelectExercise }: Props) {
   const exercises = useMemo(
-    () => getExerciseLibrary().sort((a, b) => a.name.localeCompare(b.name)),
+    () => getExerciseLibrary().filter(e => !e.archived).sort((a, b) => a.name.localeCompare(b.name)),
     [],
   );
 

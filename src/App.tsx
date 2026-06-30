@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from './data/program';
-import { getStoredProgram, saveStoredProgram } from './data/programStore';
+import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { migrateExerciseIds } from './db/database';
@@ -156,6 +156,11 @@ function App() {
           exerciseName={view.exerciseName}
           onBack={() => setView({ screen: 'exercise-list' })}
           onSaved={sync}
+          onDeleted={() => {
+            setProgram(p => removeExerciseFromProgram(view.exerciseId, p));
+            setView({ screen: 'exercise-list' });
+            sync();
+          }}
         />
       </div>
     );

@@ -255,6 +255,27 @@ export async function deleteExerciseLogsForSession(sessionId: number): Promise<v
   }
 }
 
+export async function hasSetLogsForExercise(exerciseId: string): Promise<boolean> {
+  const db = await openDB();
+  const all = await idbReq<SetLog[]>(
+    db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
+  );
+  return all.some(l => l.exerciseId === exerciseId);
+}
+
+export async function deleteSetLogsByExerciseId(exerciseId: string): Promise<void> {
+  const db = await openDB();
+  const all = await idbReq<SetLog[]>(
+    db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
+  );
+  const toDelete = all.filter(l => l.exerciseId === exerciseId);
+  if (toDelete.length === 0) return;
+  const store = db.transaction('setLogs', 'readwrite').objectStore('setLogs');
+  for (const log of toDelete) {
+    await idbReq(store.delete(log.id!));
+  }
+}
+
 // ── Exercise ID migration ─────────────────────────────────────────────────────
 
 const EXERCISE_ID_MIGRATIONS: Record<string, string> = {

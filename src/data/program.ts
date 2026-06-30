@@ -6,6 +6,7 @@ export interface Exercise {
   sets: number;
   repLow: number;
   repHigh: number;
+  archived?: boolean;
 }
 
 export interface WorkoutDay {

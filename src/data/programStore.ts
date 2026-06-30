@@ -99,3 +99,22 @@ export function generateExerciseId(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return `${slug}-${Date.now()}`;
 }
+
+export function archiveExercise(id: string): void {
+  const lib = getExerciseLibrary();
+  saveExerciseLibrary(lib.map(e => e.id === id ? { ...e, archived: true } : e));
+}
+
+export function deleteExerciseFromLibrary(id: string): void {
+  saveExerciseLibrary(getExerciseLibrary().filter(e => e.id !== id));
+}
+
+// Removes an exercise from all program days and saves. Returns the updated program.
+export function removeExerciseFromProgram(id: string, program: WorkoutDay[]): WorkoutDay[] {
+  const updated = program.map(day => ({
+    ...day,
+    exercises: day.exercises.filter(e => e.id !== id),
+  }));
+  saveStoredProgram(updated);
+  return updated;
+}
