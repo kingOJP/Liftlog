@@ -75,8 +75,8 @@ interface PushPayload {
   sessions:      Array<{ id: number; dayId: number; weekNumber: number; startedAt: number; completedAt?: number }>;
   setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number }>;
   exerciseLogs:  Array<{ id: number; sessionId: number; exerciseId: string; difficulty?: string }>;
-  exerciseMuscles: Array<{ exerciseId: string; primaryMuscle: string | null; secondaryMuscle1: string | null; secondaryMuscle2: string | null; secondaryMuscle3: string | null }>;
-  exerciseDetails: Array<{ exerciseId: string; workoutType: string | null; equipment: string | null; weightType: string | null }>;
+  exerciseMuscles?: Array<{ exerciseId: string; primaryMuscle: string | null; secondaryMuscle1: string | null; secondaryMuscle2: string | null; secondaryMuscle3: string | null }>;
+  exerciseDetails?: Array<{ exerciseId: string; workoutType: string | null; equipment: string | null; weightType: string | null }>;
   program:   unknown;
   exercises: unknown;
 }
@@ -113,11 +113,12 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   }
 
   // Merge exerciseMuscles + exerciseDetails into one row per exerciseId
+  // These fields are optional — newer clients omit them (metadata is device-local)
   const metaMap = new Map<string, Record<string, unknown>>();
-  for (const m of data.exerciseMuscles) {
+  for (const m of (data.exerciseMuscles ?? [])) {
     metaMap.set(m.exerciseId, { ...metaMap.get(m.exerciseId), ...m });
   }
-  for (const d of data.exerciseDetails) {
+  for (const d of (data.exerciseDetails ?? [])) {
     metaMap.set(d.exerciseId, { ...metaMap.get(d.exerciseId), ...d });
   }
   for (const [exId, m] of metaMap) {
