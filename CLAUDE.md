@@ -122,7 +122,11 @@ src/
     programStore.ts            — localStorage CRUD: getStoredProgram, saveStoredProgram,
                                   getExerciseLibrary, saveExerciseLibrary, addToExerciseLibrary,
                                   getExerciseName, generateExerciseId.
-                                  Runs library migration (v2/v3) on first call to getExerciseLibrary.
+                                  Runs library migration (v2/v3) on first call to getExerciseLibrary,
+                                  and canonicalizes legacy -d1/-d2/-d4 program IDs on every read.
+    legacyIds.ts               — LEGACY_ID_MAP + canonicalizeId(): single source of truth for the
+                                  old -d1/-d2/-d4 → canonical exercise-ID remap (used by set-log
+                                  migration in database.ts and program canonicalization here)
     recommendations.ts         — calculateRecommendation(sets, exercise) → WeightRec | null
                                   ({ weight, direction, reason }); per-exercise next-weight + why
     metrics.ts                 — computeMetrics() → Metrics (volume, e1RM series, muscle sets)
@@ -254,4 +258,4 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
 - **`PROGRAM_START`** is hardcoded as `2026-06-09` in `program.ts`. The user wants to make this configurable later.
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
-- **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. `migrateExerciseIds()` in `database.ts` remaps these in set logs. Always run this before any code that reads set logs by exercise ID.
+- **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.

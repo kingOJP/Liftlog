@@ -1,4 +1,5 @@
 import { EXERCISES, EXERCISE_MAP } from './exercises';
+import { LEGACY_ID_MAP, canonicalizeId } from './legacyIds';
 import { PROGRAM, type Exercise, type WorkoutDay } from './program';
 
 const PROGRAM_KEY  = 'liftlog_program';
@@ -7,23 +8,43 @@ const MIGRATION_V2 = 'liftlog_library_v2';
 const MIGRATION_V3 = 'liftlog_library_v3';
 
 // IDs that existed in old builds with -d1/-d2/-d4 suffixes; now unified
-const STALE_IDS = new Set([
-  'cable-lateral-raises-d1',
-  'face-pulls-d2',
-  'face-pulls-d4',
-  'lat-pulldown-d2',
-  'cable-pull-down-d2',
-  'tricep-pushdowns-d4',
-]);
+const STALE_IDS = new Set(Object.keys(LEGACY_ID_MAP));
 
 // ── Program ─────────────────────────────────────────────────────────────────
 
 export function getStoredProgram(): WorkoutDay[] {
+  let stored: WorkoutDay[] | null = null;
   try {
     const raw = localStorage.getItem(PROGRAM_KEY);
-    if (raw) return JSON.parse(raw) as WorkoutDay[];
+    if (raw) stored = JSON.parse(raw) as WorkoutDay[];
   } catch { /* corrupt data — fall through */ }
-  return PROGRAM;
+
+  // A stored program from an old build may still reference legacy -d1/-d2/-d4
+  // exercise IDs. Canonicalize them on read (and persist the fix) so newly
+  // logged workouts share IDs with existing history instead of spawning
+  // duplicate, unclassified exercises.
+  const { program, changed } = canonicalizeProgram(stored ?? PROGRAM);
+  if (changed) saveStoredProgram(program);
+  return program;
+}
+
+// Remaps legacy exercise IDs (and their display names) to canonical ones,
+// dropping any duplicate an exercise would collapse into within the same day.
+function canonicalizeProgram(program: WorkoutDay[]): { program: WorkoutDay[]; changed: boolean } {
+  let changed = false;
+  const next = program.map(day => {
+    const seen = new Set<string>();
+    const exercises: Exercise[] = [];
+    for (const ex of day.exercises) {
+      const id = canonicalizeId(ex.id);
+      if (id !== ex.id) changed = true;
+      if (seen.has(id)) { changed = true; continue; } // remap collided with a sibling — merge
+      seen.add(id);
+      exercises.push(id === ex.id ? ex : { ...ex, id, name: EXERCISE_MAP.get(id)?.name ?? ex.name });
+    }
+    return { ...day, exercises };
+  });
+  return { program: next, changed };
 }
 
 export function saveStoredProgram(program: WorkoutDay[]): void {
