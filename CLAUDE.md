@@ -306,3 +306,58 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
 - **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.
+
+---
+
+## Future Roadmap (V3)
+
+These are the highest-leverage improvements identified in the Rev 2 audit. Implement them in
+roughly this order when ready — each one builds on the previous.
+
+### 1. Delta-based sync
+**The biggest remaining architectural risk.** The current sync is full-replace, last-writer-wins:
+`pushSync()` sends the entire IDB and `pullSync()` wipes local IDB and restores from server.
+On two concurrent devices (phone + desktop) this silently drops whichever device synced last.
+
+Fix: move to per-session upsert with tombstones. Each `session` row gets a `deletedAt` timestamp
+instead of being physically deleted. The worker merges by `startedAt` (the natural dedup key) and
+returns only rows newer than the client's `lastSyncAt`. This also eliminates the `pendingSessions`
+localStorage workaround entirely.
+
+### 2. RPE / RIR logging
+The deload trigger today fires purely on e1RM stagnation across 3 sessions, which can't
+distinguish "I was grinding at RPE 10" from "these were easy reps." One optional `rpe` field per
+set (scale 1–10, blank = untracked) lets the engine confirm fatigue before recommending a deload
+and detect under-effort when reps stay in range but RPE is low.
+
+Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a small tap-to-set
+chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
+No UI change is needed if the field is left blank — fully backwards-compatible.
+
+### 3. In-workout session persistence (draft sessions)
+Sets live only in React state from "Start Workout" until "Finish Workout." An accidental app kill
+or Safari tab eviction silently loses the whole session.
+
+Fix: write a draft session to IDB as sets are logged (not just at finish), keyed to a
+`draftSessionId` in localStorage. On app mount, detect a stale draft and offer to resume or
+discard. At "Finish Workout," promote the draft to a completed session atomically. This is the
+single biggest UX risk for anyone doing long sessions with spotty connectivity.
+
+### 4. Mesocycle awareness
+The current deload is purely reactive (stall → deload). A planned accumulation/deload structure
+would let the engine front-run fatigue: e.g., 3 weeks accumulation → 1 deload week, cycling
+automatically. The configurable program start date (already in Settings) is the foundation —
+extend it to support a `mesocycleLengthWeeks` setting and expose the current mesocycle phase
+(accumulation / peak / deload) to the recommendation engine and Coach card.
+
+### 5. Quality-of-life additions
+These are independent of each other and can land in any order:
+
+- **Unit preference (kg / lb)** — a single `weightUnit` setting in `settings.ts`; all display
+  and input converts via a thin `toDisplay(lbs)` / `fromDisplay(val)` helper. Store always in lbs.
+- **Exercise substitution suggestions** — when the Coach flags a muscle as under-trained, surface
+  1–2 exercises from `EXERCISES` that target it and match the user's available equipment
+  (`taxonomy.ts` already has the data).
+- **Worker-side tests** — the `worker/` directory has no test coverage. Add
+  `vitest-pool-workers` (Cloudflare's Vitest integration) and cover `validatePush()`, the
+  OAuth redirect helper, and the D1 upsert logic.
