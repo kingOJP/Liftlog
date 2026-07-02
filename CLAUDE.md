@@ -24,6 +24,15 @@ Long-term milestones (roughly):
     shared analytics core (`analytics.ts`), Settings screen, "last time" context
     on exercise cards, Vitest test suite, worker payload validation
 
+**Future milestones:**
+- Delta-based sync — the current full-replace, last-writer-wins sync is the biggest remaining architectural risk (two devices logging on the same day can drop a session; pendingSessions only patches one case). A per-session upsert protocol with tombstones is the fix.
+- RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
+- In-workout session persistence — sets live only in React state until "Finish Workout"; an accidental app kill loses the session. Draft-session storage in IDB would fix it.
+- Mesocycle awareness — planned accumulation/deload weeks rather than reactive-only deloads; the configurable start date is the foundation.
+- Unit preference (kg/lb), exercise substitution suggestions from the equipment/workout-type taxonomy (the metadata already exists to power this), and worker-side tests with vitest-pool-workers.
+- Exercise swap suggestions — add a button on exercises in the workout edit screen to suggest a different exercise that hits the same primary muscle group and doesn't repeat any others in the workout.
+- Human model graph — interactive human body that shows a heatmap of the muscle groups worked in a time frame, with buttons/interactions to change the scale/window.
+
 ---
 
 ## Stack
