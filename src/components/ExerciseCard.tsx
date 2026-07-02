@@ -1,15 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Exercise } from '../data/program';
-import type { WeightRec } from '../data/recommendations';
+import type { WeightRec, ExerciseSession } from '../data/recommendations';
 import './ExerciseCard.css';
 
 interface Props {
   exercise: Exercise;
   sets: Array<{ weight: number; reps: number }>;
   recommendation?: WeightRec;
+  lastSession?: ExerciseSession;
   onLogSet: (weight: number, reps: number) => void;
   onEditSet: (index: number, weight: number, reps: number) => void;
   onDeleteSet: (index: number) => void;
+}
+
+// "100×10, 100×9, 95×8" — compressed to "100 lbs × 10, 9, 8" when the weight
+// never changes, which is the common case for straight sets.
+function formatLastSets(sets: ExerciseSession['sets']): string {
+  const uniqueWeights = new Set(sets.map(s => s.weight));
+  if (uniqueWeights.size === 1) {
+    return `${sets[0].weight} lbs × ${sets.map(s => s.reps).join(', ')}`;
+  }
+  return sets.map(s => `${s.weight}×${s.reps}`).join(', ');
+}
+
+function lastSessionLabel(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
@@ -19,7 +38,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 };
 
 export default function ExerciseCard({
-  exercise, sets, recommendation,
+  exercise, sets, recommendation, lastSession,
   onLogSet, onEditSet, onDeleteSet,
 }: Props) {
   const [weight, setWeight] = useState('');
@@ -28,12 +47,17 @@ export default function ExerciseCard({
   const [editWeight, setEditWeight] = useState('');
   const [editReps, setEditReps] = useState('');
 
-  // Pre-populate weight input once the recommendation loads (only if field is still empty)
-  useEffect(() => {
+  // Pre-populate the weight input when a recommendation arrives (async, after
+  // mount) — but only if the field is still untouched. Guarded state
+  // adjustment during render, per the React "adjusting state when a prop
+  // changes" pattern.
+  const [appliedRec, setAppliedRec] = useState<WeightRec | undefined>(undefined);
+  if (recommendation !== appliedRec) {
+    setAppliedRec(recommendation);
     if (recommendation != null && weight === '') {
       setWeight(String(recommendation.weight));
     }
-  }, [recommendation]);
+  }
 
   const targetLabel = `${exercise.sets} × ${exercise.repLow}–${exercise.repHigh}`;
   const nextSetNum = sets.length + 1;
@@ -41,7 +65,8 @@ export default function ExerciseCard({
   function handleLogSet() {
     const w = parseFloat(weight);
     const r = parseInt(reps, 10);
-    if (!isFinite(w) || !isFinite(r) || w <= 0 || r <= 0) return;
+    // Weight of 0 is valid (bodyweight exercises); reps must be positive.
+    if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
     onLogSet(w, r);
     setReps('');
   }
@@ -56,7 +81,7 @@ export default function ExerciseCard({
     if (editingIndex === null) return;
     const w = parseFloat(editWeight);
     const r = parseInt(editReps, 10);
-    if (isFinite(w) && isFinite(r) && w > 0 && r > 0) {
+    if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
       onEditSet(editingIndex, w, r);
     }
     setEditingIndex(null);
@@ -88,6 +113,13 @@ export default function ExerciseCard({
             {DIRECTION_ICON[recommendation.direction]} {recommendation.weight} lbs
           </span>
           <span className="ex-rec-reason">{recommendation.reason}</span>
+        </div>
+      )}
+
+      {lastSession && (
+        <div className="ex-last">
+          <span className="ex-last-label">Last time · {lastSessionLabel(lastSession.completedAt)}</span>
+          <span className="ex-last-sets">{formatLastSets(lastSession.sets)}</span>
         </div>
       )}
 
@@ -160,7 +192,7 @@ export default function ExerciseCard({
               className="num-input"
               type="number"
               inputMode="numeric"
-              placeholder="Reps"
+              placeholder={`${exercise.repLow}–${exercise.repHigh} reps`}
               value={reps}
               onChange={e => setReps(e.target.value)}
               onKeyDown={handleKeyDown}

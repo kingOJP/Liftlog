@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getExerciseName } from '../data/programStore';
-import { getAllCompletedSessions, getSetLogsForSession } from '../db/database';
+import { loadTrainingSnapshot } from '../data/analytics';
 import type { Session, SetLog } from '../db/database';
 import './HistoryView.css';
 
@@ -32,18 +32,16 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
-    async function load() {
-      const sessions = await getAllCompletedSessions();
-      const withSets = await Promise.all(
-        sessions.map(async s => ({
-          session: s,
-          sets: await getSetLogsForSession(s.id!),
-        })),
-      );
-      setEntries(withSets);
+    let cancelled = false;
+    loadTrainingSnapshot().then(snapshot => {
+      if (cancelled) return;
+      setEntries(snapshot.sessions.map(session => ({
+        session,
+        sets: snapshot.setsBySession.get(session.id!) ?? [],
+      })));
       setLoading(false);
-    }
-    load();
+    });
+    return () => { cancelled = true; };
   }, []);
 
   return (
@@ -74,11 +72,19 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
             ...Object.keys(grouped).filter(id => !exerciseOrder.includes(id)),
           ];
 
+          const toggle = () => setExpandedId(isExpanded ? null : (session.id ?? null));
+
           return (
             <div
               key={session.id}
               className={`history-card${isExpanded ? ' expanded' : ''}`}
-              onClick={() => setExpandedId(isExpanded ? null : (session.id ?? null))}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              onClick={toggle}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+              }}
             >
               <div className="history-card-header">
                 <div className="history-card-left">

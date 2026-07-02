@@ -1,14 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { getRestDuration, saveRestDuration, REST_PRESETS } from '../data/settings';
 import './RestTimer.css';
-
-const DURATION_KEY = 'liftlog_rest_seconds';
-const PRESETS = [60, 90, 120, 180];
-const DEFAULT_DURATION = 120;
-
-function getRestDuration(): number {
-  const raw = Number(localStorage.getItem(DURATION_KEY));
-  return PRESETS.includes(raw) ? raw : DEFAULT_DURATION;
-}
 
 // Wall-clock read, kept at module scope so it stays outside React's purity model.
 const clockNow = () => Date.now();
@@ -29,23 +21,27 @@ export default function RestTimer({ runId, onDismiss }: Props) {
   const [duration, setDuration] = useState(getRestDuration);
   const [remaining, setRemaining] = useState(0);
   const [done, setDone] = useState(false);
-  const endRef = useRef<number>(0);
+  // Wall-clock deadline the countdown ticks toward (survives tab throttling)
+  const [endAt, setEndAt] = useState(0);
 
-  // (Re)start whenever runId changes (a new set was logged). The countdown is an
-  // external (wall-clock) system, so driving state from an effect is intentional.
-  useEffect(() => {
-    if (runId === 0) return;
-    endRef.current = clockNow() + duration * 1000;
-    setRemaining(duration);
-    setDone(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId]);
+  // (Re)start whenever runId changes (a new set was logged). Guarded state
+  // adjustment during render — the React pattern for resetting state when a
+  // prop changes.
+  const [lastRunId, setLastRunId] = useState(0);
+  if (runId !== lastRunId) {
+    setLastRunId(runId);
+    if (runId !== 0) {
+      setEndAt(clockNow() + duration * 1000);
+      setRemaining(duration);
+      setDone(false);
+    }
+  }
 
-  // Tick once per second off a wall-clock deadline (survives tab throttling)
+  // Tick against the wall-clock deadline
   useEffect(() => {
-    if (runId === 0 || done) return;
+    if (runId === 0 || done || endAt === 0) return;
     const id = setInterval(() => {
-      const left = Math.round((endRef.current - clockNow()) / 1000);
+      const left = Math.round((endAt - clockNow()) / 1000);
       if (left <= 0) {
         setRemaining(0);
         setDone(true);
@@ -56,21 +52,22 @@ export default function RestTimer({ runId, onDismiss }: Props) {
       }
     }, 250);
     return () => clearInterval(id);
-  }, [runId, done]);
+  }, [runId, done, endAt]);
 
   if (runId === 0) return null;
 
   function adjust(delta: number) {
-    endRef.current = Math.max(clockNow(), endRef.current + delta * 1000);
-    const left = Math.max(0, Math.round((endRef.current - clockNow()) / 1000));
+    const next = Math.max(clockNow(), endAt + delta * 1000);
+    setEndAt(next);
+    const left = Math.max(0, Math.round((next - clockNow()) / 1000));
     setRemaining(left);
     if (left > 0) setDone(false);
   }
 
   function pickPreset(sec: number) {
     setDuration(sec);
-    localStorage.setItem(DURATION_KEY, String(sec));
-    endRef.current = clockNow() + sec * 1000;
+    saveRestDuration(sec);
+    setEndAt(clockNow() + sec * 1000);
     setRemaining(sec);
     setDone(false);
   }
@@ -87,7 +84,7 @@ export default function RestTimer({ runId, onDismiss }: Props) {
         </div>
 
         <div className="rest-presets">
-          {PRESETS.map(p => (
+          {REST_PRESETS.map(p => (
             <button
               key={p}
               className={`rest-preset${duration === p ? ' active' : ''}`}

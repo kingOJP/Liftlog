@@ -22,24 +22,6 @@
   color: var(--text);
 }
 
-/* reuse from WorkoutView */
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 22px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
-  line-height: 1;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.back-btn:active {
-  background: var(--bg-card);
-}
-
 .history-list {
   padding: 16px;
   display: flex;

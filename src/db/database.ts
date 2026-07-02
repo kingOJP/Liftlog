@@ -2,52 +2,6 @@ import { LEGACY_ID_MAP } from '../data/legacyIds';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
-export type MuscleGroup =
-  | 'Chest' | 'Upper Back' | 'Lats' | 'Lower Back'
-  | 'Front Delts' | 'Side Delts' | 'Rear Delts'
-  | 'Triceps' | 'Biceps' | 'Forearms' | 'Traps'
-  | 'Quads' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Abs';
-
-export type WorkoutType =
-  | 'Chest Press' | 'Row' | 'Pull Down' | 'Overhead Press'
-  | 'Curl' | 'Tricep Extension' | 'Lateral Raise' | 'Fly'
-  | 'Squat' | 'Hip Hinge' | 'Leg Press' | 'Leg Curl'
-  | 'Leg Extension' | 'Calf Raise' | 'Hip Thrust' | 'Face Pull'
-  | 'Pull Up' | 'Push Up';
-
-export type Equipment =
-  | 'Bench' | 'Cable Machine' | 'Squat Rack' | 'Leg Press Machine'
-  | 'Smith Machine' | 'Pull Up Bar' | 'None';
-
-export type WeightType =
-  | 'Barbell' | 'Dumbbell' | 'Machine' | 'Bodyweight'
-  | 'EZ Bar' | 'Kettlebell' | 'Resistance Band';
-
-export const MUSCLE_GROUPS: MuscleGroup[] = [
-  'Chest', 'Upper Back', 'Lats', 'Lower Back',
-  'Front Delts', 'Side Delts', 'Rear Delts',
-  'Triceps', 'Biceps', 'Forearms', 'Traps',
-  'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Abs',
-];
-
-export const WORKOUT_TYPES: WorkoutType[] = [
-  'Chest Press', 'Row', 'Pull Down', 'Overhead Press',
-  'Curl', 'Tricep Extension', 'Lateral Raise', 'Fly',
-  'Squat', 'Hip Hinge', 'Leg Press', 'Leg Curl',
-  'Leg Extension', 'Calf Raise', 'Hip Thrust', 'Face Pull',
-  'Pull Up', 'Push Up',
-];
-
-export const EQUIPMENT_OPTIONS: Equipment[] = [
-  'Bench', 'Cable Machine', 'Squat Rack', 'Leg Press Machine',
-  'Smith Machine', 'Pull Up Bar', 'None',
-];
-
-export const WEIGHT_TYPES: WeightType[] = [
-  'Barbell', 'Dumbbell', 'Machine', 'Bodyweight',
-  'EZ Bar', 'Kettlebell', 'Resistance Band',
-];
-
 export interface Session {
   id?: number;
   dayId: number;
@@ -65,6 +19,7 @@ export interface SetLog {
   reps: number;
 }
 
+// Difficulty ratings — feature removed, store kept for compatibility
 export interface ExerciseLog {
   id?: number;
   sessionId: number;
@@ -77,6 +32,17 @@ function idbReq<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+
+// Resolves when a transaction commits. Queue all requests on the transaction
+// synchronously (never await between them — an await lets the transaction
+// auto-commit), then await this once.
+function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
   });
 }
 
@@ -160,7 +126,7 @@ export async function getSession(sessionId: number): Promise<Session | undefined
 }
 
 // Move a completed session to a new date. weekNumber is recomputed by the caller
-// (which owns PROGRAM_START) so weekly metrics bucket the session correctly.
+// (which owns the program start date) so weekly metrics bucket the session correctly.
 export async function updateSessionDate(
   sessionId: number,
   completedAt: number,
@@ -188,26 +154,6 @@ export async function getCompletedSessionsForWeek(weekNumber: number): Promise<S
   return all.filter(s => s.completedAt != null);
 }
 
-export async function getAllCompletedSessions(): Promise<Session[]> {
-  const db = await openDB();
-  const all = await idbReq<Session[]>(
-    db.transaction('sessions', 'readonly').objectStore('sessions').getAll(),
-  );
-  return all
-    .filter(s => s.completedAt != null)
-    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
-}
-
-export async function getLastCompletedSessionForDay(dayId: number): Promise<Session | undefined> {
-  const db = await openDB();
-  const all = await idbReq<Session[]>(
-    db.transaction('sessions', 'readonly').objectStore('sessions').getAll(),
-  );
-  return all
-    .filter(s => s.dayId === dayId && s.completedAt != null)
-    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))[0];
-}
-
 export async function getSetLogsForSession(sessionId: number): Promise<SetLog[]> {
   const db = await openDB();
   return idbReq<SetLog[]>(
@@ -218,19 +164,21 @@ export async function getSetLogsForSession(sessionId: number): Promise<SetLog[]>
   );
 }
 
-export async function deleteSetLogsForSession(sessionId: number): Promise<void> {
+// Delete every set log whose key is returned by the given lookup, in one
+// readwrite transaction (all-or-nothing, single commit).
+async function deleteSetLogs(getKeys: (store: IDBObjectStore) => IDBRequest<IDBValidKey[]>): Promise<void> {
   const db = await openDB();
-  const logs = await idbReq<SetLog[]>(
-    db.transaction('setLogs', 'readonly')
-      .objectStore('setLogs')
-      .index('sessionId')
-      .getAll(sessionId),
-  );
-  if (logs.length === 0) return;
-  const store = db.transaction('setLogs', 'readwrite').objectStore('setLogs');
-  for (const log of logs) {
-    await idbReq(store.delete(log.id!));
-  }
+  const keys = await idbReq(getKeys(db.transaction('setLogs', 'readonly').objectStore('setLogs')));
+  if (keys.length === 0) return;
+
+  const tx = db.transaction('setLogs', 'readwrite');
+  const store = tx.objectStore('setLogs');
+  for (const key of keys) store.delete(key);
+  await txDone(tx);
+}
+
+export async function deleteSetLogsForSession(sessionId: number): Promise<void> {
+  await deleteSetLogs(store => store.index('sessionId').getAllKeys(sessionId));
 }
 
 export async function hasSetLogsForExercise(exerciseId: string): Promise<boolean> {
@@ -246,12 +194,41 @@ export async function deleteSetLogsByExerciseId(exerciseId: string): Promise<voi
   const all = await idbReq<SetLog[]>(
     db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
   );
-  const toDelete = all.filter(l => l.exerciseId === exerciseId);
-  if (toDelete.length === 0) return;
-  const store = db.transaction('setLogs', 'readwrite').objectStore('setLogs');
-  for (const log of toDelete) {
-    await idbReq(store.delete(log.id!));
+  const ids = all.filter(l => l.exerciseId === exerciseId).map(l => l.id!);
+  if (ids.length === 0) return;
+
+  const tx = db.transaction('setLogs', 'readwrite');
+  const store = tx.objectStore('setLogs');
+  for (const id of ids) store.delete(id);
+  await txDone(tx);
+}
+
+// Remove sessions that carry no set logs. Empty sessions are meaningless
+// "ghost" workouts (a residue of old buggy builds / interrupted syncs) that
+// kept reappearing as duplicates. Runs at startup and around every sync so a
+// clean local DB also cleans the server copy on the next push. exerciseLogs
+// for the removed sessions are dropped too (that store is otherwise unused).
+export async function purgeEmptySessions(): Promise<number> {
+  const db = await openDB();
+  const [sessions, setLogs, exerciseLogs] = await Promise.all([
+    idbReq<Session[]>(db.transaction('sessions', 'readonly').objectStore('sessions').getAll()),
+    idbReq<SetLog[]>(db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll()),
+    idbReq<ExerciseLog[]>(db.transaction('exerciseLogs', 'readonly').objectStore('exerciseLogs').getAll()),
+  ]);
+
+  const withSets = new Set(setLogs.map(l => l.sessionId));
+  const emptyIds = new Set(sessions.filter(s => !withSets.has(s.id!)).map(s => s.id!));
+  if (emptyIds.size === 0) return 0;
+
+  const tx = db.transaction(['sessions', 'exerciseLogs'], 'readwrite');
+  const sessionStore = tx.objectStore('sessions');
+  const exerciseLogStore = tx.objectStore('exerciseLogs');
+  for (const id of emptyIds) sessionStore.delete(id);
+  for (const log of exerciseLogs) {
+    if (emptyIds.has(log.sessionId)) exerciseLogStore.delete(log.id!);
   }
+  await txDone(tx);
+  return emptyIds.size;
 }
 
 // ── Exercise ID migration ─────────────────────────────────────────────────────
@@ -264,10 +241,12 @@ export async function migrateExerciseIds(): Promise<number> {
   const toFix = logs.filter(l => LEGACY_ID_MAP[l.exerciseId]);
   if (toFix.length === 0) return 0;
 
-  const store = db.transaction('setLogs', 'readwrite').objectStore('setLogs');
+  const tx = db.transaction('setLogs', 'readwrite');
+  const store = tx.objectStore('setLogs');
   for (const log of toFix) {
-    await idbReq(store.put({ ...log, exerciseId: LEGACY_ID_MAP[log.exerciseId] }));
+    store.put({ ...log, exerciseId: LEGACY_ID_MAP[log.exerciseId] });
   }
+  await txDone(tx);
   return toFix.length;
 }
 
@@ -287,20 +266,22 @@ export async function dumpIDB(): Promise<{
   return { sessions, setLogs, exerciseLogs };
 }
 
+// Replaces all local data in one transaction: either the restore fully applies
+// or the previous state survives (no half-cleared database on interruption).
 export async function restoreIDB(data: Awaited<ReturnType<typeof dumpIDB>>): Promise<void> {
   const db = await openDB();
+  const tx = db.transaction(['sessions', 'setLogs', 'exerciseLogs'], 'readwrite');
 
-  for (const store of ['sessions', 'setLogs', 'exerciseLogs']) {
-    await idbReq(db.transaction(store, 'readwrite').objectStore(store).clear());
+  const stores = {
+    sessions: data.sessions,
+    setLogs: data.setLogs,
+    exerciseLogs: data.exerciseLogs,
+  } as const;
+
+  for (const [name, records] of Object.entries(stores)) {
+    const store = tx.objectStore(name);
+    store.clear();
+    for (const record of records) store.put(record);
   }
-
-  const putAll = async <T>(storeName: string, records: T[]) => {
-    for (const record of records) {
-      await idbReq(db.transaction(storeName, 'readwrite').objectStore(storeName).put(record));
-    }
-  };
-
-  await putAll('sessions', data.sessions);
-  await putAll('setLogs', data.setLogs);
-  await putAll('exerciseLogs', data.exerciseLogs);
+  await txDone(tx);
 }

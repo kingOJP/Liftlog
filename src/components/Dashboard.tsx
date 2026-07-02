@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getWeekNumber, getWeekDateRange } from '../data/program';
-import { getCompletedSessionsForWeek } from '../db/database';
+import { loadTrainingSnapshot } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
 import DayCard from './DayCard';
@@ -14,6 +14,7 @@ interface Props {
   onViewHistory: () => void;
   onViewExercises: () => void;
   onViewMetrics: () => void;
+  onViewSettings: () => void;
 }
 
 function lastTrainedLabel(ts: number | null): string {
@@ -25,21 +26,24 @@ function lastTrainedLabel(ts: number | null): string {
 }
 
 export default function Dashboard({
-  program, onStartWorkout, onEditDay, onViewHistory, onViewExercises, onViewMetrics,
+  program, onStartWorkout, onEditDay, onViewHistory, onViewExercises, onViewMetrics, onViewSettings,
 }: Props) {
   const weekNumber = getWeekNumber();
-  const [completedDayIds, setCompletedDayIds] = useState<number[]>([]);
+  const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
 
+  // One snapshot read powers both the week progress and the coach card
   useEffect(() => {
-    getCompletedSessionsForWeek(weekNumber).then(sessions => {
-      setCompletedDayIds(sessions.map(s => s.dayId));
+    let cancelled = false;
+    loadTrainingSnapshot().then(snapshot => {
+      if (cancelled) return;
+      setCompletedDayIds(new Set(
+        snapshot.sessions.filter(s => s.weekNumber === weekNumber).map(s => s.dayId),
+      ));
+      setCoaching(computeCoaching(program, snapshot));
     });
-  }, [weekNumber]);
-
-  useEffect(() => {
-    computeCoaching(program).then(setCoaching);
-  }, [program]);
+    return () => { cancelled = true; };
+  }, [program, weekNumber]);
 
   const topInsight = coaching?.insights[0];
   const nextDay = coaching?.nextDay;
@@ -48,7 +52,7 @@ export default function Dashboard({
     <div className="dashboard">
       <div className="week-header">
         <span className="week-label">{getWeekDateRange()}</span>
-        <span className="week-progress">{completedDayIds.length} of 4 done</span>
+        <span className="week-progress">{completedDayIds.size} of {program.length} done</span>
       </div>
 
       {nextDay && (
@@ -69,7 +73,7 @@ export default function Dashboard({
           <DayCard
             key={day.id}
             day={day}
-            done={completedDayIds.includes(day.id)}
+            done={completedDayIds.has(day.id)}
             onClick={() => onStartWorkout(day.id)}
             onEdit={() => onEditDay(day.id)}
           />
@@ -88,6 +92,10 @@ export default function Dashboard({
         <button className="dash-nav-btn" onClick={onViewExercises}>
           <span className="dash-nav-icon">📋</span>
           <span>Exercises</span>
+        </button>
+        <button className="dash-nav-btn" onClick={onViewSettings}>
+          <span className="dash-nav-icon">⚙️</span>
+          <span>Settings</span>
         </button>
       </nav>
     </div>

@@ -1,7 +1,7 @@
-import { dumpIDB } from '../db/database';
 import { getWeekNumber } from './program';
-import { getExerciseName, getExerciseLibrary } from './programStore';
-import { EXERCISE_MAP, getExerciseMeta } from './exercises';
+import { getExerciseName } from './programStore';
+import type { TrainingSnapshot } from './analytics';
+import { e1rmSeries, primaryMuscleFor, sessionTimestamp } from './analytics';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,59 +45,14 @@ export interface Metrics {
   unclassifiedExercises: string[]; // logged exercises with no primary muscle (the "Other" bucket)
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Epley one-rep-max estimate — the formula Strong/Hevy and most lifting apps use
-function epley1RM(weight: number, reps: number): number {
-  return Math.round(weight * (1 + reps / 30));
-}
-
 function shortDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
-// Lowercase, strip punctuation, collapse whitespace — for name-based matching
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-// Map of exerciseId → primary muscle, in increasing precedence:
-//   1. name match against master list (catches custom IDs by name)
-//   2. master list ID lookup (canonical built-in exercises)
-//   3. user-saved metadata overrides from localStorage (always wins)
-function buildMuscleMap(): Map<string, string> {
-  const map = new Map<string, string>();
-
-  // Name-based fallback for custom exercises
-  const nameToMuscle = new Map<string, string>();
-  for (const def of EXERCISE_MAP.values()) {
-    if (def.primaryMuscle) nameToMuscle.set(normalizeName(def.name), def.primaryMuscle);
-  }
-  for (const ex of getExerciseLibrary()) {
-    const muscle = nameToMuscle.get(normalizeName(ex.name));
-    if (muscle) map.set(ex.id, muscle);
-  }
-
-  // Master list wins over name match
-  for (const def of EXERCISE_MAP.values()) {
-    if (def.primaryMuscle) map.set(def.id, def.primaryMuscle);
-  }
-
-  // User overrides win over everything
-  for (const ex of getExerciseLibrary()) {
-    const meta = getExerciseMeta(ex.id);
-    if (meta.primaryMuscle) map.set(ex.id, meta.primaryMuscle);
-  }
-
-  return map;
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export async function computeMetrics(): Promise<Metrics> {
-  const { sessions, setLogs } = await dumpIDB();
-
-  const completed = sessions.filter(s => s.completedAt != null);
+export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeekNumber()): Metrics {
+  const { sessions, setsBySession } = snapshot;
 
   const empty: Metrics = {
     hasData: false,
@@ -108,41 +63,19 @@ export async function computeMetrics(): Promise<Metrics> {
     muscleWeekLabel: '',
     unclassifiedExercises: [],
   };
-  if (completed.length === 0 || setLogs.length === 0) return empty;
-
-  // Group set logs by session for fast lookup
-  const setsBySession = new Map<number, typeof setLogs>();
-  for (const log of setLogs) {
-    const arr = setsBySession.get(log.sessionId);
-    if (arr) arr.push(log);
-    else setsBySession.set(log.sessionId, [log]);
-  }
-
-  const muscleMap = buildMuscleMap();
+  if (sessions.length === 0 || setsBySession.size === 0) return empty;
 
   // ── Weekly volume + totals ──
   const weekBuckets = new Map<number, { value: number; latestTs: number }>();
   let totalVolume = 0;
 
-  // ── Per-exercise est. 1RM time series ──
-  // exerciseId → array of { ts, e1rm } (one best-set point per session)
-  const e1rmByExercise = new Map<string, { ts: number; value: number }[]>();
-
-  for (const session of completed) {
+  for (const session of sessions) {
     const logs = setsBySession.get(session.id!) ?? [];
     if (logs.length === 0) continue;
-    const ts = session.completedAt ?? session.startedAt;
+    const ts = sessionTimestamp(session);
 
     let sessionVolume = 0;
-    const bestPerExercise = new Map<string, number>();
-
-    for (const s of logs) {
-      sessionVolume += s.weight * s.reps;
-      const e1rm = epley1RM(s.weight, s.reps);
-      const prev = bestPerExercise.get(s.exerciseId) ?? 0;
-      if (e1rm > prev) bestPerExercise.set(s.exerciseId, e1rm);
-    }
-
+    for (const s of logs) sessionVolume += s.weight * s.reps;
     totalVolume += sessionVolume;
 
     const bucket = weekBuckets.get(session.weekNumber);
@@ -151,12 +84,6 @@ export async function computeMetrics(): Promise<Metrics> {
       if (ts > bucket.latestTs) bucket.latestTs = ts;
     } else {
       weekBuckets.set(session.weekNumber, { value: sessionVolume, latestTs: ts });
-    }
-
-    for (const [exId, e1rm] of bestPerExercise) {
-      const arr = e1rmByExercise.get(exId);
-      if (arr) arr.push({ ts, value: e1rm });
-      else e1rmByExercise.set(exId, [{ ts, value: e1rm }]);
     }
   }
 
@@ -167,21 +94,18 @@ export async function computeMetrics(): Promise<Metrics> {
     .slice(-8);
 
   // Summary — this/last program week
-  const currentWeek = getWeekNumber();
   const thisWeekVolume = Math.round(weekBuckets.get(currentWeek)?.value ?? 0);
   const lastWeekVolume = Math.round(weekBuckets.get(currentWeek - 1)?.value ?? 0);
   const deltaPct = lastWeekVolume > 0
     ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100)
     : null;
 
-  // Exercises — chronological points, most-tracked first
-  const exercises: ExerciseSeries[] = [...e1rmByExercise.entries()]
+  // ── Per-exercise est. 1RM time series — most-tracked first ──
+  const exercises: ExerciseSeries[] = [...e1rmSeries(snapshot).entries()]
     .map(([exerciseId, pts]) => ({
       exerciseId,
       name: getExerciseName(exerciseId),
-      points: pts
-        .sort((a, b) => a.ts - b.ts)
-        .map(p => ({ label: shortDate(p.ts), value: p.value })),
+      points: pts.map(p => ({ label: shortDate(p.ts), value: Math.round(p.value) })),
     }))
     .sort((a, b) => b.points.length - a.points.length || a.name.localeCompare(b.name));
 
@@ -191,11 +115,17 @@ export async function computeMetrics(): Promise<Metrics> {
   const weeksWithData = [...weekBuckets.keys()].sort((a, b) => b - a);
   const muscleWeek = weekBuckets.has(currentWeek) ? currentWeek : (weeksWithData[0] ?? currentWeek);
 
+  const primaryByExercise = new Map<string, string | null>();
+  const primaryFor = (id: string): string | null => {
+    if (!primaryByExercise.has(id)) primaryByExercise.set(id, primaryMuscleFor(id));
+    return primaryByExercise.get(id)!;
+  };
+
   const muscleCounts = new Map<string, number>();
-  for (const session of completed) {
+  for (const session of sessions) {
     if (session.weekNumber !== muscleWeek) continue;
     for (const s of setsBySession.get(session.id!) ?? []) {
-      const muscle = muscleMap.get(s.exerciseId) ?? 'Other';
+      const muscle = primaryFor(s.exerciseId) ?? 'Other';
       muscleCounts.set(muscle, (muscleCounts.get(muscle) ?? 0) + 1);
     }
   }
@@ -205,8 +135,10 @@ export async function computeMetrics(): Promise<Metrics> {
 
   // Logged exercises with no primary muscle — these fall into the "Other" bucket
   const unclassifiedIds = new Set<string>();
-  for (const log of setLogs) {
-    if (!muscleMap.has(log.exerciseId)) unclassifiedIds.add(log.exerciseId);
+  for (const logs of setsBySession.values()) {
+    for (const log of logs) {
+      if (primaryFor(log.exerciseId) === null) unclassifiedIds.add(log.exerciseId);
+    }
   }
   const unclassifiedExercises = [...unclassifiedIds]
     .map(id => getExerciseName(id))
@@ -215,7 +147,7 @@ export async function computeMetrics(): Promise<Metrics> {
   return {
     hasData: true,
     summary: {
-      totalWorkouts: completed.length,
+      totalWorkouts: sessions.length,
       totalVolume: Math.round(totalVolume),
       thisWeekVolume,
       lastWeekVolume,

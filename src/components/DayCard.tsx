@@ -10,7 +10,16 @@ interface Props {
 
 export default function DayCard({ day, done, onClick, onEdit }: Props) {
   return (
-    <div className={`day-card${done ? ' done' : ''}`} onClick={onClick}>
+    <div
+      className={`day-card${done ? ' done' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Start ${day.label}: ${day.muscleGroups}`}
+      onClick={onClick}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
+    >
       <div className="day-card-body">
         <div className="day-number">{day.label}</div>
         <div className="day-muscles">{day.muscleGroups}</div>

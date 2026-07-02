@@ -1,4 +1,5 @@
 import { EXERCISE_MAP } from './exercises';
+import { getProgramStart } from './settings';
 
 export interface Exercise {
   id: string;
@@ -76,11 +77,10 @@ export function getExerciseName(id: string): string {
   return EXERCISE_MAP.get(id)?.name ?? id;
 }
 
-// First Monday of your current training block — make this user-configurable later
-export const PROGRAM_START = new Date('2026-06-09');
-
-export function getWeekNumberForDate(date: Date): number {
-  const start = new Date(PROGRAM_START);
+// Program week numbering is anchored to the user-configurable training-block
+// start date (Settings screen; defaults to the original block's first Monday).
+export function getWeekNumberForDate(date: Date, programStart = getProgramStart()): number {
+  const start = new Date(programStart);
   start.setHours(0, 0, 0, 0);
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   return Math.max(1, Math.floor((date.getTime() - start.getTime()) / msPerWeek) + 1);

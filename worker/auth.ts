@@ -9,6 +9,12 @@ function getRedirectUri(url: URL): string {
   return `${url.protocol}//${url.host}/api/auth/google/callback`;
 }
 
+// Response.redirect() requires an absolute URL in the Workers runtime — a
+// bare path throws, turning an auth failure into a 500.
+function redirectTo(url: URL, path: string): Response {
+  return Response.redirect(new URL(path, url.origin).toString(), 302);
+}
+
 export async function handleAuth(request: Request, env: Env, url: URL): Promise<Response> {
   switch (url.pathname) {
     case '/api/auth/google':          return startOAuth(env, url);
@@ -46,7 +52,7 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
   const cookies = parseCookies(request.headers.get('Cookie') ?? '');
 
   if (!code || !state || cookies[COOKIE_STATE] !== state) {
-    return Response.redirect('/?error=auth_failed', 302);
+    return redirectTo(url, '/?error=auth_failed');
   }
 
   // Exchange code for access token
@@ -64,7 +70,7 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
 
   if (!tokenRes.ok) {
     console.error('Token exchange failed:', await tokenRes.text());
-    return Response.redirect('/?error=auth_failed', 302);
+    return redirectTo(url, '/?error=auth_failed');
   }
 
   const { access_token } = await tokenRes.json() as { access_token: string };
@@ -75,7 +81,7 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
   });
 
   if (!userRes.ok) {
-    return Response.redirect('/?error=auth_failed', 302);
+    return redirectTo(url, '/?error=auth_failed');
   }
 
   const gUser = await userRes.json() as { sub: string; email: string; name: string };

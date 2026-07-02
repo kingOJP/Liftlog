@@ -4,7 +4,7 @@ import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from '
 import { getLoggedInUser, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { getPendingSessions } from './data/pendingSessions';
-import { migrateExerciseIds } from './db/database';
+import { migrateExerciseIds, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import HistoryView from './components/HistoryView';
@@ -12,6 +12,7 @@ import DayEditView from './components/DayEditView';
 import ExerciseListView from './components/ExerciseListView';
 import ExerciseMetaView from './components/ExerciseMetaView';
 import MetricsView from './components/MetricsView';
+import SettingsView from './components/SettingsView';
 import LoginView from './components/LoginView';
 import './App.css';
 
@@ -23,7 +24,8 @@ type View =
   | { screen: 'edit-day'; dayId: number }
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
-  | { screen: 'metrics' };
+  | { screen: 'metrics' }
+  | { screen: 'settings' };
 
 function App() {
   const [view, setView]       = useState<View>({ screen: 'dashboard' });
@@ -38,6 +40,7 @@ function App() {
     (async () => {
       try {
         await migrateExerciseIds();
+        await purgeEmptySessions();
       } catch (err) {
         console.error(err);
       }
@@ -53,6 +56,9 @@ function App() {
       } catch (err) {
         console.error(err);
       }
+      // Force a fresh program reference so history/dashboard reload their
+      // snapshot after the startup cleanup (purge, migration, pull).
+      setProgram(getStoredProgram());
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -107,117 +113,109 @@ function App() {
     );
   }
 
-  if (view.screen === 'workout') {
-    const day = program.find(d => d.id === view.dayId)!;
+  // A stored view can reference a day that no longer exists (e.g. the program
+  // was replaced by a sync) — fall back to the dashboard instead of crashing.
+  const findDay = (dayId: number) => program.find(d => d.id === dayId);
+
+  function renderView(): React.ReactNode {
+    switch (view.screen) {
+      case 'workout': {
+        const day = findDay(view.dayId);
+        if (!day) break;
+        return (
+          <WorkoutView
+            day={day}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onComplete={() => { setView({ screen: 'dashboard' }); sync(); }}
+          />
+        );
+      }
+      case 'edit-session': {
+        const day = findDay(view.dayId);
+        if (!day) break;
+        return (
+          <WorkoutView
+            day={day}
+            existingSessionId={view.sessionId}
+            onBack={() => setView({ screen: 'history' })}
+            onComplete={() => { setView({ screen: 'history' }); sync(); }}
+          />
+        );
+      }
+      case 'edit-day': {
+        const day = findDay(view.dayId);
+        if (!day) break;
+        return (
+          <DayEditView
+            day={day}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onSave={handleUpdateDay}
+          />
+        );
+      }
+      case 'history':
+        return (
+          <HistoryView
+            program={program}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onEditSession={(sessionId, dayId) =>
+              setView({ screen: 'edit-session', sessionId, dayId })
+            }
+          />
+        );
+      case 'exercise-list':
+        return (
+          <ExerciseListView
+            onBack={() => setView({ screen: 'dashboard' })}
+            onSelectExercise={(exerciseId, exerciseName) =>
+              setView({ screen: 'exercise-meta', exerciseId, exerciseName })
+            }
+          />
+        );
+      case 'exercise-meta':
+        return (
+          <ExerciseMetaView
+            exerciseId={view.exerciseId}
+            exerciseName={view.exerciseName}
+            onBack={() => setView({ screen: 'exercise-list' })}
+            onSaved={sync}
+            onDeleted={() => {
+              const exerciseId = view.exerciseId;
+              setProgram(p => removeExerciseFromProgram(exerciseId, p));
+              setView({ screen: 'exercise-list' });
+              sync();
+            }}
+          />
+        );
+      case 'metrics':
+        return <MetricsView program={program} onBack={() => setView({ screen: 'dashboard' })} />;
+      case 'settings':
+        return <SettingsView user={user!} onBack={() => setView({ screen: 'dashboard' })} />;
+      case 'dashboard':
+        break;
+    }
+
     return (
-      <div className="app">
-        <WorkoutView
-          day={day}
-          onBack={() => setView({ screen: 'dashboard' })}
-          onComplete={() => { setView({ screen: 'dashboard' }); sync(); }}
-        />
-      </div>
+      <>
+        <header className="app-header">
+          <h1>LiftLog</h1>
+        </header>
+        <main className="app-main">
+          <Dashboard
+            program={program}
+            onStartWorkout={dayId => setView({ screen: 'workout', dayId })}
+            onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
+            onViewHistory={() => setView({ screen: 'history' })}
+            onViewExercises={() => setView({ screen: 'exercise-list' })}
+            onViewMetrics={() => setView({ screen: 'metrics' })}
+            onViewSettings={() => setView({ screen: 'settings' })}
+          />
+        </main>
+      </>
     );
   }
 
-  if (view.screen === 'history') {
-    return (
-      <div className="app">
-        <HistoryView
-          program={program}
-          onBack={() => setView({ screen: 'dashboard' })}
-          onEditSession={(sessionId, dayId) =>
-            setView({ screen: 'edit-session', sessionId, dayId })
-          }
-        />
-      </div>
-    );
-  }
-
-  if (view.screen === 'edit-session') {
-    const day = program.find(d => d.id === view.dayId)!;
-    return (
-      <div className="app">
-        <WorkoutView
-          day={day}
-          existingSessionId={view.sessionId}
-          onBack={() => setView({ screen: 'history' })}
-          onComplete={() => { setView({ screen: 'history' }); sync(); }}
-        />
-      </div>
-    );
-  }
-
-  if (view.screen === 'edit-day') {
-    const day = program.find(d => d.id === view.dayId)!;
-    return (
-      <div className="app">
-        <DayEditView
-          day={day}
-          onBack={() => setView({ screen: 'dashboard' })}
-          onSave={handleUpdateDay}
-        />
-      </div>
-    );
-  }
-
-  if (view.screen === 'exercise-list') {
-    return (
-      <div className="app">
-        <ExerciseListView
-          onBack={() => setView({ screen: 'dashboard' })}
-          onSelectExercise={(exerciseId, exerciseName) =>
-            setView({ screen: 'exercise-meta', exerciseId, exerciseName })
-          }
-        />
-      </div>
-    );
-  }
-
-  if (view.screen === 'metrics') {
-    return (
-      <div className="app">
-        <MetricsView program={program} onBack={() => setView({ screen: 'dashboard' })} />
-      </div>
-    );
-  }
-
-  if (view.screen === 'exercise-meta') {
-    return (
-      <div className="app">
-        <ExerciseMetaView
-          exerciseId={view.exerciseId}
-          exerciseName={view.exerciseName}
-          onBack={() => setView({ screen: 'exercise-list' })}
-          onSaved={sync}
-          onDeleted={() => {
-            setProgram(p => removeExerciseFromProgram(view.exerciseId, p));
-            setView({ screen: 'exercise-list' });
-            sync();
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="app">
-      <header className="app-header">
-        <h1>LiftLog</h1>
-        <a href="/api/auth/logout" className="logout-btn">{user.name?.split(' ')[0] ?? user.email} ↩</a>
-      </header>
-      <main className="app-main">
-        <Dashboard
-          program={program}
-          onStartWorkout={dayId => setView({ screen: 'workout', dayId })}
-          onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
-          onViewHistory={() => setView({ screen: 'history' })}
-          onViewExercises={() => setView({ screen: 'exercise-list' })}
-          onViewMetrics={() => setView({ screen: 'metrics' })}
-        />
-      </main>
-    </div>
-  );
+  return <div className="app">{renderView()}</div>;
 }
 
 export default App;

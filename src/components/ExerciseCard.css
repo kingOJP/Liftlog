@@ -63,6 +63,26 @@
   color: var(--text-muted);
 }
 
+/* ── "Last time" context line ── */
+.ex-last {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.ex-last-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ex-last-sets {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Logged sets list ── */
 .set-log {
   display: flex;

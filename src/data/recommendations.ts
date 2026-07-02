@@ -1,62 +1,134 @@
 import type { Exercise } from './program';
-import type { SetLog } from '../db/database';
+import { epley1RM } from './analytics';
+
+// Next-weight recommendations built on double progression — the standard
+// evidence-based loading scheme for hypertrophy:
+//   1. Work at a weight inside the target rep range.
+//   2. Add reps session to session until EVERY working set hits the top of
+//      the range.
+//   3. Then add load (which drops reps back to the bottom of the range) and
+//      repeat.
+// On top of that, a stall across several sessions at the same weight triggers
+// a ~10% deload so the lifter can build back up with momentum instead of
+// grinding at a plateau.
+
+export interface LoggedSet {
+  weight: number;
+  reps: number;
+}
+
+export interface ExerciseSession {
+  completedAt: number;
+  sets: LoggedSet[]; // in set order
+}
+
+export type RecKind = 'increase' | 'hold' | 'decrease' | 'deload';
 
 export interface WeightRec {
   weight: number;
   direction: 'up' | 'down' | 'hold';
+  kind: RecKind;
   reason: string;
 }
 
-// Looks at the most recent session for this exercise and scores it on three
-// progressive-overload signals (reps vs range, intra-session weight trend, set
-// count) to suggest the next working weight — and explains why.
-export function calculateRecommendation(sets: SetLog[], exercise: Exercise): WeightRec | null {
-  if (sets.length === 0) return null;
+// How many recent sessions at the same weight without strength improvement
+// count as a stall worth deloading for.
+const STALL_SESSIONS = 3;
+// e1RM must improve by more than this fraction across the stall window to not
+// count as stalled.
+const STALL_TOLERANCE = 0.01;
 
-  const sorted = [...sets].sort((a, b) => a.setNumber - b.setNumber);
-  const avgWeight = sorted.reduce((sum, s) => sum + s.weight, 0) / sorted.length;
-
-  // Signal 1: average reps vs target rep range
-  const avgReps = sorted.reduce((sum, s) => sum + s.reps, 0) / sorted.length;
-  const repSignal = avgReps > exercise.repHigh ? 1 : avgReps < exercise.repLow ? -1 : 0;
-
-  // Signal 2: weight trend across sets (first vs last)
-  let weightSignal = 0;
-  if (sorted.length >= 2) {
-    const diff = sorted[sorted.length - 1].weight - sorted[0].weight;
-    weightSignal = diff > 0 ? 1 : diff < 0 ? -1 : 0;
-  }
-
-  // Signal 3: actual sets completed vs target sets
-  const setsSignal = sets.length > exercise.sets ? 1 : sets.length < exercise.sets ? -1 : 0;
-
-  const score = (repSignal + weightSignal + setsSignal) / 3; // -1 to +1
-  const weight = Math.round((avgWeight * (1 + score * 0.08)) / 5) * 5;
-
-  const roundedLast = Math.round(avgWeight / 5) * 5;
-  const direction: WeightRec['direction'] =
-    weight > roundedLast ? 'up' : weight < roundedLast ? 'down' : 'hold';
-
-  return { weight, direction, reason: reasonFor(direction, repSignal, weightSignal, setsSignal) };
+function roundTo5(x: number): number {
+  return Math.round(x / 5) * 5;
 }
 
-function reasonFor(
-  direction: WeightRec['direction'],
-  repSignal: number,
-  weightSignal: number,
-  setsSignal: number,
-): string {
-  if (direction === 'up') {
-    if (repSignal > 0) return 'Beat your rep range — time to add load';
-    if (weightSignal > 0) return 'Built up weight across sets last time';
-    if (setsSignal > 0) return 'Logged extra sets last time';
-    return 'Progressing — nudge the weight up';
+// Load jump when the rep range is beaten: 5 lbs, scaling to ~2.5% for heavy
+// lifts (e.g. a 400 lb leg press moves in 10 lb jumps, not 5).
+function incrementFor(weight: number): number {
+  return Math.max(5, roundTo5(weight * 0.025));
+}
+
+// The session's working weight: the most-used weight, tie broken heaviest.
+// This keeps warm-up or ramp-up sets from skewing the recommendation.
+function workingWeight(sets: LoggedSet[]): number {
+  const counts = new Map<number, number>();
+  for (const s of sets) counts.set(s.weight, (counts.get(s.weight) ?? 0) + 1);
+  let best = sets[0].weight;
+  let bestCount = 0;
+  for (const [weight, count] of counts) {
+    if (count > bestCount || (count === bestCount && weight > best)) {
+      best = weight;
+      bestCount = count;
+    }
   }
-  if (direction === 'down') {
-    if (repSignal < 0) return 'Fell short of the rep range last time';
-    if (weightSignal < 0) return 'Weight dropped off on later sets';
-    if (setsSignal < 0) return 'Cut sets short last time';
-    return 'Ease back to rebuild reps';
+  return best;
+}
+
+function bestE1rm(sets: LoggedSet[]): number {
+  return sets.reduce((max, s) => Math.max(max, epley1RM(s.weight, s.reps)), 0);
+}
+
+/**
+ * Recommend the next working weight for an exercise.
+ *
+ * @param history  This exercise's recent sessions, newest first (only sessions
+ *                 where it was actually performed). One session is enough;
+ *                 more enables stall detection.
+ */
+export function calculateRecommendation(
+  history: ExerciseSession[],
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+): WeightRec | null {
+  const last = history.find(h => h.sets.length > 0);
+  if (!last) return null;
+
+  const weight = workingWeight(last.sets);
+  const workingSets = last.sets.filter(s => s.weight === weight);
+  const minReps = Math.min(...workingSets.map(s => s.reps));
+  const avgReps = workingSets.reduce((sum, s) => sum + s.reps, 0) / workingSets.length;
+
+  // 1. Rep range beaten across a full set count → add load
+  if (workingSets.length >= exercise.sets && minReps >= exercise.repHigh) {
+    return {
+      weight: weight + incrementFor(weight),
+      direction: 'up',
+      kind: 'increase',
+      reason: `All ${workingSets.length} sets hit ${exercise.repHigh}+ reps — add load`,
+    };
   }
-  return 'Repeat the weight and aim for more reps';
+
+  // 2. Stalled at this weight for several sessions → deload and rebuild
+  const window = history.filter(h => h.sets.length > 0).slice(0, STALL_SESSIONS);
+  if (window.length >= STALL_SESSIONS) {
+    const sameWeight = window.every(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
+    const oldest = window[window.length - 1];
+    const stalled = bestE1rm(last.sets) <= bestE1rm(oldest.sets) * (1 + STALL_TOLERANCE);
+    if (sameWeight && stalled) {
+      const deloaded = Math.max(5, Math.min(roundTo5(weight * 0.9), weight - 5));
+      return {
+        weight: deloaded,
+        direction: 'down',
+        kind: 'deload',
+        reason: `Stalled ${window.length} sessions at ${weight} lbs — deload, then build back up`,
+      };
+    }
+  }
+
+  // 3. Clearly under the rep range → ease the load back
+  if (avgReps < exercise.repLow) {
+    const reduced = Math.max(5, Math.min(roundTo5(weight * 0.95), weight - 5));
+    return {
+      weight: reduced,
+      direction: 'down',
+      kind: 'decrease',
+      reason: `Reps fell under ${exercise.repLow} — ease back and rebuild`,
+    };
+  }
+
+  // 4. In the range → double progression: keep the weight, chase reps
+  const reason =
+    workingSets.length < exercise.sets
+      ? `Complete all ${exercise.sets} sets at this weight, then chase reps`
+      : `In range — work toward ${exercise.sets}×${exercise.repHigh} to earn an increase`;
+  return { weight, direction: 'hold', kind: 'hold', reason };
 }

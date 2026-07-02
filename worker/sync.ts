@@ -81,8 +81,46 @@ interface PushPayload {
   exercises: unknown;
 }
 
+// Sanity limits — a personal training log is nowhere near these; anything
+// beyond them is a bug or abuse, and rejecting beats writing garbage.
+const MAX_SESSIONS = 20_000;
+const MAX_SET_LOGS = 200_000;
+
+function validatePush(data: PushPayload): string | null {
+  if (typeof data !== 'object' || data === null) return 'payload must be an object';
+  if (!Array.isArray(data.sessions) || !Array.isArray(data.setLogs) || !Array.isArray(data.exerciseLogs)) {
+    return 'sessions, setLogs and exerciseLogs must be arrays';
+  }
+  if (data.sessions.length > MAX_SESSIONS) return 'too many sessions';
+  if (data.setLogs.length > MAX_SET_LOGS) return 'too many set logs';
+  if (data.exerciseLogs.length > MAX_SET_LOGS) return 'too many exercise logs';
+
+  for (const s of data.sessions) {
+    if (typeof s.id !== 'number' || typeof s.dayId !== 'number' ||
+        typeof s.weekNumber !== 'number' || typeof s.startedAt !== 'number') {
+      return 'malformed session';
+    }
+  }
+  for (const s of data.setLogs) {
+    if (typeof s.id !== 'number' || typeof s.sessionId !== 'number' ||
+        typeof s.exerciseId !== 'string' || typeof s.setNumber !== 'number' ||
+        typeof s.weight !== 'number' || typeof s.reps !== 'number') {
+      return 'malformed set log';
+    }
+  }
+  return null;
+}
+
 async function push(request: Request, userId: string, env: Env): Promise<Response> {
-  const data = await request.json() as PushPayload;
+  let data: PushPayload;
+  try {
+    data = await request.json() as PushPayload;
+  } catch {
+    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const invalid = validatePush(data);
+  if (invalid) return Response.json({ error: invalid }, { status: 400 });
 
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare('DELETE FROM workout_sessions WHERE user_id = ?').bind(userId),

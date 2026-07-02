@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   MUSCLE_GROUPS, WORKOUT_TYPES, EQUIPMENT_OPTIONS, WEIGHT_TYPES,
   type MuscleGroup, type WorkoutType, type Equipment, type WeightType,
-} from '../db/database';
+} from '../data/taxonomy';
 import { getExerciseMeta, saveExerciseMeta } from '../data/exercises';
 import { archiveExercise, deleteExerciseFromLibrary } from '../data/programStore';
 import { hasSetLogsForExercise, deleteSetLogsByExerciseId } from '../db/database';

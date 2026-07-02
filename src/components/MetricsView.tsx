@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
+import { loadTrainingSnapshot } from '../data/analytics';
 import { computeMetrics } from '../data/metrics';
 import type { Metrics } from '../data/metrics';
 import { computeCoaching, SETS_TARGET_LOW, SETS_TARGET_HIGH } from '../data/insights';
@@ -22,11 +23,15 @@ export default function MetricsView({ program, onBack }: Props) {
   const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   useEffect(() => {
-    computeMetrics().then(m => {
+    let cancelled = false;
+    loadTrainingSnapshot().then(snapshot => {
+      if (cancelled) return;
+      const m = computeMetrics(snapshot);
       setMetrics(m);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
+      setCoaching(computeCoaching(program, snapshot));
     });
-    computeCoaching(program).then(setCoaching);
+    return () => { cancelled = true; };
   }, [program]);
 
   const selected = metrics?.exercises.find(e => e.exerciseId === selectedExercise);

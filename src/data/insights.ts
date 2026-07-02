@@ -1,18 +1,18 @@
-import { dumpIDB } from '../db/database';
-import type { MuscleGroup } from '../db/database';
+import type { MuscleGroup } from './taxonomy';
 import { getWeekNumber } from './program';
 import type { WorkoutDay } from './program';
-import { getExerciseLibrary, getExerciseName } from './programStore';
-import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
+import { getExerciseName } from './programStore';
+import type { TrainingSnapshot } from './analytics';
+import { e1rmSeries, musclesForExercise } from './analytics';
 
 // ── Tunables (hypertrophy research) ────────────────────────────────────────────
 // ~10–20 hard sets per muscle per week is the commonly cited effective range.
-// Secondary muscles count as a fraction of a direct ("hard") set.
 export const SETS_TARGET_LOW = 10;
 export const SETS_TARGET_HIGH = 20;
-const SECONDARY_SET_WEIGHT = 0.5;
 const TREND_WINDOW = 3;        // sessions compared for a strength trend
 const TREND_THRESHOLD = 3;     // % change that counts as up / down (else flat)
+const RECENT_SESSIONS = 2;     // don't nag about a muscle trained this recently
+const MAX_MUSCLE_RECS = 4;     // cap on "under-trained muscle" nudges
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -60,45 +60,6 @@ export interface Coaching {
   insights: Insight[];
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function epley1RM(weight: number, reps: number): number {
-  return weight * (1 + reps / 30);
-}
-
-// Build a name → master-def lookup so custom exercise IDs can still resolve
-// their muscle involvement by name.
-const nameToDef = new Map(EXERCISES.map(d => [normalizeName(d.name), d]));
-
-// Every muscle an exercise trains, with its fractional set weighting.
-// Precedence: user override (getExerciseMeta) → master list → name match.
-function musclesForExercise(id: string): { muscle: MuscleGroup; weight: number }[] {
-  const meta = getExerciseMeta(id);
-  let primary = meta.primaryMuscle;
-  let secondaries: (MuscleGroup | null)[] = [
-    meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3,
-  ];
-
-  // Custom IDs with no override fall back to a name match against the master list
-  if (!primary && !EXERCISE_MAP.has(id)) {
-    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
-    if (def) {
-      primary = def.primaryMuscle;
-      secondaries = [...def.secondaryMuscles];
-    }
-  }
-
-  const out: { muscle: MuscleGroup; weight: number }[] = [];
-  if (primary) out.push({ muscle: primary, weight: 1 });
-  for (const s of secondaries) if (s) out.push({ muscle: s, weight: SECONDARY_SET_WEIGHT });
-  return out;
-}
-
 function volumeStatus(sets: number): VolumeStatus {
   if (sets < SETS_TARGET_LOW) return 'low';
   if (sets > SETS_TARGET_HIGH) return 'high';
@@ -107,37 +68,31 @@ function volumeStatus(sets: number): VolumeStatus {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export async function computeCoaching(program: WorkoutDay[]): Promise<Coaching> {
-  const { sessions, setLogs } = await dumpIDB();
-  const completed = sessions.filter(s => s.completedAt != null);
+export function computeCoaching(
+  program: WorkoutDay[],
+  snapshot: TrainingSnapshot,
+  currentWeek = getWeekNumber(),
+): Coaching {
+  const { sessions, setsBySession } = snapshot;
 
   const empty: Coaching = {
     hasData: false,
     weekLabel: '',
-    nextDay: nextDayFromProgram(program, completed),
+    nextDay: nextDayFromProgram(program, sessions),
     muscleVolume: [],
     trends: [],
     insights: [],
   };
-  if (completed.length === 0 || setLogs.length === 0) return empty;
-
-  // Group sets by session
-  const setsBySession = new Map<number, typeof setLogs>();
-  for (const log of setLogs) {
-    const arr = setsBySession.get(log.sessionId);
-    if (arr) arr.push(log);
-    else setsBySession.set(log.sessionId, [log]);
-  }
+  if (sessions.length === 0 || setsBySession.size === 0) return empty;
 
   // Which week are we coaching? Current program week, else the latest with data.
-  const weeksWithData = [...new Set(completed.map(s => s.weekNumber))].sort((a, b) => b - a);
-  const currentWeek = getWeekNumber();
+  const weeksWithData = [...new Set(sessions.map(s => s.weekNumber))].sort((a, b) => b - a);
   const coachWeek = weeksWithData.includes(currentWeek) ? currentWeek : (weeksWithData[0] ?? currentWeek);
   const weekLabel = coachWeek === currentWeek ? 'This week' : `Week ${coachWeek}`;
 
   // ── Fractional set volume per muscle for the coaching week ──
   const volumeMap = new Map<MuscleGroup, number>();
-  for (const session of completed) {
+  for (const session of sessions) {
     if (session.weekNumber !== coachWeek) continue;
     for (const s of setsBySession.get(session.id!) ?? []) {
       for (const { muscle, weight } of musclesForExercise(s.exerciseId)) {
@@ -163,30 +118,10 @@ export async function computeCoaching(program: WorkoutDay[]): Promise<Coaching> 
     .sort((a, b) => b.sets - a.sets);
 
   // ── Per-exercise strength trend (best Epley e1RM per session) ──
-  const e1rmByExercise = new Map<string, { ts: number; value: number }[]>();
-  for (const session of completed) {
-    const logs = setsBySession.get(session.id!) ?? [];
-    if (logs.length === 0) continue;
-    const ts = session.completedAt ?? session.startedAt;
-    const bestPerExercise = new Map<string, number>();
-    for (const s of logs) {
-      const e1rm = epley1RM(s.weight, s.reps);
-      const prev = bestPerExercise.get(s.exerciseId) ?? 0;
-      if (e1rm > prev) bestPerExercise.set(s.exerciseId, e1rm);
-    }
-    for (const [exId, value] of bestPerExercise) {
-      const arr = e1rmByExercise.get(exId);
-      if (arr) arr.push({ ts, value });
-      else e1rmByExercise.set(exId, [{ ts, value }]);
-    }
-  }
-
-  const programExerciseIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
-
   const trends: ExerciseTrend[] = [];
-  for (const [exerciseId, pts] of e1rmByExercise) {
+  for (const [exerciseId, pts] of e1rmSeries(snapshot)) {
     if (pts.length < TREND_WINDOW) continue;
-    const window = [...pts].sort((a, b) => a.ts - b.ts).slice(-TREND_WINDOW);
+    const window = pts.slice(-TREND_WINDOW);
     const first = window[0].value;
     const last = window[window.length - 1].value;
     const changePct = first > 0 ? ((last - first) / first) * 100 : 0;
@@ -196,14 +131,28 @@ export async function computeCoaching(program: WorkoutDay[]): Promise<Coaching> 
   }
   trends.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
 
+  // Muscles trained in the last couple of sessions — we won't nag to add more
+  // volume for something that was just hit; the lifter is already on it.
+  const recentlyWorked = new Set<MuscleGroup>();
+  for (const session of sessions.slice(0, RECENT_SESSIONS)) {
+    for (const s of setsBySession.get(session.id!) ?? []) {
+      for (const { muscle } of musclesForExercise(s.exerciseId)) recentlyWorked.add(muscle);
+    }
+  }
+
   // ── Build the prioritized recommendation list ──
   const insights: Insight[] = [];
 
+  // Under-trained-muscle nudges: only for program muscles not worked in the
+  // last RECENT_SESSIONS sessions, most under-trained first, capped so the
+  // Coach stays focused instead of listing every muscle.
+  const lowMuscleInsights: Insight[] = [];
   for (const mv of muscleVolume) {
     if (!mv.inProgram) continue;
     if (mv.status === 'low') {
+      if (recentlyWorked.has(mv.muscle)) continue;
       const gap = SETS_TARGET_LOW - mv.sets;
-      insights.push({
+      lowMuscleInsights.push({
         kind: 'volume-low',
         priority: 100 + gap,
         title: `${mv.muscle} is under-trained`,
@@ -218,6 +167,10 @@ export async function computeCoaching(program: WorkoutDay[]): Promise<Coaching> 
       });
     }
   }
+  lowMuscleInsights.sort((a, b) => b.priority - a.priority);
+  insights.push(...lowMuscleInsights.slice(0, MAX_MUSCLE_RECS));
+
+  const programExerciseIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
 
   for (const t of trends) {
     if (!programExerciseIds.has(t.exerciseId)) continue;
@@ -253,7 +206,7 @@ export async function computeCoaching(program: WorkoutDay[]): Promise<Coaching> 
   return {
     hasData: true,
     weekLabel,
-    nextDay: nextDayFromProgram(program, completed),
+    nextDay: nextDayFromProgram(program, sessions),
     muscleVolume,
     trends,
     insights: insights.slice(0, 6),
