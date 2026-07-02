@@ -11,6 +11,8 @@ export const SETS_TARGET_LOW = 10;
 export const SETS_TARGET_HIGH = 20;
 const TREND_WINDOW = 3;        // sessions compared for a strength trend
 const TREND_THRESHOLD = 3;     // % change that counts as up / down (else flat)
+const RECENT_SESSIONS = 2;     // don't nag about a muscle trained this recently
+const MAX_MUSCLE_RECS = 4;     // cap on "under-trained muscle" nudges
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -129,14 +131,28 @@ export function computeCoaching(
   }
   trends.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
 
+  // Muscles trained in the last couple of sessions — we won't nag to add more
+  // volume for something that was just hit; the lifter is already on it.
+  const recentlyWorked = new Set<MuscleGroup>();
+  for (const session of sessions.slice(0, RECENT_SESSIONS)) {
+    for (const s of setsBySession.get(session.id!) ?? []) {
+      for (const { muscle } of musclesForExercise(s.exerciseId)) recentlyWorked.add(muscle);
+    }
+  }
+
   // ── Build the prioritized recommendation list ──
   const insights: Insight[] = [];
 
+  // Under-trained-muscle nudges: only for program muscles not worked in the
+  // last RECENT_SESSIONS sessions, most under-trained first, capped so the
+  // Coach stays focused instead of listing every muscle.
+  const lowMuscleInsights: Insight[] = [];
   for (const mv of muscleVolume) {
     if (!mv.inProgram) continue;
     if (mv.status === 'low') {
+      if (recentlyWorked.has(mv.muscle)) continue;
       const gap = SETS_TARGET_LOW - mv.sets;
-      insights.push({
+      lowMuscleInsights.push({
         kind: 'volume-low',
         priority: 100 + gap,
         title: `${mv.muscle} is under-trained`,
@@ -151,6 +167,8 @@ export function computeCoaching(
       });
     }
   }
+  lowMuscleInsights.sort((a, b) => b.priority - a.priority);
+  insights.push(...lowMuscleInsights.slice(0, MAX_MUSCLE_RECS));
 
   const programExerciseIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
 

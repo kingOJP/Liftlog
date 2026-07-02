@@ -207,7 +207,7 @@ src/
 
 v2 added `exerciseMuscles` + `exerciseDetails` stores; v3 deleted them (metadata moved to localStorage).
 
-Key exported functions: `createSession`, `completeSession`, `addSetLog`, `getSession`, `updateSessionDate`, `getCompletedSessionsForWeek`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `dumpIDB`, `restoreIDB`.
+Key exported functions: `createSession`, `completeSession`, `addSetLog`, `getSession`, `updateSessionDate`, `getCompletedSessionsForWeek`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `restoreIDB`.
 
 Anything that *analyzes* history (dashboard, metrics, coaching, recommendations, history list) goes through `loadTrainingSnapshot()` in `data/analytics.ts` — one `dumpIDB()` read per screen, never per-session queries.
 
@@ -221,8 +221,11 @@ On app mount, `App.tsx` runs this sequence (only when logged in):
 3. `migrateExerciseIds()` again — in case pull restored old IDs from the server
 4. `pushSync()` — if pull found nothing or any IDs were remapped
 
-Sync payload includes: sessions, setLogs, exerciseLogs, program, exercise library.
-Exercise metadata (`liftlog_exercise_meta`) is **not** synced — it's device-local.
+Sync payload includes: sessions, setLogs, exerciseLogs, program, exercise library, **and
+exercise metadata** (muscle/equipment/weight-type overrides). On pull, metadata is *merged*
+into local (server wins per exercise; unsynced local edits survive) so the info you enter for
+new exercises persists across devices and re-pulls. `pushSync()`/`pullSync()` also run
+`purgeEmptySessions()` so ghost/empty workouts can't resurrect through sync.
 
 ---
 
@@ -261,7 +264,9 @@ covered by `recommendations.test.ts`.
 - **Strength trends** — best Epley e1RM per session per exercise; over the last 3 sessions a
   >±3% change is `up`/`down`, otherwise `flat` (a plateau).
 - **Prioritized insights** — under-trained muscles, plateaus/declines, and a couple of "climbing"
-  positives, capped at 6 and sorted by priority.
+  positives, capped at 6 and sorted by priority. Under-trained-muscle nudges are limited to
+  muscles *not* worked in the last 2 sessions and capped at 4, so the Coach stays focused
+  instead of listing every muscle below target.
 - **Next workout** — the program day longest since last trained.
 
 Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full Coach section).
@@ -292,8 +297,12 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
 - **Program start date** is user-configurable in Settings (`settings.ts`, default `2026-06-09`).
   Changing it only affects the week numbering of *new* sessions — historical sessions keep the
   `weekNumber` they were stored with.
-- **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced,
-  same as exercise metadata.
+- **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced.
+  (Exercise metadata *is* synced as of the metadata-sync change — see Cloud sync.)
+- **Empty workouts are purged** — a session with no set logs is a ghost/duplicate and is
+  deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
+  legacy duplicate-workout problem for good.
+- **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
 - **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.

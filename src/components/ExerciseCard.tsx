@@ -65,7 +65,8 @@ export default function ExerciseCard({
   function handleLogSet() {
     const w = parseFloat(weight);
     const r = parseInt(reps, 10);
-    if (!isFinite(w) || !isFinite(r) || w <= 0 || r <= 0) return;
+    // Weight of 0 is valid (bodyweight exercises); reps must be positive.
+    if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
     onLogSet(w, r);
     setReps('');
   }
@@ -80,7 +81,7 @@ export default function ExerciseCard({
     if (editingIndex === null) return;
     const w = parseFloat(editWeight);
     const r = parseInt(editReps, 10);
-    if (isFinite(w) && isFinite(r) && w > 0 && r > 0) {
+    if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
       onEditSet(editingIndex, w, r);
     }
     setEditingIndex(null);

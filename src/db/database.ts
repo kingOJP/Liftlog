@@ -203,6 +203,34 @@ export async function deleteSetLogsByExerciseId(exerciseId: string): Promise<voi
   await txDone(tx);
 }
 
+// Remove sessions that carry no set logs. Empty sessions are meaningless
+// "ghost" workouts (a residue of old buggy builds / interrupted syncs) that
+// kept reappearing as duplicates. Runs at startup and around every sync so a
+// clean local DB also cleans the server copy on the next push. exerciseLogs
+// for the removed sessions are dropped too (that store is otherwise unused).
+export async function purgeEmptySessions(): Promise<number> {
+  const db = await openDB();
+  const [sessions, setLogs, exerciseLogs] = await Promise.all([
+    idbReq<Session[]>(db.transaction('sessions', 'readonly').objectStore('sessions').getAll()),
+    idbReq<SetLog[]>(db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll()),
+    idbReq<ExerciseLog[]>(db.transaction('exerciseLogs', 'readonly').objectStore('exerciseLogs').getAll()),
+  ]);
+
+  const withSets = new Set(setLogs.map(l => l.sessionId));
+  const emptyIds = new Set(sessions.filter(s => !withSets.has(s.id!)).map(s => s.id!));
+  if (emptyIds.size === 0) return 0;
+
+  const tx = db.transaction(['sessions', 'exerciseLogs'], 'readwrite');
+  const sessionStore = tx.objectStore('sessions');
+  const exerciseLogStore = tx.objectStore('exerciseLogs');
+  for (const id of emptyIds) sessionStore.delete(id);
+  for (const log of exerciseLogs) {
+    if (emptyIds.has(log.sessionId)) exerciseLogStore.delete(log.id!);
+  }
+  await txDone(tx);
+  return emptyIds.size;
+}
+
 // ── Exercise ID migration ─────────────────────────────────────────────────────
 
 export async function migrateExerciseIds(): Promise<number> {

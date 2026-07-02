@@ -4,7 +4,7 @@ import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from '
 import { getLoggedInUser, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { getPendingSessions } from './data/pendingSessions';
-import { migrateExerciseIds } from './db/database';
+import { migrateExerciseIds, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import HistoryView from './components/HistoryView';
@@ -40,6 +40,7 @@ function App() {
     (async () => {
       try {
         await migrateExerciseIds();
+        await purgeEmptySessions();
       } catch (err) {
         console.error(err);
       }
@@ -55,6 +56,9 @@ function App() {
       } catch (err) {
         console.error(err);
       }
+      // Force a fresh program reference so history/dashboard reload their
+      // snapshot after the startup cleanup (purge, migration, pull).
+      setProgram(getStoredProgram());
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -195,7 +199,6 @@ function App() {
       <>
         <header className="app-header">
           <h1>LiftLog</h1>
-          <a href="/api/auth/logout" className="logout-btn">{user!.name?.split(' ')[0] ?? user!.email} ↩</a>
         </header>
         <main className="app-main">
           <Dashboard

@@ -113,3 +113,17 @@ export function saveExerciseMeta(id: string, meta: ExerciseMetaOverride): void {
   overrides[id] = meta;
   localStorage.setItem(META_KEY, JSON.stringify(overrides));
 }
+
+// All user-edited metadata overrides — used by cloud sync so muscle/equipment
+// info the user enters survives on other devices and after a re-pull.
+export function getAllExerciseMeta(): Record<string, ExerciseMetaOverride> {
+  return loadMetaOverrides();
+}
+
+// Merge server-provided overrides into the local set (server wins per exercise;
+// local-only edits not yet pushed are preserved so a pull can't drop them).
+export function mergeExerciseMeta(incoming: Record<string, ExerciseMetaOverride>): void {
+  if (Object.keys(incoming).length === 0) return;
+  const merged = { ...loadMetaOverrides(), ...incoming };
+  localStorage.setItem(META_KEY, JSON.stringify(merged));
+}
