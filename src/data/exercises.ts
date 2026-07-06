@@ -53,8 +53,8 @@ export const EXERCISES: ExerciseDef[] = [
   { id: 'reverse-curls',            name: 'Reverse Curls',                    primaryMuscle: 'Forearms',    secondaryMuscles: ['Biceps', null, null],           workoutType: 'Curl',             equipment: 'None',              weightType: 'EZ Bar'     },
 
   // Quads
-  { id: 'leg-press',                name: 'Leg Press',                        primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Leg Press',        equipment: 'Leg Press Machine', weightType: 'Machine'    },
-  { id: 'leg-extension',            name: 'Leg Extension',                    primaryMuscle: 'Quads',       secondaryMuscles: [null, null, null],               workoutType: 'Leg Extension',    equipment: 'Leg Press Machine', weightType: 'Machine'    },
+  { id: 'leg-press',                name: 'Leg Press',                        primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Leg Press',        equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'leg-extension',            name: 'Leg Extension',                    primaryMuscle: 'Quads',       secondaryMuscles: [null, null, null],               workoutType: 'Leg Extension',    equipment: 'Machine',           weightType: 'Machine'    },
 
   // Hamstrings
   { id: 'romanian-deadlifts',       name: 'Romanian Deadlifts',               primaryMuscle: 'Hamstrings',  secondaryMuscles: ['Glutes', 'Lower Back', null],   workoutType: 'Hip Hinge',        equipment: 'None',              weightType: 'Barbell'    },
@@ -86,7 +86,13 @@ export interface ExerciseMetaOverride {
 function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
   try {
     const raw = localStorage.getItem(META_KEY);
-    return raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    const overrides = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    // 'Leg Press Machine' was folded into the 'Machine' catch-all; stored
+    // overrides (local edits or a server pull) may still carry the old value.
+    for (const o of Object.values(overrides)) {
+      if ((o.equipment as string) === 'Leg Press Machine') o.equipment = 'Machine';
+    }
+    return overrides;
   } catch {
     return {};
   }

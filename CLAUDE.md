@@ -248,7 +248,16 @@ implements **double progression** with stall detection, evaluated in order:
 The **working weight** of a session is the most-used weight (tie → heaviest), so logged
 warm-up/ramp-up sets don't skew the recommendation.
 
-Returns `{ weight, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
+**Bodyweight exercises progress by reps, not load.** When the exercise's `weightType` is
+`Bodyweight` *and* the last session's working weight was 0 lbs, the engine switches to rep
+progression (`repProgression()` in the same file): the recommendation carries a `targetReps`
+per-set goal, total session reps replace e1RM as the stall metric, and the four branches mirror
+the weight engine (beat the range → +1 rep goal; stalled 3 sessions → reset to `repLow`; under
+range → build back to `repLow`; in range → chase one more rep). If external load *was* logged
+(e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
+"↑ N reps" instead of a weight when `targetReps` is set.
+
+Returns `{ weight, targetReps?, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
 ExerciseCard pre-fills the weight input (only while untouched) and shows the reason as a
 colour-coded chip, plus a "Last time" line with the previous session's sets. The engine is fully
 covered by `recommendations.test.ts`.
@@ -303,6 +312,10 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
+- **Equipment `'Machine'` is the catch-all** for any exercise machine — the old
+  `'Leg Press Machine'` value was removed from the taxonomy. `loadMetaOverrides()` in
+  `exercises.ts` normalizes the legacy value on every read so old localStorage/server
+  overrides keep resolving in the equipment dropdown.
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
 - **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.

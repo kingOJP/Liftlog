@@ -13,6 +13,7 @@ import {
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { calculateRecommendation } from '../data/recommendations';
 import type { WeightRec, ExerciseSession } from '../data/recommendations';
+import { getExerciseMeta } from '../data/exercises';
 import { savePendingSession } from '../data/pendingSessions';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
@@ -84,7 +85,7 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
         }
         if (history.length === 0) continue;
         lasts[ex.id] = history[0];
-        const rec = calculateRecommendation(history, ex);
+        const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType);
         if (rec != null) recs[ex.id] = rec;
       }
       setRecommendations(recs);

@@ -16,7 +16,7 @@ export type WorkoutType =
   | 'Pull Up' | 'Push Up';
 
 export type Equipment =
-  | 'Bench' | 'Cable Machine' | 'Squat Rack' | 'Leg Press Machine'
+  | 'Bench' | 'Cable Machine' | 'Squat Rack' | 'Machine'
   | 'Smith Machine' | 'Pull Up Bar' | 'None';
 
 export type WeightType =
@@ -39,7 +39,7 @@ export const WORKOUT_TYPES: WorkoutType[] = [
 ];
 
 export const EQUIPMENT_OPTIONS: Equipment[] = [
-  'Bench', 'Cable Machine', 'Squat Rack', 'Leg Press Machine',
+  'Bench', 'Cable Machine', 'Squat Rack', 'Machine',
   'Smith Machine', 'Pull Up Bar', 'None',
 ];
 
