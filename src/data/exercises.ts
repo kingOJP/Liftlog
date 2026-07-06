@@ -61,6 +61,78 @@ export const EXERCISES: ExerciseDef[] = [
   // Calves
   { id: 'seated-calf-raises',       name: 'Seated Calf Raises',               primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'None',              weightType: 'Machine'    },
   { id: 'standing-calf-raises',     name: 'Standing Calf Raises',             primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'None',              weightType: 'Barbell'    },
+
+  // ── Catalog expansion ────────────────────────────────────────────────────────
+  // Curated additions vetted through the same ExerciseDef pipeline as the
+  // originals: canonical slug IDs, normalized names, full muscle/pattern/
+  // equipment classification, deduped against everything above. They exist
+  // primarily to give the substitution engine (data/substitution.ts) a deep
+  // candidate pool; an exercise only joins the user's library when it is
+  // actually swapped into the program (addToExerciseLibrary).
+
+  // Chest
+  { id: 'flat-barbell-bench-press', name: 'Flat Barbell Bench Press',         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'incline-dumbbell-press',   name: 'Incline Dumbbell Press',           primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'machine-chest-press',      name: 'Machine Chest Press',              primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'pec-deck-fly',             name: 'Pec Deck Fly',                     primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'dumbbell-fly',             name: 'Dumbbell Fly',                     primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'weighted-dips',            name: 'Weighted Dips',                    primaryMuscle: 'Chest',       secondaryMuscles: ['Triceps', 'Delts', null],       workoutType: 'Dip',              equipment: 'Dip Station',       weightType: 'Bodyweight' },
+  { id: 'push-ups',                 name: 'Push Ups',                         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'None',              weightType: 'Bodyweight' },
+
+  // Delts
+  { id: 'machine-shoulder-press',   name: 'Machine Shoulder Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'machine-lateral-raise',    name: 'Machine Lateral Raise',            primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'reverse-pec-deck',         name: 'Reverse Pec Deck',                 primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'dumbbell-rear-delt-fly',   name: 'Dumbbell Rear Delt Fly',           primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Bench',             weightType: 'Dumbbell'   },
+
+  // Traps
+  { id: 'barbell-shrugs',           name: 'Barbell Shrugs',                   primaryMuscle: 'Traps',       secondaryMuscles: ['Forearms', null, null],         workoutType: 'Shrug',            equipment: 'None',              weightType: 'Barbell'    },
+  { id: 'dumbbell-shrugs',          name: 'Dumbbell Shrugs',                  primaryMuscle: 'Traps',       secondaryMuscles: ['Forearms', null, null],         workoutType: 'Shrug',            equipment: 'None',              weightType: 'Dumbbell'   },
+
+  // Upper Back
+  { id: 'seated-cable-row',         name: 'Seated Cable Row',                 primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Biceps', null],         workoutType: 'Row',              equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'chest-supported-row',      name: 'Chest Supported Row',              primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Biceps', null],         workoutType: 'Row',              equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 't-bar-row',                name: 'T-Bar Row',                        primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Biceps', null],         workoutType: 'Row',              equipment: 'Machine',           weightType: 'Barbell'    },
+
+  // Lats
+  { id: 'chin-ups',                 name: 'Chin Ups',                         primaryMuscle: 'Lats',        secondaryMuscles: ['Biceps', 'Upper Back', null],   workoutType: 'Pull Up',          equipment: 'Pull Up Bar',       weightType: 'Bodyweight' },
+  { id: 'dumbbell-pullover',        name: 'Dumbbell Pullover',                primaryMuscle: 'Lats',        secondaryMuscles: ['Chest', null, null],            workoutType: 'Pull Over',        equipment: 'Bench',             weightType: 'Dumbbell'   },
+
+  // Posterior chain
+  { id: 'conventional-deadlift',    name: 'Conventional Deadlift',            primaryMuscle: 'Glutes',      secondaryMuscles: ['Hamstrings', 'Lower Back', 'Traps'], workoutType: 'Hip Hinge',   equipment: 'None',              weightType: 'Barbell'    },
+  { id: 'good-mornings',            name: 'Good Mornings',                    primaryMuscle: 'Hamstrings',  secondaryMuscles: ['Glutes', 'Lower Back', null],   workoutType: 'Hip Hinge',        equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'dumbbell-rdl',             name: 'Dumbbell Romanian Deadlift',       primaryMuscle: 'Hamstrings',  secondaryMuscles: ['Glutes', 'Lower Back', null],   workoutType: 'Hip Hinge',        equipment: 'None',              weightType: 'Dumbbell'   },
+  { id: 'seated-leg-curl',          name: 'Seated Leg Curl',                  primaryMuscle: 'Hamstrings',  secondaryMuscles: [null, null, null],               workoutType: 'Leg Curl',         equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'lying-leg-curl',           name: 'Lying Leg Curl',                   primaryMuscle: 'Hamstrings',  secondaryMuscles: [null, null, null],               workoutType: 'Leg Curl',         equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'cable-pull-through',       name: 'Cable Pull Through',               primaryMuscle: 'Glutes',      secondaryMuscles: ['Hamstrings', 'Lower Back', null], workoutType: 'Hip Hinge',      equipment: 'Cable Machine',     weightType: 'Machine'    },
+
+  // Quads
+  { id: 'barbell-back-squat',       name: 'Barbell Back Squat',               primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', 'Lower Back'], workoutType: 'Squat',      equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'hack-squat',               name: 'Hack Squat',                       primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', null, null],           workoutType: 'Squat',            equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'smith-machine-squat',      name: 'Smith Machine Squat',              primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Squat',            equipment: 'Smith Machine',     weightType: 'Machine'    },
+  { id: 'goblet-squat',             name: 'Goblet Squat',                     primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', null, null],           workoutType: 'Squat',            equipment: 'None',              weightType: 'Dumbbell'   },
+  { id: 'bulgarian-split-squat',    name: 'Bulgarian Split Squat',            primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Lunge',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'walking-lunges',           name: 'Walking Lunges',                   primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Lunge',            equipment: 'None',              weightType: 'Dumbbell'   },
+
+  // Calves
+  { id: 'leg-press-calf-raise',     name: 'Leg Press Calf Raise',             primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'Machine',           weightType: 'Machine'    },
+
+  // Biceps
+  { id: 'ez-bar-curls',             name: 'EZ Bar Curls',                     primaryMuscle: 'Biceps',      secondaryMuscles: ['Forearms', null, null],         workoutType: 'Curl',             equipment: 'None',              weightType: 'EZ Bar'     },
+  { id: 'preacher-curls',           name: 'Preacher Curls',                   primaryMuscle: 'Biceps',      secondaryMuscles: [null, null, null],               workoutType: 'Curl',             equipment: 'Machine',           weightType: 'EZ Bar'     },
+  { id: 'cable-curls',              name: 'Cable Curls',                      primaryMuscle: 'Biceps',      secondaryMuscles: ['Forearms', null, null],         workoutType: 'Curl',             equipment: 'Cable Machine',     weightType: 'Machine'    },
+
+  // Triceps
+  { id: 'skull-crushers',           name: 'Skull Crushers',                   primaryMuscle: 'Triceps',     secondaryMuscles: [null, null, null],               workoutType: 'Tricep Extension', equipment: 'Bench',             weightType: 'EZ Bar'     },
+  { id: 'close-grip-bench-press',   name: 'Close Grip Bench Press',           primaryMuscle: 'Triceps',     secondaryMuscles: ['Chest', 'Delts', null],         workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+
+  // Abs
+  { id: 'cable-crunch',             name: 'Cable Crunch',                     primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Crunch',           equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'hanging-leg-raise',        name: 'Hanging Leg Raise',                primaryMuscle: 'Abs',         secondaryMuscles: ['Forearms', null, null],         workoutType: 'Crunch',           equipment: 'Pull Up Bar',       weightType: 'Bodyweight' },
+  { id: 'machine-crunch',           name: 'Machine Crunch',                   primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Crunch',           equipment: 'Machine',           weightType: 'Machine'    },
+
+  // Forearms
+  { id: 'wrist-curls',              name: 'Wrist Curls',                      primaryMuscle: 'Forearms',    secondaryMuscles: [null, null, null],               workoutType: 'Curl',             equipment: 'Bench',             weightType: 'Dumbbell'   },
 ];
 
 export const EXERCISE_MAP = new Map<string, ExerciseDef>(EXERCISES.map(e => [e.id, e]));

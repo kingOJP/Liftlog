@@ -179,6 +179,133 @@
   margin: 8px 0;
 }
 
+/* ── Replacement suggestions ── */
+
+.exercise-edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exercise-swap-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
+}
+
+.exercise-swap-btn:active,
+.exercise-swap-btn.active {
+  color: var(--purple);
+}
+
+.swap-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--purple);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+}
+
+.swap-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.swap-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0;
+}
+
+.swap-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.swap-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.swap-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.swap-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.swap-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.swap-card-btn {
+  background: var(--purple);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s;
+}
+
+.swap-card-btn:active {
+  opacity: 0.8;
+}
+
+.swap-card-notes {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.swap-card-notes li {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.swap-card-notes li.swap-caution {
+  color: #d9a441;
+}
+
+.swap-card-keep {
+  font-size: 11px;
+  color: var(--green);
+}
+
 /* ── Add exercise ── */
 
 .add-exercise-trigger {
