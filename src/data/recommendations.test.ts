@@ -85,3 +85,62 @@ describe('calculateRecommendation', () => {
     expect(rec!.weight).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe('calculateRecommendation — bodyweight (rep progression)', () => {
+  it('raises the rep goal when every set beats the top of the range', () => {
+    const rec = calculateRecommendation(
+      [session([[0, 12], [0, 13], [0, 12]])], exercise, 'Bodyweight',
+    );
+    expect(rec).toMatchObject({ weight: 0, targetReps: 13, direction: 'up', kind: 'increase' });
+  });
+
+  it('chases one more rep while inside the range', () => {
+    const rec = calculateRecommendation(
+      [session([[0, 10], [0, 9], [0, 8]])], exercise, 'Bodyweight',
+    );
+    expect(rec).toMatchObject({ weight: 0, targetReps: 9, direction: 'hold', kind: 'hold' });
+  });
+
+  it('caps the in-range rep goal at the top of the range', () => {
+    const rec = calculateRecommendation(
+      [session([[0, 12], [0, 12], [0, 11]])], exercise, 'Bodyweight',
+    );
+    expect(rec!.targetReps).toBe(12);
+  });
+
+  it('resets to the bottom of the range when reps fall under it', () => {
+    const rec = calculateRecommendation(
+      [session([[0, 6], [0, 6], [0, 5]])], exercise, 'Bodyweight',
+    );
+    expect(rec).toMatchObject({ targetReps: 8, direction: 'down', kind: 'decrease' });
+  });
+
+  it('suggests a rep deload after 3 sessions with no total-rep progress', () => {
+    const history = [
+      session([[0, 9], [0, 9], [0, 8]], 3),
+      session([[0, 9], [0, 9], [0, 9]], 2),
+      session([[0, 10], [0, 9], [0, 8]], 1),
+    ];
+    const rec = calculateRecommendation(history, exercise, 'Bodyweight');
+    expect(rec).toMatchObject({ targetReps: 8, direction: 'down', kind: 'deload' });
+  });
+
+  it('does not deload while total reps are still climbing', () => {
+    const history = [
+      session([[0, 11], [0, 10], [0, 10]], 3),
+      session([[0, 10], [0, 9], [0, 9]], 2),
+      session([[0, 9], [0, 9], [0, 8]], 1),
+    ];
+    const rec = calculateRecommendation(history, exercise, 'Bodyweight');
+    expect(rec).toMatchObject({ kind: 'hold', targetReps: 11 });
+  });
+
+  it('uses the normal weight engine when a bodyweight exercise is loaded', () => {
+    // Weighted pull-ups with a 25 lb belt — progress load, not reps
+    const rec = calculateRecommendation(
+      [session([[25, 12], [25, 12], [25, 12]])], exercise, 'Bodyweight',
+    );
+    expect(rec).toMatchObject({ weight: 30, kind: 'increase' });
+    expect(rec!.targetReps).toBeUndefined();
+  });
+});

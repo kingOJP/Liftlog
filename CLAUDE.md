@@ -257,7 +257,16 @@ implements **double progression** with stall detection, evaluated in order:
 The **working weight** of a session is the most-used weight (tie → heaviest), so logged
 warm-up/ramp-up sets don't skew the recommendation.
 
-Returns `{ weight, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
+**Bodyweight exercises progress by reps, not load.** When the exercise's `weightType` is
+`Bodyweight` *and* the last session's working weight was 0 lbs, the engine switches to rep
+progression (`repProgression()` in the same file): the recommendation carries a `targetReps`
+per-set goal, total session reps replace e1RM as the stall metric, and the four branches mirror
+the weight engine (beat the range → +1 rep goal; stalled 3 sessions → reset to `repLow`; under
+range → build back to `repLow`; in range → chase one more rep). If external load *was* logged
+(e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
+"↑ N reps" instead of a weight when `targetReps` is set.
+
+Returns `{ weight, targetReps?, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
 ExerciseCard pre-fills the weight input (only while untouched) and shows the reason as a
 colour-coded chip, plus a "Last time" line with the previous session's sets. The engine is fully
 covered by `recommendations.test.ts`.
@@ -312,6 +321,71 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
+- **Taxonomy merges are normalized on read** — `normalizeOverride()` in `exercises.ts`
+  remaps merged-away values from stored overrides (localStorage or a server pull) on every
+  read so old data keeps resolving in the dropdowns:
+  - Equipment `'Leg Press Machine'` → `'Machine'` (the catch-all for any exercise machine)
+  - Muscles `'Front Delts'`/`'Side Delts'`/`'Rear Delts'` → `'Delts'` (duplicates created by
+    the collapse are deduped — first mention wins, later ones are nulled)
+  - Workout types `'Chest Press'`/`'Overhead Press'`/`'Push Up'` → `'Press'`
+- **Taxonomy option arrays are alphabetical** — `MUSCLE_GROUPS`, `WORKOUT_TYPES`,
+  `EQUIPMENT_OPTIONS`, `WEIGHT_TYPES` render directly as dropdowns; keep them sorted when
+  adding values.
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
 - **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.
+
+---
+
+## Future Roadmap (V3)
+
+These are the highest-leverage improvements identified in the Rev 2 audit. Implement them in
+roughly this order when ready — each one builds on the previous.
+
+### 1. Delta-based sync
+**The biggest remaining architectural risk.** The current sync is full-replace, last-writer-wins:
+`pushSync()` sends the entire IDB and `pullSync()` wipes local IDB and restores from server.
+On two concurrent devices (phone + desktop) this silently drops whichever device synced last.
+
+Fix: move to per-session upsert with tombstones. Each `session` row gets a `deletedAt` timestamp
+instead of being physically deleted. The worker merges by `startedAt` (the natural dedup key) and
+returns only rows newer than the client's `lastSyncAt`. This also eliminates the `pendingSessions`
+localStorage workaround entirely.
+
+### 2. RPE / RIR logging
+The deload trigger today fires purely on e1RM stagnation across 3 sessions, which can't
+distinguish "I was grinding at RPE 10" from "these were easy reps." One optional `rpe` field per
+set (scale 1–10, blank = untracked) lets the engine confirm fatigue before recommending a deload
+and detect under-effort when reps stay in range but RPE is low.
+
+Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a small tap-to-set
+chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
+No UI change is needed if the field is left blank — fully backwards-compatible.
+
+### 3. In-workout session persistence (draft sessions)
+Sets live only in React state from "Start Workout" until "Finish Workout." An accidental app kill
+or Safari tab eviction silently loses the whole session.
+
+Fix: write a draft session to IDB as sets are logged (not just at finish), keyed to a
+`draftSessionId` in localStorage. On app mount, detect a stale draft and offer to resume or
+discard. At "Finish Workout," promote the draft to a completed session atomically. This is the
+single biggest UX risk for anyone doing long sessions with spotty connectivity.
+
+### 4. Mesocycle awareness
+The current deload is purely reactive (stall → deload). A planned accumulation/deload structure
+would let the engine front-run fatigue: e.g., 3 weeks accumulation → 1 deload week, cycling
+automatically. The configurable program start date (already in Settings) is the foundation —
+extend it to support a `mesocycleLengthWeeks` setting and expose the current mesocycle phase
+(accumulation / peak / deload) to the recommendation engine and Coach card.
+
+### 5. Quality-of-life additions
+These are independent of each other and can land in any order:
+
+- **Unit preference (kg / lb)** — a single `weightUnit` setting in `settings.ts`; all display
+  and input converts via a thin `toDisplay(lbs)` / `fromDisplay(val)` helper. Store always in lbs.
+- **Exercise substitution suggestions** — when the Coach flags a muscle as under-trained, surface
+  1–2 exercises from `EXERCISES` that target it and match the user's available equipment
+  (`taxonomy.ts` already has the data).
+- **Worker-side tests** — the `worker/` directory has no test coverage. Add
+  `vitest-pool-workers` (Cloudflare's Vitest integration) and cover `validatePush()`, the
+  OAuth redirect helper, and the D1 upsert logic.

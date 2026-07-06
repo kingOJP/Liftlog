@@ -1,4 +1,5 @@
 import type { Exercise } from './program';
+import type { WeightType } from './taxonomy';
 import { epley1RM } from './analytics';
 
 // Next-weight recommendations built on double progression — the standard
@@ -26,6 +27,9 @@ export type RecKind = 'increase' | 'hold' | 'decrease' | 'deload';
 
 export interface WeightRec {
   weight: number;
+  // Set for rep-progression recommendations (bodyweight exercises logged at
+  // 0 lbs) — the per-set rep goal for the next session.
+  targetReps?: number;
   direction: 'up' | 'down' | 'hold';
   kind: RecKind;
   reason: string;
@@ -69,20 +73,30 @@ function bestE1rm(sets: LoggedSet[]): number {
 }
 
 /**
- * Recommend the next working weight for an exercise.
+ * Recommend the next working weight (or rep target) for an exercise.
  *
- * @param history  This exercise's recent sessions, newest first (only sessions
- *                 where it was actually performed). One session is enough;
- *                 more enables stall detection.
+ * @param history     This exercise's recent sessions, newest first (only
+ *                    sessions where it was actually performed). One session is
+ *                    enough; more enables stall detection.
+ * @param weightType  The exercise's weight type. Bodyweight exercises logged
+ *                    without external load progress by reps instead of weight
+ *                    (e1RM and load increments are meaningless at 0 lbs).
  */
 export function calculateRecommendation(
   history: ExerciseSession[],
   exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+  weightType?: WeightType | null,
 ): WeightRec | null {
   const last = history.find(h => h.sets.length > 0);
   if (!last) return null;
 
   const weight = workingWeight(last.sets);
+
+  // Bodyweight at 0 lbs → rep progression. If external load was logged
+  // (e.g. weighted pull-ups with a belt), the normal weight engine applies.
+  if (weightType === 'Bodyweight' && weight === 0) {
+    return repProgression(history, last, exercise);
+  }
   const workingSets = last.sets.filter(s => s.weight === weight);
   const minReps = Math.min(...workingSets.map(s => s.reps));
   const avgReps = workingSets.reduce((sum, s) => sum + s.reps, 0) / workingSets.length;
@@ -131,4 +145,67 @@ export function calculateRecommendation(
       ? `Complete all ${exercise.sets} sets at this weight, then chase reps`
       : `In range — work toward ${exercise.sets}×${exercise.repHigh} to earn an increase`;
   return { weight, direction: 'hold', kind: 'hold', reason };
+}
+
+// ── Rep progression (bodyweight at 0 lbs) ─────────────────────────────────────
+// Same shape as the weight engine, but the lever is reps per set: total session
+// reps stand in for e1RM as the progress metric, and the recommendation carries
+// a `targetReps` goal instead of a new load.
+
+function totalReps(sets: LoggedSet[]): number {
+  return sets.reduce((sum, s) => sum + s.reps, 0);
+}
+
+function repProgression(
+  history: ExerciseSession[],
+  last: ExerciseSession,
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+): WeightRec {
+  const minReps = Math.min(...last.sets.map(s => s.reps));
+  const avgReps = totalReps(last.sets) / last.sets.length;
+
+  // 1. Rep range beaten across a full set count → raise the rep goal
+  if (last.sets.length >= exercise.sets && minReps >= exercise.repHigh) {
+    return {
+      weight: 0,
+      targetReps: minReps + 1,
+      direction: 'up',
+      kind: 'increase',
+      reason: `All ${last.sets.length} sets hit ${exercise.repHigh}+ — push for ${minReps + 1} reps, or add weight`,
+    };
+  }
+
+  // 2. Total reps stalled for several sessions → back off and rebuild
+  const window = history.filter(h => h.sets.length > 0).slice(0, STALL_SESSIONS);
+  if (window.length >= STALL_SESSIONS) {
+    const oldest = window[window.length - 1];
+    if (totalReps(last.sets) <= totalReps(oldest.sets)) {
+      return {
+        weight: 0,
+        targetReps: exercise.repLow,
+        direction: 'down',
+        kind: 'deload',
+        reason: `Stalled ${window.length} sessions — reset to ${exercise.repLow} crisp reps and build back up`,
+      };
+    }
+  }
+
+  // 3. Under the range → work back toward it
+  if (avgReps < exercise.repLow) {
+    return {
+      weight: 0,
+      targetReps: exercise.repLow,
+      direction: 'down',
+      kind: 'decrease',
+      reason: `Reps fell under ${exercise.repLow} — build back into the range`,
+    };
+  }
+
+  // 4. In range → chase one more rep per set
+  const target = Math.min(minReps + 1, exercise.repHigh);
+  const reason =
+    last.sets.length < exercise.sets
+      ? `Complete all ${exercise.sets} sets, then chase reps`
+      : `In range — aim for ${target}+ reps per set, toward ${exercise.sets}×${exercise.repHigh}`;
+  return { weight: 0, targetReps: target, direction: 'hold', kind: 'hold', reason };
 }

@@ -110,7 +110,10 @@ export default function ExerciseCard({
       {recommendation && (
         <div className={`ex-rec ex-rec--${recommendation.direction}`}>
           <span className="ex-rec-weight">
-            {DIRECTION_ICON[recommendation.direction]} {recommendation.weight} lbs
+            {DIRECTION_ICON[recommendation.direction]}{' '}
+            {recommendation.targetReps != null
+              ? `${recommendation.targetReps} reps`
+              : `${recommendation.weight} lbs`}
           </span>
           <span className="ex-rec-reason">{recommendation.reason}</span>
         </div>
