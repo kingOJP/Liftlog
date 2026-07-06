@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
-import { getLoggedInUser, pullSync, pushSync } from './data/sync';
+import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { getPendingSessions } from './data/pendingSessions';
 import { migrateExerciseIds, purgeEmptySessions } from './db/database';
@@ -38,6 +38,15 @@ function App() {
   useEffect(() => {
     if (!user) return;
     (async () => {
+      try {
+        // If a different account signed in on this device, wipe the previous
+        // account's local data BEFORE any sync — otherwise the startup push
+        // would upload it into this account.
+        await ensureLocalDataOwner();
+        setProgram(getStoredProgram());
+      } catch (err) {
+        console.error(err);
+      }
       try {
         await migrateExerciseIds();
         await purgeEmptySessions();

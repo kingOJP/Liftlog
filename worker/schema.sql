@@ -59,6 +59,38 @@ CREATE TABLE IF NOT EXISTS exercise_metadata (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- App-wide exercise library (shared across all accounts — exercises are an
+-- app-level feature, not per-user). Populated from the client's library on
+-- push; per-user exercises_json remains only as a legacy fallback for pull.
+CREATE TABLE IF NOT EXISTS app_exercises (
+  id       TEXT PRIMARY KEY,
+  name     TEXT    NOT NULL,
+  sets     INTEGER NOT NULL,
+  rep_low  INTEGER NOT NULL,
+  rep_high INTEGER NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0
+);
+
+-- App-wide exercise metadata (successor of the per-user exercise_metadata,
+-- which is kept only as a legacy pull fallback).
+CREATE TABLE IF NOT EXISTS app_exercise_metadata (
+  exercise_id       TEXT PRIMARY KEY,
+  primary_muscle    TEXT,
+  secondary_muscle1 TEXT,
+  secondary_muscle2 TEXT,
+  secondary_muscle3 TEXT,
+  workout_type      TEXT,
+  equipment         TEXT,
+  weight_type       TEXT
+);
+
+-- Deletion tombstones: once an exercise is deleted it stays deleted, no matter
+-- which device or account later pushes a stale copy of the library.
+CREATE TABLE IF NOT EXISTS deleted_exercises (
+  exercise_id TEXT PRIMARY KEY,
+  deleted_at  INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS user_programs (
   user_id        TEXT PRIMARY KEY,
   program_json   TEXT NOT NULL,

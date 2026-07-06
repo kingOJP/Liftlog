@@ -250,6 +250,18 @@ export async function migrateExerciseIds(): Promise<number> {
   return toFix.length;
 }
 
+// Wipes every store. Used when a different account signs in on this device so
+// one user's workout history can never leak into (or be pushed up to) another
+// account.
+export async function clearIDB(): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(['sessions', 'setLogs', 'exerciseLogs'], 'readwrite');
+  tx.objectStore('sessions').clear();
+  tx.objectStore('setLogs').clear();
+  tx.objectStore('exerciseLogs').clear();
+  await txDone(tx);
+}
+
 // ── Backup / restore ─────────────────────────────────────────────────────────
 
 export async function dumpIDB(): Promise<{

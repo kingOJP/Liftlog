@@ -10,8 +10,11 @@ export async function handleSync(request: Request, env: Env): Promise<Response> 
   return new Response('Method Not Allowed', { status: 405 });
 }
 
+const META_COLUMNS = `exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2,
+                      secondary_muscle3, workout_type, equipment, weight_type`;
+
 async function pull(userId: string, env: Env): Promise<Response> {
-  const [sessions, setLogs, exerciseLogs, meta, program] = await Promise.all([
+  const [sessions, setLogs, exerciseLogs, program, appExercises, appMeta, tombstones] = await Promise.all([
     env.DB.prepare(
       'SELECT local_id, day_id, week_number, started_at, completed_at FROM workout_sessions WHERE user_id = ?',
     ).bind(userId).all(),
@@ -22,14 +25,46 @@ async function pull(userId: string, env: Env): Promise<Response> {
       'SELECT local_id, session_id, exercise_id, difficulty FROM exercise_logs WHERE user_id = ?',
     ).bind(userId).all(),
     env.DB.prepare(
-      `SELECT exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
-              workout_type, equipment, weight_type
-       FROM exercise_metadata WHERE user_id = ?`,
-    ).bind(userId).all(),
-    env.DB.prepare(
       'SELECT program_json, exercises_json FROM user_programs WHERE user_id = ?',
     ).bind(userId).first<{ program_json: string; exercises_json: string }>(),
+    env.DB.prepare(
+      'SELECT id, name, sets, rep_low, rep_high, archived FROM app_exercises',
+    ).all(),
+    env.DB.prepare(`SELECT ${META_COLUMNS} FROM app_exercise_metadata`).all(),
+    env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
   ]);
+
+  const deletedIds = new Set(tombstones.results.map(r => r.exercise_id as string));
+
+  // Exercises + metadata are app-wide (shared by every account). Until the
+  // first post-deploy push populates the global tables, fall back to this
+  // user's legacy per-user copies. Tombstoned exercises are never returned.
+  let metaRows = appMeta.results;
+  if (metaRows.length === 0) {
+    metaRows = (await env.DB.prepare(
+      `SELECT ${META_COLUMNS} FROM exercise_metadata WHERE user_id = ?`,
+    ).bind(userId).all()).results;
+  }
+  metaRows = metaRows.filter(r => !deletedIds.has(r.exercise_id as string));
+
+  let exercises: unknown = null;
+  if (appExercises.results.length > 0) {
+    exercises = appExercises.results
+      .filter(r => !deletedIds.has(r.id as string))
+      .map(r => ({
+        id:      r.id,
+        name:    r.name,
+        sets:    r.sets,
+        repLow:  r.rep_low,
+        repHigh: r.rep_high,
+        ...(r.archived ? { archived: true } : {}),
+      }));
+  } else if (program?.exercises_json) {
+    const legacy: unknown = JSON.parse(program.exercises_json);
+    exercises = Array.isArray(legacy)
+      ? legacy.filter((e: { id?: string }) => !deletedIds.has(e.id ?? ''))
+      : legacy;
+  }
 
   return Response.json({
     sessions: sessions.results.map(r => ({
@@ -53,22 +88,27 @@ async function pull(userId: string, env: Env): Promise<Response> {
       exerciseId: r.exercise_id,
       difficulty: r.difficulty ?? undefined,
     })),
-    exerciseMuscles: meta.results.map(r => ({
+    exerciseMuscles: metaRows.map(r => ({
       exerciseId:       r.exercise_id,
       primaryMuscle:    r.primary_muscle    ?? null,
       secondaryMuscle1: r.secondary_muscle1 ?? null,
       secondaryMuscle2: r.secondary_muscle2 ?? null,
       secondaryMuscle3: r.secondary_muscle3 ?? null,
     })),
-    exerciseDetails: meta.results.map(r => ({
+    exerciseDetails: metaRows.map(r => ({
       exerciseId:  r.exercise_id,
       workoutType: r.workout_type ?? null,
       equipment:   r.equipment    ?? null,
       weightType:  r.weight_type  ?? null,
     })),
-    program:   program?.program_json   ? JSON.parse(program.program_json)   : null,
-    exercises: program?.exercises_json ? JSON.parse(program.exercises_json) : null,
+    deletedExerciseIds: [...deletedIds],
+    program:   program?.program_json ? JSON.parse(program.program_json) : null,
+    exercises,
   });
+}
+
+interface PushExercise {
+  id: string; name: string; sets: number; repLow: number; repHigh: number; archived?: boolean;
 }
 
 interface PushPayload {
@@ -77,14 +117,16 @@ interface PushPayload {
   exerciseLogs:  Array<{ id: number; sessionId: number; exerciseId: string; difficulty?: string }>;
   exerciseMuscles?: Array<{ exerciseId: string; primaryMuscle: string | null; secondaryMuscle1: string | null; secondaryMuscle2: string | null; secondaryMuscle3: string | null }>;
   exerciseDetails?: Array<{ exerciseId: string; workoutType: string | null; equipment: string | null; weightType: string | null }>;
+  deletedExerciseIds?: string[];
   program:   unknown;
-  exercises: unknown;
+  exercises: PushExercise[] | null;
 }
 
 // Sanity limits — a personal training log is nowhere near these; anything
 // beyond them is a bug or abuse, and rejecting beats writing garbage.
-const MAX_SESSIONS = 20_000;
-const MAX_SET_LOGS = 200_000;
+const MAX_SESSIONS  = 20_000;
+const MAX_SET_LOGS  = 200_000;
+const MAX_EXERCISES = 10_000;
 
 function validatePush(data: PushPayload): string | null {
   if (typeof data !== 'object' || data === null) return 'payload must be an object';
@@ -108,6 +150,22 @@ function validatePush(data: PushPayload): string | null {
       return 'malformed set log';
     }
   }
+  if (data.exercises != null) {
+    if (!Array.isArray(data.exercises)) return 'exercises must be an array';
+    if (data.exercises.length > MAX_EXERCISES) return 'too many exercises';
+    for (const e of data.exercises) {
+      if (typeof e.id !== 'string' || typeof e.name !== 'string' ||
+          typeof e.sets !== 'number' || typeof e.repLow !== 'number' ||
+          typeof e.repHigh !== 'number') {
+        return 'malformed exercise';
+      }
+    }
+  }
+  if (data.deletedExerciseIds != null) {
+    if (!Array.isArray(data.deletedExerciseIds)) return 'deletedExerciseIds must be an array';
+    if (data.deletedExerciseIds.length > MAX_EXERCISES) return 'too many deleted exercise ids';
+    if (data.deletedExerciseIds.some(id => typeof id !== 'string')) return 'malformed deleted exercise id';
+  }
   return null;
 }
 
@@ -122,12 +180,26 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const invalid = validatePush(data);
   if (invalid) return Response.json({ error: invalid }, { status: 400 });
 
+  // Deletions are permanent: union the client's tombstones with the server's,
+  // so no stale library copy — from any device or account — can resurrect a
+  // deleted exercise.
+  const existing = await env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all();
+  const tombstoned = new Set(existing.results.map(r => r.exercise_id as string));
+  const newTombstones = (data.deletedExerciseIds ?? []).filter(id => !tombstoned.has(id));
+  for (const id of newTombstones) tombstoned.add(id);
+
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare('DELETE FROM workout_sessions WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM set_logs WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM exercise_logs WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM exercise_metadata WHERE user_id = ?').bind(userId),
   ];
+
+  const now = Date.now();
+  for (const id of newTombstones) {
+    stmts.push(env.DB.prepare(
+      'INSERT OR IGNORE INTO deleted_exercises (exercise_id, deleted_at) VALUES (?, ?)',
+    ).bind(id, now));
+  }
 
   for (const s of data.sessions) {
     stmts.push(env.DB.prepare(
@@ -150,8 +222,20 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     ).bind(s.id, userId, s.sessionId, s.exerciseId, s.difficulty ?? null));
   }
 
-  // Merge exerciseMuscles + exerciseDetails into one row per exerciseId
-  // These fields are optional — newer clients omit them (metadata is device-local)
+  // App-wide exercise library: replace wholesale with the pushed copy, minus
+  // anything tombstoned. (Clients pull before they push, so the pushed library
+  // already includes exercises other accounts added.)
+  if (data.exercises) {
+    stmts.push(env.DB.prepare('DELETE FROM app_exercises'));
+    for (const e of data.exercises) {
+      if (tombstoned.has(e.id)) continue;
+      stmts.push(env.DB.prepare(
+        'INSERT INTO app_exercises (id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?)',
+      ).bind(e.id, e.name, e.sets, e.repLow, e.repHigh, e.archived ? 1 : 0));
+    }
+  }
+
+  // Merge exerciseMuscles + exerciseDetails into one app-wide row per exerciseId
   const metaMap = new Map<string, Record<string, unknown>>();
   for (const m of (data.exerciseMuscles ?? [])) {
     metaMap.set(m.exerciseId, { ...metaMap.get(m.exerciseId), ...m });
@@ -159,14 +243,16 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   for (const d of (data.exerciseDetails ?? [])) {
     metaMap.set(d.exerciseId, { ...metaMap.get(d.exerciseId), ...d });
   }
+  stmts.push(env.DB.prepare('DELETE FROM app_exercise_metadata'));
   for (const [exId, m] of metaMap) {
+    if (tombstoned.has(exId)) continue;
     stmts.push(env.DB.prepare(
-      `INSERT INTO exercise_metadata
-         (exercise_id, user_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
+      `INSERT INTO app_exercise_metadata
+         (exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
           workout_type, equipment, weight_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
-      exId, userId,
+      exId,
       (m.primaryMuscle    as string | null) ?? null,
       (m.secondaryMuscle1 as string | null) ?? null,
       (m.secondaryMuscle2 as string | null) ?? null,

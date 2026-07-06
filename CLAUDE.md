@@ -220,6 +220,8 @@ src/
 | `liftlog_settings` | `settings.ts` | Device-local settings (program start date) |
 | `liftlog_rest_seconds` | `settings.ts` | Rest-timer default duration (pre-Rev-2 key, kept) |
 | `liftlog_pending_sessions` | `pendingSessions.ts` | Sessions saved locally but not yet confirmed by the server |
+| `liftlog_deleted_exercises` | `programStore.ts` | Deleted-exercise tombstones (synced app-wide; filtered on every library read) |
+| `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
 
@@ -247,16 +249,30 @@ Anything that *analyzes* history (dashboard, metrics, coaching, recommendations,
 ## Cloud sync
 
 On app mount, `App.tsx` runs this sequence (only when logged in):
-1. `migrateExerciseIds()` — fast local IDB fix, must run **before** WorkoutView reads logs
-2. `pullSync()` — pulls server data into IDB + localStorage (clears and replaces)
-3. `migrateExerciseIds()` again — in case pull restored old IDs from the server
-4. `pushSync()` — if pull found nothing or any IDs were remapped
+1. `ensureLocalDataOwner()` — if a *different* account signed in on this device, wipe
+   user-scoped local data (IDB history, program, pending sessions) **before** any sync so one
+   account's data can never be shown to — or pushed into — another account. App-wide exercise
+   data and device settings survive the switch. Owner is tracked in `liftlog_data_owner`.
+2. `migrateExerciseIds()` — fast local IDB fix, must run **before** WorkoutView reads logs
+3. `pullSync()` — pulls server data into IDB + localStorage (clears and replaces)
+4. `migrateExerciseIds()` again — in case pull restored old IDs from the server
+5. `pushSync()` — if pull found nothing or any IDs were remapped
 
-Sync payload includes: sessions, setLogs, exerciseLogs, program, exercise library, **and
-exercise metadata** (muscle/equipment/weight-type overrides). On pull, metadata is *merged*
-into local (server wins per exercise; unsynced local edits survive) so the info you enter for
-new exercises persists across devices and re-pulls. `pushSync()`/`pullSync()` also run
-`purgeEmptySessions()` so ghost/empty workouts can't resurrect through sync.
+Sync payload includes: sessions, setLogs, exerciseLogs, program, exercise library, exercise
+metadata (muscle/equipment/weight-type overrides), **and deleted-exercise tombstones**. On
+pull, metadata is *merged* into local (server wins per exercise; unsynced local edits survive)
+so the info you enter for new exercises persists across devices and re-pulls.
+`pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
+resurrect through sync.
+
+**Per-user vs app-wide on the server (D1):** sessions/set logs/program are per-user
+(`user_id`-keyed tables). The exercise library and its metadata are **app-wide** — global
+`app_exercises` / `app_exercise_metadata` tables shared by every account (the per-user
+`exercise_metadata` table and `user_programs.exercises_json` remain only as legacy pull
+fallbacks). Exercise deletion writes a tombstone (`deleted_exercises` server table,
+`liftlog_deleted_exercises` locally, synced both ways); tombstoned IDs are filtered from every
+library read, sync push/pull, and the default-library rebuild, so a deleted exercise stays
+deleted no matter which device or account pushes a stale copy.
 
 ---
 

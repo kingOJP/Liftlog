@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { canonicalizeId } from './legacyIds';
-import { getStoredProgram } from './programStore';
+import {
+  getStoredProgram, getExerciseLibrary, saveExerciseLibrary,
+  deleteExerciseFromLibrary, addToExerciseLibrary,
+  getDeletedExerciseIds, addDeletedExerciseIds,
+} from './programStore';
+import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta } from './exercises';
 import type { WorkoutDay } from './program';
 
 beforeEach(() => localStorage.clear());
@@ -64,5 +69,43 @@ describe('getStoredProgram', () => {
     const program = getStoredProgram();
     expect(program[0].exercises).toHaveLength(1);
     expect(program[0].exercises[0].id).toBe('face-pulls');
+  });
+});
+
+describe('deleted-exercise tombstones', () => {
+  it('deleting an exercise records a tombstone and removes it from the library', () => {
+    deleteExerciseFromLibrary('face-pulls');
+    expect(getDeletedExerciseIds().has('face-pulls')).toBe(true);
+    expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(false);
+  });
+
+  it('a deleted exercise cannot resurrect through a stale library write', () => {
+    deleteExerciseFromLibrary('face-pulls');
+    // Simulate a stale server/device copy re-adding it via full-replace sync
+    saveExerciseLibrary([
+      ...getExerciseLibrary(),
+      { id: 'face-pulls', name: 'Face Pulls', sets: 3, repLow: 15, repHigh: 20 },
+    ]);
+    expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(false);
+  });
+
+  it('a deleted exercise cannot resurrect through the default library rebuild', () => {
+    addDeletedExerciseIds(['face-pulls']);
+    localStorage.removeItem('liftlog_exercises'); // force rebuild from defaults
+    expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(false);
+  });
+
+  it('deleting an exercise drops its metadata override', () => {
+    saveExerciseMeta('face-pulls', { ...getExerciseMeta('face-pulls'), equipment: 'Machine' });
+    expect('face-pulls' in getAllExerciseMeta()).toBe(true);
+    deleteExerciseFromLibrary('face-pulls');
+    expect('face-pulls' in getAllExerciseMeta()).toBe(false);
+  });
+
+  it('explicitly re-adding an exercise lifts its tombstone', () => {
+    deleteExerciseFromLibrary('face-pulls');
+    addToExerciseLibrary({ id: 'face-pulls', name: 'Face Pulls', sets: 3, repLow: 15, repHigh: 20 });
+    expect(getDeletedExerciseIds().has('face-pulls')).toBe(false);
+    expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(true);
   });
 });

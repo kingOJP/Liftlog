@@ -1,8 +1,12 @@
-import { dumpIDB, restoreIDB, createSession, completeSession, addSetLog, purgeEmptySessions } from '../db/database';
+import { dumpIDB, restoreIDB, clearIDB, createSession, completeSession, addSetLog, purgeEmptySessions } from '../db/database';
 import type { Session, SetLog, ExerciseLog } from '../db/database';
 import { getPendingSessions, clearPendingSessions } from './pendingSessions';
-import { getStoredProgram, saveStoredProgram, getExerciseLibrary, saveExerciseLibrary } from './programStore';
-import { getAllExerciseMeta, mergeExerciseMeta } from './exercises';
+import {
+  getStoredProgram, saveStoredProgram, clearStoredProgram,
+  getExerciseLibrary, saveExerciseLibrary,
+  getDeletedExerciseIds, addDeletedExerciseIds,
+} from './programStore';
+import { getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta } from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
 
@@ -28,13 +32,14 @@ interface ExerciseDetailsRow {
 }
 
 interface SyncPayload {
-  sessions:        Session[];
-  setLogs:         SetLog[];
-  exerciseLogs:    ExerciseLog[];
-  program:         WorkoutDay[];
-  exercises:       Exercise[];
-  exerciseMuscles: ExerciseMusclesRow[];
-  exerciseDetails: ExerciseDetailsRow[];
+  sessions:           Session[];
+  setLogs:            SetLog[];
+  exerciseLogs:       ExerciseLog[];
+  program:            WorkoutDay[];
+  exercises:          Exercise[];
+  exerciseMuscles:    ExerciseMusclesRow[];
+  exerciseDetails:    ExerciseDetailsRow[];
+  deletedExerciseIds: string[];
 }
 
 function splitMeta(meta: Record<string, ExerciseMetaOverride>): {
@@ -76,15 +81,40 @@ export function getLoggedInUser(): SyncUser | null {
   }
 }
 
+// Tracks which account the *local* data belongs to. Without this, signing in
+// with a different account on the same device shows the previous account's
+// workouts — and worse, the startup push uploads them into the new account.
+const OWNER_KEY = 'liftlog_data_owner';
+
+export async function ensureLocalDataOwner(): Promise<void> {
+  const user = getLoggedInUser();
+  if (!user) return;
+  const owner = localStorage.getItem(OWNER_KEY);
+  if (owner && owner !== user.email) {
+    // Account switch: wipe user-scoped data (workout history, program, pending
+    // sessions). App-wide data — exercise library, metadata, deletion
+    // tombstones — and device settings survive the switch.
+    await clearIDB();
+    clearStoredProgram();
+    clearPendingSessions();
+  }
+  localStorage.setItem(OWNER_KEY, user.email);
+}
+
 export async function pushSync(): Promise<void> {
   // Drop ghost/empty workouts before uploading so they don't propagate
   await purgeEmptySessions();
   const idb = await dumpIDB();
+  const deleted = getDeletedExerciseIds();
+  const meta = Object.fromEntries(
+    Object.entries(getAllExerciseMeta()).filter(([id]) => !deleted.has(id)),
+  );
   const payload: SyncPayload = {
     ...idb,
-    program:   getStoredProgram(),
-    exercises: getExerciseLibrary(),
-    ...splitMeta(getAllExerciseMeta()),
+    program:            getStoredProgram(),
+    exercises:          getExerciseLibrary(),
+    deletedExerciseIds: [...deleted],
+    ...splitMeta(meta),
   };
 
   const res = await fetch('/api/sync', {
@@ -110,18 +140,43 @@ export async function pullSync(): Promise<boolean> {
   }
 
   const data = await res.json() as {
-    sessions:        Session[];
-    setLogs:         SetLog[];
-    exerciseLogs:    ExerciseLog[];
-    program:         WorkoutDay[]         | null;
-    exercises:       Exercise[]           | null;
-    exerciseMuscles: ExerciseMusclesRow[] | null;
-    exerciseDetails: ExerciseDetailsRow[] | null;
+    sessions:           Session[];
+    setLogs:            SetLog[];
+    exerciseLogs:       ExerciseLog[];
+    program:            WorkoutDay[]         | null;
+    exercises:          Exercise[]           | null;
+    exerciseMuscles:    ExerciseMusclesRow[] | null;
+    exerciseDetails:    ExerciseDetailsRow[] | null;
+    deletedExerciseIds: string[]             | null;
   };
 
-  // Restore exercise metadata even when there are no sessions yet (a fresh
-  // device pulling an existing account) — merge so unsynced local edits survive.
-  mergeExerciseMeta(recombineMeta(data.exerciseMuscles, data.exerciseDetails));
+  // Exercise deletions are permanent and app-wide: merge the server's
+  // tombstones, then scrub any local trace of the deleted exercises so a stale
+  // copy on this device can't resurrect them (or be pushed back up).
+  addDeletedExerciseIds(data.deletedExerciseIds ?? []);
+  const deleted = getDeletedExerciseIds();
+  if (deleted.size > 0) {
+    for (const id of deleted) deleteExerciseMeta(id);
+    saveExerciseLibrary(getExerciseLibrary()); // getter filters tombstones
+    const program = getStoredProgram();
+    const scrubbed = program.map(d => ({
+      ...d,
+      exercises: d.exercises.filter(e => !deleted.has(e.id)),
+    }));
+    if (scrubbed.some((d, i) => d.exercises.length !== program[i].exercises.length)) {
+      saveStoredProgram(scrubbed);
+    }
+  }
+
+  // The exercise library and its metadata are app-wide — apply them even when
+  // this account has no workout history yet. Metadata is merged so unsynced
+  // local edits survive; both are filtered through the tombstones.
+  const incomingMeta = recombineMeta(data.exerciseMuscles, data.exerciseDetails);
+  for (const id of deleted) delete incomingMeta[id];
+  mergeExerciseMeta(incomingMeta);
+  if (data.exercises) {
+    saveExerciseLibrary(data.exercises.filter(e => !deleted.has(e.id)));
+  }
 
   const hasData = data.sessions.length > 0 || data.setLogs.length > 0;
   if (!hasData) return false;
@@ -150,8 +205,12 @@ export async function pullSync(): Promise<boolean> {
   // A pulled server copy may itself contain ghost/empty sessions from old builds
   await purgeEmptySessions();
 
-  if (data.program)   saveStoredProgram(data.program);
-  if (data.exercises) saveExerciseLibrary(data.exercises);
+  if (data.program) {
+    saveStoredProgram(data.program.map(d => ({
+      ...d,
+      exercises: d.exercises.filter(e => !deleted.has(e.id)),
+    })));
+  }
 
   return true;
 }
