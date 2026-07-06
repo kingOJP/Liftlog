@@ -13,17 +13,82 @@ export async function handleSync(request: Request, env: Env): Promise<Response> 
 const META_COLUMNS = `exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2,
                       secondary_muscle3, workout_type, equipment, weight_type`;
 
-async function pull(userId: string, env: Env): Promise<Response> {
-  const [sessions, setLogs, exerciseLogs, program, appExercises, appMeta, tombstones] = await Promise.all([
+interface SetEntry {
+  exerciseId: string;
+  setNumber: number;
+  weight: number;
+  reps: number;
+}
+
+interface SessionDoc {
+  guid: string;
+  dayId: number;
+  weekNumber: number;
+  startedAt: number;
+  completedAt: number | null;
+  updatedAt: number;
+  sets: SetEntry[];
+}
+
+// The user's sessions as documents: session_docs, or — until this user's
+// first sync-v2 push — assembled from the legacy per-row tables. Legacy docs
+// derive the same deterministic GUID the client derives (legacy-<startedAt>),
+// so both sides agree on identity. Empty sessions (ghosts) are dropped.
+async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> {
+  const docs = await env.DB.prepare(
+    'SELECT guid, day_id, week_number, started_at, completed_at, updated_at, sets_json FROM session_docs WHERE user_id = ?',
+  ).bind(userId).all();
+
+  if (docs.results.length > 0) {
+    return docs.results.map(r => ({
+      guid:        r.guid as string,
+      dayId:       r.day_id as number,
+      weekNumber:  r.week_number as number,
+      startedAt:   r.started_at as number,
+      completedAt: (r.completed_at as number | null) ?? null,
+      updatedAt:   r.updated_at as number,
+      sets:        JSON.parse(r.sets_json as string) as SetEntry[],
+    }));
+  }
+
+  const [sessions, setLogs] = await Promise.all([
     env.DB.prepare(
       'SELECT local_id, day_id, week_number, started_at, completed_at FROM workout_sessions WHERE user_id = ?',
     ).bind(userId).all(),
     env.DB.prepare(
-      'SELECT local_id, session_id, exercise_id, set_number, weight, reps FROM set_logs WHERE user_id = ?',
+      'SELECT session_id, exercise_id, set_number, weight, reps FROM set_logs WHERE user_id = ?',
     ).bind(userId).all(),
-    env.DB.prepare(
-      'SELECT local_id, session_id, exercise_id, difficulty FROM exercise_logs WHERE user_id = ?',
-    ).bind(userId).all(),
+  ]);
+
+  const setsBySession = new Map<number, SetEntry[]>();
+  for (const r of setLogs.results) {
+    const arr = setsBySession.get(r.session_id as number) ?? [];
+    arr.push({
+      exerciseId: r.exercise_id as string,
+      setNumber:  r.set_number as number,
+      weight:     r.weight as number,
+      reps:       r.reps as number,
+    });
+    setsBySession.set(r.session_id as number, arr);
+  }
+
+  return sessions.results
+    .map(r => ({
+      guid:        `legacy-${r.started_at}`,
+      dayId:       r.day_id as number,
+      weekNumber:  r.week_number as number,
+      startedAt:   r.started_at as number,
+      completedAt: (r.completed_at as number | null) ?? null,
+      updatedAt:   (r.completed_at as number | null) ?? (r.started_at as number),
+      sets:        setsBySession.get(r.local_id as number) ?? [],
+    }))
+    .filter(d => d.sets.length > 0);
+}
+
+async function pull(userId: string, env: Env): Promise<Response> {
+  const [sessionDocs, sessionTombstones, program, appExercises, appMeta, tombstones] = await Promise.all([
+    loadSessionDocs(userId, env),
+    env.DB.prepare('SELECT guid FROM deleted_sessions WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare(
       'SELECT program_json, exercises_json FROM user_programs WHERE user_id = ?',
     ).bind(userId).first<{ program_json: string; exercises_json: string }>(),
@@ -33,6 +98,30 @@ async function pull(userId: string, env: Env): Promise<Response> {
     env.DB.prepare(`SELECT ${META_COLUMNS} FROM app_exercise_metadata`).all(),
     env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
   ]);
+
+  const deletedSessionGuids = new Set(sessionTombstones.results.map(r => r.guid as string));
+  const liveDocs = sessionDocs.filter(d => !deletedSessionGuids.has(d.guid));
+
+  // Flatten documents back into the wire's session/setLog arrays. The ids are
+  // synthetic and only tie a doc's sets to it within this response.
+  const wireSessions: unknown[] = [];
+  const wireSetLogs: unknown[] = [];
+  let nextLogId = 1;
+  liveDocs.forEach((d, i) => {
+    const id = i + 1;
+    wireSessions.push({
+      id,
+      guid:        d.guid,
+      dayId:       d.dayId,
+      weekNumber:  d.weekNumber,
+      startedAt:   d.startedAt,
+      completedAt: d.completedAt ?? undefined,
+      updatedAt:   d.updatedAt,
+    });
+    for (const s of d.sets) {
+      wireSetLogs.push({ id: nextLogId++, sessionId: id, ...s });
+    }
+  });
 
   const deletedIds = new Set(tombstones.results.map(r => r.exercise_id as string));
 
@@ -67,27 +156,12 @@ async function pull(userId: string, env: Env): Promise<Response> {
   }
 
   return Response.json({
-    sessions: sessions.results.map(r => ({
-      id:          r.local_id,
-      dayId:       r.day_id,
-      weekNumber:  r.week_number,
-      startedAt:   r.started_at,
-      completedAt: r.completed_at ?? undefined,
-    })),
-    setLogs: setLogs.results.map(r => ({
-      id:         r.local_id,
-      sessionId:  r.session_id,
-      exerciseId: r.exercise_id,
-      setNumber:  r.set_number,
-      weight:     r.weight,
-      reps:       r.reps,
-    })),
-    exerciseLogs: exerciseLogs.results.map(r => ({
-      id:         r.local_id,
-      sessionId:  r.session_id,
-      exerciseId: r.exercise_id,
-      difficulty: r.difficulty ?? undefined,
-    })),
+    sessions: wireSessions,
+    setLogs:  wireSetLogs,
+    // Difficulty ratings — feature removed; empty array kept so stale cached
+    // clients (which restore this field) don't crash on undefined.
+    exerciseLogs: [],
+    deletedSessionGuids: [...deletedSessionGuids],
     exerciseMuscles: metaRows.map(r => ({
       exerciseId:       r.exercise_id,
       primaryMuscle:    r.primary_muscle    ?? null,
@@ -112,9 +186,14 @@ interface PushExercise {
 }
 
 interface PushPayload {
-  sessions:      Array<{ id: number; dayId: number; weekNumber: number; startedAt: number; completedAt?: number }>;
+  // guid/updatedAt are absent from stale cached clients — the server derives
+  // the same deterministic fallbacks the client would (legacy-<startedAt>,
+  // completedAt) so identities agree across versions.
+  sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number; updatedAt?: number }>;
   setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number }>;
-  exerciseLogs:  Array<{ id: number; sessionId: number; exerciseId: string; difficulty?: string }>;
+  /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
+  exerciseLogs:  unknown[];
+  deletedSessionGuids?: string[];
   exerciseMuscles?: Array<{ exerciseId: string; primaryMuscle: string | null; secondaryMuscle1: string | null; secondaryMuscle2: string | null; secondaryMuscle3: string | null }>;
   exerciseDetails?: Array<{ exerciseId: string; workoutType: string | null; equipment: string | null; weightType: string | null }>;
   deletedExerciseIds?: string[];
@@ -139,9 +218,16 @@ function validatePush(data: PushPayload): string | null {
 
   for (const s of data.sessions) {
     if (typeof s.id !== 'number' || typeof s.dayId !== 'number' ||
-        typeof s.weekNumber !== 'number' || typeof s.startedAt !== 'number') {
+        typeof s.weekNumber !== 'number' || typeof s.startedAt !== 'number' ||
+        (s.guid !== undefined && typeof s.guid !== 'string') ||
+        (s.updatedAt !== undefined && typeof s.updatedAt !== 'number')) {
       return 'malformed session';
     }
+  }
+  if (data.deletedSessionGuids != null) {
+    if (!Array.isArray(data.deletedSessionGuids)) return 'deletedSessionGuids must be an array';
+    if (data.deletedSessionGuids.length > MAX_SESSIONS) return 'too many deleted session guids';
+    if (data.deletedSessionGuids.some(g => typeof g !== 'string')) return 'malformed deleted session guid';
   }
   for (const s of data.setLogs) {
     if (typeof s.id !== 'number' || typeof s.sessionId !== 'number' ||
@@ -180,47 +266,75 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const invalid = validatePush(data);
   if (invalid) return Response.json({ error: invalid }, { status: 400 });
 
-  // Deletions are permanent: union the client's tombstones with the server's,
-  // so no stale library copy — from any device or account — can resurrect a
-  // deleted exercise.
+  // Exercise deletions are permanent: union the client's tombstones with the
+  // server's, so no stale library copy — from any device or account — can
+  // resurrect a deleted exercise.
   const existing = await env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all();
   const tombstoned = new Set(existing.results.map(r => r.exercise_id as string));
   const newTombstones = (data.deletedExerciseIds ?? []).filter(id => !tombstoned.has(id));
   for (const id of newTombstones) tombstoned.add(id);
 
-  const stmts: D1PreparedStatement[] = [
-    env.DB.prepare('DELETE FROM workout_sessions WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM set_logs WHERE user_id = ?').bind(userId),
-    env.DB.prepare('DELETE FROM exercise_logs WHERE user_id = ?').bind(userId),
-  ];
+  // Session tombstones follow the same rule, per user.
+  const existingSessionTombs = await env.DB.prepare(
+    'SELECT guid FROM deleted_sessions WHERE user_id = ?',
+  ).bind(userId).all();
+  const deadSessions = new Set(existingSessionTombs.results.map(r => r.guid as string));
+  const newSessionTombs = (data.deletedSessionGuids ?? []).filter(g => !deadSessions.has(g));
+  for (const g of newSessionTombs) deadSessions.add(g);
 
+  const stmts: D1PreparedStatement[] = [];
   const now = Date.now();
+
   for (const id of newTombstones) {
     stmts.push(env.DB.prepare(
       'INSERT OR IGNORE INTO deleted_exercises (exercise_id, deleted_at) VALUES (?, ?)',
     ).bind(id, now));
   }
+  for (const g of newSessionTombs) {
+    stmts.push(env.DB.prepare(
+      'INSERT OR IGNORE INTO deleted_sessions (user_id, guid, deleted_at) VALUES (?, ?, ?)',
+    ).bind(userId, g, now));
+    stmts.push(env.DB.prepare(
+      'DELETE FROM session_docs WHERE user_id = ? AND guid = ?',
+    ).bind(userId, g));
+  }
+
+  // Merge sessions per document: newer updated_at wins, everything else is
+  // left alone — two devices logging different workouts both keep theirs.
+  // Documents replace the old delete-all-and-reinsert, which silently dropped
+  // whichever device pushed first.
+  const setsBySession = new Map<number, SetEntry[]>();
+  for (const s of data.setLogs) {
+    const arr = setsBySession.get(s.sessionId) ?? [];
+    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps });
+    setsBySession.set(s.sessionId, arr);
+  }
 
   for (const s of data.sessions) {
+    const guid = s.guid ?? `legacy-${s.startedAt}`;
+    if (deadSessions.has(guid)) continue;
+    const sets = setsBySession.get(s.id) ?? [];
+    if (sets.length === 0) continue; // ghost/empty session — never store
+    const updatedAt = s.updatedAt ?? s.completedAt ?? s.startedAt;
     stmts.push(env.DB.prepare(
-      `INSERT INTO workout_sessions (local_id, user_id, day_id, week_number, started_at, completed_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(s.id, userId, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null));
+      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, guid) DO UPDATE SET
+         day_id       = excluded.day_id,
+         week_number  = excluded.week_number,
+         started_at   = excluded.started_at,
+         completed_at = excluded.completed_at,
+         updated_at   = excluded.updated_at,
+         sets_json    = excluded.sets_json
+       WHERE excluded.updated_at > session_docs.updated_at`,
+    ).bind(userId, guid, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null, updatedAt, JSON.stringify(sets)));
   }
 
-  for (const s of data.setLogs) {
-    stmts.push(env.DB.prepare(
-      `INSERT INTO set_logs (local_id, user_id, session_id, exercise_id, set_number, weight, reps)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(s.id, userId, s.sessionId, s.exerciseId, s.setNumber, s.weight, s.reps));
-  }
-
-  for (const s of data.exerciseLogs) {
-    stmts.push(env.DB.prepare(
-      `INSERT INTO exercise_logs (local_id, user_id, session_id, exercise_id, difficulty)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).bind(s.id, userId, s.sessionId, s.exerciseId, s.difficulty ?? null));
-  }
+  // The legacy per-row tables (workout_sessions/set_logs/exercise_logs) are
+  // deliberately left untouched: the pull fallback only reads them while
+  // session_docs is empty for the user, so once docs exist they're inert.
+  // Deleting them here would risk losing history if a client pushed after a
+  // failed pull (before ever merging the legacy data).
 
   // App-wide exercise library: replace wholesale with the pushed copy, minus
   // anything tombstoned. (Clients pull before they push, so the pushed library

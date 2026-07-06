@@ -29,11 +29,16 @@ Long-term milestones (roughly):
     constraint, redesigned Coach insights (3 highlights + 3 opportunities;
     under-trained nudges removed — the planner fixes volume instead), muscle
     heatmap (front/back SVG silhouettes, timeframe presets)
+15. ✅ Backend audit: Monday-anchored week numbering, per-account local-data
+    isolation (`liftlog_data_owner`), app-wide exercise library + metadata with
+    deletion tombstones (D1 `app_exercises`/`app_exercise_metadata`/`deleted_exercises`)
+16. ✅ Merge-based session sync (sync v2) — sessions are atomic documents keyed
+    by immutable GUID, merged per-session by `updatedAt` with deletion tombstones
+    (replaces full-replace LWW sync and the `pendingSessions` workaround), plus
+    in-workout draft persistence (localStorage; auto-restore on reopening the day)
 
 **Future milestones:**
-- Delta-based sync — the current full-replace, last-writer-wins sync is the biggest remaining architectural risk (two devices logging on the same day can drop a session; pendingSessions only patches one case). A per-session upsert protocol with tombstones is the fix.
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
-- In-workout session persistence — sets live only in React state until "Finish Workout"; an accidental app kill loses the session. Draft-session storage in IDB would fix it.
 - Mesocycle awareness — planned accumulation/deload weeks rather than reactive-only deloads; the configurable start date is the foundation.
 - Unit preference (kg/lb), exercise substitution suggestions from the equipment/workout-type taxonomy (the metadata already exists to power this), and worker-side tests with vitest-pool-workers.
 - Exercise swap suggestions — add a button on exercises in the workout edit screen to suggest a different exercise that hits the same primary muscle group and doesn't repeat any others in the workout.
@@ -178,7 +183,14 @@ src/
                                   highlights + 3 highest-impact opportunities, e1RM trend/plateau
                                   detection, weekly muscle volume, next-workout suggestion, and
                                   the coach plan (embeds computeProgramPlan)
-    sync.ts                    — pushSync(), pullSync(), getLoggedInUser() — cloud sync via /api/sync
+    sync.ts                    — pushSync(), pullSync(), getLoggedInUser(), ensureLocalDataOwner()
+                                  — merge-based cloud sync via /api/sync (see Cloud sync section)
+    syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
+                                  sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
+                                  unit-tested without IndexedDB
+    sessionTombstones.ts       — deleted-session tombstone set (localStorage, user-scoped, synced)
+    draftSession.ts            — in-progress workout draft (localStorage): saveDraftSession(),
+                                  getResumableDraft(), clearDraftSession()
     *.test.ts                  — Vitest unit tests for the data layer
 
   db/
@@ -219,8 +231,9 @@ src/
 | `liftlog_exercise_meta` | `exercises.ts` | Per-exercise metadata overrides (muscle, equipment, etc.) |
 | `liftlog_settings` | `settings.ts` | Device-local settings (program start date) |
 | `liftlog_rest_seconds` | `settings.ts` | Rest-timer default duration (pre-Rev-2 key, kept) |
-| `liftlog_pending_sessions` | `pendingSessions.ts` | Sessions saved locally but not yet confirmed by the server |
 | `liftlog_deleted_exercises` | `programStore.ts` | Deleted-exercise tombstones (synced app-wide; filtered on every library read) |
+| `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
+| `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
@@ -230,17 +243,20 @@ src/
 ## IndexedDB schema (version 3)
 
 **`sessions`** — index: `weekNumber`
-- `id` (autoincrement), `dayId`, `weekNumber`, `startedAt`, `completedAt?`
+- `id` (autoincrement), `guid?` (immutable sync identity; legacy rows get `legacy-<startedAt>`
+  backfilled by `ensureSessionGuids()`), `dayId`, `weekNumber`, `startedAt`, `completedAt?`,
+  `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync)
 
 **`setLogs`** — index: `sessionId`
 - `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`
 
-**`exerciseLogs`** — index: `sessionId` (difficulty ratings — feature removed, store kept for compatibility)
+**`exerciseLogs`** — index: `sessionId` (difficulty ratings — feature removed, store kept for compatibility; no longer synced)
 - `id`, `sessionId`, `exerciseId`, `difficulty`
 
 v2 added `exerciseMuscles` + `exerciseDetails` stores; v3 deleted them (metadata moved to localStorage).
+`guid`/`updatedAt` needed no version bump — IDB records are schemaless; only stores/indexes are versioned.
 
-Key exported functions: `createSession`, `completeSession`, `addSetLog`, `getSession`, `updateSessionDate`, `getCompletedSessionsForWeek`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `restoreIDB`.
+Key exported functions: `createSession`, `completeSession`, `touchSession`, `ensureSessionGuids`, `addSetLog`, `getSession`, `updateSessionDate`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `mergeServerSessions`, `clearIDB`.
 
 Anything that *analyzes* history (dashboard, metrics, coaching, recommendations, history list) goes through `loadTrainingSnapshot()` in `data/analytics.ts` — one `dumpIDB()` read per screen, never per-session queries.
 
@@ -250,23 +266,39 @@ Anything that *analyzes* history (dashboard, metrics, coaching, recommendations,
 
 On app mount, `App.tsx` runs this sequence (only when logged in):
 1. `ensureLocalDataOwner()` — if a *different* account signed in on this device, wipe
-   user-scoped local data (IDB history, program, pending sessions) **before** any sync so one
-   account's data can never be shown to — or pushed into — another account. App-wide exercise
-   data and device settings survive the switch. Owner is tracked in `liftlog_data_owner`.
-2. `migrateExerciseIds()` — fast local IDB fix, must run **before** WorkoutView reads logs
-3. `pullSync()` — pulls server data into IDB + localStorage (clears and replaces)
-4. `migrateExerciseIds()` again — in case pull restored old IDs from the server
-5. `pushSync()` — if pull found nothing or any IDs were remapped
+   user-scoped local data (IDB history, program, session tombstones, draft) **before** any
+   sync so one account's data can never be shown to — or pushed into — another account.
+   App-wide exercise data and device settings survive the switch (`liftlog_data_owner`).
+2. `migrateExerciseIds()` + `ensureSessionGuids()` — local IDB fixes, must run **before**
+   anything reads logs or the first merge runs
+3. `pullSync()` — merges server data into IDB + localStorage (see below)
+4. `migrateExerciseIds()` again — in case pull merged old IDs from the server
+5. `pushSync()` — uploads the merged union
 
-Sync payload includes: sessions, setLogs, exerciseLogs, program, exercise library, exercise
-metadata (muscle/equipment/weight-type overrides), **and deleted-exercise tombstones**. On
-pull, metadata is *merged* into local (server wins per exercise; unsynced local edits survive)
-so the info you enter for new exercises persists across devices and re-pulls.
+**Merge protocol (sync v2).** The unit of sync is the *session document*: a session row plus
+its set logs, identified by an immutable client-generated `guid` (pre-v2 rows derive the
+deterministic `legacy-<startedAt>` so every device computes the same identity). On the wire
+sessions/setLogs stay flat arrays; the server stores one row per document
+(`session_docs`, `sets_json` blob) and **upserts per document — newer `updatedAt` wins** — so
+two devices logging different workouts both keep theirs, and an edit propagates as the newer
+copy. Pull merges the same way locally (`planSessionMerge` in `data/syncMerge.ts`, pure +
+unit-tested; applied by `mergeServerSessions` in `db/database.ts`): tombstoned sessions are
+removed, newer server copies replace local ones, **local-only sessions are never dropped**.
+Session deletions (ghost purge, exercise-history wipe) record tombstones
+(`liftlog_deleted_sessions` locally, `deleted_sessions` in D1, per-user) so they stick.
+Anything that rewrites a session's sets must bump its `updatedAt` (`touchSession`) or the
+merge will consider the server copy equal and other devices won't converge.
+Legacy `workout_sessions`/`set_logs` tables are a read-only pull fallback until a user's
+first v2 push; `exerciseLogs` (removed difficulty feature) is no longer synced.
+
+Sync payload also includes: program, exercise library, exercise metadata
+(muscle/equipment/weight-type overrides), and deleted-exercise tombstones. On pull, metadata
+is *merged* into local (server wins per exercise; unsynced local edits survive).
 `pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
-resurrect through sync.
+resurrect through sync (the server additionally refuses to store empty session docs).
 
-**Per-user vs app-wide on the server (D1):** sessions/set logs/program are per-user
-(`user_id`-keyed tables). The exercise library and its metadata are **app-wide** — global
+**Per-user vs app-wide on the server (D1):** session docs, tombstones and the program are
+per-user (`user_id`-keyed). The exercise library and its metadata are **app-wide** — global
 `app_exercises` / `app_exercise_metadata` tables shared by every account (the per-user
 `exercise_metadata` table and `user_programs.exercises_json` remain only as legacy pull
 fallbacks). Exercise deletion writes a tombstone (`deleted_exercises` server table,
@@ -382,8 +414,12 @@ sets + weekly rate + status.
 
 ## Decisions & things to keep in mind
 
-- **DB writes only at "Finish Workout"** — sets are pure React state until save. This makes inline editing/deletion free (no DB rollback needed).
-- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session and re-writes them.
+- **DB writes only at "Finish Workout"** — sets are pure React state until save. This makes
+  inline editing/deletion free (no DB rollback needed). A localStorage draft
+  (`draftSession.ts`) shadows the state on every set change so an app kill mid-workout loses
+  nothing: reopening the same day within 12 h auto-restores it (with a Discard button); the
+  draft is cleared at Finish. Edit-session mode never drafts.
+- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session, re-writes them, and calls `touchSession()` so merge sync propagates the edit.
 - **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
 - **Program start date** is user-configurable in Settings (`settings.ts`, default `2026-06-09`).
@@ -421,15 +457,13 @@ sets + weekly rate + status.
 These are the highest-leverage improvements identified in the Rev 2 audit. Implement them in
 roughly this order when ready — each one builds on the previous.
 
-### 1. Delta-based sync
-**The biggest remaining architectural risk.** The current sync is full-replace, last-writer-wins:
-`pushSync()` sends the entire IDB and `pullSync()` wipes local IDB and restores from server.
-On two concurrent devices (phone + desktop) this silently drops whichever device synced last.
-
-Fix: move to per-session upsert with tombstones. Each `session` row gets a `deletedAt` timestamp
-instead of being physically deleted. The worker merges by `startedAt` (the natural dedup key) and
-returns only rows newer than the client's `lastSyncAt`. This also eliminates the `pendingSessions`
-localStorage workaround entirely.
+### 1. ~~Delta-based sync~~ — DONE (merge-based sync v2)
+Implemented as per-session-document merge rather than a cursor-based delta protocol: payloads
+are tiny for a personal training log, so incremental transfer (`lastSyncAt` cursors) would add
+clock-skew and per-device state for no user-visible benefit. What actually fixes the data-loss
+risk is *merge semantics*: immutable session GUIDs (not `startedAt`, which `updateSessionDate`
+mutates), per-document last-write-wins by `updatedAt`, and deletion tombstones. See the Cloud
+sync section. `pendingSessions` was removed.
 
 ### 2. RPE / RIR logging
 The deload trigger today fires purely on e1RM stagnation across 3 sessions, which can't
@@ -441,14 +475,12 @@ Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a sma
 chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
 No UI change is needed if the field is left blank — fully backwards-compatible.
 
-### 3. In-workout session persistence (draft sessions)
-Sets live only in React state from "Start Workout" until "Finish Workout." An accidental app kill
-or Safari tab eviction silently loses the whole session.
-
-Fix: write a draft session to IDB as sets are logged (not just at finish), keyed to a
-`draftSessionId` in localStorage. On app mount, detect a stale draft and offer to resume or
-discard. At "Finish Workout," promote the draft to a completed session atomically. This is the
-single biggest UX risk for anyone doing long sessions with spotty connectivity.
+### 3. ~~In-workout session persistence (draft sessions)~~ — DONE
+Implemented in localStorage rather than IDB: a draft is one small single-writer object, and
+synchronous writes can't be lost to an interrupted async transaction during an app kill.
+WorkoutView shadows its set state into `liftlog_draft_session` on every change; reopening the
+same day within 12 h auto-restores it (banner + Discard), Finish clears it. `startedAt` is
+preserved so duration tracking stays correct. See `data/draftSession.ts`.
 
 ### 4. Mesocycle awareness
 The current deload is purely reactive (stall → deload). A planned accumulation/deload structure

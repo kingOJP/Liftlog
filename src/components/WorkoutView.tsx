@@ -6,6 +6,7 @@ import type { PlanChange } from '../data/coach';
 import {
   createSession,
   completeSession,
+  touchSession,
   addSetLog,
   getSetLogsForSession,
   deleteSetLogsForSession,
@@ -16,7 +17,7 @@ import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { calculateRecommendation } from '../data/recommendations';
 import type { WeightRec, ExerciseSession } from '../data/recommendations';
 import { getExerciseMeta } from '../data/exercises';
-import { savePendingSession } from '../data/pendingSessions';
+import { getResumableDraft, saveDraftSession, clearDraftSession } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
 import './WorkoutView.css';
@@ -52,7 +53,12 @@ function dateInputToTimestamp(value: string, originalTs: number): number {
 
 export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
   const isEditMode = existingSessionId !== undefined;
-  const [sets, setSets] = useState<Record<string, SetEntry[]>>({});
+  // An interrupted workout (app killed mid-session) left a draft behind —
+  // restore it so no logged set is ever lost. Edit mode never drafts.
+  const [restoredDraft, setRestoredDraft] = useState(() =>
+    isEditMode ? null : getResumableDraft(day.id),
+  );
+  const [sets, setSets] = useState<Record<string, SetEntry[]>>(() => restoredDraft?.sets ?? {});
   const [recommendations, setRecommendations] = useState<Record<string, WeightRec>>({});
   // Per exercise: the most recent session it appeared in (for the "last time" line)
   const [lastSessions, setLastSessions] = useState<Record<string, ExerciseSession>>({});
@@ -64,9 +70,10 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   const [loading, setLoading] = useState(isEditMode);
   // Increments on every logged set to (re)start the rest timer. Edit mode skips it.
   const [restRunId, setRestRunId] = useState(0);
-  // Duration tracking: the workout starts when the view opens; the session ends
-  // at the final logged set. completedAt − startedAt is the workout duration.
-  const [sessionStart] = useState(() => Date.now());
+  // Duration tracking: the workout starts when the view opens (or when the
+  // restored draft's workout originally started); the session ends at the
+  // final logged set. completedAt − startedAt is the workout duration.
+  const [sessionStart, setSessionStart] = useState(() => restoredDraft?.startedAt ?? Date.now());
   const lastSetAtRef = useRef<number | null>(null);
 
   // Stamp the time of the most recent set activity — completedAt uses it so
@@ -75,6 +82,20 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   useEffect(() => {
     if (totalSets > 0) lastSetAtRef.current = Date.now();
   }, [sets, totalSets]);
+
+  // Persist the in-progress workout on every set change so an app kill or tab
+  // eviction can't lose it. Cleared at Finish (or when the draft is discarded).
+  useEffect(() => {
+    if (isEditMode || totalSets === 0) return;
+    saveDraftSession({ dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets });
+  }, [sets, totalSets, isEditMode, day.id, sessionStart]);
+
+  function handleDiscardDraft() {
+    clearDraftSession();
+    setSets({});
+    setSessionStart(Date.now());
+    setRestoredDraft(null);
+  }
   // Edit mode only: the session's original completedAt + the (editable) date.
   const [originalCompletedAt, setOriginalCompletedAt] = useState<number | null>(null);
   const [dateInput, setDateInput] = useState('');
@@ -188,20 +209,15 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       }
     }
 
-    if (!isEditMode) {
+    if (isEditMode) {
+      // Mark the session as freshly edited so merge sync propagates this copy
+      await touchSession(sid);
+    } else {
       // The session ends at the final logged set, not the "Finish" tap — the
       // duration engine needs the training window, not phone-in-hand time.
       const completedAt = Math.max(lastSetAtRef.current ?? Date.now(), startedAt);
       await completeSession(sid, completedAt);
-      savePendingSession({
-        startedAt,
-        completedAt,
-        dayId: day.id,
-        weekNumber: getWeekNumber(),
-        setLogs: Object.entries(sets).flatMap(([exerciseId, exerciseSets]) =>
-          exerciseSets.map((s, i) => ({ exerciseId, setNumber: i + 1, weight: s.weight, reps: s.reps }))
-        ),
-      });
+      clearDraftSession();
     }
     onComplete();
   }
@@ -246,6 +262,16 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
               max={maxDate}
               onChange={e => setDateInput(e.target.value)}
             />
+          </div>
+        )}
+        {restoredDraft && (
+          <div className="draft-banner">
+            <span className="draft-banner-text">
+              Restored your in-progress workout — keep logging or discard it
+            </span>
+            <button className="draft-banner-discard" onClick={handleDiscardDraft}>
+              Discard
+            </button>
           </div>
         )}
         {!isEditMode && planChanges.length > 0 && !planDismissed && (

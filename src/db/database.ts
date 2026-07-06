@@ -1,13 +1,20 @@
 import { LEGACY_ID_MAP } from '../data/legacyIds';
+import { addSessionTombstones } from '../data/sessionTombstones';
+import { planSessionMerge, mergePlanIsEmpty } from '../data/syncMerge';
+import type { SessionDoc, SessionMergePlan } from '../data/syncMerge';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface Session {
   id?: number;
+  /** Immutable sync identity. Absent on pre-sync-v2 rows (derived as legacy-<startedAt>). */
+  guid?: string;
   dayId: number;
   weekNumber: number;
   startedAt: number;
   completedAt?: number;
+  /** Last meaningful write — per-session conflict resolution for merge sync. */
+  updatedAt?: number;
 }
 
 export interface SetLog {
@@ -89,7 +96,7 @@ export async function createSession(dayId: number, weekNumber: number, startedAt
   const db = await openDB();
   const id = await idbReq(
     db.transaction('sessions', 'readwrite').objectStore('sessions').add({
-      dayId, weekNumber, startedAt,
+      guid: crypto.randomUUID(), dayId, weekNumber, startedAt, updatedAt: Date.now(),
     } as Session),
   );
   return id as number;
@@ -100,7 +107,38 @@ export async function completeSession(sessionId: number, completedAt = Date.now(
   const store = db.transaction('sessions', 'readonly').objectStore('sessions');
   const session = await idbReq<Session>(store.get(sessionId));
   session.completedAt = completedAt;
+  session.updatedAt = Date.now();
   await idbReq(db.transaction('sessions', 'readwrite').objectStore('sessions').put(session));
+}
+
+// Bump a session's updatedAt after its set logs were rewritten (edit-session
+// flow) so the merge protocol propagates the edit as the newer copy.
+export async function touchSession(sessionId: number): Promise<void> {
+  const db = await openDB();
+  const session = await idbReq<Session | undefined>(
+    db.transaction('sessions', 'readonly').objectStore('sessions').get(sessionId),
+  );
+  if (!session) return;
+  session.updatedAt = Date.now();
+  await idbReq(db.transaction('sessions', 'readwrite').objectStore('sessions').put(session));
+}
+
+// Pins a stored GUID onto pre-sync-v2 sessions. The value is derived
+// deterministically from startedAt so every device holding a copy of the same
+// legacy session computes the same identity; materializing it protects the
+// identity against later startedAt mutation (updateSessionDate re-dating).
+export async function ensureSessionGuids(): Promise<void> {
+  const db = await openDB();
+  const sessions = await idbReq<Session[]>(
+    db.transaction('sessions', 'readonly').objectStore('sessions').getAll(),
+  );
+  const missing = sessions.filter(s => !s.guid);
+  if (missing.length === 0) return;
+
+  const tx = db.transaction('sessions', 'readwrite');
+  const store = tx.objectStore('sessions');
+  for (const s of missing) store.put({ ...s, guid: `legacy-${s.startedAt}` });
+  await txDone(tx);
 }
 
 export async function addSetLog(
@@ -140,18 +178,8 @@ export async function updateSessionDate(
   session.completedAt = completedAt;
   session.startedAt = Math.min(session.startedAt, completedAt);
   session.weekNumber = weekNumber;
+  session.updatedAt = Date.now();
   await idbReq(db.transaction('sessions', 'readwrite').objectStore('sessions').put(session));
-}
-
-export async function getCompletedSessionsForWeek(weekNumber: number): Promise<Session[]> {
-  const db = await openDB();
-  const all = await idbReq<Session[]>(
-    db.transaction('sessions', 'readonly')
-      .objectStore('sessions')
-      .index('weekNumber')
-      .getAll(weekNumber),
-  );
-  return all.filter(s => s.completedAt != null);
 }
 
 export async function getSetLogsForSession(sessionId: number): Promise<SetLog[]> {
@@ -194,20 +222,28 @@ export async function deleteSetLogsByExerciseId(exerciseId: string): Promise<voi
   const all = await idbReq<SetLog[]>(
     db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
   );
-  const ids = all.filter(l => l.exerciseId === exerciseId).map(l => l.id!);
-  if (ids.length === 0) return;
+  const doomed = all.filter(l => l.exerciseId === exerciseId);
+  if (doomed.length === 0) return;
 
   const tx = db.transaction('setLogs', 'readwrite');
   const store = tx.objectStore('setLogs');
-  for (const id of ids) store.delete(id);
+  for (const log of doomed) store.delete(log.id!);
   await txDone(tx);
+
+  // Bump the affected sessions so merge sync propagates the removal as the
+  // newer copy (sessions emptied entirely are tombstoned by the purge that
+  // follows in pushSync).
+  for (const sessionId of new Set(doomed.map(l => l.sessionId))) {
+    await touchSession(sessionId);
+  }
 }
 
 // Remove sessions that carry no set logs. Empty sessions are meaningless
 // "ghost" workouts (a residue of old buggy builds / interrupted syncs) that
-// kept reappearing as duplicates. Runs at startup and around every sync so a
-// clean local DB also cleans the server copy on the next push. exerciseLogs
-// for the removed sessions are dropped too (that store is otherwise unused).
+// kept reappearing as duplicates. Runs at startup and around every sync.
+// Each purge records a session tombstone so the deletion propagates through
+// merge sync instead of resurrecting from the server copy. exerciseLogs for
+// the removed sessions are dropped too (that store is otherwise unused).
 export async function purgeEmptySessions(): Promise<number> {
   const db = await openDB();
   const [sessions, setLogs, exerciseLogs] = await Promise.all([
@@ -217,8 +253,11 @@ export async function purgeEmptySessions(): Promise<number> {
   ]);
 
   const withSets = new Set(setLogs.map(l => l.sessionId));
-  const emptyIds = new Set(sessions.filter(s => !withSets.has(s.id!)).map(s => s.id!));
-  if (emptyIds.size === 0) return 0;
+  const empty = sessions.filter(s => !withSets.has(s.id!));
+  if (empty.length === 0) return 0;
+  const emptyIds = new Set(empty.map(s => s.id!));
+
+  addSessionTombstones(empty.map(s => s.guid ?? `legacy-${s.startedAt}`));
 
   const tx = db.transaction(['sessions', 'exerciseLogs'], 'readwrite');
   const sessionStore = tx.objectStore('sessions');
@@ -228,7 +267,7 @@ export async function purgeEmptySessions(): Promise<number> {
     if (emptyIds.has(log.sessionId)) exerciseLogStore.delete(log.id!);
   }
   await txDone(tx);
-  return emptyIds.size;
+  return empty.length;
 }
 
 // ── Exercise ID migration ─────────────────────────────────────────────────────
@@ -278,22 +317,81 @@ export async function dumpIDB(): Promise<{
   return { sessions, setLogs, exerciseLogs };
 }
 
-// Replaces all local data in one transaction: either the restore fully applies
-// or the previous state survives (no half-cleared database on interruption).
-export async function restoreIDB(data: Awaited<ReturnType<typeof dumpIDB>>): Promise<void> {
+// ── Merge sync ───────────────────────────────────────────────────────────────
+
+// Plans a merge of server session documents into the local DB (pure logic in
+// data/syncMerge.ts) and applies it. Local-only sessions are untouched — they
+// upload on the next push — so a pull can never drop a workout logged on this
+// device. Returns true if anything changed.
+export async function mergeServerSessions(
+  incoming: SessionDoc[],
+  tombstones: Set<string>,
+): Promise<boolean> {
   const db = await openDB();
-  const tx = db.transaction(['sessions', 'setLogs', 'exerciseLogs'], 'readwrite');
+  const local = await idbReq<Session[]>(
+    db.transaction('sessions', 'readonly').objectStore('sessions').getAll(),
+  );
+  const plan = planSessionMerge(local, incoming, tombstones);
+  if (mergePlanIsEmpty(plan)) return false;
+  await applySessionMergePlan(db, plan);
+  return true;
+}
 
-  const stores = {
-    sessions: data.sessions,
-    setLogs: data.setLogs,
-    exerciseLogs: data.exerciseLogs,
-  } as const;
+async function applySessionMergePlan(db: IDBDatabase, plan: SessionMergePlan): Promise<void> {
+  // Deletions + replaced-session cleanup need the set logs of every touched session
+  const doomedSessionIds = new Set<number>([
+    ...plan.deleteLocalIds,
+    ...plan.replace.map(r => r.localId),
+  ]);
 
-  for (const [name, records] of Object.entries(stores)) {
-    const store = tx.objectStore(name);
-    store.clear();
-    for (const record of records) store.put(record);
+  if (doomedSessionIds.size > 0) {
+    const allLogs = await idbReq<SetLog[]>(
+      db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
+    );
+    const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
+    const sessionStore = tx.objectStore('sessions');
+    const logStore = tx.objectStore('setLogs');
+    for (const id of plan.deleteLocalIds) sessionStore.delete(id);
+    for (const log of allLogs) {
+      if (doomedSessionIds.has(log.sessionId)) logStore.delete(log.id!);
+    }
+    await txDone(tx);
+  }
+
+  // Replaced sessions keep their local id (kept references stay valid);
+  // inserted sessions get a fresh autoincrement id.
+  for (const { localId, doc } of plan.replace) {
+    await writeSessionDoc(db, doc, localId);
+  }
+  for (const doc of plan.insert) {
+    await writeSessionDoc(db, doc);
+  }
+}
+
+async function writeSessionDoc(db: IDBDatabase, doc: SessionDoc, localId?: number): Promise<void> {
+  const session: Session = {
+    ...(localId !== undefined ? { id: localId } : {}),
+    guid: doc.guid,
+    dayId: doc.dayId,
+    weekNumber: doc.weekNumber,
+    startedAt: doc.startedAt,
+    completedAt: doc.completedAt,
+    updatedAt: doc.updatedAt,
+  };
+  const sid = await idbReq(
+    db.transaction('sessions', 'readwrite').objectStore('sessions').put(session),
+  ) as number;
+
+  const tx = db.transaction('setLogs', 'readwrite');
+  const store = tx.objectStore('setLogs');
+  for (const s of doc.sets) {
+    store.add({
+      sessionId: sid,
+      exerciseId: s.exerciseId,
+      setNumber: s.setNumber,
+      weight: s.weight,
+      reps: s.reps,
+    } as SetLog);
   }
   await txDone(tx);
 }

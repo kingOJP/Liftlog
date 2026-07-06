@@ -179,3 +179,34 @@
   color: var(--text-muted);
   line-height: 1.4;
 }
+
+.draft-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.draft-banner-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.draft-banner-discard {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}

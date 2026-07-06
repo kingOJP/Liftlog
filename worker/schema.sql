@@ -59,6 +59,35 @@ CREATE TABLE IF NOT EXISTS exercise_metadata (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Sync v2: each workout session is one atomic document — the session row and
+-- its sets travel together, keyed by an immutable client-generated GUID.
+-- Pushes upsert per document (newer updated_at wins), so two devices logging
+-- different workouts both keep theirs. Replaces the full-replace sync over
+-- workout_sessions/set_logs/exercise_logs, which are kept only as a legacy
+-- pull fallback until each user's first sync-v2 push.
+CREATE TABLE IF NOT EXISTS session_docs (
+  user_id      TEXT    NOT NULL,
+  guid         TEXT    NOT NULL,
+  day_id       INTEGER NOT NULL,
+  week_number  INTEGER NOT NULL,
+  started_at   INTEGER NOT NULL,
+  completed_at INTEGER,
+  updated_at   INTEGER NOT NULL,
+  sets_json    TEXT    NOT NULL,
+  PRIMARY KEY (user_id, guid),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Session deletion tombstones (per user): once a session is deleted — ghost
+-- cleanup or wiping an exercise's history — it stays deleted on every device.
+CREATE TABLE IF NOT EXISTS deleted_sessions (
+  user_id    TEXT    NOT NULL,
+  guid       TEXT    NOT NULL,
+  deleted_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, guid),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- App-wide exercise library (shared across all accounts — exercises are an
 -- app-level feature, not per-user). Populated from the client's library on
 -- push; per-user exercises_json remains only as a legacy fallback for pull.
