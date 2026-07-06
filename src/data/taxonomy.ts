@@ -1,49 +1,46 @@
 // Domain taxonomy: the closed vocabularies every exercise is classified with.
 // These are training-domain concepts (not storage concerns), so they live in
 // data/ — the IndexedDB layer and UI both import from here.
+// The option arrays are kept alphabetical — they render directly as dropdowns.
 
 export type MuscleGroup =
-  | 'Chest' | 'Upper Back' | 'Lats' | 'Lower Back'
-  | 'Front Delts' | 'Side Delts' | 'Rear Delts'
-  | 'Triceps' | 'Biceps' | 'Forearms' | 'Traps'
-  | 'Quads' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Abs';
+  | 'Abs' | 'Biceps' | 'Calves' | 'Chest' | 'Delts'
+  | 'Forearms' | 'Glutes' | 'Hamstrings' | 'Lats' | 'Lower Back'
+  | 'Quads' | 'Traps' | 'Triceps' | 'Upper Back';
 
 export type WorkoutType =
-  | 'Chest Press' | 'Row' | 'Pull Down' | 'Overhead Press'
-  | 'Curl' | 'Tricep Extension' | 'Lateral Raise' | 'Fly'
-  | 'Squat' | 'Hip Hinge' | 'Leg Press' | 'Leg Curl'
-  | 'Leg Extension' | 'Calf Raise' | 'Hip Thrust' | 'Face Pull'
-  | 'Pull Up' | 'Push Up';
+  | 'Calf Raise' | 'Curl' | 'Face Pull' | 'Fly'
+  | 'Hip Hinge' | 'Hip Thrust' | 'Lateral Raise' | 'Leg Curl'
+  | 'Leg Extension' | 'Leg Press' | 'Lunge' | 'Press'
+  | 'Pull Down' | 'Pull Up' | 'Row' | 'Squat' | 'Tricep Extension';
 
 export type Equipment =
-  | 'Bench' | 'Cable Machine' | 'Squat Rack' | 'Machine'
-  | 'Smith Machine' | 'Pull Up Bar' | 'None';
+  | 'Bench' | 'Cable Machine' | 'Machine' | 'None'
+  | 'Pull Up Bar' | 'Smith Machine' | 'Squat Rack';
 
 export type WeightType =
-  | 'Barbell' | 'Dumbbell' | 'Machine' | 'Bodyweight'
-  | 'EZ Bar' | 'Kettlebell' | 'Resistance Band';
+  | 'Barbell' | 'Bodyweight' | 'Dumbbell' | 'EZ Bar'
+  | 'Kettlebell' | 'Machine' | 'Resistance Band';
 
 export const MUSCLE_GROUPS: MuscleGroup[] = [
-  'Chest', 'Upper Back', 'Lats', 'Lower Back',
-  'Front Delts', 'Side Delts', 'Rear Delts',
-  'Triceps', 'Biceps', 'Forearms', 'Traps',
-  'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Abs',
+  'Abs', 'Biceps', 'Calves', 'Chest', 'Delts',
+  'Forearms', 'Glutes', 'Hamstrings', 'Lats', 'Lower Back',
+  'Quads', 'Traps', 'Triceps', 'Upper Back',
 ];
 
 export const WORKOUT_TYPES: WorkoutType[] = [
-  'Chest Press', 'Row', 'Pull Down', 'Overhead Press',
-  'Curl', 'Tricep Extension', 'Lateral Raise', 'Fly',
-  'Squat', 'Hip Hinge', 'Leg Press', 'Leg Curl',
-  'Leg Extension', 'Calf Raise', 'Hip Thrust', 'Face Pull',
-  'Pull Up', 'Push Up',
+  'Calf Raise', 'Curl', 'Face Pull', 'Fly',
+  'Hip Hinge', 'Hip Thrust', 'Lateral Raise', 'Leg Curl',
+  'Leg Extension', 'Leg Press', 'Lunge', 'Press',
+  'Pull Down', 'Pull Up', 'Row', 'Squat', 'Tricep Extension',
 ];
 
 export const EQUIPMENT_OPTIONS: Equipment[] = [
-  'Bench', 'Cable Machine', 'Squat Rack', 'Machine',
-  'Smith Machine', 'Pull Up Bar', 'None',
+  'Bench', 'Cable Machine', 'Machine', 'None',
+  'Pull Up Bar', 'Smith Machine', 'Squat Rack',
 ];
 
 export const WEIGHT_TYPES: WeightType[] = [
-  'Barbell', 'Dumbbell', 'Machine', 'Bodyweight',
-  'EZ Bar', 'Kettlebell', 'Resistance Band',
+  'Barbell', 'Bodyweight', 'Dumbbell', 'EZ Bar',
+  'Kettlebell', 'Machine', 'Resistance Band',
 ];

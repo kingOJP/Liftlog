@@ -12,23 +12,19 @@ export interface ExerciseDef {
 
 export const EXERCISES: ExerciseDef[] = [
   // Chest
-  { id: 'incline-barbell-press',    name: 'Incline Barbell Press',            primaryMuscle: 'Chest',       secondaryMuscles: ['Front Delts', 'Triceps', null], workoutType: 'Chest Press',      equipment: 'Bench',             weightType: 'Barbell'    },
-  { id: 'dumbbell-bench-press',     name: 'Dumbbell Bench Press',             primaryMuscle: 'Chest',       secondaryMuscles: ['Front Delts', 'Triceps', null], workoutType: 'Chest Press',      equipment: 'Bench',             weightType: 'Dumbbell'   },
-  { id: 'cable-fly',                name: 'Cable Fly',                        primaryMuscle: 'Chest',       secondaryMuscles: ['Front Delts', null, null],      workoutType: 'Fly',              equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'incline-barbell-press',    name: 'Incline Barbell Press',            primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'dumbbell-bench-press',     name: 'Dumbbell Bench Press',             primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'cable-fly',                name: 'Cable Fly',                        primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Cable Machine',     weightType: 'Machine'    },
 
-  // Front Delts
-  { id: 'seated-db-overhead-press', name: 'Seated Dumbbell Overhead Press',   primaryMuscle: 'Front Delts', secondaryMuscles: ['Side Delts', 'Triceps', null],  workoutType: 'Overhead Press',   equipment: 'Bench',             weightType: 'Dumbbell'   },
-  { id: 'barbell-overhead-press',   name: 'Barbell Overhead Press',           primaryMuscle: 'Front Delts', secondaryMuscles: ['Side Delts', 'Triceps', null],  workoutType: 'Overhead Press',   equipment: 'Squat Rack',        weightType: 'Barbell'    },
-
-  // Side Delts
-  { id: 'cable-lateral-raises',     name: 'Cable Lateral Raises',             primaryMuscle: 'Side Delts',  secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'Cable Machine',     weightType: 'Machine'    },
-  { id: 'dumbbell-lateral-raises',  name: 'Dumbbell Lateral Raises',          primaryMuscle: 'Side Delts',  secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'None',              weightType: 'Dumbbell'   },
-
-  // Rear Delts
-  { id: 'face-pulls',               name: 'Face Pulls',                       primaryMuscle: 'Rear Delts',  secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Face Pull',        equipment: 'Cable Machine',     weightType: 'Machine'    },
+  // Delts
+  { id: 'seated-db-overhead-press', name: 'Seated Dumbbell Overhead Press',   primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'barbell-overhead-press',   name: 'Barbell Overhead Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'cable-lateral-raises',     name: 'Cable Lateral Raises',             primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'dumbbell-lateral-raises',  name: 'Dumbbell Lateral Raises',          primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'None',              weightType: 'Dumbbell'   },
+  { id: 'face-pulls',               name: 'Face Pulls',                       primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Face Pull',        equipment: 'Cable Machine',     weightType: 'Machine'    },
 
   // Upper Back
-  { id: 'bent-over-db-row',         name: 'Bent Over One Arm Dumbbell Row',   primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Rear Delts', 'Biceps'], workoutType: 'Row',              equipment: 'None',              weightType: 'Dumbbell'   },
+  { id: 'bent-over-db-row',         name: 'Bent Over One Arm Dumbbell Row',   primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Delts', 'Biceps'],      workoutType: 'Row',              equipment: 'None',              weightType: 'Dumbbell'   },
   { id: 'barbell-rows',             name: 'Barbell Rows',                     primaryMuscle: 'Upper Back',  secondaryMuscles: ['Lats', 'Biceps', null],         workoutType: 'Row',              equipment: 'None',              weightType: 'Barbell'    },
 
   // Lats
@@ -83,15 +79,41 @@ export interface ExerciseMetaOverride {
   weightType: WeightType | null;
 }
 
+// Taxonomy values that were merged away — stored overrides (local edits or a
+// server pull) may still carry them, so every read normalizes.
+const LEGACY_MUSCLES: Record<string, MuscleGroup> = {
+  'Front Delts': 'Delts', 'Side Delts': 'Delts', 'Rear Delts': 'Delts',
+};
+const LEGACY_WORKOUT_TYPES: Record<string, WorkoutType> = {
+  'Chest Press': 'Press', 'Overhead Press': 'Press', 'Push Up': 'Press',
+};
+
+function normalizeOverride(o: ExerciseMetaOverride): void {
+  const muscle = (m: MuscleGroup | null): MuscleGroup | null =>
+    m ? (LEGACY_MUSCLES[m as string] ?? m) : null;
+  o.primaryMuscle    = muscle(o.primaryMuscle);
+  o.secondaryMuscle1 = muscle(o.secondaryMuscle1);
+  o.secondaryMuscle2 = muscle(o.secondaryMuscle2);
+  o.secondaryMuscle3 = muscle(o.secondaryMuscle3);
+  // Folding the three delt groups into one can leave the same muscle listed
+  // twice (e.g. primary Front Delts + secondary Side Delts) — keep the first.
+  const seen = new Set<MuscleGroup>();
+  if (o.primaryMuscle) seen.add(o.primaryMuscle);
+  for (const key of ['secondaryMuscle1', 'secondaryMuscle2', 'secondaryMuscle3'] as const) {
+    const m = o[key];
+    if (!m) continue;
+    if (seen.has(m)) o[key] = null;
+    else seen.add(m);
+  }
+  if (o.workoutType) o.workoutType = LEGACY_WORKOUT_TYPES[o.workoutType as string] ?? o.workoutType;
+  if ((o.equipment as string) === 'Leg Press Machine') o.equipment = 'Machine';
+}
+
 function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
   try {
     const raw = localStorage.getItem(META_KEY);
     const overrides = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
-    // 'Leg Press Machine' was folded into the 'Machine' catch-all; stored
-    // overrides (local edits or a server pull) may still carry the old value.
-    for (const o of Object.values(overrides)) {
-      if ((o.equipment as string) === 'Leg Press Machine') o.equipment = 'Machine';
-    }
+    for (const o of Object.values(overrides)) normalizeOverride(o);
     return overrides;
   } catch {
     return {};

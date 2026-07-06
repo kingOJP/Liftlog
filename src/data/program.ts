@@ -34,7 +34,7 @@ export const PROGRAM: WorkoutDay[] = [
   {
     id: 2,
     label: 'Day 2',
-    muscleGroups: 'Back, Biceps, Rear Delts',
+    muscleGroups: 'Back, Biceps, Delts',
     exercises: [
       { id: 'face-pulls',               name: 'Face Pulls',                     sets: 3, repLow: 15, repHigh: 20 },
       { id: 'straight-arm-pulldowns',   name: 'Straight Arm Pull Downs',        sets: 3, repLow: 10, repHigh: 14 },

@@ -312,10 +312,16 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
-- **Equipment `'Machine'` is the catch-all** for any exercise machine — the old
-  `'Leg Press Machine'` value was removed from the taxonomy. `loadMetaOverrides()` in
-  `exercises.ts` normalizes the legacy value on every read so old localStorage/server
-  overrides keep resolving in the equipment dropdown.
+- **Taxonomy merges are normalized on read** — `normalizeOverride()` in `exercises.ts`
+  remaps merged-away values from stored overrides (localStorage or a server pull) on every
+  read so old data keeps resolving in the dropdowns:
+  - Equipment `'Leg Press Machine'` → `'Machine'` (the catch-all for any exercise machine)
+  - Muscles `'Front Delts'`/`'Side Delts'`/`'Rear Delts'` → `'Delts'` (duplicates created by
+    the collapse are deduped — first mention wins, later ones are nulled)
+  - Workout types `'Chest Press'`/`'Overhead Press'`/`'Push Up'` → `'Press'`
+- **Taxonomy option arrays are alphabetical** — `MUSCLE_GROUPS`, `WORKOUT_TYPES`,
+  `EQUIPMENT_OPTIONS`, `WEIGHT_TYPES` render directly as dropdowns; keep them sorted when
+  adding values.
 - **`e.stopPropagation()`** is used on nested buttons (Edit, ×) inside tappable cards to prevent triggering parent onClick.
 - **White screen with no terminal error** after adding new files = Vite HMR confusion. Fix: hard refresh (`Ctrl+Shift+R`) + restart dev server.
 - **Exercise ID migration** — old builds used `-d1`/`-d2`/`-d4` suffixed IDs for exercises that appeared in multiple days. The remap lives in `src/data/legacyIds.ts` (`LEGACY_ID_MAP`/`canonicalizeId`). It is applied in **two** places that must stay in sync: `migrateExerciseIds()` in `database.ts` (set logs — run before any code that reads set logs by exercise ID) **and** `getStoredProgram()` in `programStore.ts` (the stored program on every read). Fixing only the set logs is not enough: if the stored program still holds a legacy ID, every new workout re-creates legacy-ID set logs, so both must be canonicalized.
