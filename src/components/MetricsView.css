@@ -195,7 +195,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  width: 20px;
+  width: 32px; /* fits fractional counts like "10.5" */
   text-align: right;
   flex-shrink: 0;
 }

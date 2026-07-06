@@ -25,6 +25,7 @@ import {
   SETS_TARGET_HIGH,
   avgDurationByDay,
   e1rmSeries,
+  muscleSetTotals,
   musclesForExercise,
   sessionTimestamp,
 } from './analytics';
@@ -92,7 +93,7 @@ export function computeProgramPlan(
   snapshot: TrainingSnapshot,
   now = Date.now(),
 ): ProgramPlan {
-  const { sessions, setsBySession } = snapshot;
+  const { sessions } = snapshot;
   if (sessions.length < MIN_SESSIONS_TO_ADAPT || program.length === 0) return EMPTY_PLAN;
 
   const windowStart = now - WINDOW_DAYS * DAY_MS;
@@ -105,15 +106,11 @@ export function computeProgramPlan(
   const oldestTs = Math.min(...windowSessions.map(sessionTimestamp));
   const weeks = Math.min(WINDOW_DAYS / 7, Math.max(1, (now - oldestTs) / (7 * DAY_MS)));
 
-  const windowSets = new Map<MuscleGroup, number>();
+  const inWindow = (s: typeof sessions[number]) => sessionTimestamp(s) >= windowStart;
+  const windowSets = muscleSetTotals(snapshot, inWindow).totals;
   const sessionsPerDay = new Map<number, number>();
   for (const session of windowSessions) {
     sessionsPerDay.set(session.dayId, (sessionsPerDay.get(session.dayId) ?? 0) + 1);
-    for (const log of setsBySession.get(session.id!) ?? []) {
-      for (const { muscle, weight } of musclesForExercise(log.exerciseId)) {
-        windowSets.set(muscle, (windowSets.get(muscle) ?? 0) + weight);
-      }
-    }
   }
   const weeklyMuscleSets = new Map<MuscleGroup, number>(
     [...windowSets].map(([m, sets]) => [m, sets / weeks]),

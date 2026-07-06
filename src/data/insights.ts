@@ -20,7 +20,8 @@ import {
   SETS_TARGET_LOW,
   SETS_TARGET_HIGH,
   e1rmSeries,
-  musclesForExercise,
+  muscleSetTotals,
+  primaryMuscleFor,
   sessionTimestamp,
 } from './analytics';
 import { computeProgramPlan } from './coach';
@@ -123,21 +124,13 @@ export function computeCoaching(
   const weekLabel = coachWeek === currentWeek ? 'This week' : `Week ${coachWeek}`;
 
   // ── Fractional set volume per muscle for the coaching week ──
-  const volumeMap = new Map<MuscleGroup, number>();
-  for (const session of sessions) {
-    if (session.weekNumber !== coachWeek) continue;
-    for (const s of setsBySession.get(session.id!) ?? []) {
-      for (const { muscle, weight } of musclesForExercise(s.exerciseId)) {
-        volumeMap.set(muscle, (volumeMap.get(muscle) ?? 0) + weight);
-      }
-    }
-  }
+  const volumeMap = muscleSetTotals(snapshot, s => s.weekNumber === coachWeek).totals;
 
   // Muscles the program directly targets
   const programMuscles = new Set<MuscleGroup>();
   for (const day of program) {
     for (const ex of day.exercises) {
-      const m = musclesForExercise(ex.id)[0]?.muscle;
+      const m = primaryMuscleFor(ex.id);
       if (m) programMuscles.add(m);
     }
   }

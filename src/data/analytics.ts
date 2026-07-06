@@ -164,3 +164,49 @@ export function musclesForExercise(id: string): MuscleInvolvement[] {
 export function primaryMuscleFor(id: string): MuscleGroup | null {
   return musclesForExercise(id).find(m => m.weight === 1)?.muscle ?? null;
 }
+
+// ── Muscle set accumulation ───────────────────────────────────────────────────
+// THE set-counting model, shared by metrics, insights, the coach planner and
+// the heatmap so every surface reports the same number: each logged set counts
+// 1 toward its exercise's primary muscle and SECONDARY_SET_WEIGHT toward each
+// secondary. Sets of an exercise with no primary muscle are "unmapped" — they
+// surface as the "Other" bucket / unclassified warning instead of silently
+// skewing a muscle's total.
+
+export interface MuscleSetTotals {
+  /** fractional hard sets per muscle across the included sessions */
+  totals: Map<MuscleGroup, number>;
+  /** whole sets belonging to exercises with no primary muscle */
+  unmappedSets: number;
+  unmappedExerciseIds: Set<string>;
+}
+
+export function muscleSetTotals(
+  snapshot: TrainingSnapshot,
+  include: (session: Session) => boolean = () => true,
+): MuscleSetTotals {
+  const totals = new Map<MuscleGroup, number>();
+  let unmappedSets = 0;
+  const unmappedExerciseIds = new Set<string>();
+  const involvementCache = new Map<string, MuscleInvolvement[]>();
+
+  for (const session of snapshot.sessions) {
+    if (!include(session)) continue;
+    for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
+      let involvement = involvementCache.get(log.exerciseId);
+      if (!involvement) {
+        involvement = musclesForExercise(log.exerciseId);
+        involvementCache.set(log.exerciseId, involvement);
+      }
+      if (!involvement.some(m => m.weight === 1)) {
+        unmappedSets++;
+        unmappedExerciseIds.add(log.exerciseId);
+        continue;
+      }
+      for (const { muscle, weight } of involvement) {
+        totals.set(muscle, (totals.get(muscle) ?? 0) + weight);
+      }
+    }
+  }
+  return { totals, unmappedSets, unmappedExerciseIds };
+}

@@ -9,7 +9,7 @@ import type { TrainingSnapshot } from './analytics';
 import {
   SETS_TARGET_LOW,
   SETS_TARGET_HIGH,
-  musclesForExercise,
+  muscleSetTotals,
   sessionTimestamp,
 } from './analytics';
 import { getProgramStart } from './settings';
@@ -33,20 +33,13 @@ export function computeMuscleHeat(
   toTs: number,
 ): HeatmapData {
   const weeks = Math.max((toTs - fromTs) / (7 * DAY_MS), 1 / 7);
-  const byMuscle = new Map<MuscleGroup, MuscleHeat>();
-
-  for (const session of snapshot.sessions) {
-    const ts = sessionTimestamp(session);
-    if (ts < fromTs || ts > toTs) continue;
-    for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
-      for (const { muscle, weight } of musclesForExercise(log.exerciseId)) {
-        const heat = byMuscle.get(muscle) ?? { sets: 0, weeklyRate: 0 };
-        heat.sets += weight;
-        byMuscle.set(muscle, heat);
-      }
-    }
-  }
-  for (const heat of byMuscle.values()) heat.weeklyRate = heat.sets / weeks;
+  const { totals } = muscleSetTotals(snapshot, s => {
+    const ts = sessionTimestamp(s);
+    return ts >= fromTs && ts <= toTs;
+  });
+  const byMuscle = new Map<MuscleGroup, MuscleHeat>(
+    [...totals].map(([muscle, sets]) => [muscle, { sets, weeklyRate: sets / weeks }]),
+  );
   return { byMuscle, weeks };
 }
 
