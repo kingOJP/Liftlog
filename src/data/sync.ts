@@ -1,8 +1,15 @@
-import { dumpIDB, restoreIDB, createSession, completeSession, addSetLog, purgeEmptySessions } from '../db/database';
-import type { Session, SetLog, ExerciseLog } from '../db/database';
-import { getPendingSessions, clearPendingSessions } from './pendingSessions';
-import { getStoredProgram, saveStoredProgram, getExerciseLibrary, saveExerciseLibrary } from './programStore';
-import { getAllExerciseMeta, mergeExerciseMeta } from './exercises';
+import { dumpIDB, clearIDB, purgeEmptySessions, mergeServerSessions } from '../db/database';
+import type { Session, SetLog } from '../db/database';
+import { sessionGuid, sessionUpdatedAt } from './syncMerge';
+import type { SessionDoc } from './syncMerge';
+import { getSessionTombstones, addSessionTombstones, clearSessionTombstones } from './sessionTombstones';
+import { clearDraftSession } from './draftSession';
+import {
+  getStoredProgram, saveStoredProgram, clearStoredProgram,
+  getExerciseLibrary, saveExerciseLibrary,
+  getDeletedExerciseIds, addDeletedExerciseIds,
+} from './programStore';
+import { getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta } from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
 
@@ -27,14 +34,31 @@ interface ExerciseDetailsRow {
   weightType: string | null;
 }
 
+// Wire shape: sessions and set logs travel as flat arrays (setLogs reference
+// the session `id` within the same payload/response), but the unit of merge is
+// the session document — the server groups them by session and stores each as
+// one row keyed by GUID.
+interface WireSession {
+  id: number;
+  guid: string;
+  dayId: number;
+  weekNumber: number;
+  startedAt: number;
+  completedAt?: number;
+  updatedAt: number;
+}
+
 interface SyncPayload {
-  sessions:        Session[];
-  setLogs:         SetLog[];
-  exerciseLogs:    ExerciseLog[];
-  program:         WorkoutDay[];
-  exercises:       Exercise[];
-  exerciseMuscles: ExerciseMusclesRow[];
-  exerciseDetails: ExerciseDetailsRow[];
+  sessions:            WireSession[];
+  setLogs:             SetLog[];
+  /** Dead feature (difficulty ratings) — field kept for wire compatibility */
+  exerciseLogs:        never[];
+  deletedSessionGuids: string[];
+  program:             WorkoutDay[];
+  exercises:           Exercise[];
+  exerciseMuscles:     ExerciseMusclesRow[];
+  exerciseDetails:     ExerciseDetailsRow[];
+  deletedExerciseIds:  string[];
 }
 
 function splitMeta(meta: Record<string, ExerciseMetaOverride>): {
@@ -76,15 +100,55 @@ export function getLoggedInUser(): SyncUser | null {
   }
 }
 
+// Tracks which account the *local* data belongs to. Without this, signing in
+// with a different account on the same device shows the previous account's
+// workouts — and worse, the startup push uploads them into the new account.
+const OWNER_KEY = 'liftlog_data_owner';
+
+export async function ensureLocalDataOwner(): Promise<void> {
+  const user = getLoggedInUser();
+  if (!user) return;
+  const owner = localStorage.getItem(OWNER_KEY);
+  if (owner && owner !== user.email) {
+    // Account switch: wipe user-scoped data (workout history, program, session
+    // tombstones, any in-progress draft). App-wide data — exercise library,
+    // metadata, deletion tombstones — and device settings survive the switch.
+    await clearIDB();
+    clearStoredProgram();
+    clearSessionTombstones();
+    clearDraftSession();
+  }
+  localStorage.setItem(OWNER_KEY, user.email);
+}
+
 export async function pushSync(): Promise<void> {
   // Drop ghost/empty workouts before uploading so they don't propagate
+  // (the purge records tombstones, which this push carries)
   await purgeEmptySessions();
   const idb = await dumpIDB();
+
+  const deletedExercises = getDeletedExerciseIds();
+  const meta = Object.fromEntries(
+    Object.entries(getAllExerciseMeta()).filter(([id]) => !deletedExercises.has(id)),
+  );
+
   const payload: SyncPayload = {
-    ...idb,
-    program:   getStoredProgram(),
-    exercises: getExerciseLibrary(),
-    ...splitMeta(getAllExerciseMeta()),
+    sessions: idb.sessions.map(s => ({
+      id:          s.id!,
+      guid:        sessionGuid(s),
+      dayId:       s.dayId,
+      weekNumber:  s.weekNumber,
+      startedAt:   s.startedAt,
+      completedAt: s.completedAt,
+      updatedAt:   sessionUpdatedAt(s),
+    })),
+    setLogs:             idb.setLogs,
+    exerciseLogs:        [],
+    deletedSessionGuids: [...getSessionTombstones()],
+    program:             getStoredProgram(),
+    exercises:           getExerciseLibrary(),
+    deletedExerciseIds:  [...deletedExercises],
+    ...splitMeta(meta),
   };
 
   const res = await fetch('/api/sync', {
@@ -95,10 +159,9 @@ export async function pushSync(): Promise<void> {
 
   if (res.status === 401) return;
   if (!res.ok) throw new Error(`Sync push failed: ${res.status}`);
-  clearPendingSessions();
 }
 
-// Returns true if server had data and local state was updated
+// Returns true if local state changed (caller should refresh UI state)
 export async function pullSync(): Promise<boolean> {
   const res = await fetch('/api/sync');
   if (res.status === 401) return false;
@@ -110,50 +173,94 @@ export async function pullSync(): Promise<boolean> {
   }
 
   const data = await res.json() as {
-    sessions:        Session[];
-    setLogs:         SetLog[];
-    exerciseLogs:    ExerciseLog[];
-    program:         WorkoutDay[]         | null;
-    exercises:       Exercise[]           | null;
-    exerciseMuscles: ExerciseMusclesRow[] | null;
-    exerciseDetails: ExerciseDetailsRow[] | null;
+    sessions:            WireSession[];
+    setLogs:             SetLog[];
+    deletedSessionGuids: string[]             | null;
+    program:             WorkoutDay[]         | null;
+    exercises:           Exercise[]           | null;
+    exerciseMuscles:     ExerciseMusclesRow[] | null;
+    exerciseDetails:     ExerciseDetailsRow[] | null;
+    deletedExerciseIds:  string[]             | null;
   };
 
-  // Restore exercise metadata even when there are no sessions yet (a fresh
-  // device pulling an existing account) — merge so unsynced local edits survive.
-  mergeExerciseMeta(recombineMeta(data.exerciseMuscles, data.exerciseDetails));
+  // Exercise deletions are permanent and app-wide: merge the server's
+  // tombstones, then scrub any local trace of the deleted exercises so a stale
+  // copy on this device can't resurrect them (or be pushed back up).
+  addDeletedExerciseIds(data.deletedExerciseIds ?? []);
+  const deleted = getDeletedExerciseIds();
+  if (deleted.size > 0) {
+    for (const id of deleted) deleteExerciseMeta(id);
+    saveExerciseLibrary(getExerciseLibrary()); // getter filters tombstones
+  }
 
-  const hasData = data.sessions.length > 0 || data.setLogs.length > 0;
-  if (!hasData) return false;
+  // The exercise library and its metadata are app-wide — apply them even when
+  // this account has no workout history yet. Metadata is merged so unsynced
+  // local edits survive; both are filtered through the tombstones.
+  const incomingMeta = recombineMeta(data.exerciseMuscles, data.exerciseDetails);
+  for (const id of deleted) delete incomingMeta[id];
+  mergeExerciseMeta(incomingMeta);
+  if (data.exercises) {
+    saveExerciseLibrary(data.exercises.filter(e => !deleted.has(e.id)));
+  }
 
-  await restoreIDB({
-    sessions:     data.sessions,
-    setLogs:      data.setLogs,
-    exerciseLogs: data.exerciseLogs,
-  });
+  // Merge server sessions per-document: tombstoned sessions are removed, newer
+  // server copies replace local ones, and sessions that exist only locally are
+  // left alone (they upload on the next push). A pull can never drop a workout
+  // logged on this device — this replaces the old wipe-and-restore sync and
+  // the pendingSessions workaround it needed.
+  addSessionTombstones(data.deletedSessionGuids ?? []);
+  const docs = groupWireSessions(data.sessions, data.setLogs);
+  let changed = await mergeServerSessions(docs, getSessionTombstones());
+  if (await purgeEmptySessions() > 0) changed = true;
 
-  // Re-apply any locally saved sessions not yet confirmed by the server
-  const pending = getPendingSessions();
-  if (pending.length > 0) {
-    const pulledStartedAts = new Set(data.sessions.map(s => s.startedAt));
-    for (const p of pending) {
-      if (!pulledStartedAts.has(p.startedAt)) {
-        const sid = await createSession(p.dayId, p.weekNumber, p.startedAt);
-        for (const sl of p.setLogs) {
-          await addSetLog(sid, sl.exerciseId, sl.setNumber, sl.weight, sl.reps);
-        }
-        await completeSession(sid, p.completedAt);
-      }
+  if (data.program) {
+    const incomingProgram = data.program.map(d => ({
+      ...d,
+      exercises: d.exercises.filter(e => !deleted.has(e.id)),
+    }));
+    const next = JSON.stringify(incomingProgram);
+    if (next !== JSON.stringify(getStoredProgram())) {
+      saveStoredProgram(incomingProgram);
+      changed = true;
+    }
+  } else if (deleted.size > 0) {
+    // No server program, but tombstones may still need scrubbing locally
+    const program = getStoredProgram();
+    const scrubbed = program.map(d => ({
+      ...d,
+      exercises: d.exercises.filter(e => !deleted.has(e.id)),
+    }));
+    if (scrubbed.some((d, i) => d.exercises.length !== program[i].exercises.length)) {
+      saveStoredProgram(scrubbed);
+      changed = true;
     }
   }
 
-  // A pulled server copy may itself contain ghost/empty sessions from old builds
-  await purgeEmptySessions();
+  return changed;
+}
 
-  if (data.program)   saveStoredProgram(data.program);
-  if (data.exercises) saveExerciseLibrary(data.exercises);
-
-  return true;
+// Reassemble the wire's flat arrays into session documents for the merge.
+function groupWireSessions(sessions: WireSession[], setLogs: SetLog[]): SessionDoc[] {
+  const setsBySession = new Map<number, SetLog[]>();
+  for (const log of setLogs) {
+    const arr = setsBySession.get(log.sessionId);
+    if (arr) arr.push(log);
+    else setsBySession.set(log.sessionId, [log]);
+  }
+  return sessions.map(s => ({
+    guid:        sessionGuid(s as Session), // derives legacy-<startedAt> if guid missing
+    dayId:       s.dayId,
+    weekNumber:  s.weekNumber,
+    startedAt:   s.startedAt,
+    completedAt: s.completedAt,
+    updatedAt:   sessionUpdatedAt(s as Session),
+    sets: (setsBySession.get(s.id) ?? []).map(l => ({
+      exerciseId: l.exerciseId,
+      setNumber:  l.setNumber,
+      weight:     l.weight,
+      reps:       l.reps,
+    })),
+  }));
 }
 
 // Recombine the server's two metadata rows into client override objects.

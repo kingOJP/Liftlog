@@ -1,9 +1,10 @@
-import { EXERCISES, EXERCISE_MAP } from './exercises';
+import { EXERCISES, EXERCISE_MAP, deleteExerciseMeta } from './exercises';
 import { LEGACY_ID_MAP, canonicalizeId } from './legacyIds';
 import { PROGRAM, type Exercise, type WorkoutDay } from './program';
 
 const PROGRAM_KEY  = 'liftlog_program';
 const LIBRARY_KEY  = 'liftlog_exercises';
+const DELETED_KEY  = 'liftlog_deleted_exercises';
 const MIGRATION_V2 = 'liftlog_library_v2';
 const MIGRATION_V3 = 'liftlog_library_v3';
 
@@ -51,6 +52,37 @@ export function saveStoredProgram(program: WorkoutDay[]): void {
   localStorage.setItem(PROGRAM_KEY, JSON.stringify(program));
 }
 
+// Drops the stored program entirely (account switch) — the next read rebuilds
+// from PROGRAM defaults or from the incoming account's sync pull.
+export function clearStoredProgram(): void {
+  localStorage.removeItem(PROGRAM_KEY);
+}
+
+// ── Deleted-exercise tombstones ──────────────────────────────────────────────
+// A deleted exercise must STAY deleted: the library used to resurrect through
+// sync (a stale server/device copy re-adding it) and through the default
+// library rebuild. Tombstones are synced app-wide and filtered on every read.
+
+export function getDeletedExerciseIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_KEY);
+    return new Set(raw ? JSON.parse(raw) as string[] : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDeletedExerciseIds(ids: Set<string>): void {
+  localStorage.setItem(DELETED_KEY, JSON.stringify([...ids]));
+}
+
+export function addDeletedExerciseIds(ids: string[]): void {
+  if (ids.length === 0) return;
+  const merged = getDeletedExerciseIds();
+  for (const id of ids) merged.add(id);
+  saveDeletedExerciseIds(merged);
+}
+
 // ── Exercise library ─────────────────────────────────────────────────────────
 
 function buildDefaultLibrary(): Exercise[] {
@@ -92,11 +124,12 @@ function migrateLibraryIfNeeded(): void {
 
 export function getExerciseLibrary(): Exercise[] {
   migrateLibraryIfNeeded();
+  const deleted = getDeletedExerciseIds();
   try {
     const raw = localStorage.getItem(LIBRARY_KEY);
-    if (raw) return JSON.parse(raw) as Exercise[];
+    if (raw) return (JSON.parse(raw) as Exercise[]).filter(e => !deleted.has(e.id));
   } catch { /* fall through */ }
-  return buildDefaultLibrary();
+  return buildDefaultLibrary().filter(e => !deleted.has(e.id));
 }
 
 export function saveExerciseLibrary(exercises: Exercise[]): void {
@@ -104,6 +137,10 @@ export function saveExerciseLibrary(exercises: Exercise[]): void {
 }
 
 export function addToExerciseLibrary(exercise: Exercise): void {
+  // Explicitly re-adding an exercise lifts its tombstone
+  const deleted = getDeletedExerciseIds();
+  if (deleted.delete(exercise.id)) saveDeletedExerciseIds(deleted);
+
   const lib = getExerciseLibrary();
   if (!lib.find(e => e.id === exercise.id)) {
     saveExerciseLibrary([...lib, exercise]);
@@ -127,7 +164,9 @@ export function archiveExercise(id: string): void {
 }
 
 export function deleteExerciseFromLibrary(id: string): void {
+  addDeletedExerciseIds([id]);
   saveExerciseLibrary(getExerciseLibrary().filter(e => e.id !== id));
+  deleteExerciseMeta(id);
 }
 
 // Removes an exercise from all program days and saves. Returns the updated program.

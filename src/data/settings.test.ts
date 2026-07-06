@@ -46,6 +46,18 @@ describe('getWeekNumberForDate', () => {
     saveProgramStart('2026-01-05');
     expect(getWeekNumberForDate(new Date(2026, 0, 12))).toBe(2);
   });
+
+  it('rolls over on Monday even when the start date falls mid-week', () => {
+    // Tue Jun 9 2026 — the previous default start; weeks used to flip on
+    // Tuesday, so a fully trained Mon–Sun week still showed "all done" on the
+    // next Monday. The anchor now snaps back to that week's Monday (Jun 8).
+    const tuesdayStart = new Date(2026, 5, 9);
+    expect(getWeekNumberForDate(new Date(2026, 5, 9),  tuesdayStart)).toBe(1);  // start day
+    expect(getWeekNumberForDate(new Date(2026, 5, 14), tuesdayStart)).toBe(1);  // first Sunday
+    expect(getWeekNumberForDate(new Date(2026, 5, 15), tuesdayStart)).toBe(2);  // next Monday
+    expect(getWeekNumberForDate(new Date(2026, 6, 5),  tuesdayStart)).toBe(4);  // Sun Jul 5
+    expect(getWeekNumberForDate(new Date(2026, 6, 6),  tuesdayStart)).toBe(5);  // Mon Jul 6 — new week
+  });
 });
 
 describe('rest duration setting', () => {

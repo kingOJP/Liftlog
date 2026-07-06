@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
-import { getLoggedInUser, pullSync, pushSync } from './data/sync';
+import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
-import { getPendingSessions } from './data/pendingSessions';
-import { migrateExerciseIds, purgeEmptySessions } from './db/database';
+import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import HistoryView from './components/HistoryView';
@@ -39,7 +38,18 @@ function App() {
     if (!user) return;
     (async () => {
       try {
+        // If a different account signed in on this device, wipe the previous
+        // account's local data BEFORE any sync — otherwise the startup push
+        // would upload it into this account.
+        await ensureLocalDataOwner();
+        setProgram(getStoredProgram());
+      } catch (err) {
+        console.error(err);
+      }
+      try {
         await migrateExerciseIds();
+        // Pin sync identities on pre-sync-v2 sessions before the first merge
+        await ensureSessionGuids();
         await purgeEmptySessions();
       } catch (err) {
         console.error(err);
@@ -72,12 +82,6 @@ function App() {
         if (didPull) setProgram(getStoredProgram());
       } catch {
         // silent — background refresh is best-effort
-      }
-      // If pending sessions were re-applied to IDB by pullSync, push them now
-      try {
-        if (getPendingSessions().length > 0) await pushSync();
-      } catch {
-        // silent
       }
     }
 

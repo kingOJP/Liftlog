@@ -142,6 +142,15 @@ export function saveExerciseMeta(id: string, meta: ExerciseMetaOverride): void {
   localStorage.setItem(META_KEY, JSON.stringify(overrides));
 }
 
+// Drops an exercise's metadata override — part of deleting the exercise, so a
+// later sync merge can't carry its stale metadata back.
+export function deleteExerciseMeta(id: string): void {
+  const overrides = loadMetaOverrides();
+  if (!(id in overrides)) return;
+  delete overrides[id];
+  localStorage.setItem(META_KEY, JSON.stringify(overrides));
+}
+
 // All user-edited metadata overrides — used by cloud sync so muscle/equipment
 // info the user enters survives on other devices and after a re-pull.
 export function getAllExerciseMeta(): Record<string, ExerciseMetaOverride> {

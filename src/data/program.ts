@@ -78,12 +78,21 @@ export function getExerciseName(id: string): string {
 }
 
 // Program week numbering is anchored to the user-configurable training-block
-// start date (Settings screen; defaults to the original block's first Monday).
+// start date (Settings screen). The anchor is snapped back to the Monday of
+// that week so week numbers roll over on Monday — matching the Mon–Sun range
+// the dashboard displays — even when the start date itself falls mid-week.
 export function getWeekNumberForDate(date: Date, programStart = getProgramStart()): number {
   const start = new Date(programStart);
   start.setHours(0, 0, 0, 0);
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  return Math.max(1, Math.floor((date.getTime() - start.getTime()) / msPerWeek) + 1);
+  const startDay = start.getDay();
+  start.setDate(start.getDate() - (startDay === 0 ? 6 : startDay - 1));
+
+  const current = new Date(date);
+  current.setHours(0, 0, 0, 0);
+
+  // Count whole days (rounded, so DST's 23/25-hour days can't drift the boundary)
+  const days = Math.round((current.getTime() - start.getTime()) / 86_400_000);
+  return Math.max(1, Math.floor(days / 7) + 1);
 }
 
 export function getWeekNumber(): number {
