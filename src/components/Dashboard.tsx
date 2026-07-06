@@ -45,8 +45,10 @@ export default function Dashboard({
     return () => { cancelled = true; };
   }, [program, weekNumber]);
 
-  const topInsight = coaching?.insights[0];
+  // Lead with the biggest opportunity; fall back to the best highlight.
+  const topInsight = coaching?.opportunities[0] ?? coaching?.highlights[0];
   const nextDay = coaching?.nextDay;
+  const nextDayAdjustments = nextDay ? coaching?.plan.days.get(nextDay.dayId)?.changes.length ?? 0 : 0;
 
   return (
     <div className="dashboard">
@@ -59,6 +61,11 @@ export default function Dashboard({
         <button className="coach-card" onClick={() => onStartWorkout(nextDay.dayId)}>
           <div className="coach-eyebrow">Next up · {lastTrainedLabel(nextDay.lastTrained)}</div>
           <div className="coach-day">{nextDay.label} — {nextDay.muscleGroups}</div>
+          {nextDayAdjustments > 0 && (
+            <div className="coach-adjusted">
+              ✦ Coach adjusted this workout — open it to see what changed and why
+            </div>
+          )}
           {topInsight && (
             <div className={`coach-insight coach-insight--${topInsight.kind}`}>
               <span className="coach-insight-title">{topInsight.title}</span>

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getWeekNumber, getWeekNumberForDate } from '../data/program';
+import { computeProgramPlan, applyPlanToDay } from '../data/coach';
+import type { PlanChange } from '../data/coach';
 import {
   createSession,
   completeSession,
@@ -21,6 +23,8 @@ import './WorkoutView.css';
 
 interface Props {
   day: WorkoutDay;
+  /** Full program — the coach plans volume holistically across every day */
+  program: WorkoutDay[];
   existingSessionId?: number;
   onBack: () => void;
   onComplete: () => void;
@@ -46,16 +50,31 @@ function dateInputToTimestamp(value: string, originalTs: number): number {
   ).getTime();
 }
 
-export default function WorkoutView({ day, existingSessionId, onBack, onComplete }: Props) {
+export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
   const isEditMode = existingSessionId !== undefined;
   const [sets, setSets] = useState<Record<string, SetEntry[]>>({});
   const [recommendations, setRecommendations] = useState<Record<string, WeightRec>>({});
   // Per exercise: the most recent session it appeared in (for the "last time" line)
   const [lastSessions, setLastSessions] = useState<Record<string, ExerciseSession>>({});
+  // The day as the coach adjusted it (set counts), plus what changed and why
+  const [effectiveDay, setEffectiveDay] = useState<WorkoutDay>(day);
+  const [planChanges, setPlanChanges] = useState<PlanChange[]>([]);
+  const [planDismissed, setPlanDismissed] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   // Increments on every logged set to (re)start the rest timer. Edit mode skips it.
   const [restRunId, setRestRunId] = useState(0);
+  // Duration tracking: the workout starts when the view opens; the session ends
+  // at the final logged set. completedAt − startedAt is the workout duration.
+  const [sessionStart] = useState(() => Date.now());
+  const lastSetAtRef = useRef<number | null>(null);
+
+  // Stamp the time of the most recent set activity — completedAt uses it so
+  // the session duration reflects training time, not phone-in-hand time.
+  const totalSets = Object.values(sets).reduce((sum, s) => sum + s.length, 0);
+  useEffect(() => {
+    if (totalSets > 0) lastSetAtRef.current = Date.now();
+  }, [sets, totalSets]);
   // Edit mode only: the session's original completedAt + the (editable) date.
   const [originalCompletedAt, setOriginalCompletedAt] = useState<number | null>(null);
   const [dateInput, setDateInput] = useState('');
@@ -63,15 +82,23 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
 
   // Build each exercise's recent history (across all days it appears in, not
   // just this one) to drive recommendations and the "last time" context line.
+  // The coach's program plan is overlaid first so recommendations target the
+  // adjusted set counts.
   useEffect(() => {
     if (isEditMode) return;
     let cancelled = false;
     loadTrainingSnapshot().then(snapshot => {
       if (cancelled) return;
+
+      const plan = computeProgramPlan(program, snapshot);
+      const adjusted = applyPlanToDay(day, plan);
+      setEffectiveDay(adjusted);
+      setPlanChanges(plan.days.get(day.id)?.changes ?? []);
+
       const recs: Record<string, WeightRec> = {};
       const lasts: Record<string, ExerciseSession> = {};
 
-      for (const ex of day.exercises) {
+      for (const ex of adjusted.exercises) {
         const history: ExerciseSession[] = [];
         for (const session of snapshot.sessions) { // newest first
           const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
@@ -92,7 +119,7 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
       setLastSessions(lasts);
     });
     return () => { cancelled = true; };
-  }, [day, isEditMode]);
+  }, [day, program, isEditMode]);
 
   useEffect(() => {
     if (!existingSessionId) return;
@@ -139,7 +166,7 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
     if (finishing) return;
     setFinishing(true);
 
-    const startedAt = Date.now();
+    const startedAt = sessionStart;
     const sid = isEditMode
       ? existingSessionId
       : await createSession(day.id, getWeekNumber(), startedAt);
@@ -162,7 +189,9 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
     }
 
     if (!isEditMode) {
-      const completedAt = Date.now();
+      // The session ends at the final logged set, not the "Finish" tap — the
+      // duration engine needs the training window, not phone-in-hand time.
+      const completedAt = Math.max(lastSetAtRef.current ?? Date.now(), startedAt);
       await completeSession(sid, completedAt);
       savePendingSession({
         startedAt,
@@ -176,8 +205,6 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
     }
     onComplete();
   }
-
-  const totalSets = Object.values(sets).reduce((sum, s) => sum + s.length, 0);
 
   if (loading) {
     return (
@@ -221,7 +248,29 @@ export default function WorkoutView({ day, existingSessionId, onBack, onComplete
             />
           </div>
         )}
-        {day.exercises.map(ex => (
+        {!isEditMode && planChanges.length > 0 && !planDismissed && (
+          <div className="coach-plan-banner">
+            <div className="coach-plan-head">
+              <span className="coach-plan-title">Coach adjusted today's workout</span>
+              <button
+                className="coach-plan-dismiss"
+                onClick={() => setPlanDismissed(true)}
+                aria-label="Dismiss coach adjustments"
+              >
+                ×
+              </button>
+            </div>
+            {planChanges.map(c => (
+              <div className="coach-plan-change" key={c.exerciseId}>
+                <span className="coach-plan-what">
+                  {c.exerciseName}: {c.fromSets} → {c.toSets} sets
+                </span>
+                <span className="coach-plan-why">{c.reason}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {effectiveDay.exercises.map(ex => (
           <ExerciseCard
             key={ex.id}
             exercise={ex}

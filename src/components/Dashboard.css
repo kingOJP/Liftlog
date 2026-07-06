@@ -74,10 +74,21 @@
   border-left: 3px solid var(--text-muted);
 }
 
-.coach-insight--volume-low,
+.coach-insight--pr,
+.coach-insight--trend-up,
+.coach-insight--volume-up,
+.coach-insight--consistency { border-left-color: var(--green); }
+.coach-insight--trend-down,
 .coach-insight--plateau { border-left-color: var(--red); }
-.coach-insight--volume-high { border-left-color: var(--purple); }
-.coach-insight--progress { border-left-color: var(--green); }
+.coach-insight--volume-high,
+.coach-insight--program-gap { border-left-color: #E8C44A; }
+
+.coach-adjusted {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--purple);
+  margin-top: 2px;
+}
 
 .coach-insight-title {
   font-size: 13px;

@@ -125,3 +125,57 @@
 .workout-date-input:focus {
   border-color: var(--purple);
 }
+
+/* ── Coach plan banner ── */
+
+.coach-plan-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(124, 114, 232, 0.16), rgba(124, 114, 232, 0.04));
+  border: 1px solid var(--purple-dim, var(--purple));
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.coach-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.coach-plan-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--purple);
+}
+
+.coach-plan-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.coach-plan-change {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coach-plan-what {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.coach-plan-why {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}

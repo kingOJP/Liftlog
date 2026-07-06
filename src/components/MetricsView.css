@@ -218,10 +218,31 @@
   border-left: 3px solid var(--text-muted);
 }
 
-.coach-insight-item.coach-insight--volume-low,
+/* highlights */
+.coach-insight-item.coach-insight--pr,
+.coach-insight-item.coach-insight--trend-up,
+.coach-insight-item.coach-insight--volume-up,
+.coach-insight-item.coach-insight--consistency { border-left-color: var(--green); }
+/* opportunities */
+.coach-insight-item.coach-insight--trend-down,
 .coach-insight-item.coach-insight--plateau { border-left-color: var(--red); }
-.coach-insight-item.coach-insight--volume-high { border-left-color: var(--purple); }
-.coach-insight-item.coach-insight--progress { border-left-color: var(--green); }
+.coach-insight-item.coach-insight--volume-high,
+.coach-insight-item.coach-insight--program-gap { border-left-color: #E8C44A; }
+/* automatic program adjustments */
+.coach-insight-item.coach-insight--plan { border-left-color: var(--purple); }
+
+.coach-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
+.coach-subhead--good { color: var(--green); }
+.coach-subhead--opportunity { color: #E8C44A; }
+.coach-subhead--plan { color: var(--purple); }
 
 .coach-insight-item .coach-insight-title {
   font-size: 14px;

@@ -13,6 +13,11 @@ import { getExerciseLibrary } from './programStore';
 // Secondary muscles count as a fraction of a direct ("hard") set
 export const SECONDARY_SET_WEIGHT = 0.5;
 
+// ~10–20 hard sets per muscle per week is the commonly cited effective range
+// for hypertrophy. Shared by the coach planner, insights, metrics and heatmap.
+export const SETS_TARGET_LOW = 10;
+export const SETS_TARGET_HIGH = 20;
+
 // ── Training snapshot ─────────────────────────────────────────────────────────
 
 export interface TrainingSnapshot {
@@ -43,6 +48,39 @@ export async function loadTrainingSnapshot(): Promise<TrainingSnapshot> {
 
 export function sessionTimestamp(s: Session): number {
   return s.completedAt ?? s.startedAt;
+}
+
+// ── Workout duration ──────────────────────────────────────────────────────────
+// startedAt is captured when the workout is opened and completedAt is the time
+// of the final logged set, so completedAt − startedAt is the session duration.
+// Sessions from older builds stamped both at "Finish" (duration ≈ 0) — the
+// validity window filters those out, along with left-open-overnight outliers.
+
+const MIN_VALID_DURATION_MS = 10 * 60_000;       // anything shorter is a data artifact
+const MAX_VALID_DURATION_MS = 4 * 3_600_000;     // anything longer was left running
+const DURATION_SAMPLE_SESSIONS = 8;              // recent sessions per day to average
+
+export function sessionDurationMs(s: Session): number | null {
+  if (s.completedAt == null) return null;
+  const d = s.completedAt - s.startedAt;
+  return d >= MIN_VALID_DURATION_MS && d <= MAX_VALID_DURATION_MS ? d : null;
+}
+
+// Average workout duration per program day over the most recent valid sessions.
+export function avgDurationByDay(snapshot: TrainingSnapshot): Map<number, number> {
+  const byDay = new Map<number, number[]>();
+  for (const s of snapshot.sessions) { // newest first
+    const d = sessionDurationMs(s);
+    if (d == null) continue;
+    const arr = byDay.get(s.dayId) ?? [];
+    if (arr.length < DURATION_SAMPLE_SESSIONS) {
+      arr.push(d);
+      byDay.set(s.dayId, arr);
+    }
+  }
+  return new Map(
+    [...byDay].map(([dayId, ds]) => [dayId, ds.reduce((a, b) => a + b, 0) / ds.length]),
+  );
 }
 
 // ── Strength math ─────────────────────────────────────────────────────────────
