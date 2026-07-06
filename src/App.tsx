@@ -125,6 +125,7 @@ function App() {
         return (
           <WorkoutView
             day={day}
+            program={program}
             onBack={() => setView({ screen: 'dashboard' })}
             onComplete={() => { setView({ screen: 'dashboard' }); sync(); }}
           />
@@ -136,6 +137,7 @@ function App() {
         return (
           <WorkoutView
             day={day}
+            program={program}
             existingSessionId={view.sessionId}
             onBack={() => setView({ screen: 'history' })}
             onComplete={() => { setView({ screen: 'history' }); sync(); }}

@@ -23,6 +23,12 @@ Long-term milestones (roughly):
 13. ✅ Rev 2: double-progression recommendation engine with deload detection,
     shared analytics core (`analytics.ts`), Settings screen, "last time" context
     on exercise cards, Vitest test suite, worker payload validation
+14. ✅ Adaptive coaching system: `coach.ts` planner (holistic set-volume
+    redistribution across future workouts, computed as a pure overlay — never
+    mutates the stored program), workout-duration tracking as an optimization
+    constraint, redesigned Coach insights (3 highlights + 3 opportunities;
+    under-trained nudges removed — the planner fixes volume instead), muscle
+    heatmap (front/back SVG silhouettes, timeframe presets)
 
 **Future milestones:**
 - Delta-based sync — the current full-replace, last-writer-wins sync is the biggest remaining architectural risk (two devices logging on the same day can drop a session; pendingSessions only patches one case). A per-session upsert protocol with tombstones is the fix.
@@ -31,7 +37,9 @@ Long-term milestones (roughly):
 - Mesocycle awareness — planned accumulation/deload weeks rather than reactive-only deloads; the configurable start date is the foundation.
 - Unit preference (kg/lb), exercise substitution suggestions from the equipment/workout-type taxonomy (the metadata already exists to power this), and worker-side tests with vitest-pool-workers.
 - Exercise swap suggestions — add a button on exercises in the workout edit screen to suggest a different exercise that hits the same primary muscle group and doesn't repeat any others in the workout.
-- Human model graph — interactive human body that shows a heatmap of the muscle groups worked in a time frame, with buttons/interactions to change the scale/window.
+- Planner v2 — RPE-aware volume decisions, automatic exercise substitution (the planner
+  currently only *suggests* adding an exercise when no slot fits), and per-exercise rep-range
+  adjustments in addition to set counts.
 
 ---
 
@@ -153,14 +161,23 @@ src/
     analytics.ts               — shared analytics core: loadTrainingSnapshot() (ONE dumpIDB read
                                   powering every consumer), buildSnapshot() (pure, for tests),
                                   epley1RM, e1rmSeries(), musclesForExercise()/primaryMuscleFor()
-                                  (override → master list → name match)
+                                  (override → master list → name match), SETS_TARGET_LOW/HIGH,
+                                  sessionDurationMs()/avgDurationByDay() (workout durations)
     recommendations.ts         — calculateRecommendation(history, exercise) → WeightRec | null
                                   ({ weight, direction, kind, reason }); double progression +
                                   stall-triggered deload (see algorithm section below)
+    coach.ts                   — adaptive programming engine: computeProgramPlan(program, snapshot)
+                                  → ProgramPlan (conservative set additions/trims across future
+                                  workouts, each with a plain-language reason) + applyPlanToDay()
+                                  overlay. Pure function of history — never mutates the program.
+    heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
+                                  heatColor()/heatLabel() (blue→green→yellow→red weekly-rate
+                                  gradient), presetWindow()/mesocycleWindow()
     metrics.ts                 — computeMetrics(snapshot) → Metrics (volume, e1RM series, muscle sets)
-    insights.ts                — computeCoaching(program, snapshot) → Coaching: fractional weekly
-                                  set-volume per muscle vs 10–20 target, e1RM trend/plateau
-                                  detection, prioritized insights + next-workout suggestion
+    insights.ts                — computeCoaching(program, snapshot) → Coaching: 3 positive
+                                  highlights + 3 highest-impact opportunities, e1RM trend/plateau
+                                  detection, weekly muscle volume, next-workout suggestion, and
+                                  the coach plan (embeds computeProgramPlan)
     sync.ts                    — pushSync(), pullSync(), getLoggedInUser() — cloud sync via /api/sync
     *.test.ts                  — Vitest unit tests for the data layer
 
@@ -169,9 +186,11 @@ src/
                                   Also: migrateExerciseIds() — remaps old -d1/-d2/-d4 exercise IDs.
 
   components/
-    Dashboard.tsx/css          — Coach card (next day + top insight) + 4 day cards + icon nav row
+    Dashboard.tsx/css          — Coach card (next day + top insight + "coach adjusted" note)
+                                  + 4 day cards + icon nav row
     DayCard.tsx/css            — single day card with Edit button
-    WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest timer
+    WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest
+                                  timer + coach-plan overlay/banner + duration capture
     ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
                                   set logging, tap-to-edit
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
@@ -179,8 +198,11 @@ src/
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises
     ExerciseListView.tsx/css   — alphabetical list of all exercises, taps into ExerciseMetaView
     ExerciseMetaView.tsx/css   — edit an exercise's muscle groups, equipment, weight type
-    MetricsView.tsx/css        — metrics dashboard: volume summary, weekly chart, e1RM chart,
-                                  muscle sets chart, unclassified exercises banner
+    MetricsView.tsx/css        — metrics dashboard: Coach section (highlights, opportunities,
+                                  program adjustments), muscle heatmap, volume summary, weekly
+                                  chart, e1RM chart, muscle sets chart, unclassified banner
+    MuscleHeatmap.tsx/css      — front/back SVG body silhouettes colored by weekly training
+                                  volume per muscle; 7d/30d/mesocycle/custom timeframe presets
     SettingsView.tsx/css       — program start date, rest-timer default, account/sign-out
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart and LineChart (hand-rolled CSS/SVG)
@@ -273,22 +295,58 @@ covered by `recommendations.test.ts`.
 
 ---
 
-## Coaching engine (`src/data/insights.ts`)
+## Coaching engine (`src/data/insights.ts` + `src/data/coach.ts`)
 
-`computeCoaching(program, snapshot)` takes a `TrainingSnapshot` (from `analytics.ts`) and produces:
-- **Per-muscle weekly set volume** using *fractional* sets — a primary muscle counts as 1 hard set,
-  each secondary muscle as 0.5 — scored against the 10–20 hard-set hypertrophy range
-  (`low`/`optimal`/`high`). Muscle involvement resolves via override → master list → name match.
+### Adaptive planner (`coach.ts`)
+
+`computeProgramPlan(program, snapshot, now?)` is a **pure function of history** that produces a
+`ProgramPlan` — small set additions/trims applied to future workouts as an overlay
+(`applyPlanToDay`). The stored program is **never mutated**: the plan re-derives on every load,
+stays consistent across devices (history syncs, the plan follows), and every change carries a
+plain-language `reason` shown to the user. Under-trained muscles are *fixed* by the planner, not
+notified about.
+
+How it decides:
+- **Volume measurement** — fractional hard sets per muscle over a trailing 28-day window,
+  normalized to a weekly rate (primary = 1, secondary = 0.5).
+- **Under target (<10/week)** — +1 set to the best-scoring slot across *all* program days:
+  direct stimulus beats secondary spillover, fewer extra muscles = less fatigue, never pushes a
+  muscle already ≥20/week, spreads across movements instead of stacking the workhorse, avoids
+  lifts with a declining e1RM, mild bonus for the muscle's lightest day (frequency).
+- **Over target (>22/week)** — −1 set from the exercise doing the most direct sets.
+- **Guardrails** — no adaptation until 6 completed sessions; ≤2 sets added and ≤2 trimmed per
+  plan; ±1 set per exercise; exercises stay within 2–5 sets; a day is only touched once it has
+  2+ recent sessions; added sets must keep the day within **+15% of its average duration**
+  (`avgDurationByDay` — 3 min/set estimate).
+- **Structural gaps** — if a muscle is ≥3 sets under target with no eligible slot, the plan emits
+  a suggestion (add exercise X to day Y) surfaced as a `program-gap` opportunity.
+
+Surfaced in WorkoutView (banner: "Coach adjusted today's workout" + reasons; recommendations
+target the adjusted set counts) and MetricsView (Program adjustments list). Fully covered by
+`coach.test.ts`.
+
+### Insights (`insights.ts`)
+
+`computeCoaching(program, snapshot)` embeds the plan and produces:
+- **Highlights (≤3)** — fresh PRs (all-time best e1RM within 10 days), climbing lifts,
+  week-over-week volume gains, consistency streaks.
+- **Opportunities (≤3)** — strength declines (recovery-oriented advice), plateaus (pre-frames
+  the engine's deload), muscles past the volume ceiling, planner `program-gap` suggestions.
 - **Strength trends** — best Epley e1RM per session per exercise; over the last 3 sessions a
   >±3% change is `up`/`down`, otherwise `flat` (a plateau).
-- **Prioritized insights** — under-trained muscles, plateaus/declines, and a couple of "climbing"
-  positives, capped at 6 and sorted by priority. Under-trained-muscle nudges are limited to
-  muscles *not* worked in the last 2 sessions and capped at 4, so the Coach stays focused
-  instead of listing every muscle below target.
-- **Next workout** — the program day longest since last trained.
+- **Per-muscle weekly set volume** (`muscleVolume`) and **next workout** (day longest untrained).
 
-Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full Coach section).
-`SETS_TARGET_LOW`/`SETS_TARGET_HIGH` are exported and shared with MetricsView.
+Surfaced on the Dashboard (Coach card: next day + top opportunity/highlight + "coach adjusted"
+note) and Metrics (Coach section: What's working / Biggest opportunities / Program adjustments).
+`SETS_TARGET_LOW`/`SETS_TARGET_HIGH` live in `analytics.ts` (re-exported from insights.ts).
+
+### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx`)
+
+Front/back SVG silhouettes with one region per `MuscleGroup`, colored by weekly-rate volume:
+blue (untrained) → green (10–20 target) → yellow (elevated) → red (very high). Muscle mapping
+reuses `musclesForExercise()` — no duplicate mapping. Presets: 7 days / 30 days / current
+mesocycle (4-week blocks anchored to the program start date) / custom range. Tap a region for
+sets + weekly rate + status.
 
 ---
 
@@ -321,6 +379,11 @@ Surfaced on the Dashboard (Coach card: next day + top insight) and Metrics (full
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
+- **Session timestamps are the duration signal** — `startedAt` is stamped when WorkoutView
+  opens and `completedAt` at the *final logged set* (not the "Finish" tap), so
+  `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions
+  from older builds have duration ≈ 0 and are filtered by `sessionDurationMs()`'s validity
+  window (10 min – 4 h).
 - **Taxonomy merges are normalized on read** — `normalizeOverride()` in `exercises.ts`
   remaps merged-away values from stored overrides (localStorage or a server pull) on every
   read so old data keeps resolving in the dropdowns:

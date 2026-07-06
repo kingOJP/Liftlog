@@ -1,7 +1,7 @@
 import { getWeekNumber } from './program';
 import { getExerciseName } from './programStore';
 import type { TrainingSnapshot } from './analytics';
-import { e1rmSeries, primaryMuscleFor, sessionTimestamp } from './analytics';
+import { e1rmSeries, muscleSetTotals, sessionTimestamp } from './analytics';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -111,36 +111,22 @@ export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeek
 
   // ── Sets per muscle group ──
   // Use the current program week; if it has no data, fall back to the latest
-  // week that does, so the chart is never needlessly empty.
+  // week that does, so the chart is never needlessly empty. Counting uses the
+  // shared fractional model (primary = 1, secondary = 0.5) so this chart
+  // agrees with the coach, insights and heatmap — and with the 10–20
+  // hard-set target it's displayed against.
   const weeksWithData = [...weekBuckets.keys()].sort((a, b) => b - a);
   const muscleWeek = weekBuckets.has(currentWeek) ? currentWeek : (weeksWithData[0] ?? currentWeek);
 
-  const primaryByExercise = new Map<string, string | null>();
-  const primaryFor = (id: string): string | null => {
-    if (!primaryByExercise.has(id)) primaryByExercise.set(id, primaryMuscleFor(id));
-    return primaryByExercise.get(id)!;
-  };
+  const week = muscleSetTotals(snapshot, s => s.weekNumber === muscleWeek);
+  const muscleSets: MuscleSets[] = [...week.totals.entries()]
+    .map(([muscle, sets]) => ({ muscle: muscle as string, sets: Math.round(sets * 2) / 2 }));
+  if (week.unmappedSets > 0) muscleSets.push({ muscle: 'Other', sets: week.unmappedSets });
+  muscleSets.sort((a, b) => b.sets - a.sets);
 
-  const muscleCounts = new Map<string, number>();
-  for (const session of sessions) {
-    if (session.weekNumber !== muscleWeek) continue;
-    for (const s of setsBySession.get(session.id!) ?? []) {
-      const muscle = primaryFor(s.exerciseId) ?? 'Other';
-      muscleCounts.set(muscle, (muscleCounts.get(muscle) ?? 0) + 1);
-    }
-  }
-  const muscleSets: MuscleSets[] = [...muscleCounts.entries()]
-    .map(([muscle, sets]) => ({ muscle, sets }))
-    .sort((a, b) => b.sets - a.sets);
-
-  // Logged exercises with no primary muscle — these fall into the "Other" bucket
-  const unclassifiedIds = new Set<string>();
-  for (const logs of setsBySession.values()) {
-    for (const log of logs) {
-      if (primaryFor(log.exerciseId) === null) unclassifiedIds.add(log.exerciseId);
-    }
-  }
-  const unclassifiedExercises = [...unclassifiedIds]
+  // Logged exercises with no primary muscle (all-time) — their sets fall into
+  // the "Other" bucket, so tell the user which ones need classifying.
+  const unclassifiedExercises = [...muscleSetTotals(snapshot).unmappedExerciseIds]
     .map(id => getExerciseName(id))
     .sort((a, b) => a.localeCompare(b));
 

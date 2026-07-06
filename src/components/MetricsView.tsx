@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { loadTrainingSnapshot } from '../data/analytics';
+import type { TrainingSnapshot } from '../data/analytics';
 import { computeMetrics } from '../data/metrics';
 import type { Metrics } from '../data/metrics';
 import { computeCoaching, SETS_TARGET_LOW, SETS_TARGET_HIGH } from '../data/insights';
-import type { Coaching } from '../data/insights';
+import type { Coaching, Insight } from '../data/insights';
 import { BarChart, LineChart } from './charts';
+import MuscleHeatmap from './MuscleHeatmap';
 import './MetricsView.css';
 
 interface Props {
@@ -20,16 +22,18 @@ function formatVolume(v: number): string {
 export default function MetricsView({ program, onBack }: Props) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
-    loadTrainingSnapshot().then(snapshot => {
+    loadTrainingSnapshot().then(snap => {
       if (cancelled) return;
-      const m = computeMetrics(snapshot);
+      const m = computeMetrics(snap);
       setMetrics(m);
+      setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snapshot));
+      setCoaching(computeCoaching(program, snap));
     });
     return () => { cancelled = true; };
   }, [program]);
@@ -53,19 +57,53 @@ export default function MetricsView({ program, onBack }: Props) {
 
         {metrics && metrics.hasData && (
           <>
-            {/* ── Coaching insights ── */}
-            {coaching && coaching.insights.length > 0 && (
+            {/* ── Coach ── */}
+            {coaching && (coaching.highlights.length > 0 || coaching.opportunities.length > 0 || coaching.plan.changes.length > 0) && (
               <section className="metric-section">
                 <h2 className="metric-heading">Coach</h2>
-                <p className="metric-sub">Data-driven nudges from your logged sets · {coaching.weekLabel}.</p>
-                <div className="coach-insight-list">
-                  {coaching.insights.map((ins, i) => (
-                    <div key={i} className={`coach-insight-item coach-insight--${ins.kind}`}>
-                      <span className="coach-insight-title">{ins.title}</span>
-                      <span className="coach-insight-detail">{ins.detail}</span>
+                <p className="metric-sub">Read from your training data · {coaching.weekLabel}.</p>
+
+                {coaching.highlights.length > 0 && (
+                  <>
+                    <h3 className="coach-subhead coach-subhead--good">What's working</h3>
+                    <InsightList insights={coaching.highlights} />
+                  </>
+                )}
+
+                {coaching.opportunities.length > 0 && (
+                  <>
+                    <h3 className="coach-subhead coach-subhead--opportunity">Biggest opportunities</h3>
+                    <InsightList insights={coaching.opportunities} />
+                  </>
+                )}
+
+                {coaching.plan.changes.length > 0 && (
+                  <>
+                    <h3 className="coach-subhead coach-subhead--plan">Program adjustments</h3>
+                    <p className="metric-sub">
+                      Applied automatically to your next workouts — you'll see them explained when you open the day.
+                    </p>
+                    <div className="coach-insight-list">
+                      {coaching.plan.changes.map((c, i) => (
+                        <div key={i} className="coach-insight-item coach-insight--plan">
+                          <span className="coach-insight-title">
+                            {c.dayLabel} · {c.exerciseName}: {c.fromSets} → {c.toSets} sets
+                          </span>
+                          <span className="coach-insight-detail">{c.reason}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
+              </section>
+            )}
+
+            {/* ── Muscle heatmap ── */}
+            {snapshot && (
+              <section className="metric-section">
+                <h2 className="metric-heading">Training Heatmap</h2>
+                <p className="metric-sub">Where your training volume is landing — per muscle, per week.</p>
+                <MuscleHeatmap snapshot={snapshot} />
               </section>
             )}
 
@@ -161,6 +199,19 @@ export default function MetricsView({ program, onBack }: Props) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function InsightList({ insights }: { insights: Insight[] }) {
+  return (
+    <div className="coach-insight-list">
+      {insights.map((ins, i) => (
+        <div key={i} className={`coach-insight-item coach-insight--${ins.kind}`}>
+          <span className="coach-insight-title">{ins.title}</span>
+          <span className="coach-insight-detail">{ins.detail}</span>
+        </div>
+      ))}
     </div>
   );
 }

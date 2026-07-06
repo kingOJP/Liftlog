@@ -46,13 +46,31 @@ describe('computeMetrics', () => {
     ]);
   });
 
-  it('buckets sets by primary muscle and flags unclassified exercises', () => {
+  it('counts fractional muscle sets (primary 1, secondary 0.5) and flags unclassified exercises', () => {
     const m = computeMetrics(makeData(), 2);
-    const chest = m.muscleSets.find(s => s.muscle === 'Chest');
-    const other = m.muscleSets.find(s => s.muscle === 'Other');
-    expect(chest?.sets).toBe(1);   // week 2: one bench set
-    expect(other?.sets).toBe(1);   // the mystery exercise
+    const find = (muscle: string) => m.muscleSets.find(s => s.muscle === muscle)?.sets;
+    // week 2: one bench set — Chest primary, Delts + Triceps secondary
+    expect(find('Chest')).toBe(1);
+    expect(find('Delts')).toBe(0.5);
+    expect(find('Triceps')).toBe(0.5);
+    expect(find('Other')).toBe(1);   // the mystery exercise
     expect(m.unclassifiedExercises).toEqual(['mystery-exercise-1']);
+  });
+
+  it('credits secondary volume from compounds — a push day counts real triceps sets', () => {
+    // 4 incline press (Triceps secondary) + 3 pushdowns (Triceps primary)
+    const sessions: Session[] = [{ id: 1, dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 2_000 }];
+    const setLogs: SetLog[] = [
+      ...[1, 2, 3, 4].map(s => ({
+        id: s, sessionId: 1, exerciseId: 'incline-barbell-press', setNumber: s, weight: 135, reps: 8,
+      })),
+      ...[1, 2, 3].map(s => ({
+        id: 4 + s, sessionId: 1, exerciseId: 'tricep-cable-pushdown', setNumber: s, weight: 50, reps: 12,
+      })),
+    ];
+    const m = computeMetrics(buildSnapshot(sessions, setLogs), 1);
+    const triceps = m.muscleSets.find(s => s.muscle === 'Triceps');
+    expect(triceps?.sets).toBe(4 * 0.5 + 3);  // 5 fractional hard sets
   });
 
   it('falls back to the latest week with data when the current week is empty', () => {

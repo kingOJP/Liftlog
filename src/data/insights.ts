@@ -1,20 +1,45 @@
+// Coaching insights — the concise dashboard the Coach surfaces.
+//
+// Instead of a stream of notifications, computeCoaching() produces:
+//   - highlights:     up to 3 positive trends worth reinforcing (PRs, climbing
+//                     lifts, rising volume, consistency)
+//   - opportunities:  up to 3 diagnostic insights with the biggest expected
+//                     payoff (strength declines, plateaus, recovery risk,
+//                     structural program gaps)
+//   - plan:           the adaptive programming plan (coach.ts). Under-trained
+//                     muscles are no longer "notified" — the planner
+//                     redistributes volume across future workouts instead, and
+//                     the plan's changes carry their own plain-language reasons.
+
 import type { MuscleGroup } from './taxonomy';
 import { getWeekNumber } from './program';
 import type { WorkoutDay } from './program';
 import { getExerciseName } from './programStore';
 import type { TrainingSnapshot } from './analytics';
-import { e1rmSeries, musclesForExercise } from './analytics';
+import {
+  SETS_TARGET_LOW,
+  SETS_TARGET_HIGH,
+  e1rmSeries,
+  muscleSetTotals,
+  primaryMuscleFor,
+  sessionTimestamp,
+} from './analytics';
+import { computeProgramPlan } from './coach';
+import type { ProgramPlan } from './coach';
 
-// ── Tunables (hypertrophy research) ────────────────────────────────────────────
-// ~10–20 hard sets per muscle per week is the commonly cited effective range.
-export const SETS_TARGET_LOW = 10;
-export const SETS_TARGET_HIGH = 20;
+// Re-exported for existing consumers (MetricsView renders the target range)
+export { SETS_TARGET_LOW, SETS_TARGET_HIGH };
+
+// ── Tunables ──────────────────────────────────────────────────────────────────
 const TREND_WINDOW = 3;        // sessions compared for a strength trend
 const TREND_THRESHOLD = 3;     // % change that counts as up / down (else flat)
-const RECENT_SESSIONS = 2;     // don't nag about a muscle trained this recently
-const MAX_MUSCLE_RECS = 4;     // cap on "under-trained muscle" nudges
+const MAX_HIGHLIGHTS = 3;
+const MAX_OPPORTUNITIES = 3;
+const PR_RECENT_DAYS = 10;     // a PR is only a highlight while it's fresh
+const VOLUME_UP_PCT = 5;       // week-over-week volume gain worth celebrating
+const DAY_MS = 86_400_000;
 
-// ── Types ───────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type VolumeStatus = 'low' | 'optimal' | 'high';
 
@@ -35,7 +60,9 @@ export interface ExerciseTrend {
   sessions: number;
 }
 
-export type InsightKind = 'volume-low' | 'volume-high' | 'plateau' | 'progress';
+export type InsightKind =
+  | 'pr' | 'trend-up' | 'volume-up' | 'consistency'          // highlights
+  | 'trend-down' | 'plateau' | 'volume-high' | 'program-gap'; // opportunities
 
 export interface Insight {
   kind: InsightKind;
@@ -57,7 +84,9 @@ export interface Coaching {
   nextDay: NextDay | null;
   muscleVolume: MuscleVolume[];
   trends: ExerciseTrend[];
-  insights: Insight[];
+  highlights: Insight[];
+  opportunities: Insight[];
+  plan: ProgramPlan;
 }
 
 function volumeStatus(sets: number): VolumeStatus {
@@ -72,8 +101,10 @@ export function computeCoaching(
   program: WorkoutDay[],
   snapshot: TrainingSnapshot,
   currentWeek = getWeekNumber(),
+  now = Date.now(),
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
+  const plan = computeProgramPlan(program, snapshot, now);
 
   const empty: Coaching = {
     hasData: false,
@@ -81,7 +112,9 @@ export function computeCoaching(
     nextDay: nextDayFromProgram(program, sessions),
     muscleVolume: [],
     trends: [],
-    insights: [],
+    highlights: [],
+    opportunities: [],
+    plan,
   };
   if (sessions.length === 0 || setsBySession.size === 0) return empty;
 
@@ -91,21 +124,13 @@ export function computeCoaching(
   const weekLabel = coachWeek === currentWeek ? 'This week' : `Week ${coachWeek}`;
 
   // ── Fractional set volume per muscle for the coaching week ──
-  const volumeMap = new Map<MuscleGroup, number>();
-  for (const session of sessions) {
-    if (session.weekNumber !== coachWeek) continue;
-    for (const s of setsBySession.get(session.id!) ?? []) {
-      for (const { muscle, weight } of musclesForExercise(s.exerciseId)) {
-        volumeMap.set(muscle, (volumeMap.get(muscle) ?? 0) + weight);
-      }
-    }
-  }
+  const volumeMap = muscleSetTotals(snapshot, s => s.weekNumber === coachWeek).totals;
 
-  // Muscles the program directly targets (so we only nudge for trained muscles)
+  // Muscles the program directly targets
   const programMuscles = new Set<MuscleGroup>();
   for (const day of program) {
     for (const ex of day.exercises) {
-      const m = musclesForExercise(ex.id)[0]?.muscle;
+      const m = primaryMuscleFor(ex.id);
       if (m) programMuscles.add(m);
     }
   }
@@ -118,8 +143,9 @@ export function computeCoaching(
     .sort((a, b) => b.sets - a.sets);
 
   // ── Per-exercise strength trend (best Epley e1RM per session) ──
+  const series = e1rmSeries(snapshot);
   const trends: ExerciseTrend[] = [];
-  for (const [exerciseId, pts] of e1rmSeries(snapshot)) {
+  for (const [exerciseId, pts] of series) {
     if (pts.length < TREND_WINDOW) continue;
     const window = pts.slice(-TREND_WINDOW);
     const first = window[0].value;
@@ -131,77 +157,114 @@ export function computeCoaching(
   }
   trends.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
 
-  // Muscles trained in the last couple of sessions — we won't nag to add more
-  // volume for something that was just hit; the lifter is already on it.
-  const recentlyWorked = new Set<MuscleGroup>();
-  for (const session of sessions.slice(0, RECENT_SESSIONS)) {
-    for (const s of setsBySession.get(session.id!) ?? []) {
-      for (const { muscle } of musclesForExercise(s.exerciseId)) recentlyWorked.add(muscle);
-    }
-  }
-
-  // ── Build the prioritized recommendation list ──
-  const insights: Insight[] = [];
-
-  // Under-trained-muscle nudges: only for program muscles not worked in the
-  // last RECENT_SESSIONS sessions, most under-trained first, capped so the
-  // Coach stays focused instead of listing every muscle.
-  const lowMuscleInsights: Insight[] = [];
-  for (const mv of muscleVolume) {
-    if (!mv.inProgram) continue;
-    if (mv.status === 'low') {
-      if (recentlyWorked.has(mv.muscle)) continue;
-      const gap = SETS_TARGET_LOW - mv.sets;
-      lowMuscleInsights.push({
-        kind: 'volume-low',
-        priority: 100 + gap,
-        title: `${mv.muscle} is under-trained`,
-        detail: `${formatSets(mv.sets)} of ${SETS_TARGET_LOW}+ weekly sets — add about ${Math.ceil(gap)} more.`,
-      });
-    } else if (mv.status === 'high') {
-      insights.push({
-        kind: 'volume-high',
-        priority: 40,
-        title: `${mv.muscle} volume is high`,
-        detail: `${formatSets(mv.sets)} weekly sets — past ${SETS_TARGET_HIGH}, watch for junk volume and recovery.`,
-      });
-    }
-  }
-  lowMuscleInsights.sort((a, b) => b.priority - a.priority);
-  insights.push(...lowMuscleInsights.slice(0, MAX_MUSCLE_RECS));
-
   const programExerciseIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
 
-  for (const t of trends) {
-    if (!programExerciseIds.has(t.exerciseId)) continue;
-    if (t.dir === 'flat') {
-      insights.push({
-        kind: 'plateau',
-        priority: 80,
-        title: `${t.name} has stalled`,
-        detail: `No strength gain across ${t.sessions} sessions — try a light deload week or push for more reps.`,
-      });
-    } else if (t.dir === 'down') {
-      insights.push({
-        kind: 'plateau',
-        priority: 90,
-        title: `${t.name} is trending down`,
-        detail: `Est. 1RM down ${Math.abs(Math.round(t.changePct))}% lately — check recovery, sleep, and form.`,
+  // ── Highlights: the strongest recent improvements ──
+  const highlights: Insight[] = [];
+
+  // Fresh personal records: the latest e1RM point is an all-time best.
+  for (const [exerciseId, pts] of series) {
+    if (pts.length < 2 || !programExerciseIds.has(exerciseId)) continue;
+    const last = pts[pts.length - 1];
+    if (now - last.ts > PR_RECENT_DAYS * DAY_MS) continue;
+    const previousBest = Math.max(...pts.slice(0, -1).map(p => p.value));
+    if (last.value > previousBest * 1.005) {
+      const gainPct = Math.round(((last.value - previousBest) / previousBest) * 100);
+      highlights.push({
+        kind: 'pr',
+        priority: 100 + gainPct,
+        title: `New ${getExerciseName(exerciseId)} PR`,
+        detail: `Est. 1RM hit ${Math.round(last.value)} lbs${gainPct >= 1 ? ` — ${gainPct}% over your previous best` : ''}. That's the progression working.`,
       });
     }
   }
 
-  const progressing = trends.filter(t => t.dir === 'up' && programExerciseIds.has(t.exerciseId)).slice(0, 2);
-  for (const t of progressing) {
-    insights.push({
-      kind: 'progress',
-      priority: 20,
+  // Climbing lifts
+  for (const t of trends) {
+    if (t.dir !== 'up' || !programExerciseIds.has(t.exerciseId)) continue;
+    highlights.push({
+      kind: 'trend-up',
+      priority: 80 + t.changePct,
       title: `${t.name} is climbing`,
-      detail: `Est. 1RM up ${Math.round(t.changePct)}% over your last ${t.sessions} sessions — keep it up.`,
+      detail: `Est. 1RM up ${Math.round(t.changePct)}% over your last ${TREND_WINDOW} sessions — keep riding this progression.`,
     });
   }
 
-  insights.sort((a, b) => b.priority - a.priority);
+  // Week-over-week volume gain
+  const weekVolume = new Map<number, number>();
+  for (const session of sessions) {
+    let v = 0;
+    for (const s of setsBySession.get(session.id!) ?? []) v += s.weight * s.reps;
+    weekVolume.set(session.weekNumber, (weekVolume.get(session.weekNumber) ?? 0) + v);
+  }
+  const thisWeekVol = weekVolume.get(coachWeek) ?? 0;
+  const lastWeekVol = weekVolume.get(coachWeek - 1) ?? 0;
+  if (lastWeekVol > 0 && thisWeekVol > lastWeekVol * (1 + VOLUME_UP_PCT / 100)) {
+    const pct = Math.round(((thisWeekVol - lastWeekVol) / lastWeekVol) * 100);
+    highlights.push({
+      kind: 'volume-up',
+      priority: 60,
+      title: 'Training volume is rising',
+      detail: `${weekLabel}'s total volume is up ${pct}% on last week — progressive overload in action.`,
+    });
+  }
+
+  // Consistency: sessions in the trailing 7 days
+  const recentCount = sessions.filter(s => now - sessionTimestamp(s) <= 7 * DAY_MS).length;
+  if (recentCount >= Math.min(program.length, 3)) {
+    highlights.push({
+      kind: 'consistency',
+      priority: 50,
+      title: `${recentCount} workouts in the last 7 days`,
+      detail: 'Showing up is the biggest driver of long-term progress — this streak is doing more than any single set.',
+    });
+  }
+
+  // ── Opportunities: the changes with the biggest expected payoff ──
+  const opportunities: Insight[] = [];
+
+  for (const t of trends) {
+    if (!programExerciseIds.has(t.exerciseId)) continue;
+    if (t.dir === 'down') {
+      opportunities.push({
+        kind: 'trend-down',
+        priority: 90 + Math.abs(t.changePct),
+        title: `${t.name} strength has declined`,
+        detail: `Est. 1RM is down ${Math.abs(Math.round(t.changePct))}% over your last ${TREND_WINDOW} sessions. Prioritize recovery — sleep and food — and hold volume at target rather than pushing load.`,
+      });
+    } else if (t.dir === 'flat') {
+      opportunities.push({
+        kind: 'plateau',
+        priority: 70,
+        title: `${t.name} has stalled`,
+        detail: `No strength change across ${TREND_WINDOW} sessions at the same load. If it doesn't move next session, the coach will recommend a deload — that's the plan working, not a setback.`,
+      });
+    }
+  }
+
+  for (const mv of muscleVolume) {
+    if (mv.status === 'high' && mv.inProgram) {
+      opportunities.push({
+        kind: 'volume-high',
+        priority: 60 + (mv.sets - SETS_TARGET_HIGH),
+        title: `${mv.muscle} volume is running hot`,
+        detail: `${formatSets(mv.sets)} weekly sets — past the ${SETS_TARGET_HIGH}-set ceiling, extra sets mostly cost recovery. The coach will trim volume here if it persists.`,
+      });
+    }
+  }
+
+  // Structural gaps the planner couldn't fix by redistributing sets
+  for (const suggestion of plan.suggestions) {
+    opportunities.push({
+      kind: 'program-gap',
+      priority: 65,
+      title: 'Program gap',
+      detail: suggestion,
+    });
+  }
+
+  highlights.sort((a, b) => b.priority - a.priority);
+  opportunities.sort((a, b) => b.priority - a.priority);
 
   return {
     hasData: true,
@@ -209,7 +272,9 @@ export function computeCoaching(
     nextDay: nextDayFromProgram(program, sessions),
     muscleVolume,
     trends,
-    insights: insights.slice(0, 6),
+    highlights: highlights.slice(0, MAX_HIGHLIGHTS),
+    opportunities: opportunities.slice(0, MAX_OPPORTUNITIES),
+    plan,
   };
 }
 
