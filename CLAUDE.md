@@ -36,15 +36,21 @@ Long-term milestones (roughly):
     by immutable GUID, merged per-session by `updatedAt` with deletion tombstones
     (replaces full-replace LWW sync and the `pendingSessions` workaround), plus
     in-workout draft persistence (localStorage; auto-restore on reopening the day)
+17. ✅ Exercise Intelligence / substitution engine (`substitution.ts`) — per-exercise
+    "Find replacement" in the day editor: top-3 ranked, explained suggestions that
+    preserve the slot's programming; curated catalog expansion (~68 exercises)
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
 - Mesocycle awareness — planned accumulation/deload weeks rather than reactive-only deloads; the configurable start date is the foundation.
-- Unit preference (kg/lb), exercise substitution suggestions from the equipment/workout-type taxonomy (the metadata already exists to power this), and worker-side tests with vitest-pool-workers.
-- Exercise swap suggestions — add a button on exercises in the workout edit screen to suggest a different exercise that hits the same primary muscle group and doesn't repeat any others in the workout.
+- Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
 - Planner v2 — RPE-aware volume decisions, automatic exercise substitution (the planner
-  currently only *suggests* adding an exercise when no slot fits), and per-exercise rep-range
-  adjustments in addition to set counts.
+  currently only *suggests* adding an exercise when no slot fits; it could now rank that
+  suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
+  addition to set counts.
+- Exercise Intelligence v2 — external candidate sources behind the `ExerciseProfile`
+  normalization seam (AI-generated suggestions, coach-curated collections), injury-aware
+  and equipment-aware (travel/home-gym) substitution modes.
 
 ---
 
@@ -152,9 +158,11 @@ src/
                                   getExerciseName()
     settings.ts                — device-local settings (localStorage): configurable program
                                   start date (drives week numbering) + rest-timer default
-    exercises.ts               — Single source of truth for all 28 exercises (ExerciseDef),
-                                  EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
-                                  saveExerciseMeta() — metadata overrides in localStorage
+    exercises.ts               — Single source of truth for the ~68 built-in exercises
+                                  (ExerciseDef), EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
+                                  saveExerciseMeta() — metadata overrides in localStorage.
+                                  Includes the curated catalog expansion that feeds the
+                                  substitution engine's candidate pool
     programStore.ts            — localStorage CRUD: getStoredProgram, saveStoredProgram,
                                   getExerciseLibrary, saveExerciseLibrary, addToExerciseLibrary,
                                   getExerciseName, generateExerciseId.
@@ -175,6 +183,11 @@ src/
                                   → ProgramPlan (conservative set additions/trims across future
                                   workouts, each with a plain-language reason) + applyPlanToDay()
                                   overlay. Pure function of history — never mutates the program.
+    substitution.ts            — Exercise Intelligence: profileFor()/candidateProfiles()
+                                  (normalized ExerciseProfile view: muscles, pattern, equipment,
+                                  derived compound/isolation), suggestReplacements(target, day,
+                                  snapshot) → top-3 ranked, explained replacement suggestions
+                                  (see substitution engine section below)
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
                                   heatColor()/heatLabel() (blue→green→yellow→red weekly-rate
                                   gradient), presetWindow()/mesocycleWindow()
@@ -207,7 +220,8 @@ src/
                                   set logging, tap-to-edit
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
     HistoryView.tsx/css        — all past sessions in reverse chronological order
-    DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises
+    DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
+                                  per-exercise "Find replacement" (⇄) suggestion panel
     ExerciseListView.tsx/css   — alphabetical list of all exercises, taps into ExerciseMetaView
     ExerciseMetaView.tsx/css   — edit an exercise's muscle groups, equipment, weight type
     MetricsView.tsx/css        — metrics dashboard: Coach section (highlights, opportunities,
@@ -398,9 +412,47 @@ sets + weekly rate + status.
 
 ---
 
+## Substitution engine (`src/data/substitution.ts`)
+
+The Exercise Intelligence layer behind "Find replacement" (⇄) in DayEditView. Same
+architecture as the coach: **pure functions of (exercise, day, TrainingSnapshot)** — no
+storage writes, fully unit-tested (`substitution.test.ts`).
+
+- **`ExerciseProfile`** — the normalized view every candidate is ranked as: muscles
+  (override → catalog → name match, same precedence as `musclesForExercise`), movement
+  pattern (`WorkoutType`), equipment, weight type, and derived compound/isolation
+  mechanics. Any future candidate source (external APIs, AI generation, coach-curated
+  collections) plugs in by producing profiles; the ranker never changes.
+- **Candidate pool** (`candidateProfiles()`) — the user's exercise library first (a custom
+  entry that duplicates a catalog exercise *by name* shadows it, so the ID their history
+  is logged under wins), then the built-in catalog. Tombstoned/archived exercises and
+  exercises with no resolvable primary muscle are excluded.
+- **Ranking** (`suggestReplacements`) — hard filters (not the target, not already in the
+  day, must train the target's primary muscle, not the same lift under another name —
+  token-subset check catches "Cable Pushdown" vs "Tricep Cable Pushdown"), then additive
+  scored factors, each carrying a plain-language reason or caution: direct-vs-secondary
+  stimulus, muscle-overlap similarity, movement pattern (same-pattern bonus **or** a
+  redundancy penalty when the rest of the day already covers that pattern — never both),
+  compound/isolation match, equipment the user has actually trained with, familiarity +
+  e1RM trend from history, weekly volume balance (extra muscles should fill under-target
+  gaps, not pile onto muscles at the ceiling), and a fatigue penalty for dragging in more
+  muscles. Top 3 with score > 0 are shown.
+- **Accepting a swap** replaces the exercise in place, preserving the slot's sets/rep
+  range/order, and `addToExerciseLibrary` makes the newcomer first-class (also lifting any
+  deletion tombstone). Nothing "notifies" the coach: the planner, insights and
+  recommendations are pure functions of (program, history), so they re-derive from the
+  updated program automatically — on every device, once it syncs.
+- Without history (`snapshot: null`) the engine still works on structural factors; the
+  history-driven factors simply contribute nothing.
+
+---
+
 ## Exercise data architecture
 
-`src/data/exercises.ts` is the single source of truth for the 28 built-in exercises:
+`src/data/exercises.ts` is the single source of truth for the ~68 built-in exercises
+(the original 28 plus a curated catalog expansion that feeds the substitution engine's
+candidate pool — catalog-only exercises join the user's library when swapped into the
+program, not before):
 - `EXERCISES: ExerciseDef[]` — id, name, primaryMuscle, secondaryMuscles, workoutType, equipment, weightType
 - `EXERCISE_MAP: Map<string, ExerciseDef>` — fast lookup by id
 - `getExerciseMeta(id)` — returns metadata, preferring user overrides from `liftlog_exercise_meta` over defaults

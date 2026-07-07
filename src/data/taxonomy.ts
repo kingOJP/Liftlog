@@ -9,13 +9,14 @@ export type MuscleGroup =
   | 'Quads' | 'Traps' | 'Triceps' | 'Upper Back';
 
 export type WorkoutType =
-  | 'Calf Raise' | 'Curl' | 'Face Pull' | 'Fly'
+  | 'Calf Raise' | 'Crunch' | 'Curl' | 'Dip' | 'Face Pull' | 'Fly'
   | 'Hip Hinge' | 'Hip Thrust' | 'Lateral Raise' | 'Leg Curl'
   | 'Leg Extension' | 'Leg Press' | 'Lunge' | 'Press'
-  | 'Pull Down' | 'Pull Up' | 'Row' | 'Squat' | 'Tricep Extension';
+  | 'Pull Down' | 'Pull Over' | 'Pull Up' | 'Reverse Fly' | 'Row'
+  | 'Shrug' | 'Squat' | 'Tricep Extension';
 
 export type Equipment =
-  | 'Bench' | 'Cable Machine' | 'Machine' | 'None'
+  | 'Bench' | 'Cable Machine' | 'Dip Station' | 'Machine' | 'None'
   | 'Pull Up Bar' | 'Smith Machine' | 'Squat Rack';
 
 export type WeightType =
@@ -29,14 +30,15 @@ export const MUSCLE_GROUPS: MuscleGroup[] = [
 ];
 
 export const WORKOUT_TYPES: WorkoutType[] = [
-  'Calf Raise', 'Curl', 'Face Pull', 'Fly',
+  'Calf Raise', 'Crunch', 'Curl', 'Dip', 'Face Pull', 'Fly',
   'Hip Hinge', 'Hip Thrust', 'Lateral Raise', 'Leg Curl',
   'Leg Extension', 'Leg Press', 'Lunge', 'Press',
-  'Pull Down', 'Pull Up', 'Row', 'Squat', 'Tricep Extension',
+  'Pull Down', 'Pull Over', 'Pull Up', 'Reverse Fly', 'Row',
+  'Shrug', 'Squat', 'Tricep Extension',
 ];
 
 export const EQUIPMENT_OPTIONS: Equipment[] = [
-  'Bench', 'Cable Machine', 'Machine', 'None',
+  'Bench', 'Cable Machine', 'Dip Station', 'Machine', 'None',
   'Pull Up Bar', 'Smith Machine', 'Squat Rack',
 ];
 
