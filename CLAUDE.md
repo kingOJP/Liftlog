@@ -2,7 +2,11 @@
 
 ## Project goal
 
-LiftLog is a Progressive Web App for tracking a 4-day bodybuilding split, installable on iPhone via "Add to Home Screen." The user is a first-time web app developer. The app lives at this repo and auto-deploys to Cloudflare Pages on push to `main`.
+LiftLog is a Progressive Web App for coached strength training — plan a training journey, log workouts, get adaptive coaching — installable on iPhone via "Add to Home Screen." The user is a first-time web app developer. The app lives at this repo and auto-deploys to Cloudflare Pages on push to `main`.
+
+New accounts start with a **blank slate** — no pre-populated workouts. The stored-program
+fallback is `[]`; a first program comes from the plan wizard. The hardcoded 4-day `PROGRAM`
+in program.ts is only a sets/reps seed for the built-in exercise library.
 
 Long-term milestones (roughly):
 1. ✅ PWA shell + Cloudflare deployment
@@ -562,6 +566,10 @@ program, not before):
   nothing: reopening the same day within 12 h auto-restores it (with a Discard button); the
   draft is cleared at Finish. Edit-session mode never drafts.
 - **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session, re-writes them, and calls `touchSession()` so merge sync propagates the edit.
+- **New accounts get no default program** — `getStoredProgram()` falls back to `[]`, not
+  `PROGRAM`. The dashboard shows an empty state + plan CTA; the wizard builds the first
+  program. Existing accounts are unaffected (their program is in localStorage and in the
+  per-user `user_programs` server row, restored by pull on any device).
 - **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
 - **Program start date** is user-configurable in Settings (`settings.ts`, default `2026-06-09`).

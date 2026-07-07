@@ -131,7 +131,9 @@ export default function Dashboard({
     <div className="dashboard">
       <div className="week-header">
         <span className="week-label">{getWeekDateRange()}</span>
-        <span className="week-progress">{completedDayIds.size} of {program.length} done</span>
+        {program.length > 0 && (
+          <span className="week-progress">{completedDayIds.size} of {program.length} done</span>
+        )}
       </div>
 
       {journeyCard}
@@ -154,17 +156,27 @@ export default function Dashboard({
         </button>
       )}
 
-      <div className="day-list">
-        {program.map(day => (
-          <DayCard
-            key={day.id}
-            day={day}
-            done={completedDayIds.has(day.id)}
-            onClick={() => onStartWorkout(day.id)}
-            onEdit={() => onEditDay(day.id)}
-          />
-        ))}
-      </div>
+      {program.length === 0 ? (
+        <div className="day-list-empty">
+          <span className="day-list-empty-title">No workouts yet</span>
+          <span className="day-list-empty-detail">
+            Tell the coach your goal above and it designs your program with you —
+            every workout, explained, and yours to adjust before it starts.
+          </span>
+        </div>
+      ) : (
+        <div className="day-list">
+          {program.map(day => (
+            <DayCard
+              key={day.id}
+              day={day}
+              done={completedDayIds.has(day.id)}
+              onClick={() => onStartWorkout(day.id)}
+              onEdit={() => onEditDay(day.id)}
+            />
+          ))}
+        </div>
+      )}
 
       <nav className="dash-nav">
         <button className="dash-nav-btn" onClick={onViewMetrics}>

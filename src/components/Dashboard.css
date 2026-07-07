@@ -28,6 +28,30 @@
   gap: 12px;
 }
 
+.day-list-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 28px 20px;
+}
+
+.day-list-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.day-list-empty-detail {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 300px;
+}
+
 /* ── Journey card ── */
 .journey-card {
   display: flex;
