@@ -80,6 +80,17 @@ describe('computeProgramPlan', () => {
     expect(trims[0].toSets).toBe(3);
   });
 
+  it('stands down during a planned deload or recovery week', () => {
+    // Same under-target scenario that normally earns an add-set
+    const { sessions, setLogs } = makeSessions(6, 'leg-extension', 2);
+    const snapshot = buildSnapshot(sessions, setLogs);
+    for (const phase of ['deload', 'recovery'] as const) {
+      const plan = computeProgramPlan([legDay], snapshot, NOW, phase);
+      expect(plan.ready).toBe(false);
+      expect(plan.changes).toHaveLength(0);
+    }
+  });
+
   it('respects the workout-duration constraint when adding sets', () => {
     // Same volume gap as the add-set case, but historical sessions are only
     // 15 minutes — a 3-minute set exceeds the +15% duration headroom.

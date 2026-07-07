@@ -12,6 +12,7 @@
 //                     the plan's changes carry their own plain-language reasons.
 
 import type { MuscleGroup } from './taxonomy';
+import type { PhaseKind } from './plan';
 import { getWeekNumber } from './program';
 import type { WorkoutDay } from './program';
 import { getExerciseName } from './programStore';
@@ -102,9 +103,10 @@ export function computeCoaching(
   snapshot: TrainingSnapshot,
   currentWeek = getWeekNumber(),
   now = Date.now(),
+  phase: PhaseKind | null = null,
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
-  const plan = computeProgramPlan(program, snapshot, now);
+  const plan = computeProgramPlan(program, snapshot, now, phase);
 
   const empty: Coaching = {
     hasData: false,

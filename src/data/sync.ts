@@ -12,6 +12,8 @@ import {
 import { getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta } from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
+import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
+import type { PlanState } from './planStore';
 
 export interface SyncUser {
   email: string;
@@ -59,6 +61,8 @@ interface SyncPayload {
   exerciseMuscles:     ExerciseMusclesRow[];
   exerciseDetails:     ExerciseDetailsRow[];
   deletedExerciseIds:  string[];
+  /** the training journey (plans + blocks) — whole-document LWW by updatedAt */
+  plan:                PlanState | null;
 }
 
 function splitMeta(meta: Record<string, ExerciseMetaOverride>): {
@@ -111,12 +115,14 @@ export async function ensureLocalDataOwner(): Promise<void> {
   const owner = localStorage.getItem(OWNER_KEY);
   if (owner && owner !== user.email) {
     // Account switch: wipe user-scoped data (workout history, program, session
-    // tombstones, any in-progress draft). App-wide data — exercise library,
-    // metadata, deletion tombstones — and device settings survive the switch.
+    // tombstones, training journey, any in-progress draft). App-wide data —
+    // exercise library, metadata, deletion tombstones — and device settings
+    // survive the switch.
     await clearIDB();
     clearStoredProgram();
     clearSessionTombstones();
     clearDraftSession();
+    clearPlanState();
   }
   localStorage.setItem(OWNER_KEY, user.email);
 }
@@ -148,6 +154,7 @@ export async function pushSync(): Promise<void> {
     program:             getStoredProgram(),
     exercises:           getExerciseLibrary(),
     deletedExerciseIds:  [...deletedExercises],
+    plan:                getPlanState().plans.length > 0 ? getPlanState() : null,
     ...splitMeta(meta),
   };
 
@@ -181,6 +188,7 @@ export async function pullSync(): Promise<boolean> {
     exerciseMuscles:     ExerciseMusclesRow[] | null;
     exerciseDetails:     ExerciseDetailsRow[] | null;
     deletedExerciseIds:  string[]             | null;
+    plan?:               PlanState            | null;
   };
 
   // Exercise deletions are permanent and app-wide: merge the server's
@@ -212,6 +220,10 @@ export async function pullSync(): Promise<boolean> {
   const docs = groupWireSessions(data.sessions, data.setLogs);
   let changed = await mergeServerSessions(docs, getSessionTombstones());
   if (await purgeEmptySessions() > 0) changed = true;
+
+  // Training journey: whole-document LWW — a newer server copy replaces local
+  // (an older server copy is ignored; the next push uploads ours).
+  if (mergeServerPlanState(data.plan ?? null)) changed = true;
 
   if (data.program) {
     const incomingProgram = data.program.map(d => ({

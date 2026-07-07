@@ -126,3 +126,13 @@ CREATE TABLE IF NOT EXISTS user_programs (
   exercises_json TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Training journey (plans + blocks + retrospectives) as one per-user document.
+-- Whole-document last-write-wins by updated_at — the merge-sensitive data
+-- (workout sessions) has its own per-document merge in session_docs.
+CREATE TABLE IF NOT EXISTS training_plans (
+  user_id    TEXT    PRIMARY KEY,
+  plan_json  TEXT    NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

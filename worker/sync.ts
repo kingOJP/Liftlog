@@ -86,7 +86,7 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
 }
 
 async function pull(userId: string, env: Env): Promise<Response> {
-  const [sessionDocs, sessionTombstones, program, appExercises, appMeta, tombstones] = await Promise.all([
+  const [sessionDocs, sessionTombstones, program, appExercises, appMeta, tombstones, planRow] = await Promise.all([
     loadSessionDocs(userId, env),
     env.DB.prepare('SELECT guid FROM deleted_sessions WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare(
@@ -97,6 +97,9 @@ async function pull(userId: string, env: Env): Promise<Response> {
     ).all(),
     env.DB.prepare(`SELECT ${META_COLUMNS} FROM app_exercise_metadata`).all(),
     env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
+    env.DB.prepare(
+      'SELECT plan_json FROM training_plans WHERE user_id = ?',
+    ).bind(userId).first<{ plan_json: string }>(),
   ]);
 
   const deletedSessionGuids = new Set(sessionTombstones.results.map(r => r.guid as string));
@@ -178,6 +181,7 @@ async function pull(userId: string, env: Env): Promise<Response> {
     deletedExerciseIds: [...deletedIds],
     program:   program?.program_json ? JSON.parse(program.program_json) : null,
     exercises,
+    plan:      planRow?.plan_json ? JSON.parse(planRow.plan_json) : null,
   });
 }
 
@@ -199,6 +203,8 @@ interface PushPayload {
   deletedExerciseIds?: string[];
   program:   unknown;
   exercises: PushExercise[] | null;
+  /** training journey document — whole-document LWW by updatedAt */
+  plan?: { version: number; plans: unknown[]; updatedAt: number } | null;
 }
 
 // Sanity limits — a personal training log is nowhere near these; anything
@@ -206,6 +212,8 @@ interface PushPayload {
 const MAX_SESSIONS  = 20_000;
 const MAX_SET_LOGS  = 200_000;
 const MAX_EXERCISES = 10_000;
+const MAX_PLANS      = 200;
+const MAX_PLAN_BYTES = 1_000_000;
 
 function validatePush(data: PushPayload): string | null {
   if (typeof data !== 'object' || data === null) return 'payload must be an object';
@@ -251,6 +259,15 @@ function validatePush(data: PushPayload): string | null {
     if (!Array.isArray(data.deletedExerciseIds)) return 'deletedExerciseIds must be an array';
     if (data.deletedExerciseIds.length > MAX_EXERCISES) return 'too many deleted exercise ids';
     if (data.deletedExerciseIds.some(id => typeof id !== 'string')) return 'malformed deleted exercise id';
+  }
+  if (data.plan != null) {
+    if (typeof data.plan !== 'object') return 'malformed plan';
+    if (data.plan.version !== 1 || !Array.isArray(data.plan.plans) ||
+        typeof data.plan.updatedAt !== 'number') {
+      return 'malformed plan';
+    }
+    if (data.plan.plans.length > MAX_PLANS) return 'too many plans';
+    if (JSON.stringify(data.plan).length > MAX_PLAN_BYTES) return 'plan too large';
   }
   return null;
 }
@@ -384,6 +401,18 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
          program_json   = excluded.program_json,
          exercises_json = excluded.exercises_json`,
     ).bind(userId, JSON.stringify(data.program), JSON.stringify(data.exercises)));
+  }
+
+  // Training journey: upsert only when the pushed document is newer — the
+  // same last-write-wins the client applies on pull, enforced on both ends.
+  if (data.plan) {
+    stmts.push(env.DB.prepare(
+      `INSERT INTO training_plans (user_id, plan_json, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         plan_json  = excluded.plan_json,
+         updated_at = excluded.updated_at
+       WHERE excluded.updated_at > training_plans.updated_at`,
+    ).bind(userId, JSON.stringify(data.plan), data.plan.updatedAt));
   }
 
   // D1 batch limit is 1000 statements; chunk to be safe

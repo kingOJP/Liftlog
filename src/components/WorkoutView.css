@@ -126,6 +126,32 @@
   border-color: var(--purple);
 }
 
+/* ── Phase banner (planned deload / recovery week) ── */
+
+.phase-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: linear-gradient(135deg, rgba(61, 107, 232, 0.18), rgba(61, 107, 232, 0.04));
+  border: 1px solid rgba(61, 107, 232, 0.5);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.phase-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #7fa3ff;
+}
+
+.phase-banner-detail {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 /* ── Coach plan banner ── */
 
 .coach-plan-banner {

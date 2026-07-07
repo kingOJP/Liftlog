@@ -39,10 +39,22 @@ Long-term milestones (roughly):
 17. ✅ Exercise Intelligence / substitution engine (`substitution.ts`) — per-exercise
     "Find replacement" in the day editor: top-3 ranked, explained suggestions that
     preserve the slot's programming; curated catalog expansion (~68 exercises)
+18. ✅ Training journey — the long-term planning layer above individual workouts:
+    TrainingPlan/TrainingBlock domain model (`plan.ts`), block planner
+    (`planner.ts`: goal + history → explained split/phases/workouts proposal),
+    collaborative 3-step plan wizard (PlanSetupView), JourneyView (block
+    timeline + retrospectives), block retrospectives (`retrospective.ts`) whose
+    carryover feeds the next planning cycle, phase-aware engines (planned
+    deload/recovery weeks override recommendations and pause the set-planner),
+    legacy history migrated into an open-ended "Foundation" block, journey
+    document synced LWW (D1 `training_plans`)
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
-- Mesocycle awareness — planned accumulation/deload weeks rather than reactive-only deloads; the configurable start date is the foundation.
+- Journey v2 — deload-position editing in the wizard (`validatePhases` already
+  enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
+  seam: any generator that emits one plugs into the same review-and-activate
+  flow), block-over-block comparison charts, rehab/peaking block presets.
 - Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
 - Planner v2 — RPE-aware volume decisions, automatic exercise substitution (the planner
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
@@ -131,7 +143,9 @@ type View =
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
-  | { screen: 'settings' };
+  | { screen: 'settings' }
+  | { screen: 'journey' }
+  | { screen: 'plan-setup' };
 ```
 
 Day-scoped views (`workout`, `edit-session`, `edit-day`) look the day up with a fallback:
@@ -188,6 +202,21 @@ src/
                                   derived compound/isolation), suggestReplacements(target, day,
                                   snapshot) → top-3 ranked, explained replacement suggestions
                                   (see substitution engine section below)
+    plan.ts                    — training-journey domain: TrainingPlan/TrainingBlock/
+                                  BlockRetrospective types, PhaseKind week tags, Monday-anchored
+                                  block week math (blockWeekIndex/currentPhase/blockEnded),
+                                  validatePhases() deload guardrails
+    planner.ts                 — block planner: buildPlanProposal(input, program, snapshot,
+                                  prevRetro) → PlanProposal (split, phase layout, generated
+                                  workouts, per-exercise decisions with reasons, confidence,
+                                  parsed guidance notes) — pure, like every other engine
+    retrospective.ts           — computeBlockRetrospective(block, snapshot) → adherence,
+                                  per-lift e1RM change, muscle volume, coach-voice summary,
+                                  carryover signals the next planner run consumes
+    planStore.ts               — journey persistence (localStorage `liftlog_plan`):
+                                  activateProposal(), completeActiveBlock(), getActivePhase(),
+                                  ensureJourneyMigrated() (wraps legacy history in a Foundation
+                                  block), mergeServerPlanState() (LWW sync)
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
                                   heatColor()/heatLabel() (blue→green→yellow→red weekly-rate
                                   gradient), presetWindow()/mesocycleWindow()
@@ -229,6 +258,13 @@ src/
                                   chart, e1RM chart, muscle sets chart, unclassified banner
     MuscleHeatmap.tsx/css      — front/back SVG body silhouettes colored by weekly training
                                   volume per muscle; 7d/30d/mesocycle/custom timeframe presets
+    JourneyView.tsx/css        — training journey: active block (phase timeline, intent,
+                                  progression), wrap-up/end-early with retrospective, past
+                                  blocks with expandable reviews
+    PlanSetupView.tsx/css      — collaborative plan wizard: goal + schedule + open notes →
+                                  proposed structure (confidence, split, phases, reasons) →
+                                  workout review (kept/new/replacement badges, swap ⇄ / remove)
+                                  → activate
     SettingsView.tsx/css       — program start date, rest-timer default, account/sign-out
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart and LineChart (hand-rolled CSS/SVG)
@@ -248,6 +284,7 @@ src/
 | `liftlog_deleted_exercises` | `programStore.ts` | Deleted-exercise tombstones (synced app-wide; filtered on every library read) |
 | `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
+| `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives; user-scoped, synced LWW) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
@@ -306,7 +343,10 @@ Legacy `workout_sessions`/`set_logs` tables are a read-only pull fallback until 
 first v2 push; `exerciseLogs` (removed difficulty feature) is no longer synced.
 
 Sync payload also includes: program, exercise library, exercise metadata
-(muscle/equipment/weight-type overrides), and deleted-exercise tombstones. On pull, metadata
+(muscle/equipment/weight-type overrides), deleted-exercise tombstones, and the **training
+journey document** (`plan` — all plans/blocks/retrospectives as one JSON doc, per-user D1
+`training_plans` table, whole-document LWW by `updatedAt` on both ends: the server upserts
+only a newer copy, the client replaces local only with a newer copy). On pull, metadata
 is *merged* into local (server wins per exercise; unsynced local edits survive).
 `pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
 resurrect through sync (the server additionally refuses to store empty session docs).
@@ -444,6 +484,56 @@ storage writes, fully unit-tested (`substitution.test.ts`).
   updated program automatically — on every device, once it syncs.
 - Without history (`snapshot: null`) the engine still works on structural factors; the
   history-driven factors simply contribute nothing.
+
+---
+
+## Training journey (`plan.ts` + `planner.ts` + `retrospective.ts` + `planStore.ts`)
+
+The planning layer above individual workouts. Two domain levels, deliberately not more:
+
+- **`TrainingPlan`** — a "goal era" (Muscle Growth, Strength, Fat Loss, Athletic, General).
+  Owns a sequence of blocks; at most one plan is active; history is unlimited. Activating a
+  proposal with the *same* goal appends a block to the active plan; a *different* goal
+  completes the plan and starts a new one (goal transition).
+- **`TrainingBlock`** — a mesocycle: `startDate`, `phases: PhaseKind[]` (**one tag per
+  week** — recovery/accumulation/intensification/peak/deload), the program designed for it,
+  plain-language `intent` + `progression`, and (once completed) its `retrospective`.
+  Phases-as-week-tags is the bridge between the coach thinking in phases and the user
+  thinking in weeks. Open-ended blocks (`openEnded`, migrated legacy training) are
+  perpetual accumulation with no scheduled end.
+
+**Key invariants:**
+- All intelligence is pure functions, same as coach/substitution: `buildPlanProposal()`
+  and `computeBlockRetrospective()` take a `TrainingSnapshot` and return documents.
+- **The active block's program IS `liftlog_program`.** Activation copies the block's
+  program into the program store and re-anchors the week-numbering start date
+  (`saveProgramStart`). Nothing else in the app needs to know blocks exist — coach,
+  recommendations, metrics keep reading (program, history).
+- **Phase-aware engines:** `getActivePhase()` (planStore) resolves this week's phase;
+  during `deload`/`recovery` weeks `calculateRecommendation(…, phase)` prescribes ~10%
+  off (rep-goal floor for bodyweight) and `computeProgramPlan(…, phase)` returns the
+  empty plan (no set fiddling in a planned easy week). WorkoutView shows a phase banner.
+- **Deload guardrails** (`validatePhases`): recovery only as the opener, one deload max,
+  deload closes the block, ≥3 productive weeks before it. `buildPhases` auto-drops an
+  unearned deload and says why.
+- **The learning loop:** wrapping a block stores a `BlockRetrospective` (adherence,
+  per-lift e1RM change, muscle volume vs the 10–20 band, coach-voice summary). Its
+  `carryover` (keep/review exercise ids, under/over muscles) feeds the next
+  `buildPlanProposal`: keepers get selection bonuses, stalled lifts get rotated with a
+  "replaces X" explanation, under-target muscles get +1 set, over-ceiling muscles −1.
+  The wizard computes a *live* retrospective of the running block, so even the first
+  planned block learns from foundation history.
+- **Confidence is declared:** proposals label themselves evidence-based (0 sessions),
+  partly personalized (<12) or personalized (≥12), and every exercise decision carries a
+  reason shown in the review step.
+- **Open-ended notes** are parsed conservatively (`parseGuidance`: equipment limits,
+  knee/shoulder/lower-back issues); every match is echoed back as a "what the coach took
+  from your notes" line, everything else stays visible on the plan.
+- **Migration:** `ensureJourneyMigrated()` (App startup, after pull, before push) wraps
+  pre-journey history + program in a migrated plan with one open-ended "Foundation
+  training" block, so the first planning cycle starts from everything already logged.
+- The journey syncs as **one document** (`liftlog_plan` ↔ D1 `training_plans`), LWW by
+  `updatedAt`; cleared on account switch like other user-scoped data.
 
 ---
 
