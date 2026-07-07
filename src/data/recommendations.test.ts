@@ -144,3 +144,36 @@ describe('calculateRecommendation — bodyweight (rep progression)', () => {
     expect(rec!.targetReps).toBeUndefined();
   });
 });
+
+describe('planned phase overrides', () => {
+  it('prescribes ~10% off during a scheduled deload week, whatever the trend', () => {
+    // Last session beat the rep range — normally an increase
+    const rec = calculateRecommendation(
+      [session([[100, 12], [100, 12], [100, 12]])], exercise, null, 'deload',
+    );
+    expect(rec).toMatchObject({ weight: 90, direction: 'down', kind: 'deload' });
+    expect(rec!.reason).toMatch(/deload week/i);
+  });
+
+  it('treats a recovery week the same way with its own framing', () => {
+    const rec = calculateRecommendation(
+      [session([[100, 10], [100, 9], [100, 9]])], exercise, null, 'recovery',
+    );
+    expect(rec).toMatchObject({ weight: 90, kind: 'deload' });
+    expect(rec!.reason).toMatch(/recovery week/i);
+  });
+
+  it('backs bodyweight work off to the bottom of the rep range', () => {
+    const rec = calculateRecommendation(
+      [session([[0, 12], [0, 12], [0, 12]])], exercise, 'Bodyweight', 'deload',
+    );
+    expect(rec).toMatchObject({ weight: 0, targetReps: 8, kind: 'deload' });
+  });
+
+  it('changes nothing during productive phases', () => {
+    const rec = calculateRecommendation(
+      [session([[100, 12], [100, 12], [100, 12]])], exercise, null, 'accumulation',
+    );
+    expect(rec).toMatchObject({ weight: 105, kind: 'increase' });
+  });
+});

@@ -23,15 +23,13 @@ describe('canonicalizeId', () => {
 });
 
 describe('getStoredProgram', () => {
-  it('returns the default program when nothing is stored', () => {
-    const program = getStoredProgram();
-    expect(program).toHaveLength(4);
-    expect(program[0].exercises.length).toBeGreaterThan(0);
+  it('returns a blank slate when nothing is stored (new accounts get no pre-populated workouts)', () => {
+    expect(getStoredProgram()).toHaveLength(0);
   });
 
   it('survives corrupt stored JSON', () => {
     localStorage.setItem('liftlog_program', '{broken');
-    expect(getStoredProgram()).toHaveLength(4);
+    expect(getStoredProgram()).toHaveLength(0);
   });
 
   it('canonicalizes legacy exercise ids in the stored program and persists the fix', () => {

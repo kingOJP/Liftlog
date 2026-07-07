@@ -6,6 +6,8 @@ import { computeMetrics } from '../data/metrics';
 import type { Metrics } from '../data/metrics';
 import { computeCoaching, SETS_TARGET_LOW, SETS_TARGET_HIGH } from '../data/insights';
 import type { Coaching, Insight } from '../data/insights';
+import { getWeekNumber } from '../data/program';
+import { getActivePhase } from '../data/planStore';
 import { BarChart, LineChart } from './charts';
 import MuscleHeatmap from './MuscleHeatmap';
 import './MetricsView.css';
@@ -33,7 +35,7 @@ export default function MetricsView({ program, onBack }: Props) {
       setMetrics(m);
       setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snap));
+      setCoaching(computeCoaching(program, snap, getWeekNumber(), Date.now(), getActivePhase()));
     });
     return () => { cancelled = true; };
   }, [program]);

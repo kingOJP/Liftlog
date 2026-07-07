@@ -3,6 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
+import { ensureJourneyMigrated } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -13,6 +14,8 @@ import ExerciseMetaView from './components/ExerciseMetaView';
 import MetricsView from './components/MetricsView';
 import SettingsView from './components/SettingsView';
 import LoginView from './components/LoginView';
+import JourneyView from './components/JourneyView';
+import PlanSetupView from './components/PlanSetupView';
 import './App.css';
 
 type View =
@@ -24,7 +27,9 @@ type View =
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
-  | { screen: 'settings' };
+  | { screen: 'settings' }
+  | { screen: 'journey' }
+  | { screen: 'plan-setup' };
 
 function App() {
   const [view, setView]       = useState<View>({ screen: 'dashboard' });
@@ -57,6 +62,14 @@ function App() {
       try {
         const didPull = await pullSync();
         if (didPull) setProgram(getStoredProgram());
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        // Wrap pre-journey training (program + history, no plan) in a
+        // Foundation block — after pull, so a plan synced from another
+        // device wins over creating a fresh wrapper.
+        await ensureJourneyMigrated();
       } catch (err) {
         console.error(err);
       }
@@ -197,6 +210,27 @@ function App() {
         return <MetricsView program={program} onBack={() => setView({ screen: 'dashboard' })} />;
       case 'settings':
         return <SettingsView user={user!} onBack={() => setView({ screen: 'dashboard' })} />;
+      case 'journey':
+        return (
+          <JourneyView
+            onBack={() => setView({ screen: 'dashboard' })}
+            onPlanNew={() => setView({ screen: 'plan-setup' })}
+            onChanged={sync}
+          />
+        );
+      case 'plan-setup':
+        return (
+          <PlanSetupView
+            program={program}
+            onBack={() => setView({ screen: 'journey' })}
+            onActivated={() => {
+              // The activated block's program is now the live program
+              setProgram(getStoredProgram());
+              setView({ screen: 'dashboard' });
+              sync();
+            }}
+          />
+        );
       case 'dashboard':
         break;
     }
@@ -215,6 +249,8 @@ function App() {
             onViewExercises={() => setView({ screen: 'exercise-list' })}
             onViewMetrics={() => setView({ screen: 'metrics' })}
             onViewSettings={() => setView({ screen: 'settings' })}
+            onViewJourney={() => setView({ screen: 'journey' })}
+            onPlanSetup={() => setView({ screen: 'plan-setup' })}
           />
         </main>
       </>

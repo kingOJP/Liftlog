@@ -19,6 +19,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay, Exercise } from './program';
+import type { PhaseKind } from './plan';
 import type { TrainingSnapshot } from './analytics';
 import {
   SETS_TARGET_LOW,
@@ -92,8 +93,12 @@ export function computeProgramPlan(
   program: WorkoutDay[],
   snapshot: TrainingSnapshot,
   now = Date.now(),
+  phase: PhaseKind | null = null,
 ): ProgramPlan {
   const { sessions } = snapshot;
+  // A planned deload/recovery week is deliberately lighter — adding or
+  // trimming sets there would fight the block's design.
+  if (phase === 'deload' || phase === 'recovery') return EMPTY_PLAN;
   if (sessions.length < MIN_SESSIONS_TO_ADAPT || program.length === 0) return EMPTY_PLAN;
 
   const windowStart = now - WINDOW_DAYS * DAY_MS;

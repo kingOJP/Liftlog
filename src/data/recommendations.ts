@@ -1,5 +1,6 @@
 import type { Exercise } from './program';
 import type { WeightType } from './taxonomy';
+import type { PhaseKind } from './plan';
 import { epley1RM } from './analytics';
 
 // Next-weight recommendations built on double progression — the standard
@@ -81,16 +82,33 @@ function bestE1rm(sets: LoggedSet[]): number {
  * @param weightType  The exercise's weight type. Bodyweight exercises logged
  *                    without external load progress by reps instead of weight
  *                    (e1RM and load increments are meaningless at 0 lbs).
+ * @param phase       The training-block phase governing this week (plan.ts).
+ *                    During a planned deload/recovery week the engine stops
+ *                    chasing progression and prescribes ~10% off the working
+ *                    weight — the deload is scheduled, not reactive.
  */
 export function calculateRecommendation(
   history: ExerciseSession[],
   exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
   weightType?: WeightType | null,
+  phase?: PhaseKind | null,
 ): WeightRec | null {
   const last = history.find(h => h.sets.length > 0);
   if (!last) return null;
 
   const weight = workingWeight(last.sets);
+
+  // Planned easy week: back off ~10% regardless of how the last session went.
+  if (phase === 'deload' || phase === 'recovery') {
+    const easy = phase === 'deload'
+      ? 'Planned deload week — ~10% lighter, crisp reps, let fatigue drain'
+      : 'Recovery week — ~10% lighter while you ramp back into training';
+    if (weightType === 'Bodyweight' && weight === 0) {
+      return { weight: 0, targetReps: exercise.repLow, direction: 'down', kind: 'deload', reason: easy };
+    }
+    const deloaded = Math.max(5, Math.min(roundTo5(weight * 0.9), weight - 5));
+    return { weight: deloaded, direction: 'down', kind: 'deload', reason: easy };
+  }
 
   // Bodyweight at 0 lbs → rep progression. If external load was logged
   // (e.g. weighted pull-ups with a belt), the normal weight engine applies.

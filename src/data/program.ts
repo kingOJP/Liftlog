@@ -17,6 +17,10 @@ export interface WorkoutDay {
   exercises: Exercise[];
 }
 
+// The original owner's 4-day split. No longer anyone's starting program —
+// new accounts begin with a blank slate and build their first program through
+// the plan wizard. Kept only as the sets/reps seed for the built-in exercise
+// library (programStore.buildDefaultLibrary).
 export const PROGRAM: WorkoutDay[] = [
   {
     id: 1,

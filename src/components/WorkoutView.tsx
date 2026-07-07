@@ -17,6 +17,8 @@ import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { calculateRecommendation } from '../data/recommendations';
 import type { WeightRec, ExerciseSession } from '../data/recommendations';
 import { getExerciseMeta } from '../data/exercises';
+import { getActivePhase } from '../data/planStore';
+import { PHASE_INFO } from '../data/plan';
 import { getResumableDraft, saveDraftSession, clearDraftSession } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
@@ -53,6 +55,9 @@ function dateInputToTimestamp(value: string, originalTs: number): number {
 
 export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
   const isEditMode = existingSessionId !== undefined;
+  // The training-block phase governing this week — planned deload/recovery
+  // weeks flip the engines into back-off mode. Editing history ignores phase.
+  const [phase] = useState(() => (existingSessionId !== undefined ? null : getActivePhase()));
   // An interrupted workout (app killed mid-session) left a draft behind —
   // restore it so no logged set is ever lost. Edit mode never drafts.
   const [restoredDraft, setRestoredDraft] = useState(() =>
@@ -111,7 +116,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     loadTrainingSnapshot().then(snapshot => {
       if (cancelled) return;
 
-      const plan = computeProgramPlan(program, snapshot);
+      const plan = computeProgramPlan(program, snapshot, Date.now(), phase);
       const adjusted = applyPlanToDay(day, plan);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);
@@ -133,14 +138,14 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
         }
         if (history.length === 0) continue;
         lasts[ex.id] = history[0];
-        const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType);
+        const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType, phase);
         if (rec != null) recs[ex.id] = rec;
       }
       setRecommendations(recs);
       setLastSessions(lasts);
     });
     return () => { cancelled = true; };
-  }, [day, program, isEditMode]);
+  }, [day, program, isEditMode, phase]);
 
   useEffect(() => {
     if (!existingSessionId) return;
@@ -272,6 +277,12 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             <button className="draft-banner-discard" onClick={handleDiscardDraft}>
               Discard
             </button>
+          </div>
+        )}
+        {!isEditMode && (phase === 'deload' || phase === 'recovery') && (
+          <div className="phase-banner">
+            <span className="phase-banner-title">{PHASE_INFO[phase].label} week</span>
+            <span className="phase-banner-detail">{PHASE_INFO[phase].blurb} — the lighter targets are the plan working, not you slacking.</span>
           </div>
         )}
         {!isEditMode && planChanges.length > 0 && !planDismissed && (

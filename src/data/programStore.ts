@@ -20,11 +20,16 @@ export function getStoredProgram(): WorkoutDay[] {
     if (raw) stored = JSON.parse(raw) as WorkoutDay[];
   } catch { /* corrupt data — fall through */ }
 
+  // New accounts start with a blank slate — no pre-populated workouts. Their
+  // first program comes from the plan wizard (or a sync pull on an existing
+  // account's new device). PROGRAM in program.ts is only a library seed now.
+  if (stored == null) return [];
+
   // A stored program from an old build may still reference legacy -d1/-d2/-d4
   // exercise IDs. Canonicalize them on read (and persist the fix) so newly
   // logged workouts share IDs with existing history instead of spawning
   // duplicate, unclassified exercises.
-  const { program, changed } = canonicalizeProgram(stored ?? PROGRAM);
+  const { program, changed } = canonicalizeProgram(stored);
   if (changed) saveStoredProgram(program);
   return program;
 }
@@ -52,8 +57,8 @@ export function saveStoredProgram(program: WorkoutDay[]): void {
   localStorage.setItem(PROGRAM_KEY, JSON.stringify(program));
 }
 
-// Drops the stored program entirely (account switch) — the next read rebuilds
-// from PROGRAM defaults or from the incoming account's sync pull.
+// Drops the stored program entirely (account switch) — the next read returns
+// the blank slate until the incoming account's sync pull restores theirs.
 export function clearStoredProgram(): void {
   localStorage.removeItem(PROGRAM_KEY);
 }
