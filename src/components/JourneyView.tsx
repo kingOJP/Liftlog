@@ -5,7 +5,7 @@ import {
   PHASE_INFO, blockEndTs, blockEnded, blockWeekIndex, currentPhase, goalLabel,
 } from '../data/plan';
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
-import { completeActiveBlock, getPlanState, startPendingActivation } from '../data/planStore';
+import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, startPendingActivation } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import './JourneyView.css';
 
@@ -83,12 +83,21 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
   const activePlan = state.plans.find(p => p.status === 'active') ?? null;
   const activeBlock = activePlan?.blocks.find(b => b.status === 'active') ?? null;
   const pending = state.pendingActivation ?? null;
+  const canDefer = canDeferActiveBlock();
 
   async function startPendingNow() {
     if (!window.confirm('Start the new block today instead of waiting for its start date?')) return;
     await startPendingActivation(Date.now(), { force: true });
     setRefresh(r => r + 1);
     onChanged();
+  }
+
+  function deferToNextWeek() {
+    if (!window.confirm('Restore your previous workouts for the rest of this week? The new block will start next Monday instead.')) return;
+    if (deferActiveBlockToNextWeek()) {
+      setRefresh(r => r + 1);
+      onChanged();
+    }
   }
 
   const completedBlocks: { plan: TrainingPlan; block: TrainingBlock }[] = state.plans
@@ -217,6 +226,12 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
                   </button>
                 )}
               </div>
+            )}
+
+            {!ended && canDefer && (
+              <button className="journey-text-btn" onClick={deferToNextWeek}>
+                Started this too early? Finish the week on your previous workouts
+              </button>
             )}
           </section>
         ) : !justWrapped && (

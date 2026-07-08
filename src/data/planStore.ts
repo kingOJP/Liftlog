@@ -18,7 +18,7 @@ import { getProgramStartValue, saveProgramStart } from './settings';
 import { loadTrainingSnapshot } from './analytics';
 import type { TrainingSnapshot } from './analytics';
 import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan } from './plan';
-import { blockAnchor, currentPhase, generatePlanId, goalLabel, toPlanDate } from './plan';
+import { blockAnchor, currentPhase, generatePlanId, goalLabel, nextMonday, toPlanDate } from './plan';
 import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
 
@@ -282,6 +282,79 @@ export function getTrainingGoal(): Goal {
   return state.plans.find(p => p.status === 'active')?.goal
     ?? state.pendingActivation?.goal
     ?? 'general';
+}
+
+/** The block the currently-active block replaced (most recently completed). */
+function mostRecentCompletedBlock(state: PlanState): { plan: TrainingPlan; block: TrainingBlock } | null {
+  let best: { plan: TrainingPlan; block: TrainingBlock } | null = null;
+  for (const plan of state.plans) {
+    for (const block of plan.blocks) {
+      if (block.status === 'completed' && block.completedAt != null) {
+        if (!best || block.completedAt > (best.block.completedAt ?? 0)) best = { plan, block };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * True when there's a started block that could be postponed back to the
+ * program that preceded it — i.e. the user activated a block mid-week and can
+ * still finish the week on their previous workouts.
+ */
+export function canDeferActiveBlock(): boolean {
+  const state = getPlanState();
+  const active = getActiveBlockInfo();
+  return !!active && !active.block.openEnded && mostRecentCompletedBlock(state) != null;
+}
+
+/**
+ * Undo a premature activation: restore the previous block's program as the
+ * live program (so this week finishes on the old workouts) and reschedule the
+ * just-activated block to next Monday as a pending activation. The faithful
+ * inverse of commitActivation. Returns false when there's nothing to restore.
+ */
+export function deferActiveBlockToNextWeek(now = Date.now()): boolean {
+  const state = getPlanState();
+  const activePlan = state.plans.find(p => p.status === 'active');
+  const activeBlock = activePlan?.blocks.find(b => b.status === 'active');
+  if (!activePlan || !activeBlock || activeBlock.openEnded) return false;
+
+  const prev = mostRecentCompletedBlock(state);
+  if (!prev) return false;
+
+  // Reactivate the previous block (and its plan, if a goal transition had
+  // completed it) — clearing the retrospective activation auto-generated.
+  prev.block.status = 'active';
+  delete prev.block.completedAt;
+  delete prev.block.retrospective;
+  prev.plan.status = 'active';
+  delete prev.plan.completedAt;
+
+  // Pull the just-activated block out of its plan; drop a now-empty plan that
+  // activation had freshly created for a goal transition.
+  activePlan.blocks = activePlan.blocks.filter(b => b.id !== activeBlock.id);
+  if (activePlan.id !== prev.plan.id && activePlan.blocks.length === 0) {
+    state.plans = state.plans.filter(p => p.id !== activePlan.id);
+  }
+
+  // Queue it for next Monday instead.
+  activeBlock.status = 'pending';
+  activeBlock.startDate = nextMonday(new Date(now));
+  state.pendingActivation = {
+    goal: activeBlock.focus,
+    ...(activePlan.goalNotes ? { goalNotes: activePlan.goalNotes } : {}),
+    block: activeBlock,
+    createdAt: now,
+  };
+
+  // Restore the previous block's program + week anchor as the live program.
+  saveStoredProgram(prev.block.program);
+  saveProgramStart(prev.block.startDate);
+
+  state.updatedAt = now;
+  savePlanState(state);
+  return true;
 }
 
 // ── Migration of pre-journey training ─────────────────────────────────────────

@@ -33,7 +33,7 @@ import {
   sessionTimestamp,
 } from './analytics';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
+import { EXERCISES, EXERCISE_MAP, catalogDefFor, getExerciseMeta } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
 // ── Exercise profiles ─────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export function profileFor(id: string, fallbackName?: string): ExerciseProfile {
     }
   }
 
-  const name = EXERCISE_MAP.get(id)?.name ?? fallbackName ?? id;
+  const name = EXERCISE_MAP.get(id)?.name ?? fallbackName ?? catalogDefFor(id)?.name ?? id;
   const secs = secondaries.filter((m): m is MuscleGroup => m != null);
   return {
     id,

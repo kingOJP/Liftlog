@@ -9,7 +9,9 @@ import type { PlanProposal } from './planner';
 const emptySnapshot = () => Promise.resolve(buildSnapshot([], []));
 import {
   activateProposal,
+  canDeferActiveBlock,
   completeActiveBlock,
+  deferActiveBlockToNextWeek,
   getActiveBlockInfo,
   getActivePhase,
   getActivePlan,
@@ -142,6 +144,43 @@ describe('activateProposal (scheduled — future start while a block runs)', () 
     expect(pending!.block.startDate).toBe('2026-07-06');
     // Only one pending block, and still just one active plan/block
     expect(getPlanState().plans[0].blocks.filter(b => b.status === 'active')).toHaveLength(1);
+  });
+});
+
+describe('deferActiveBlockToNextWeek (finish the week on the previous program)', () => {
+  it('restores the previous program and reschedules the new block for next Monday', () => {
+    // Block 1 (leg-press) activated, then Block 2 (bench) activated immediately.
+    activateProposal(makeProposal(), null, JUN1);
+    const block1 = getActiveBlockInfo()!.block;
+    activateProposal(
+      makeProposal({ startDate: '2026-07-06' }),
+      makeRetro(block1.id), JUL6,
+    );
+    // Now Block 2 is live; change its program marker so we can tell them apart
+    // (makeProposal always uses leg-press, so assert via block identity instead).
+    const block2 = getActiveBlockInfo()!.block;
+    expect(block2.id).not.toBe(block1.id);
+
+    expect(canDeferActiveBlock()).toBe(true);
+    const now = new Date('2026-07-08T12:00:00').getTime(); // mid-week
+    expect(deferActiveBlockToNextWeek(now)).toBe(true);
+
+    // Block 1 is active again; Block 2 is pending for next Monday (Jul 13)
+    expect(getActiveBlockInfo()!.block.id).toBe(block1.id);
+    const pending = getPendingActivation();
+    expect(pending!.block.id).toBe(block2.id);
+    expect(pending!.block.status).toBe('pending');
+    expect(pending!.block.startDate).toBe('2026-07-13');
+    // The restored block's retrospective (auto-made on activation) is cleared
+    expect(getActiveBlockInfo()!.block.retrospective).toBeUndefined();
+  });
+
+  it('is unavailable when the only block is open-ended (nothing to fall back to)', () => {
+    // Simulate a migrated foundation block
+    activateProposal(makeProposal(), null, JUN1);
+    // Only one block, no previous completed block → cannot defer
+    expect(canDeferActiveBlock()).toBe(false);
+    expect(deferActiveBlockToNextWeek()).toBe(false);
   });
 });
 

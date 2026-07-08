@@ -488,9 +488,11 @@ target the adjusted set counts) and MetricsView (Program adjustments list). Full
   opportunities derive from each exercise's `status`, not a raw e1RM %.
 - **Per-muscle weekly set volume** (`muscleVolume`) and **next workout** (day longest untrained).
 
-Surfaced on the Dashboard (Coach card) and Metrics — where the redesigned page leads with a
-**Progress Report** (per-exercise status + signal breakdown + evidence, attention items first),
-a **Recent PRs** timeline, and **Exercise Trends** (paired est-1RM and volume-load charts).
+Surfaced on the Dashboard (Coach card) and Metrics. On Metrics the Coach narrative, the
+**Progress Report** (per-exercise status + signal breakdown + evidence, attention items first)
+and the **Recent PRs** timeline share **one tabbed panel** (Coach / Progress / PRs — tabs
+appear only when they have content); below it sit **Exercise Trends** (paired est-1RM and
+volume-load charts), the heatmap, and volume charts.
 `SETS_TARGET_LOW`/`SETS_TARGET_HIGH` live in `analytics.ts` (re-exported from insights.ts).
 
 ### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx`)
@@ -570,6 +572,12 @@ The planning layer above individual workouts. Two domain levels, deliberately no
   pending block starts replaces it; JourneyView offers "Start it today instead"
   (`force: true`). If nothing is running (or the start is today/past), activation commits
   immediately as before. Dashboard/JourneyView surface the pending block.
+- **Undoing a premature activation.** `deferActiveBlockToNextWeek()` is the inverse of
+  `commitActivation`: it reactivates the block the active one replaced (restoring its program
+  as the live program and clearing the auto-generated retrospective) and reschedules the
+  just-started block as a `pendingActivation` for next Monday — so the user can finish the
+  current week on their previous workouts. `canDeferActiveBlock()` gates the JourneyView
+  action (only when a started, non-open-ended block has a completed predecessor).
 - **Phase-aware engines:** `getActivePhase()` (planStore) resolves this week's phase;
   during `deload`/`recovery` weeks `calculateRecommendation(…, phase)` prescribes ~10%
   off (rep-goal floor for bodyweight) and `computeProgramPlan(…, phase)` returns the
@@ -608,6 +616,12 @@ program, not before):
 - `EXERCISE_MAP: Map<string, ExerciseDef>` — fast lookup by id
 - `getExerciseMeta(id)` — returns metadata, preferring user overrides from `liftlog_exercise_meta` over defaults
 - `saveExerciseMeta(id, meta)` — writes user override to `liftlog_exercise_meta`
+- `catalogDefFor(id)` — resolves a timestamped custom id whose slug is a catalog exercise
+  (`back-extensions-1782…` → `back-extensions`) back to its `ExerciseDef`. `generateExerciseId`
+  stamps `${slug}-${Date.now()}`, so a custom entry that duplicates a catalog exercise by name
+  ends up with a catalog slug + timestamp; stripping a trailing `-<10+ digits>` recovers it.
+  Used by `getExerciseMeta`, `getExerciseName` and `profileFor` so these resolve muscles/name
+  instead of surfacing as unclassified "Other".
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 

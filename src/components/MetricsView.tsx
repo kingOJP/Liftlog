@@ -23,11 +23,14 @@ function formatVolume(v: number): string {
   return v.toLocaleString('en-US');
 }
 
+type CoachTab = 'coach' | 'progress' | 'prs';
+
 export default function MetricsView({ program, onBack }: Props) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string>('');
+  const [coachTab, setCoachTab] = useState<CoachTab>('coach');
 
   useEffect(() => {
     let cancelled = false;
@@ -74,103 +77,124 @@ export default function MetricsView({ program, onBack }: Props) {
           <p className="metrics-empty">No workouts logged yet. Complete a workout to see your metrics.</p>
         )}
 
-        {metrics && metrics.hasData && (
+        {metrics && metrics.hasData && (() => {
+          // One "Coach" panel with tabs — flip between the narrative insights,
+          // the per-exercise progress verdicts, and the PR timeline.
+          const coachHasContent = !!coaching &&
+            (coaching.highlights.length > 0 || coaching.opportunities.length > 0 || coaching.plan.changes.length > 0);
+          const tabs: { id: CoachTab; label: string }[] = [];
+          if (coachHasContent) tabs.push({ id: 'coach', label: 'Coach' });
+          if (progressReport.length > 0) tabs.push({ id: 'progress', label: 'Progress' });
+          if (recentPRs.length > 0) tabs.push({ id: 'prs', label: 'PRs' });
+          const activeTab = tabs.some(t => t.id === coachTab) ? coachTab : tabs[0]?.id;
+
+          return (
           <>
-            {/* ── Coach ── */}
-            {coaching && (coaching.highlights.length > 0 || coaching.opportunities.length > 0 || coaching.plan.changes.length > 0) && (
+            {/* ── Coach panel (tabbed) ── */}
+            {tabs.length > 0 && (
               <section className="metric-section">
-                <h2 className="metric-heading">Coach</h2>
-                <p className="metric-sub">Read from your training data · {coaching.weekLabel}.</p>
+                <div className="coach-tabs" role="tablist">
+                  {tabs.map(t => (
+                    <button
+                      key={t.id}
+                      role="tab"
+                      aria-selected={activeTab === t.id}
+                      className={`coach-tab${activeTab === t.id ? ' coach-tab--active' : ''}`}
+                      onClick={() => setCoachTab(t.id)}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
 
-                {coaching.highlights.length > 0 && (
-                  <>
-                    <h3 className="coach-subhead coach-subhead--good">What's working</h3>
-                    <InsightList insights={coaching.highlights} />
-                  </>
+                {activeTab === 'coach' && coaching && (
+                  <div className="coach-tab-panel">
+                    <p className="metric-sub">Read from your training data · {coaching.weekLabel}.</p>
+                    {coaching.highlights.length > 0 && (
+                      <>
+                        <h3 className="coach-subhead coach-subhead--good">What's working</h3>
+                        <InsightList insights={coaching.highlights} />
+                      </>
+                    )}
+                    {coaching.opportunities.length > 0 && (
+                      <>
+                        <h3 className="coach-subhead coach-subhead--opportunity">Biggest opportunities</h3>
+                        <InsightList insights={coaching.opportunities} />
+                      </>
+                    )}
+                    {coaching.plan.changes.length > 0 && (
+                      <>
+                        <h3 className="coach-subhead coach-subhead--plan">Program adjustments</h3>
+                        <p className="metric-sub">
+                          Applied automatically to your next workouts — you'll see them explained when you open the day.
+                        </p>
+                        <div className="coach-insight-list">
+                          {coaching.plan.changes.map((c, i) => (
+                            <div key={i} className="coach-insight-item coach-insight--plan">
+                              <span className="coach-insight-title">
+                                {c.dayLabel} · {c.exerciseName}: {c.fromSets} → {c.toSets} sets
+                              </span>
+                              <span className="coach-insight-detail">{c.reason}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
 
-                {coaching.opportunities.length > 0 && (
-                  <>
-                    <h3 className="coach-subhead coach-subhead--opportunity">Biggest opportunities</h3>
-                    <InsightList insights={coaching.opportunities} />
-                  </>
-                )}
-
-                {coaching.plan.changes.length > 0 && (
-                  <>
-                    <h3 className="coach-subhead coach-subhead--plan">Program adjustments</h3>
+                {activeTab === 'progress' && (
+                  <div className="coach-tab-panel">
                     <p className="metric-sub">
-                      Applied automatically to your next workouts — you'll see them explained when you open the day.
+                      Each lift judged on strength trend, volume trend and PRs — weighted for your{' '}
+                      {goalLabel(goal).toLowerCase()} goal. Order-aware: a lift trained later in a
+                      workout than usual isn't marked down for it.
                     </p>
-                    <div className="coach-insight-list">
-                      {coaching.plan.changes.map((c, i) => (
-                        <div key={i} className="coach-insight-item coach-insight--plan">
-                          <span className="coach-insight-title">
-                            {c.dayLabel} · {c.exerciseName}: {c.fromSets} → {c.toSets} sets
-                          </span>
-                          <span className="coach-insight-detail">{c.reason}</span>
+                    <div className="progress-list">
+                      {progressReport.map(p => (
+                        <div className="progress-row" key={p.exerciseId}>
+                          <div className="progress-row-head">
+                            <span className="progress-name">{p.name}</span>
+                            <span className={`progress-badge progress-badge--${p.status}`}>
+                              {STATUS_INFO[p.status].label}
+                            </span>
+                          </div>
+                          <div className="progress-signals">
+                            {p.e1rmChangePct != null && (
+                              <span className={signalClass(p.e1rmChangePct)}>e1RM {fmtPct(p.e1rmChangePct)}</span>
+                            )}
+                            {p.volumeChangePct != null && (
+                              <span className={signalClass(p.volumeChangePct)}>volume {fmtPct(p.volumeChangePct)}</span>
+                            )}
+                            {p.weightPRs + p.repPRs > 0 && (
+                              <span className="signal signal-up">{p.weightPRs + p.repPRs} PR{p.weightPRs + p.repPRs > 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                          <span className="progress-evidence">{p.evidence[0]}</span>
                         </div>
                       ))}
                     </div>
-                  </>
+                  </div>
                 )}
-              </section>
-            )}
 
-            {/* ── Progress report: the multi-signal per-exercise verdicts ── */}
-            {progressReport.length > 0 && (
-              <section className="metric-section">
-                <h2 className="metric-heading">Progress Report</h2>
-                <p className="metric-sub">
-                  Each lift judged on strength trend, volume trend and PRs — weighted for your{' '}
-                  {goalLabel(goal).toLowerCase()} goal. Order-aware: a lift trained later in a
-                  workout than usual isn't marked down for it.
-                </p>
-                <div className="progress-list">
-                  {progressReport.map(p => (
-                    <div className="progress-row" key={p.exerciseId}>
-                      <div className="progress-row-head">
-                        <span className="progress-name">{p.name}</span>
-                        <span className={`progress-badge progress-badge--${p.status}`}>
-                          {STATUS_INFO[p.status].label}
-                        </span>
-                      </div>
-                      <div className="progress-signals">
-                        {p.e1rmChangePct != null && (
-                          <span className={signalClass(p.e1rmChangePct)}>e1RM {fmtPct(p.e1rmChangePct)}</span>
-                        )}
-                        {p.volumeChangePct != null && (
-                          <span className={signalClass(p.volumeChangePct)}>volume {fmtPct(p.volumeChangePct)}</span>
-                        )}
-                        {p.weightPRs + p.repPRs > 0 && (
-                          <span className="signal signal-up">{p.weightPRs + p.repPRs} PR{p.weightPRs + p.repPRs > 1 ? 's' : ''}</span>
-                        )}
-                      </div>
-                      <span className="progress-evidence">{p.evidence[0]}</span>
+                {activeTab === 'prs' && (
+                  <div className="coach-tab-panel">
+                    <p className="metric-sub">Weight and rep records — every one is progress banked.</p>
+                    <div className="pr-list">
+                      {recentPRs.map((pr, i) => (
+                        <div className="pr-row" key={i}>
+                          <div className="pr-main">
+                            <span className="pr-name">{pr.name}</span>
+                            <span className="pr-label">{pr.label}</span>
+                          </div>
+                          <span className="pr-date">
+                            {new Date(pr.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ── Recent PRs ── */}
-            {recentPRs.length > 0 && (
-              <section className="metric-section">
-                <h2 className="metric-heading">Recent PRs</h2>
-                <p className="metric-sub">Weight and rep records — every one is progress banked.</p>
-                <div className="pr-list">
-                  {recentPRs.map((pr, i) => (
-                    <div className="pr-row" key={i}>
-                      <div className="pr-main">
-                        <span className="pr-name">{pr.name}</span>
-                        <span className="pr-label">{pr.label}</span>
-                      </div>
-                      <span className="pr-date">
-                        {new Date(pr.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </section>
             )}
 
@@ -287,7 +311,8 @@ export default function MetricsView({ program, onBack }: Props) {
               )}
             </section>
           </>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

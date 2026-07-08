@@ -51,3 +51,30 @@ describe('exercise metadata — legacy value normalization', () => {
     expect(meta.equipment).toBe('Cable Machine');
   });
 });
+
+describe('catalogDefFor — timestamped custom ids that are really catalog exercises', () => {
+  it('resolves a slug-timestamp id to its catalog def', async () => {
+    const { catalogDefFor } = await import('./exercises');
+    expect(catalogDefFor('back-extensions-1782325116469')?.id).toBe('back-extensions');
+    expect(catalogDefFor('hip-thrusts-1782325062957')?.id).toBe('hip-thrusts');
+    expect(catalogDefFor('standing-calf-raises-1782324989917')?.primaryMuscle).toBe('Calves');
+  });
+
+  it('passes canonical ids straight through', async () => {
+    const { catalogDefFor } = await import('./exercises');
+    expect(catalogDefFor('back-extensions')?.id).toBe('back-extensions');
+  });
+
+  it('returns null for genuinely custom ids with no catalog namesake', async () => {
+    const { catalogDefFor } = await import('./exercises');
+    expect(catalogDefFor('my-weird-lift-1782325116469')).toBeNull();
+    expect(catalogDefFor('face-pulls-d2')).toBeNull(); // legacy suffix, not a timestamp
+  });
+
+  it('getExerciseMeta fills a timestamped id from its catalog namesake', () => {
+    // No override stored — should still resolve the primary muscle
+    const meta = getExerciseMeta('hip-thrusts-1782325062957');
+    expect(meta.primaryMuscle).toBe('Glutes');
+    expect(meta.workoutType).toBe('Hip Thrust');
+  });
+});

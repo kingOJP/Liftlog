@@ -231,6 +231,43 @@
 /* automatic program adjustments */
 .coach-insight-item.coach-insight--plan { border-left-color: var(--purple); }
 
+/* ── Coach panel tabs ── */
+.coach-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 4px;
+}
+
+.coach-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+
+.coach-tab--active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.coach-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .coach-subhead {
   font-size: 11px;
   font-weight: 700;
