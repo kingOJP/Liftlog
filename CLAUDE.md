@@ -194,9 +194,18 @@ src/
                                   epley1RM, e1rmSeries(), musclesForExercise()/primaryMuscleFor()
                                   (override → master list → name match), SETS_TARGET_LOW/HIGH,
                                   sessionDurationMs()/avgDurationByDay() (workout durations)
+    progress.ts                — THE progress/stall assessment: assessSnapshot(snapshot, goal) →
+                                  per-exercise ExerciseProgress (status progressing/steady/
+                                  stalled/declining) blending e1RM trend + volume-load trend +
+                                  weight/rep PRs with goal-dependent weights, discounting sessions
+                                  trained later in the workout than usual (exercise-order
+                                  freshness). Single source of truth for "is this progressing?"
+                                  across insights, recommendations, retrospective, planner,
+                                  substitution (see progress engine section below)
     recommendations.ts         — calculateRecommendation(history, exercise) → WeightRec | null
                                   ({ weight, direction, kind, reason }); double progression +
-                                  stall-triggered deload (see algorithm section below)
+                                  stall-triggered deload, order-aware (late-slot sessions skipped
+                                  as the baseline) (see algorithm section below)
     coach.ts                   — adaptive programming engine: computeProgramPlan(program, snapshot)
                                   → ProgramPlan (conservative set additions/trims across future
                                   workouts, each with a plain-language reason) + applyPlanToDay()
@@ -303,7 +312,12 @@ src/
   `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync)
 
 **`setLogs`** — index: `sessionId`
-- `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`
+- `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`, `order?`
+- `order`: 0-based position of the exercise within the workout (the order it was trained),
+  written for every set by WorkoutView. Absent on pre-order rows; the progress engine falls
+  back to set-log insertion order. Schemaless field — no version bump (see below). Travels in
+  the sync wire (SessionDoc sets, D1 `sets_json`); `undefined` is dropped by JSON so legacy
+  docs are byte-identical.
 
 **`exerciseLogs`** — index: `sessionId` (difficulty ratings — feature removed, store kept for compatibility; no longer synced)
 - `id`, `sessionId`, `exerciseId`, `difficulty`
@@ -366,6 +380,30 @@ deleted no matter which device or account pushes a stale copy.
 
 ---
 
+## Progress & stall engine (`src/data/progress.ts`)
+
+The single definition of "is this exercise making progress?" — used by insights, the
+recommendation deload trigger, retrospectives, the planner and substitution, so the whole app
+agrees. e1RM alone is a raw-strength proxy (blind to volume gains, rep PRs, and workout
+context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four signals:
+
+- **e1RM trend** — best Epley estimate, first vs last session in the trailing window.
+- **volume-load trend** — tonnage (Σ weight × reps); total reps for bodyweight-at-0 work.
+- **PR events** — weight PRs (beat all-time heaviest) and rep PRs (more reps than ever at a
+  weight lifted before), detected against running all-time bests.
+- **exercise order (freshness)** — each set carries the `order` it was trained in. If the
+  latest session ran ≥2 slots later than the exercise's usual position (median), it's excluded
+  as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
+
+The signals combine into a −1…+1 composite with **goal-dependent weights** (`GOAL_WEIGHTS`):
+strength leans on e1RM, hypertrophy/fat-loss on volume, and in a deficit merely *holding*
+strength scores positive. Composite → `status`: `progressing` / `steady` / `stalled` /
+`declining` (with `evidence[]` strings and `recentPRs[]` for the UI). Bodyweight work drops
+the e1RM signal and its weight is redistributed. `progressDirections()` reduces the map to
+up/down/stalled id sets for engines that only need direction. Fully covered by
+`progress.test.ts`; **`getTrainingGoal()` (planStore) supplies the active goal** to every
+caller.
+
 ## Progressive overload algorithm (`src/data/recommendations.ts`)
 
 Runs when opening a new (non-edit) workout. WorkoutView loads one training snapshot and, for
@@ -384,6 +422,12 @@ implements **double progression** with stall detection, evaluated in order:
 
 The **working weight** of a session is the most-used weight (tie → heaviest), so logged
 warm-up/ramp-up sets don't skew the recommendation.
+
+**Order-aware baseline.** Sessions where the exercise sat much later in the workout than usual
+(≥2 slots past its median `order`) are dropped from the baseline — the prescription builds off
+fresh-slot sessions, so a lift that dipped because it ran last doesn't get ratcheted down or
+falsely flagged as stalled. The reason string says so. Falls back to all sessions when none
+are fresh-slot.
 
 **Bodyweight exercises progress by reps, not load.** When the exercise's `weightType` is
 `Bodyweight` *and* the last session's working weight was 0 lbs, the engine switches to rep
@@ -433,17 +477,20 @@ target the adjusted set counts) and MetricsView (Program adjustments list). Full
 
 ### Insights (`insights.ts`)
 
-`computeCoaching(program, snapshot)` embeds the plan and produces:
-- **Highlights (≤3)** — fresh PRs (all-time best e1RM within 10 days), climbing lifts,
+`computeCoaching(program, snapshot, week?, now?, phase?, goal?)` embeds the plan and produces:
+- **Highlights (≤3)** — fresh PRs (weight or rep PRs within 10 days), progressing lifts,
   week-over-week volume gains, consistency streaks.
-- **Opportunities (≤3)** — strength declines (recovery-oriented advice), plateaus (pre-frames
-  the engine's deload), muscles past the volume ceiling, planner `program-gap` suggestions.
-- **Strength trends** — best Epley e1RM per session per exercise; over the last 3 sessions a
-  >±3% change is `up`/`down`, otherwise `flat` (a plateau).
+- **Opportunities (≤3)** — declining lifts (recovery-oriented advice), stalled lifts
+  (pre-frames the engine's deload), muscles past the volume ceiling, planner `program-gap`
+  suggestions.
+- **Progress** (`progress: ExerciseProgress[]`) — the multi-signal per-exercise assessment
+  from `progress.ts`, weighted for the `goal` argument (`getTrainingGoal()`). Highlights and
+  opportunities derive from each exercise's `status`, not a raw e1RM %.
 - **Per-muscle weekly set volume** (`muscleVolume`) and **next workout** (day longest untrained).
 
-Surfaced on the Dashboard (Coach card: next day + top opportunity/highlight + "coach adjusted"
-note) and Metrics (Coach section: What's working / Biggest opportunities / Program adjustments).
+Surfaced on the Dashboard (Coach card) and Metrics — where the redesigned page leads with a
+**Progress Report** (per-exercise status + signal breakdown + evidence, attention items first),
+a **Recent PRs** timeline, and **Exercise Trends** (paired est-1RM and volume-load charts).
 `SETS_TARGET_LOW`/`SETS_TARGET_HIGH` live in `analytics.ts` (re-exported from insights.ts).
 
 ### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx`)
@@ -513,6 +560,16 @@ The planning layer above individual workouts. Two domain levels, deliberately no
   program into the program store and re-anchors the week-numbering start date
   (`saveProgramStart`). Nothing else in the app needs to know blocks exist — coach,
   recommendations, metrics keep reading (program, history).
+- **Scheduled activation (deferred install).** `activateProposal()` returns
+  `{ started, plan }`. If a block is approved for a *future* start Monday while a block is
+  still running, it's stored as a `pendingActivation` (block `status: 'pending'`) instead of
+  installing immediately — the current week's workouts stay put. `startPendingActivation()`
+  (App startup + the 60 s background tick, which doubles as its scheduler) commits it once the
+  start date arrives: it computes the outgoing block's retrospective *then* (so the final
+  training week counts), swaps in the new program, and re-anchors weeks. Re-planning before a
+  pending block starts replaces it; JourneyView offers "Start it today instead"
+  (`force: true`). If nothing is running (or the start is today/past), activation commits
+  immediately as before. Dashboard/JourneyView surface the pending block.
 - **Phase-aware engines:** `getActivePhase()` (planStore) resolves this week's phase;
   during `deload`/`recovery` weeks `calculateRecommendation(…, phase)` prescribes ~10%
   off (rep-goal floor for bodyweight) and `computeProgramPlan(…, phase)` returns the

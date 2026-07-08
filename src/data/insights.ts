@@ -12,19 +12,19 @@
 //                     the plan's changes carry their own plain-language reasons.
 
 import type { MuscleGroup } from './taxonomy';
-import type { PhaseKind } from './plan';
+import type { Goal, PhaseKind } from './plan';
 import { getWeekNumber } from './program';
 import type { WorkoutDay } from './program';
-import { getExerciseName } from './programStore';
 import type { TrainingSnapshot } from './analytics';
 import {
   SETS_TARGET_LOW,
   SETS_TARGET_HIGH,
-  e1rmSeries,
   muscleSetTotals,
   primaryMuscleFor,
   sessionTimestamp,
 } from './analytics';
+import { assessSnapshot, MIN_TREND_SESSIONS } from './progress';
+import type { ExerciseProgress } from './progress';
 import { computeProgramPlan } from './coach';
 import type { ProgramPlan } from './coach';
 
@@ -32,8 +32,6 @@ import type { ProgramPlan } from './coach';
 export { SETS_TARGET_LOW, SETS_TARGET_HIGH };
 
 // ── Tunables ──────────────────────────────────────────────────────────────────
-const TREND_WINDOW = 3;        // sessions compared for a strength trend
-const TREND_THRESHOLD = 3;     // % change that counts as up / down (else flat)
 const MAX_HIGHLIGHTS = 3;
 const MAX_OPPORTUNITIES = 3;
 const PR_RECENT_DAYS = 10;     // a PR is only a highlight while it's fresh
@@ -49,16 +47,6 @@ export interface MuscleVolume {
   sets: number;           // fractional weekly sets (rounded to 0.5)
   status: VolumeStatus;
   inProgram: boolean;     // is this muscle a primary target of the current program?
-}
-
-export type TrendDir = 'up' | 'flat' | 'down';
-
-export interface ExerciseTrend {
-  exerciseId: string;
-  name: string;
-  dir: TrendDir;
-  changePct: number;
-  sessions: number;
 }
 
 export type InsightKind =
@@ -84,7 +72,8 @@ export interface Coaching {
   weekLabel: string;
   nextDay: NextDay | null;
   muscleVolume: MuscleVolume[];
-  trends: ExerciseTrend[];
+  /** multi-signal per-exercise assessment (progress.ts), most-trained first */
+  progress: ExerciseProgress[];
   highlights: Insight[];
   opportunities: Insight[];
   plan: ProgramPlan;
@@ -104,6 +93,7 @@ export function computeCoaching(
   currentWeek = getWeekNumber(),
   now = Date.now(),
   phase: PhaseKind | null = null,
+  goal: Goal = 'general',
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
   const plan = computeProgramPlan(program, snapshot, now, phase);
@@ -113,7 +103,7 @@ export function computeCoaching(
     weekLabel: '',
     nextDay: nextDayFromProgram(program, sessions),
     muscleVolume: [],
-    trends: [],
+    progress: [],
     highlights: [],
     opportunities: [],
     plan,
@@ -144,51 +134,39 @@ export function computeCoaching(
     })
     .sort((a, b) => b.sets - a.sets);
 
-  // ── Per-exercise strength trend (best Epley e1RM per session) ──
-  const series = e1rmSeries(snapshot);
-  const trends: ExerciseTrend[] = [];
-  for (const [exerciseId, pts] of series) {
-    if (pts.length < TREND_WINDOW) continue;
-    const window = pts.slice(-TREND_WINDOW);
-    const first = window[0].value;
-    const last = window[window.length - 1].value;
-    const changePct = first > 0 ? ((last - first) / first) * 100 : 0;
-    const dir: TrendDir =
-      changePct > TREND_THRESHOLD ? 'up' : changePct < -TREND_THRESHOLD ? 'down' : 'flat';
-    trends.push({ exerciseId, name: getExerciseName(exerciseId), dir, changePct, sessions: pts.length });
-  }
-  trends.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+  // ── Per-exercise progress: the multi-signal assessment (progress.ts) ──
+  // e1RM trend + volume-load trend + weight/rep PRs, blended with
+  // goal-dependent weights, with exercise-order freshness discounting.
+  const assessments = assessSnapshot(snapshot, goal);
+  const progress = [...assessments.values()]
+    .sort((a, b) => b.totalSessions - a.totalSessions || a.name.localeCompare(b.name));
 
   const programExerciseIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
 
   // ── Highlights: the strongest recent improvements ──
   const highlights: Insight[] = [];
 
-  // Fresh personal records: the latest e1RM point is an all-time best.
-  for (const [exerciseId, pts] of series) {
-    if (pts.length < 2 || !programExerciseIds.has(exerciseId)) continue;
-    const last = pts[pts.length - 1];
-    if (now - last.ts > PR_RECENT_DAYS * DAY_MS) continue;
-    const previousBest = Math.max(...pts.slice(0, -1).map(p => p.value));
-    if (last.value > previousBest * 1.005) {
-      const gainPct = Math.round(((last.value - previousBest) / previousBest) * 100);
-      highlights.push({
-        kind: 'pr',
-        priority: 100 + gainPct,
-        title: `New ${getExerciseName(exerciseId)} PR`,
-        detail: `Est. 1RM hit ${Math.round(last.value)} lbs${gainPct >= 1 ? ` — ${gainPct}% over your previous best` : ''}. That's the progression working.`,
-      });
-    }
+  // Fresh personal records — weight PRs and rep PRs both count.
+  for (const p of progress) {
+    if (!programExerciseIds.has(p.exerciseId)) continue;
+    const freshPRs = p.recentPRs.filter(pr => now - pr.ts <= PR_RECENT_DAYS * DAY_MS);
+    if (freshPRs.length === 0) continue;
+    highlights.push({
+      kind: 'pr',
+      priority: 100 + freshPRs.length,
+      title: `New ${p.name} PR`,
+      detail: `${freshPRs[0].label}${freshPRs.length > 1 ? ` — plus ${freshPRs.length - 1} more` : ''}. That's the progression working.`,
+    });
   }
 
-  // Climbing lifts
-  for (const t of trends) {
-    if (t.dir !== 'up' || !programExerciseIds.has(t.exerciseId)) continue;
+  // Progressing lifts — the composite says it's moving, the evidence says why
+  for (const p of progress) {
+    if (p.status !== 'progressing' || !programExerciseIds.has(p.exerciseId)) continue;
     highlights.push({
       kind: 'trend-up',
-      priority: 80 + t.changePct,
-      title: `${t.name} is climbing`,
-      detail: `Est. 1RM up ${Math.round(t.changePct)}% over your last ${TREND_WINDOW} sessions — keep riding this progression.`,
+      priority: 80 + p.score * 20,
+      title: `${p.name} is climbing`,
+      detail: `${capitalize(p.evidence.slice(0, 2).join('; '))} — keep riding this progression.`,
     });
   }
 
@@ -225,21 +203,21 @@ export function computeCoaching(
   // ── Opportunities: the changes with the biggest expected payoff ──
   const opportunities: Insight[] = [];
 
-  for (const t of trends) {
-    if (!programExerciseIds.has(t.exerciseId)) continue;
-    if (t.dir === 'down') {
+  for (const p of progress) {
+    if (!programExerciseIds.has(p.exerciseId) || p.totalSessions < MIN_TREND_SESSIONS) continue;
+    if (p.status === 'declining') {
       opportunities.push({
         kind: 'trend-down',
-        priority: 90 + Math.abs(t.changePct),
-        title: `${t.name} strength has declined`,
-        detail: `Est. 1RM is down ${Math.abs(Math.round(t.changePct))}% over your last ${TREND_WINDOW} sessions. Prioritize recovery — sleep and food — and hold volume at target rather than pushing load.`,
+        priority: 90 + Math.abs(p.score) * 20,
+        title: `${p.name} is trending down`,
+        detail: `${capitalize(p.evidence.slice(0, 2).join('; '))}. Prioritize recovery — sleep and food — and hold volume at target rather than pushing load.`,
       });
-    } else if (t.dir === 'flat') {
+    } else if (p.status === 'stalled') {
       opportunities.push({
         kind: 'plateau',
         priority: 70,
-        title: `${t.name} has stalled`,
-        detail: `No strength change across ${TREND_WINDOW} sessions at the same load. If it doesn't move next session, the coach will recommend a deload — that's the plan working, not a setback.`,
+        title: `${p.name} has stalled`,
+        detail: `No weight or rep PRs and ${p.evidence.slice(0, 2).join(', ')} across your last ${p.sessions} sessions. If it doesn't move next session, the coach will recommend a deload — that's the plan working, not a setback.`,
       });
     }
   }
@@ -273,11 +251,15 @@ export function computeCoaching(
     weekLabel,
     nextDay: nextDayFromProgram(program, sessions),
     muscleVolume,
-    trends,
+    progress,
     highlights: highlights.slice(0, MAX_HIGHLIGHTS),
     opportunities: opportunities.slice(0, MAX_OPPORTUNITIES),
     plan,
   };
+}
+
+function capitalize(s: string): string {
+  return s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 // Suggest the program day that has gone longest without being trained.

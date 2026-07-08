@@ -96,6 +96,15 @@
   color: var(--green);
 }
 
+.journey-pending {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--purple);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
 .journey-track {
   display: flex;
   gap: 3px;

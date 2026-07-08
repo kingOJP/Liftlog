@@ -19,6 +19,7 @@ import type { WeightRec, ExerciseSession } from '../data/recommendations';
 import { getExerciseMeta } from '../data/exercises';
 import { getActivePhase } from '../data/planStore';
 import { PHASE_INFO } from '../data/plan';
+import { snapshotPositions } from '../data/progress';
 import { getResumableDraft, saveDraftSession, clearDraftSession } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
@@ -64,6 +65,10 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     isEditMode ? null : getResumableDraft(day.id),
   );
   const [sets, setSets] = useState<Record<string, SetEntry[]>>(() => restoredDraft?.sets ?? {});
+  // Exercise ids in the order they were first trained this session — stored on
+  // every set log so the progress engine can tell "benched 4th" from
+  // "benched 1st" when reading trends.
+  const exerciseOrderRef = useRef<string[]>(restoredDraft?.order ?? []);
   const [recommendations, setRecommendations] = useState<Record<string, WeightRec>>({});
   // Per exercise: the most recent session it appeared in (for the "last time" line)
   const [lastSessions, setLastSessions] = useState<Record<string, ExerciseSession>>({});
@@ -92,12 +97,16 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // eviction can't lose it. Cleared at Finish (or when the draft is discarded).
   useEffect(() => {
     if (isEditMode || totalSets === 0) return;
-    saveDraftSession({ dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets });
+    saveDraftSession({
+      dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets,
+      order: exerciseOrderRef.current,
+    });
   }, [sets, totalSets, isEditMode, day.id, sessionStart]);
 
   function handleDiscardDraft() {
     clearDraftSession();
     setSets({});
+    exerciseOrderRef.current = [];
     setSessionStart(Date.now());
     setRestoredDraft(null);
   }
@@ -123,6 +132,9 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
 
       const recs: Record<string, WeightRec> = {};
       const lasts: Record<string, ExerciseSession> = {};
+      // Where each exercise sat within each past workout — freshness context
+      // for the recommendation engine.
+      const positions = snapshotPositions(snapshot);
 
       for (const ex of adjusted.exercises) {
         const history: ExerciseSession[] = [];
@@ -132,9 +144,13 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             .sort((a, b) => a.setNumber - b.setNumber)
             .map(s => ({ weight: s.weight, reps: s.reps }));
           if (exSets.length > 0) {
-            history.push({ completedAt: sessionTimestamp(session), sets: exSets });
+            history.push({
+              completedAt: sessionTimestamp(session),
+              sets: exSets,
+              position: positions.get(session.id!)?.get(ex.id) ?? null,
+            });
           }
-          if (history.length >= 3) break;
+          if (history.length >= 4) break;
         }
         if (history.length === 0) continue;
         lasts[ex.id] = history[0];
@@ -160,11 +176,16 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
         (groupedSets[sl.exerciseId] ??= []).push({ weight: sl.weight, reps: sl.reps });
       }
       setSets(groupedSets);
+      // Preserve the session's original exercise order through the rewrite
+      exerciseOrderRef.current = Object.keys(groupedSets);
       setLoading(false);
     });
   }, [existingSessionId]);
 
   function handleLogSet(exerciseId: string, weight: number, reps: number) {
+    if (!exerciseOrderRef.current.includes(exerciseId)) {
+      exerciseOrderRef.current = [...exerciseOrderRef.current, exerciseId];
+    }
     setSets(prev => ({
       ...prev,
       [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps }],
@@ -209,8 +230,10 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     }
 
     for (const [exerciseId, exerciseSets] of Object.entries(sets)) {
+      const orderIdx = exerciseOrderRef.current.indexOf(exerciseId);
+      const order = orderIdx >= 0 ? orderIdx : undefined;
       for (let i = 0; i < exerciseSets.length; i++) {
-        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps);
+        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order);
       }
     }
 

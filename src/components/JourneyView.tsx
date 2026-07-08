@@ -5,7 +5,7 @@ import {
   PHASE_INFO, blockEndTs, blockEnded, blockWeekIndex, currentPhase, goalLabel,
 } from '../data/plan';
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
-import { completeActiveBlock, getPlanState } from '../data/planStore';
+import { completeActiveBlock, getPlanState, startPendingActivation } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import './JourneyView.css';
 
@@ -82,6 +82,14 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
   const state = useMemo(() => getPlanState(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   const activePlan = state.plans.find(p => p.status === 'active') ?? null;
   const activeBlock = activePlan?.blocks.find(b => b.status === 'active') ?? null;
+  const pending = state.pendingActivation ?? null;
+
+  async function startPendingNow() {
+    if (!window.confirm('Start the new block today instead of waiting for its start date?')) return;
+    await startPendingActivation(Date.now(), { force: true });
+    setRefresh(r => r + 1);
+    onChanged();
+  }
 
   const completedBlocks: { plan: TrainingPlan; block: TrainingBlock }[] = state.plans
     .flatMap(plan => plan.blocks.filter(b => b.status === 'completed').map(block => ({ plan, block })))
@@ -118,6 +126,24 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
       </header>
 
       <div className="journey-body">
+        {pending && (
+          <section className="journey-section journey-section--accent">
+            <span className="journey-label">Up next</span>
+            <div className="journey-block-name">{goalLabel(pending.goal)} block</div>
+            <div className="journey-block-dates">
+              Starts {new Date(`${pending.block.startDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {' '}· {pending.block.phases.length} weeks
+            </div>
+            <p className="journey-hint">
+              Your current training keeps running until then — the new workouts install on the
+              start date, and the outgoing block gets its review at the same time.
+            </p>
+            <button className="journey-secondary-btn" onClick={startPendingNow}>
+              Start it today instead
+            </button>
+          </section>
+        )}
+
         {justWrapped && (
           <section className="journey-section journey-section--accent">
             <span className="journey-label">Block review</span>

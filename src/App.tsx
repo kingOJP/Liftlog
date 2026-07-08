@@ -3,7 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
-import { ensureJourneyMigrated } from './data/planStore';
+import { ensureJourneyMigrated, startPendingActivation } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -70,6 +70,8 @@ function App() {
         // Foundation block — after pull, so a plan synced from another
         // device wins over creating a fresh wrapper.
         await ensureJourneyMigrated();
+        // A block approved mid-week installs its workouts on its start date
+        if (await startPendingActivation()) setProgram(getStoredProgram());
       } catch (err) {
         console.error(err);
       }
@@ -92,7 +94,11 @@ function App() {
     async function backgroundPull() {
       try {
         const didPull = await pullSync();
-        if (didPull) setProgram(getStoredProgram());
+        // A pending block whose start date arrived while the app was open
+        // installs here (the interval doubles as its scheduler).
+        const started = await startPendingActivation();
+        if (didPull || started) setProgram(getStoredProgram());
+        if (started) pushSync().catch(() => {});
       } catch {
         // silent — background refresh is best-effort
       }
@@ -215,7 +221,7 @@ function App() {
           <JourneyView
             onBack={() => setView({ screen: 'dashboard' })}
             onPlanNew={() => setView({ screen: 'plan-setup' })}
-            onChanged={sync}
+            onChanged={() => { setProgram(getStoredProgram()); sync(); }}
           />
         );
       case 'plan-setup':

@@ -16,16 +16,29 @@ import type { WorkoutDay } from './program';
 import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { loadTrainingSnapshot } from './analytics';
-import type { BlockRetrospective, PhaseKind, TrainingBlock, TrainingPlan } from './plan';
-import { currentPhase, generatePlanId, goalLabel, toPlanDate } from './plan';
+import type { TrainingSnapshot } from './analytics';
+import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan } from './plan';
+import { blockAnchor, currentPhase, generatePlanId, goalLabel, toPlanDate } from './plan';
+import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
 
 const PLAN_KEY = 'liftlog_plan';
+
+// An approved block that hasn't reached its start date yet. The current block
+// keeps running (this week's workouts stay put); the new program installs on
+// the pending block's start Monday.
+export interface PendingActivation {
+  goal: Goal;
+  goalNotes?: string;
+  block: TrainingBlock; // status 'pending'
+  createdAt: number;
+}
 
 export interface PlanState {
   version: 1;
   /** every plan, oldest first; at most one with status 'active' */
   plans: TrainingPlan[];
+  pendingActivation?: PendingActivation;
   updatedAt: number;
 }
 
@@ -115,34 +128,87 @@ export function completeActiveBlock(
 }
 
 /**
- * Activate an approved proposal: close out whatever is running, then either
- * append a block to the active plan (same goal — the journey continues) or
- * complete it and start a new plan (goal transition). Writes the block's
- * program as the live program and re-anchors week numbering to its start.
+ * Activate an approved proposal.
+ *
+ * If the block starts now (or nothing is currently running), it commits
+ * immediately: the running block is closed out, the block joins the active
+ * plan (same goal) or starts a new one (goal transition), and its program
+ * becomes the live program with week numbering re-anchored to its start.
+ *
+ * If the block is scheduled for a future Monday while a block is still
+ * running, it is stored as a *pending activation* instead — the current
+ * week's workouts stay untouched, and startPendingActivation() commits it
+ * once the start date arrives (the outgoing block's retrospective is
+ * computed then, so it includes the final week of training).
  */
 export function activateProposal(
   proposal: PlanProposal,
   outgoingRetro: BlockRetrospective | null = null,
   now = Date.now(),
-): TrainingPlan {
+): { started: boolean; plan: TrainingPlan | null } {
   const state = getPlanState();
+  // Re-planning before a pending block started replaces it outright
+  delete state.pendingActivation;
+
+  const block: TrainingBlock = {
+    id: generatePlanId(),
+    name: '', // assigned at commit (sequence number depends on commit order)
+    focus: proposal.input.goal,
+    startDate: proposal.input.startDate,
+    phases: proposal.phases,
+    program: proposal.days,
+    intent: proposal.intent,
+    progression: proposal.progression,
+    status: 'pending',
+    activatedAt: now,
+  };
+  const pending: PendingActivation = {
+    goal: proposal.input.goal,
+    ...(proposal.input.notes.trim() ? { goalNotes: proposal.input.notes.trim() } : {}),
+    block,
+    createdAt: now,
+  };
+
+  const hasRunningBlock = state.plans.some(
+    p => p.status === 'active' && p.blocks.some(b => b.status === 'active'),
+  );
+  const startsInFuture = blockAnchor(block).getTime() > now;
+
+  if (hasRunningBlock && startsInFuture) {
+    state.pendingActivation = pending;
+    state.updatedAt = now;
+    savePlanState(state);
+    return { started: false, plan: null };
+  }
+
+  const plan = commitActivation(state, pending, outgoingRetro, now);
+  return { started: true, plan };
+}
+
+// Commit a (possibly deferred) activation: close out the running block, slot
+// the new block into the right plan, install its program, anchor the weeks.
+function commitActivation(
+  state: PlanState,
+  pending: PendingActivation,
+  outgoingRetro: BlockRetrospective | null,
+  now: number,
+): TrainingPlan {
   const active = state.plans.find(p => p.status === 'active');
 
-  // Close the running block under whichever plan owns it
   if (active) {
-    const block = active.blocks.find(b => b.status === 'active');
-    if (block) {
-      block.status = 'completed';
-      block.completedAt = now;
-      if (outgoingRetro) block.retrospective = outgoingRetro;
+    const running = active.blocks.find(b => b.status === 'active');
+    if (running) {
+      running.status = 'completed';
+      running.completedAt = now;
+      if (outgoingRetro) running.retrospective = outgoingRetro;
     }
   }
 
-  const continuing = active != null && active.goal === proposal.input.goal;
+  const continuing = active != null && active.goal === pending.goal;
   let plan: TrainingPlan;
   if (continuing) {
     plan = active!;
-    if (proposal.input.notes.trim()) plan.goalNotes = proposal.input.notes.trim();
+    if (pending.goalNotes) plan.goalNotes = pending.goalNotes;
   } else {
     if (active) {
       active.status = 'completed';
@@ -150,8 +216,8 @@ export function activateProposal(
     }
     plan = {
       id: generatePlanId(),
-      goal: proposal.input.goal,
-      ...(proposal.input.notes.trim() ? { goalNotes: proposal.input.notes.trim() } : {}),
+      goal: pending.goal,
+      ...(pending.goalNotes ? { goalNotes: pending.goalNotes } : {}),
       origin: 'planned',
       status: 'active',
       createdAt: now,
@@ -161,28 +227,61 @@ export function activateProposal(
   }
 
   const seq = state.plans.reduce((n, p) => n + p.blocks.length, 0) + 1;
-  const block: TrainingBlock = {
-    id: generatePlanId(),
-    name: `Block ${seq} · ${goalLabel(proposal.input.goal)}`,
-    focus: proposal.input.goal,
-    startDate: proposal.input.startDate,
-    phases: proposal.phases,
-    program: proposal.days,
-    intent: proposal.intent,
-    progression: proposal.progression,
-    status: 'active',
-    activatedAt: now,
-  };
+  const block = pending.block;
+  block.name = `Block ${seq} · ${goalLabel(pending.goal)}`;
+  block.status = 'active';
   plan.blocks.push(block);
 
   state.updatedAt = now;
   savePlanState(state);
 
   // The block's program becomes the live program; weeks count from its start.
-  saveStoredProgram(proposal.days);
-  saveProgramStart(proposal.input.startDate);
+  saveStoredProgram(block.program);
+  saveProgramStart(block.startDate);
 
   return plan;
+}
+
+export function getPendingActivation(): PendingActivation | null {
+  return getPlanState().pendingActivation ?? null;
+}
+
+/**
+ * Commit the pending activation once its start date arrives (or immediately
+ * with `force`). Computes the outgoing block's retrospective from everything
+ * logged — including the final week the deferral protected. Returns true when
+ * the program changed (callers refresh UI and sync).
+ */
+export async function startPendingActivation(
+  now = Date.now(),
+  opts: { force?: boolean; loadSnapshot?: () => Promise<TrainingSnapshot> } = {},
+): Promise<boolean> {
+  const state = getPlanState();
+  const pending = state.pendingActivation;
+  if (!pending) return false;
+  if (!opts.force && blockAnchor(pending.block).getTime() > now) return false;
+
+  let outgoingRetro: BlockRetrospective | null = null;
+  const running = state.plans
+    .find(p => p.status === 'active')?.blocks.find(b => b.status === 'active');
+  if (running) {
+    const snapshot = await (opts.loadSnapshot ?? loadTrainingSnapshot)();
+    if (snapshot.sessions.length > 0) {
+      outgoingRetro = computeBlockRetrospective(running, snapshot, now);
+    }
+  }
+
+  delete state.pendingActivation;
+  commitActivation(state, pending, outgoingRetro, now);
+  return true;
+}
+
+/** The goal the user is currently training toward (weights the progress engine). */
+export function getTrainingGoal(): Goal {
+  const state = getPlanState();
+  return state.plans.find(p => p.status === 'active')?.goal
+    ?? state.pendingActivation?.goal
+    ?? 'general';
 }
 
 // ── Migration of pre-journey training ─────────────────────────────────────────

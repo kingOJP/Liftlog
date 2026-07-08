@@ -28,11 +28,11 @@ import type { TrainingSnapshot } from './analytics';
 import {
   SETS_TARGET_LOW,
   SETS_TARGET_HIGH,
-  e1rmSeries,
   muscleSetTotals,
   normalizeName,
   sessionTimestamp,
 } from './analytics';
+import { assessSnapshot, progressDirections } from './progress';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
@@ -218,20 +218,19 @@ function buildContext(
   }
 
   const loggedIds = new Set<string>();
-  const trendUp = new Set<string>();
-  const trendDown = new Set<string>();
+  let trendUp = new Set<string>();
+  let trendDown = new Set<string>();
   let weeklyRate = new Map<MuscleGroup, number>();
 
   if (snapshot) {
     for (const logs of snapshot.setsBySession.values()) {
       for (const l of logs) loggedIds.add(l.exerciseId);
     }
-    for (const [id, pts] of e1rmSeries(snapshot)) {
-      if (pts.length < 3) continue;
-      const win = pts.slice(-3);
-      if (win[win.length - 1].value > win[0].value * 1.03) trendUp.add(id);
-      else if (win[win.length - 1].value < win[0].value * 0.97) trendDown.add(id);
-    }
+    // Shared multi-signal trend (progress.ts) — balanced weighting, since a
+    // swap suggestion isn't tied to one goal's priorities.
+    const directions = progressDirections(assessSnapshot(snapshot, 'general'));
+    trendUp = directions.up;
+    trendDown = directions.down;
 
     // Trailing weekly volume rate per muscle — same model as the coach planner,
     // so "over/under target" means the same thing everywhere.
