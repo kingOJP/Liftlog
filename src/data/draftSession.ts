@@ -14,6 +14,8 @@ export interface DraftSession {
   startedAt: number;
   savedAt: number;
   sets: Record<string, Array<{ weight: number; reps: number }>>;
+  /** exercise ids in the order they were first trained (order tracking) */
+  order?: string[];
 }
 
 const KEY = 'liftlog_draft_session';

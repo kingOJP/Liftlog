@@ -24,6 +24,13 @@ export interface SetLog {
   setNumber: number;
   weight: number;
   reps: number;
+  /**
+   * 0-based position of this set's exercise within the workout (the order it
+   * was trained in). Fresh-form context for the progress engine — benching
+   * 4th reads differently than benching 1st. Absent on pre-order rows;
+   * consumers fall back to set-log insertion order.
+   */
+  order?: number;
 }
 
 // Difficulty ratings — feature removed, store kept for compatibility
@@ -147,11 +154,13 @@ export async function addSetLog(
   setNumber: number,
   weight: number,
   reps: number,
+  order?: number,
 ): Promise<void> {
   const db = await openDB();
   await idbReq(
     db.transaction('setLogs', 'readwrite').objectStore('setLogs').add({
       sessionId, exerciseId, setNumber, weight, reps,
+      ...(order != null ? { order } : {}),
     } as SetLog),
   );
 }
@@ -391,6 +400,7 @@ async function writeSessionDoc(db: IDBDatabase, doc: SessionDoc, localId?: numbe
       setNumber: s.setNumber,
       weight: s.weight,
       reps: s.reps,
+      ...(s.order != null ? { order: s.order } : {}),
     } as SetLog);
   }
   await txDone(tx);

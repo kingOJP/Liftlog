@@ -1,20 +1,33 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getStoredProgram } from './programStore';
 import { getProgramStartValue } from './settings';
+import { buildSnapshot } from './analytics';
 import type { BlockRetrospective } from './plan';
 import type { PlanProposal } from './planner';
+
+// Stub loader — these tests exercise lifecycle, not history (no IDB in jsdom)
+const emptySnapshot = () => Promise.resolve(buildSnapshot([], []));
 import {
   activateProposal,
+  canDeferActiveBlock,
   completeActiveBlock,
+  deferActiveBlockToNextWeek,
   getActiveBlockInfo,
   getActivePhase,
   getActivePlan,
   getLatestRetrospective,
+  getPendingActivation,
   getPlanState,
   mergeServerPlanState,
+  startPendingActivation,
 } from './planStore';
 
 beforeEach(() => localStorage.clear());
+
+// Noon on the start Monday — blockAnchor is midnight that day, so a proposal
+// activated at this instant starts immediately (not deferred to pending).
+const JUN1 = new Date('2026-06-01T12:00:00').getTime();
+const JUL6 = new Date('2026-07-06T12:00:00').getTime();
 
 function makeProposal(overrides: Partial<PlanProposal['input']> = {}): PlanProposal {
   return {
@@ -44,32 +57,36 @@ function makeRetro(blockId: string): BlockRetrospective {
   };
 }
 
-describe('activateProposal', () => {
+describe('activateProposal (immediate — start date is today or nothing running)', () => {
   it('creates an active plan and block, and installs the program', () => {
-    const plan = activateProposal(makeProposal());
-    expect(plan.status).toBe('active');
-    expect(plan.blocks).toHaveLength(1);
-    expect(plan.blocks[0].status).toBe('active');
+    const { started, plan } = activateProposal(makeProposal(), null, JUN1);
+    expect(started).toBe(true);
+    expect(plan!.status).toBe('active');
+    expect(plan!.blocks).toHaveLength(1);
+    expect(plan!.blocks[0].status).toBe('active');
     // The block's program is now the live program, weeks anchor to its start
     expect(getStoredProgram()[0].exercises[0].id).toBe('leg-press');
     expect(getProgramStartValue()).toBe('2026-06-01');
   });
 
   it('appends a block to the active plan when the goal is unchanged', () => {
-    activateProposal(makeProposal(), null, 1000);
+    activateProposal(makeProposal(), null, JUN1);
     const info = getActiveBlockInfo()!;
-    const plan = activateProposal(makeProposal({ startDate: '2026-07-06' }), makeRetro(info.block.id), 2000);
+    const { started, plan } = activateProposal(
+      makeProposal({ startDate: '2026-07-06' }), makeRetro(info.block.id), JUL6,
+    );
 
+    expect(started).toBe(true);
     expect(getPlanState().plans).toHaveLength(1);
-    expect(plan.blocks).toHaveLength(2);
-    expect(plan.blocks[0].status).toBe('completed');
-    expect(plan.blocks[0].retrospective?.blockId).toBe(info.block.id);
-    expect(plan.blocks[1].status).toBe('active');
+    expect(plan!.blocks).toHaveLength(2);
+    expect(plan!.blocks[0].status).toBe('completed');
+    expect(plan!.blocks[0].retrospective?.blockId).toBe(info.block.id);
+    expect(plan!.blocks[1].status).toBe('active');
   });
 
   it('starts a new plan on a goal transition, completing the old one', () => {
-    activateProposal(makeProposal(), null, 1000);
-    activateProposal(makeProposal({ goal: 'strength' }), null, 2000);
+    activateProposal(makeProposal(), null, JUN1);
+    activateProposal(makeProposal({ goal: 'strength', startDate: '2026-07-06' }), null, JUL6);
 
     const state = getPlanState();
     expect(state.plans).toHaveLength(2);
@@ -79,9 +96,97 @@ describe('activateProposal', () => {
   });
 });
 
+describe('activateProposal (scheduled — future start while a block runs)', () => {
+  it('defers the new block to a pending activation, leaving the current program in place', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const running = getActiveBlockInfo()!.block;
+
+    // Approve a block for a future Monday, "now" still inside the running block
+    const midBlock = new Date('2026-06-10T12:00:00').getTime();
+    const { started, plan } = activateProposal(
+      makeProposal({ startDate: '2026-06-29' }), null, midBlock,
+    );
+
+    expect(started).toBe(false);
+    expect(plan).toBeNull();
+    // Current block still active, program unchanged
+    expect(getActiveBlockInfo()!.block.id).toBe(running.id);
+    const pending = getPendingActivation();
+    expect(pending).not.toBeNull();
+    expect(pending!.block.status).toBe('pending');
+    expect(pending!.block.startDate).toBe('2026-06-29');
+  });
+
+  it('commits the pending block once its start date arrives, reviewing the outgoing block', async () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const midBlock = new Date('2026-06-10T12:00:00').getTime();
+    activateProposal(makeProposal({ startDate: '2026-06-29' }), null, midBlock);
+
+    // Before the start date: nothing happens
+    expect(await startPendingActivation(new Date('2026-06-20T12:00:00').getTime(), { loadSnapshot: emptySnapshot })).toBe(false);
+    expect(getPendingActivation()).not.toBeNull();
+
+    // On/after the start date: commits, installs the new program
+    const afterStart = new Date('2026-06-29T12:00:00').getTime();
+    expect(await startPendingActivation(afterStart, { loadSnapshot: emptySnapshot })).toBe(true);
+    expect(getPendingActivation()).toBeNull();
+    expect(getActiveBlockInfo()!.block.startDate).toBe('2026-06-29');
+    expect(getProgramStartValue()).toBe('2026-06-29');
+  });
+
+  it('replaces an un-started pending block when the user re-plans', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const midBlock = new Date('2026-06-10T12:00:00').getTime();
+    activateProposal(makeProposal({ startDate: '2026-06-29' }), null, midBlock);
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, midBlock);
+
+    const pending = getPendingActivation();
+    expect(pending!.block.startDate).toBe('2026-07-06');
+    // Only one pending block, and still just one active plan/block
+    expect(getPlanState().plans[0].blocks.filter(b => b.status === 'active')).toHaveLength(1);
+  });
+});
+
+describe('deferActiveBlockToNextWeek (finish the week on the previous program)', () => {
+  it('restores the previous program and reschedules the new block for next Monday', () => {
+    // Block 1 (leg-press) activated, then Block 2 (bench) activated immediately.
+    activateProposal(makeProposal(), null, JUN1);
+    const block1 = getActiveBlockInfo()!.block;
+    activateProposal(
+      makeProposal({ startDate: '2026-07-06' }),
+      makeRetro(block1.id), JUL6,
+    );
+    // Now Block 2 is live; change its program marker so we can tell them apart
+    // (makeProposal always uses leg-press, so assert via block identity instead).
+    const block2 = getActiveBlockInfo()!.block;
+    expect(block2.id).not.toBe(block1.id);
+
+    expect(canDeferActiveBlock()).toBe(true);
+    const now = new Date('2026-07-08T12:00:00').getTime(); // mid-week
+    expect(deferActiveBlockToNextWeek(now)).toBe(true);
+
+    // Block 1 is active again; Block 2 is pending for next Monday (Jul 13)
+    expect(getActiveBlockInfo()!.block.id).toBe(block1.id);
+    const pending = getPendingActivation();
+    expect(pending!.block.id).toBe(block2.id);
+    expect(pending!.block.status).toBe('pending');
+    expect(pending!.block.startDate).toBe('2026-07-13');
+    // The restored block's retrospective (auto-made on activation) is cleared
+    expect(getActiveBlockInfo()!.block.retrospective).toBeUndefined();
+  });
+
+  it('is unavailable when the only block is open-ended (nothing to fall back to)', () => {
+    // Simulate a migrated foundation block
+    activateProposal(makeProposal(), null, JUN1);
+    // Only one block, no previous completed block → cannot defer
+    expect(canDeferActiveBlock()).toBe(false);
+    expect(deferActiveBlockToNextWeek()).toBe(false);
+  });
+});
+
 describe('phase resolution', () => {
   it('reports the active phase for the current week', () => {
-    activateProposal(makeProposal()); // starts Mon 2026-06-01
+    activateProposal(makeProposal(), null, JUN1); // starts Mon 2026-06-01
     expect(getActivePhase(new Date('2026-06-03T12:00:00').getTime())).toBe('accumulation');
     expect(getActivePhase(new Date('2026-06-25T12:00:00').getTime())).toBe('deload');
     expect(getActivePhase(new Date('2026-08-01T12:00:00').getTime())).toBeNull(); // ended
@@ -94,7 +199,7 @@ describe('phase resolution', () => {
 
 describe('completeActiveBlock', () => {
   it('stores the retrospective and leaves the plan active', () => {
-    activateProposal(makeProposal());
+    activateProposal(makeProposal(), null, JUN1);
     const block = getActiveBlockInfo()!.block;
     completeActiveBlock(makeRetro(block.id), 5000);
 

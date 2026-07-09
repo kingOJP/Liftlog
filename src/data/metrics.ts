@@ -27,7 +27,10 @@ export interface SeriesPoint {
 export interface ExerciseSeries {
   exerciseId: string;
   name: string;
+  /** best est. 1RM per session (strength trend) */
   points: SeriesPoint[];
+  /** total volume load (Σ weight × reps) per session (work-capacity trend) */
+  volumePoints: SeriesPoint[];
 }
 
 export interface MuscleSets {
@@ -100,12 +103,31 @@ export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeek
     ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100)
     : null;
 
-  // ── Per-exercise est. 1RM time series — most-tracked first ──
+  // ── Per-exercise est. 1RM + volume-load time series — most-tracked first ──
+  // Strength (intensity) and volume (work capacity) are separate trends: a
+  // lift can add tonnage while e1RM holds, and vice versa. Both are shown.
+  const volumeSeries = new Map<string, { ts: number; value: number }[]>();
+  for (const session of sessions) {
+    const logs = setsBySession.get(session.id!) ?? [];
+    if (logs.length === 0) continue;
+    const ts = sessionTimestamp(session);
+    const byExercise = new Map<string, number>();
+    for (const l of logs) byExercise.set(l.exerciseId, (byExercise.get(l.exerciseId) ?? 0) + l.weight * l.reps);
+    for (const [exerciseId, value] of byExercise) {
+      const arr = volumeSeries.get(exerciseId);
+      if (arr) arr.push({ ts, value });
+      else volumeSeries.set(exerciseId, [{ ts, value }]);
+    }
+  }
+  for (const pts of volumeSeries.values()) pts.sort((a, b) => a.ts - b.ts);
+
   const exercises: ExerciseSeries[] = [...e1rmSeries(snapshot).entries()]
     .map(([exerciseId, pts]) => ({
       exerciseId,
       name: getExerciseName(exerciseId),
       points: pts.map(p => ({ label: shortDate(p.ts), value: Math.round(p.value) })),
+      volumePoints: (volumeSeries.get(exerciseId) ?? [])
+        .map(p => ({ label: shortDate(p.ts), value: Math.round(p.value) })),
     }))
     .sort((a, b) => b.points.length - a.points.length || a.name.localeCompare(b.name));
 

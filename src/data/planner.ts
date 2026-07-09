@@ -22,7 +22,7 @@
 import type { MuscleGroup, WorkoutType, Equipment, WeightType } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
 import type { TrainingSnapshot } from './analytics';
-import { e1rmSeries } from './analytics';
+import { assessSnapshot, progressDirections } from './progress';
 import type { ExerciseProfile } from './substitution';
 import { candidateProfiles, profileFor } from './substitution';
 import type { Goal, PhaseKind, BlockRetrospective } from './plan';
@@ -497,21 +497,20 @@ export function buildPlanProposal(
   const { phases, notes: phaseNotes, warnings } = buildPhases(input, previousRetro);
   const confidence = confidenceFor(snapshot);
 
-  // History-derived context (all optional — the planner works from zero)
-  const trendUp = new Set<string>();
-  const trendDown = new Set<string>();
+  // History-derived context (all optional — the planner works from zero).
+  // Direction comes from the shared multi-signal assessment (progress.ts),
+  // weighted for the goal this plan is built around.
+  let trendUp = new Set<string>();
+  let trendDown = new Set<string>();
   const loggedIds = new Set<string>();
   const observedEquipment = new Set<Equipment>();
   if (snapshot) {
     for (const logs of snapshot.setsBySession.values()) {
       for (const l of logs) loggedIds.add(l.exerciseId);
     }
-    for (const [id, pts] of e1rmSeries(snapshot)) {
-      if (pts.length < 3) continue;
-      const win = pts.slice(-3);
-      if (win[win.length - 1].value > win[0].value * 1.03) trendUp.add(id);
-      else if (win[win.length - 1].value < win[0].value * 0.97) trendDown.add(id);
-    }
+    const directions = progressDirections(assessSnapshot(snapshot, input.goal));
+    trendUp = directions.up;
+    trendDown = directions.down;
     for (const id of loggedIds) {
       const eq = profileFor(id).equipment;
       if (eq) observedEquipment.add(eq);

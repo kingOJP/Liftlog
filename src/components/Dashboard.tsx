@@ -4,7 +4,7 @@ import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
-import { getPlanState, getActiveBlockInfo, getActivePhase } from '../data/planStore';
+import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
 import DayCard from './DayCard';
 import './Dashboard.css';
@@ -19,6 +19,10 @@ interface Props {
   onViewSettings: () => void;
   onViewJourney: () => void;
   onPlanSetup: () => void;
+}
+
+function startLabel(startDate: string): string {
+  return new Date(`${startDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function lastTrainedLabel(ts: number | null): string {
@@ -41,6 +45,8 @@ export default function Dashboard({
   const journey = getActiveBlockInfo();
   const hasPlans = getPlanState().plans.length > 0;
   const phase = getActivePhase();
+  const pending = getPendingActivation();
+  const goal = getTrainingGoal();
 
   // One snapshot read powers both the week progress and the coach card
   useEffect(() => {
@@ -54,10 +60,10 @@ export default function Dashboard({
       setCompletedDayIds(new Set(
         snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
       ));
-      setCoaching(computeCoaching(program, snapshot, weekNumber, Date.now(), phase));
+      setCoaching(computeCoaching(program, snapshot, weekNumber, Date.now(), phase, goal));
     });
     return () => { cancelled = true; };
-  }, [program, weekNumber, phase]);
+  }, [program, weekNumber, phase, goal]);
 
   // Lead with the biggest opportunity; fall back to the best highlight.
   const topInsight = coaching?.opportunities[0] ?? coaching?.highlights[0];
@@ -108,6 +114,21 @@ export default function Dashboard({
             </div>
           </>
         )}
+        {pending && (
+          <div className="journey-pending">
+            Next: {goalLabel(pending.goal)} block starts {startLabel(pending.block.startDate)} — the new workouts appear then
+          </div>
+        )}
+      </button>
+    );
+  } else if (pending) {
+    // Nothing running, but a new block is queued for its start date
+    journeyCard = (
+      <button className="journey-card" onClick={onViewJourney}>
+        <div className="journey-eyebrow">Training journey</div>
+        <div className="journey-status">
+          {goalLabel(pending.goal)} block starts {startLabel(pending.block.startDate)} ›
+        </div>
       </button>
     );
   } else if (!hasPlans) {

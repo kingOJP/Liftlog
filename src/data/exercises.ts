@@ -137,6 +137,21 @@ export const EXERCISES: ExerciseDef[] = [
 
 export const EXERCISE_MAP = new Map<string, ExerciseDef>(EXERCISES.map(e => [e.id, e]));
 
+// `generateExerciseId(name)` stamps a custom ID as `${slug}-${Date.now()}`.
+// When that slug is itself a catalog exercise (e.g. "Back Extensions" →
+// `back-extensions-1782325116469`), the ID is really the catalog exercise
+// wearing a timestamp. Strip a trailing `-<10+ digit timestamp>` and, if the
+// base is a catalog id, return the canonical `ExerciseDef` — so muscle/metadata
+// resolution, naming and the substitution profile all recognise it instead of
+// treating it as an unclassified custom lift. Returns null when the id has no
+// catalog namesake (a genuinely custom exercise).
+export function catalogDefFor(id: string): ExerciseDef | null {
+  const direct = EXERCISE_MAP.get(id);
+  if (direct) return direct;
+  const base = id.replace(/-\d{10,}$/, '');
+  return base !== id ? (EXERCISE_MAP.get(base) ?? null) : null;
+}
+
 // ── Per-exercise metadata overrides (user edits stored in localStorage) ───────
 
 const META_KEY = 'liftlog_exercise_meta';
@@ -196,7 +211,9 @@ export function getExerciseMeta(id: string): ExerciseMetaOverride {
   const overrides = loadMetaOverrides();
   if (overrides[id]) return overrides[id];
 
-  const def = EXERCISE_MAP.get(id);
+  // Fall back to the catalog def, recognising timestamped custom ids whose
+  // slug is a catalog exercise (back-extensions-1782… → back-extensions).
+  const def = catalogDefFor(id);
   return {
     primaryMuscle:    def?.primaryMuscle          ?? null,
     secondaryMuscle1: def?.secondaryMuscles[0]    ?? null,

@@ -18,6 +18,8 @@ interface SetEntry {
   setNumber: number;
   weight: number;
   reps: number;
+  /** 0-based exercise position within the workout (absent on legacy rows) */
+  order?: number;
 }
 
 interface SessionDoc {
@@ -194,7 +196,7 @@ interface PushPayload {
   // the same deterministic fallbacks the client would (legacy-<startedAt>,
   // completedAt) so identities agree across versions.
   sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number; updatedAt?: number }>;
-  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number }>;
+  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number }>;
   /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
   exerciseLogs:  unknown[];
   deletedSessionGuids?: string[];
@@ -240,7 +242,8 @@ function validatePush(data: PushPayload): string | null {
   for (const s of data.setLogs) {
     if (typeof s.id !== 'number' || typeof s.sessionId !== 'number' ||
         typeof s.exerciseId !== 'string' || typeof s.setNumber !== 'number' ||
-        typeof s.weight !== 'number' || typeof s.reps !== 'number') {
+        typeof s.weight !== 'number' || typeof s.reps !== 'number' ||
+        (s.order !== undefined && typeof s.order !== 'number')) {
       return 'malformed set log';
     }
   }
@@ -323,7 +326,8 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const setsBySession = new Map<number, SetEntry[]>();
   for (const s of data.setLogs) {
     const arr = setsBySession.get(s.sessionId) ?? [];
-    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps });
+    // undefined order is dropped by JSON.stringify, keeping legacy docs unchanged
+    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order });
     setsBySession.set(s.sessionId, arr);
   }
 

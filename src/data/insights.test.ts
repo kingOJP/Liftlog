@@ -52,11 +52,12 @@ describe('computeCoaching', () => {
     expect(all.some(i => /under-?trained/i.test(i.title + i.detail))).toBe(false);
   });
 
-  it('surfaces a plateau as an opportunity with a recovery-oriented action', () => {
+  it('surfaces a plateau as an opportunity — no PRs and flat strength/volume', () => {
     const { sessions, setLogs } = flatBenchSessions();
     const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
-    const trend = c.trends.find(t => t.exerciseId === 'dumbbell-bench-press')!;
-    expect(trend.dir).toBe('flat');
+    const p = c.progress.find(x => x.exerciseId === 'dumbbell-bench-press')!;
+    expect(p.status).toBe('stalled');
+    expect(p.weightPRs + p.repPRs).toBe(0);
     const plateau = c.opportunities.find(i => i.kind === 'plateau');
     expect(plateau).toBeDefined();
     expect(plateau!.title).toContain('Dumbbell Bench Press');
@@ -86,8 +87,9 @@ describe('computeCoaching', () => {
       setNumber: 1, weight: 100 + i * 10, reps: 10,
     }));
     const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 1, NOW);
-    const trend = c.trends.find(t => t.exerciseId === 'dumbbell-bench-press')!;
-    expect(trend.dir).toBe('up');
+    const p = c.progress.find(x => x.exerciseId === 'dumbbell-bench-press')!;
+    expect(p.status).toBe('progressing');
+    expect(p.weightPRs).toBeGreaterThan(0);
     expect(c.highlights.some(i => i.kind === 'pr')).toBe(true);
     expect(c.highlights.some(i => i.kind === 'trend-up')).toBe(true);
   });

@@ -67,7 +67,8 @@ export interface TrainingBlock {
   intent: string;
   /** progression philosophy for the block */
   progression: string;
-  status: 'active' | 'completed';
+  /** pending = approved but not started; its workouts install on the start date */
+  status: 'pending' | 'active' | 'completed';
   activatedAt: number;
   completedAt?: number;
   retrospective?: BlockRetrospective;
@@ -91,8 +92,14 @@ export interface ExerciseOutcome {
   name: string;
   startE1rm: number;
   endE1rm: number;
+  /** e1RM change across the block (total-rep change for bodyweight work) */
   changePct: number;
   sessions: number;
+  /** multi-signal verdict (progress.ts); absent on retros stored by old builds */
+  status?: 'progressing' | 'steady' | 'stalled' | 'declining';
+  volumeChangePct?: number | null;
+  /** PR events (weight + rep) inside the block */
+  prCount?: number;
 }
 
 export interface MuscleOutcome {

@@ -22,6 +22,13 @@ export interface LoggedSet {
 export interface ExerciseSession {
   completedAt: number;
   sets: LoggedSet[]; // in set order
+  /**
+   * 0-based position of this exercise within that workout, when known.
+   * Sessions trained much later than the exercise's usual slot are skipped as
+   * the recommendation baseline — the numbers dropped because the muscles
+   * weren't fresh, not because the lifter got weaker.
+   */
+  position?: number | null;
 }
 
 export type RecKind = 'increase' | 'hold' | 'decrease' | 'deload';
@@ -42,6 +49,22 @@ const STALL_SESSIONS = 3;
 // e1RM must improve by more than this fraction across the stall window to not
 // count as stalled.
 const STALL_TOLERANCE = 0.01;
+// Trained this many slots later than the exercise's usual position = not fresh.
+const POSITION_SHIFT_SLOTS = 2;
+
+function typicalPosition(history: ExerciseSession[]): number | null {
+  const positions = history
+    .map(h => h.position)
+    .filter((p): p is number => p != null)
+    .sort((a, b) => a - b);
+  if (positions.length === 0) return null;
+  return positions[Math.floor(positions.length / 2)];
+}
+
+function isPositionShifted(session: ExerciseSession, typical: number | null): boolean {
+  return session.position != null && typical != null &&
+    session.position >= typical + POSITION_SHIFT_SLOTS;
+}
 
 function roundTo5(x: number): number {
   return Math.round(x / 5) * 5;
@@ -93,10 +116,24 @@ export function calculateRecommendation(
   weightType?: WeightType | null,
   phase?: PhaseKind | null,
 ): WeightRec | null {
-  const last = history.find(h => h.sets.length > 0);
-  if (!last) return null;
+  const withSets = history.filter(h => h.sets.length > 0);
+  if (withSets.length === 0) return null;
 
+  // Freshness context: prescribe off sessions where the exercise sat in its
+  // usual slot. A session trained much later in the workout ran on tired
+  // muscles — using it as the baseline would ratchet the prescription down
+  // for reasons that have nothing to do with strength.
+  const typical = typicalPosition(withSets);
+  const fresh = withSets.filter(h => !isPositionShifted(h, typical));
+  const baseline = fresh.length > 0 ? fresh : withSets;
+  const skippedShifted = fresh.length > 0 && baseline[0] !== withSets[0];
+
+  const last = baseline[0];
   const weight = workingWeight(last.sets);
+
+  const withContext = (rec: WeightRec): WeightRec => skippedShifted
+    ? { ...rec, reason: `${rec.reason} (last session ran later in your workout than usual — not held against you)` }
+    : rec;
 
   // Planned easy week: back off ~10% regardless of how the last session went.
   if (phase === 'deload' || phase === 'recovery') {
@@ -113,7 +150,7 @@ export function calculateRecommendation(
   // Bodyweight at 0 lbs → rep progression. If external load was logged
   // (e.g. weighted pull-ups with a belt), the normal weight engine applies.
   if (weightType === 'Bodyweight' && weight === 0) {
-    return repProgression(history, last, exercise);
+    return withContext(repProgression(baseline, last, exercise));
   }
   const workingSets = last.sets.filter(s => s.weight === weight);
   const minReps = Math.min(...workingSets.map(s => s.reps));
@@ -121,40 +158,42 @@ export function calculateRecommendation(
 
   // 1. Rep range beaten across a full set count → add load
   if (workingSets.length >= exercise.sets && minReps >= exercise.repHigh) {
-    return {
+    return withContext({
       weight: weight + incrementFor(weight),
       direction: 'up',
       kind: 'increase',
       reason: `All ${workingSets.length} sets hit ${exercise.repHigh}+ reps — add load`,
-    };
+    });
   }
 
-  // 2. Stalled at this weight for several sessions → deload and rebuild
-  const window = history.filter(h => h.sets.length > 0).slice(0, STALL_SESSIONS);
+  // 2. Stalled at this weight for several sessions → deload and rebuild.
+  // Only fresh-slot sessions count toward the stall — a lift that dipped
+  // because it ran last in the workout hasn't actually stalled.
+  const window = baseline.slice(0, STALL_SESSIONS);
   if (window.length >= STALL_SESSIONS) {
     const sameWeight = window.every(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
     const oldest = window[window.length - 1];
     const stalled = bestE1rm(last.sets) <= bestE1rm(oldest.sets) * (1 + STALL_TOLERANCE);
     if (sameWeight && stalled) {
       const deloaded = Math.max(5, Math.min(roundTo5(weight * 0.9), weight - 5));
-      return {
+      return withContext({
         weight: deloaded,
         direction: 'down',
         kind: 'deload',
         reason: `Stalled ${window.length} sessions at ${weight} lbs — deload, then build back up`,
-      };
+      });
     }
   }
 
   // 3. Clearly under the rep range → ease the load back
   if (avgReps < exercise.repLow) {
     const reduced = Math.max(5, Math.min(roundTo5(weight * 0.95), weight - 5));
-    return {
+    return withContext({
       weight: reduced,
       direction: 'down',
       kind: 'decrease',
       reason: `Reps fell under ${exercise.repLow} — ease back and rebuild`,
-    };
+    });
   }
 
   // 4. In the range → double progression: keep the weight, chase reps
@@ -162,7 +201,7 @@ export function calculateRecommendation(
     workingSets.length < exercise.sets
       ? `Complete all ${exercise.sets} sets at this weight, then chase reps`
       : `In range — work toward ${exercise.sets}×${exercise.repHigh} to earn an increase`;
-  return { weight, direction: 'hold', kind: 'hold', reason };
+  return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
 
 // ── Rep progression (bodyweight at 0 lbs) ─────────────────────────────────────

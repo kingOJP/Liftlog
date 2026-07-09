@@ -14,22 +14,18 @@ import type { TrainingSnapshot } from './analytics';
 import {
   SETS_TARGET_LOW,
   SETS_TARGET_HIGH,
-  e1rmSeries,
   muscleSetTotals,
   sessionDurationMs,
   sessionTimestamp,
 } from './analytics';
 import { getExerciseName } from './programStore';
 import { primaryMuscleFor } from './analytics';
+import { assessExercise, exercisePointSeries, MIN_TREND_SESSIONS } from './progress';
 import type { BlockRetrospective, ExerciseOutcome, MuscleOutcome, TrainingBlock } from './plan';
 import { blockAnchor, blockEndTs } from './plan';
 
 const WEEK_MS = 7 * 86_400_000;
-
-// e1RM change bands (percent across the block)
-const GAIN_PCT = 3;      // ≥ +3% → progressing, worth keeping
-const DECLINE_PCT = -3;  // ≤ −3% → declining, rotation candidate
-const MIN_SESSIONS_FOR_TREND = 3;
+const MIN_SESSIONS_FOR_TREND = MIN_TREND_SESSIONS;
 
 export function computeBlockRetrospective(
   block: TrainingBlock,
@@ -63,21 +59,30 @@ export function computeBlockRetrospective(
     ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60_000)
     : null;
 
-  // ── Strength: first vs last e1RM inside the block, per exercise ──
+  // ── Strength & progress: the multi-signal assessment across the block ──
+  // Each lift is judged by the block's own goal (block.focus): e1RM trend,
+  // volume-load trend, and PR events — not e1RM alone. The whole block is the
+  // window (first vs last session inside it), with exercise-order freshness
+  // discounting applied to the endpoints.
   const strength: ExerciseOutcome[] = [];
-  for (const [exerciseId, pts] of e1rmSeries(snapshot)) {
-    const windowPts = pts.filter(p => p.ts >= from && p.ts <= to);
-    if (windowPts.length < 2) continue;
-    const start = windowPts[0].value;
-    const end = windowPts[windowPts.length - 1].value;
-    if (start <= 0) continue;
+  let blockPRs = 0;
+  for (const [exerciseId, points] of exercisePointSeries(snapshot, include)) {
+    if (points.length < 2) continue;
+    const assessment = assessExercise(exerciseId, points, block.focus, undefined, Infinity);
+    const first = points[0];
+    const end = points[points.length - 1];
+    const prCount = points.reduce((n, p) => n + (p.weightPR ? 1 : 0) + (p.repPR ? 1 : 0), 0);
+    blockPRs += prCount;
     strength.push({
       exerciseId,
       name: getExerciseName(exerciseId),
-      startE1rm: Math.round(start),
-      endE1rm: Math.round(end),
-      changePct: Math.round(((end - start) / start) * 1000) / 10,
-      sessions: windowPts.length,
+      startE1rm: Math.round(first.bestE1rm),
+      endE1rm: Math.round(end.bestE1rm),
+      changePct: assessment.e1rmChangePct ?? assessment.volumeChangePct ?? 0,
+      sessions: points.length,
+      status: assessment.status,
+      volumeChangePct: assessment.volumeChangePct,
+      prCount,
     });
   }
   strength.sort((a, b) => b.changePct - a.changePct);
@@ -94,9 +99,14 @@ export function computeBlockRetrospective(
     .sort((a, b) => b.weeklySets - a.weeklySets);
 
   // ── Carryover signals for the next planning cycle ──
+  // Verdicts come from the multi-signal status: progressing lifts earned their
+  // spot; stalled/declining ones are rotation candidates. Steady lifts (small
+  // gains, recent PRs) are neither — no reason to reward or rotate them.
   const trended = strength.filter(s => s.sessions >= MIN_SESSIONS_FOR_TREND);
-  const keepExerciseIds = trended.filter(s => s.changePct >= GAIN_PCT).map(s => s.exerciseId);
-  const reviewExerciseIds = trended.filter(s => s.changePct < GAIN_PCT).map(s => s.exerciseId);
+  const keepExerciseIds = trended.filter(s => s.status === 'progressing').map(s => s.exerciseId);
+  const reviewExerciseIds = trended
+    .filter(s => s.status === 'stalled' || s.status === 'declining')
+    .map(s => s.exerciseId);
 
   // Under-target only counts for muscles the block actually programmed —
   // an untrained muscle isn't a lagging one, it's out of scope.
@@ -115,7 +125,10 @@ export function computeBlockRetrospective(
   const summary = buildSummary({
     block, sessions: inWindow.length, sessionsPlanned, adherencePct,
     strength: trended, muscles, underMuscles, keepCount: keepExerciseIds.length,
-    reviewNames: trended.filter(s => s.changePct < GAIN_PCT).map(s => s.name),
+    reviewNames: trended
+      .filter(s => s.status === 'stalled' || s.status === 'declining')
+      .map(s => s.name),
+    blockPRs,
   });
 
   return {
@@ -143,8 +156,9 @@ function buildSummary(args: {
   underMuscles: MuscleGroup[];
   keepCount: number;
   reviewNames: string[];
+  blockPRs: number;
 }): string[] {
-  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames } = args;
+  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames, blockPRs } = args;
   const out: string[] = [];
 
   if (sessions === 0) {
@@ -163,19 +177,20 @@ function buildSummary(args: {
     out.push(`Adherence was the limiter — ${sessions} of ${sessionsPlanned} planned sessions. Before changing the program, it's worth asking whether the schedule fits your life; the best plan is the one that happens.`);
   }
 
-  // Strength
+  // Strength & PRs — the multi-signal read, not just e1RM
   if (strength.length > 0) {
     const avg = strength.reduce((s, x) => s + x.changePct, 0) / strength.length;
     const best = strength[0];
-    const decliners = strength.filter(s => s.changePct <= DECLINE_PCT);
-    if (avg >= GAIN_PCT) {
-      out.push(`Strength moved the right way: estimated 1RMs averaged ${avg >= 0 ? '+' : ''}${avg.toFixed(1)}% across ${strength.length} tracked lifts, led by ${best.name} at +${best.changePct.toFixed(1)}%.`);
-    } else if (avg > 0) {
-      out.push(`Strength inched forward — ${avg.toFixed(1)}% on average across ${strength.length} tracked lifts. Slow blocks happen; volume quality and sleep are the usual levers.`);
+    const decliners = strength.filter(s => s.status === 'declining');
+    const prLine = blockPRs > 0 ? ` You set ${blockPRs} PR${blockPRs === 1 ? '' : 's'} (weight and rep records) along the way.` : '';
+    if (avg >= 3) {
+      out.push(`Strength moved the right way: estimated 1RMs averaged ${avg >= 0 ? '+' : ''}${avg.toFixed(1)}% across ${strength.length} tracked lifts, led by ${best.name} at +${best.changePct.toFixed(1)}%.${prLine}`);
+    } else if (avg > 0 || blockPRs > 0) {
+      out.push(`Strength inched forward — ${avg.toFixed(1)}% on average across ${strength.length} tracked lifts.${prLine} Slow blocks happen; volume quality and sleep are the usual levers.`);
     } else {
       out.push(`Strength was flat to down (${avg.toFixed(1)}% average across ${strength.length} lifts) — a sign of accumulated fatigue or life stress. The next block opens easier on purpose.`);
     }
-    if (decliners.length > 0 && avg >= GAIN_PCT) {
+    if (decliners.length > 0 && avg >= 3) {
       out.push(`Not everything cooperated: ${decliners.map(d => d.name).slice(0, 3).join(', ')} lost ground and ${decliners.length === 1 ? 'is' : 'are'} flagged for rotation.`);
     }
   }

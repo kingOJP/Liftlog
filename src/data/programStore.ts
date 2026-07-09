@@ -1,4 +1,4 @@
-import { EXERCISES, EXERCISE_MAP, deleteExerciseMeta } from './exercises';
+import { EXERCISES, EXERCISE_MAP, catalogDefFor, deleteExerciseMeta } from './exercises';
 import { LEGACY_ID_MAP, canonicalizeId } from './legacyIds';
 import { PROGRAM, type Exercise, type WorkoutDay } from './program';
 
@@ -153,9 +153,13 @@ export function addToExerciseLibrary(exercise: Exercise): void {
 }
 
 export function getExerciseName(id: string): string {
-  // Master list first (canonical, always up to date), then fall back to library
-  // (covers custom exercises added via DayEditView)
-  return EXERCISE_MAP.get(id)?.name ?? getExerciseLibrary().find(e => e.id === id)?.name ?? id;
+  // Master list first (canonical, always up to date), then the library (custom
+  // exercises added via DayEditView), then the catalog namesake of a timestamped
+  // custom id (back-extensions-1782… → "Back Extensions").
+  return EXERCISE_MAP.get(id)?.name
+    ?? getExerciseLibrary().find(e => e.id === id)?.name
+    ?? catalogDefFor(id)?.name
+    ?? id;
 }
 
 export function generateExerciseId(name: string): string {

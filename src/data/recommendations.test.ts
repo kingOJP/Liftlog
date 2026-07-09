@@ -177,3 +177,36 @@ describe('planned phase overrides', () => {
     expect(rec).toMatchObject({ weight: 105, kind: 'increase' });
   });
 });
+
+describe('exercise-order freshness', () => {
+  // history is newest-first; add a position to each session
+  const at = (pos: number, sets: Array<[number, number]>, ts = 0): ExerciseSession =>
+    ({ completedAt: ts, position: pos, sets: sets.map(([weight, reps]) => ({ weight, reps })) });
+
+  it('ignores a fatigued late-slot session as the baseline', () => {
+    // Usual slot 0, climbing. Latest session ran at slot 3 with a dip — the
+    // recommendation should build off the fresh session, not the tired one.
+    const history = [
+      at(3, [[95, 6], [95, 6], [95, 6]], 4),   // newest: fatigued, late slot
+      at(0, [[100, 12], [100, 12], [100, 12]], 3),
+      at(0, [[100, 11], [100, 11], [100, 11]], 2),
+    ];
+    const rec = calculateRecommendation(history, exercise);
+    // Baseline is the fresh 100×12 session → earns an increase, not a decrease
+    expect(rec).toMatchObject({ kind: 'increase' });
+    expect(rec!.reason).toMatch(/later in your workout/i);
+  });
+
+  it('does not read a late-slot dip as an under-range decrease', () => {
+    // A tired late-slot session with low reps would normally trigger a
+    // decrease; the two fresh in-range sessions are the real baseline → hold.
+    const history = [
+      at(3, [[90, 6], [90, 6], [90, 6]], 5),      // newest: late slot, low reps
+      at(0, [[100, 10], [100, 10], [100, 10]], 4),
+      at(0, [[100, 10], [100, 10], [100, 10]], 3),
+    ];
+    const rec = calculateRecommendation(history, exercise);
+    expect(rec!.kind).toBe('hold');
+    expect(rec!.reason).toMatch(/later in your workout/i);
+  });
+});
