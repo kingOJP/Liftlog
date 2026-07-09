@@ -54,7 +54,8 @@ describe('computeMetrics', () => {
     expect(find('Delts')).toBe(0.5);
     expect(find('Triceps')).toBe(0.5);
     expect(find('Other')).toBe(1);   // the mystery exercise
-    expect(m.unclassifiedExercises).toEqual(['mystery-exercise-1']);
+    // Orphaned ids are humanized for display (getExerciseName fallback)
+    expect(m.unclassifiedExercises).toEqual(['Mystery Exercise 1']);
   });
 
   it('credits secondary volume from compounds — a push day counts real triceps sets', () => {

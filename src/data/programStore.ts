@@ -152,6 +152,39 @@ export function addToExerciseLibrary(exercise: Exercise): void {
   }
 }
 
+// Merge an incoming (server) library into the local one. Per-id the incoming
+// copy wins, but entries that exist ONLY locally are kept — they were added on
+// this device and simply haven't pushed yet (or a stale device pushed a library
+// from before they existed). A pull must never delete a local exercise; only
+// tombstones delete. Returns the merged library it saved.
+export function mergeExerciseLibrary(incoming: Exercise[]): Exercise[] {
+  const deleted = getDeletedExerciseIds();
+  const incomingIds = new Set(incoming.map(e => e.id));
+  const localOnly = getExerciseLibrary().filter(e => !incomingIds.has(e.id));
+  const merged = [...incoming, ...localOnly].filter(e => !deleted.has(e.id));
+  saveExerciseLibrary(merged);
+  return merged;
+}
+
+// Repair pass: every exercise the program references must resolve in the
+// library, or history/metrics show raw IDs. Rebuilds missing entries from the
+// program slot itself (id, name, sets, rep range). Heals libraries that were
+// gutted by the old replace-on-pull sync.
+export function ensureProgramExercisesInLibrary(program: WorkoutDay[]): void {
+  const deleted = getDeletedExerciseIds();
+  const lib = getExerciseLibrary();
+  const known = new Set(lib.map(e => e.id));
+  const missing: Exercise[] = [];
+  for (const day of program) {
+    for (const ex of day.exercises) {
+      if (known.has(ex.id) || deleted.has(ex.id)) continue;
+      known.add(ex.id);
+      missing.push({ id: ex.id, name: ex.name, sets: ex.sets, repLow: ex.repLow, repHigh: ex.repHigh });
+    }
+  }
+  if (missing.length > 0) saveExerciseLibrary([...lib, ...missing]);
+}
+
 export function getExerciseName(id: string): string {
   // Master list first (canonical, always up to date), then the library (custom
   // exercises added via DayEditView), then the catalog namesake of a timestamped
@@ -159,7 +192,20 @@ export function getExerciseName(id: string): string {
   return EXERCISE_MAP.get(id)?.name
     ?? getExerciseLibrary().find(e => e.id === id)?.name
     ?? catalogDefFor(id)?.name
-    ?? id;
+    ?? humanizeExerciseId(id);
+}
+
+// Last-resort display name for an orphaned id (a custom exercise whose library
+// entry was lost): strip the Date.now() stamp and title-case the slug, so
+// "jefferson-split-squats-1782324854942" renders as "Jefferson Split Squats"
+// instead of the raw id.
+function humanizeExerciseId(id: string): string {
+  const slug = id.replace(/-\d{10,}$/, '');
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ') || id;
 }
 
 export function generateExerciseId(name: string): string {

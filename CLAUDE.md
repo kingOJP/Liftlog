@@ -373,7 +373,14 @@ resurrect through sync (the server additionally refuses to store empty session d
 per-user (`user_id`-keyed). The exercise library and its metadata are **app-wide** — global
 `app_exercises` / `app_exercise_metadata` tables shared by every account (the per-user
 `exercise_metadata` table and `user_programs.exercises_json` remain only as legacy pull
-fallbacks). Exercise deletion writes a tombstone (`deleted_exercises` server table,
+fallbacks). **Library and metadata sync are merge-based, never replace**: the worker upserts
+per exercise on push (no `DELETE FROM app_exercises`) and the client merges on pull
+(`mergeExerciseLibrary` — incoming wins per id, local-only entries survive), so a background
+pull racing an unpushed library write, or a stale device's push, can no longer silently delete
+a custom exercise — only tombstones delete. `ensureProgramExercisesInLibrary` (end of every
+pull) rebuilds any library entry the program references but the library lost, and
+`getExerciseName` humanizes orphaned timestamped ids (`jefferson-split-squats-1782…` →
+"Jefferson Split Squats") as a last-resort display fallback. Exercise deletion writes a tombstone (`deleted_exercises` server table,
 `liftlog_deleted_exercises` locally, synced both ways); tombstoned IDs are filtered from every
 library read, sync push/pull, and the default-library rebuild, so a deleted exercise stays
 deleted no matter which device or account pushes a stale copy.
