@@ -6,7 +6,8 @@ import { getSessionTombstones, addSessionTombstones, clearSessionTombstones } fr
 import { clearDraftSession } from './draftSession';
 import {
   getStoredProgram, saveStoredProgram, clearStoredProgram,
-  getExerciseLibrary, saveExerciseLibrary,
+  getExerciseLibrary, saveExerciseLibrary, mergeExerciseLibrary,
+  ensureProgramExercisesInLibrary,
   getDeletedExerciseIds, addDeletedExerciseIds,
 } from './programStore';
 import { getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta } from './exercises';
@@ -203,12 +204,15 @@ export async function pullSync(): Promise<boolean> {
 
   // The exercise library and its metadata are app-wide — apply them even when
   // this account has no workout history yet. Metadata is merged so unsynced
-  // local edits survive; both are filtered through the tombstones.
+  // local edits survive; both are filtered through the tombstones. The library
+  // is MERGED, never replaced: a local-only exercise (added on this device,
+  // not yet pushed) must survive a pull, or a background pull racing the push
+  // silently deletes it (only tombstones delete).
   const incomingMeta = recombineMeta(data.exerciseMuscles, data.exerciseDetails);
   for (const id of deleted) delete incomingMeta[id];
   mergeExerciseMeta(incomingMeta);
   if (data.exercises) {
-    saveExerciseLibrary(data.exercises.filter(e => !deleted.has(e.id)));
+    mergeExerciseLibrary(data.exercises);
   }
 
   // Merge server sessions per-document: tombstoned sessions are removed, newer
@@ -247,6 +251,11 @@ export async function pullSync(): Promise<boolean> {
       changed = true;
     }
   }
+
+  // Repair pass: an exercise the program references but the library lost (the
+  // old replace-on-pull sync could gut it) is rebuilt from the program slot so
+  // history and the Exercises screen resolve its name again.
+  ensureProgramExercisesInLibrary(getStoredProgram());
 
   return changed;
 }

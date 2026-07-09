@@ -4,6 +4,7 @@ import {
   getStoredProgram, getExerciseLibrary, saveExerciseLibrary,
   deleteExerciseFromLibrary, addToExerciseLibrary,
   getDeletedExerciseIds, addDeletedExerciseIds,
+  mergeExerciseLibrary, ensureProgramExercisesInLibrary, getExerciseName,
 } from './programStore';
 import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta } from './exercises';
 import type { WorkoutDay } from './program';
@@ -100,10 +101,73 @@ describe('deleted-exercise tombstones', () => {
     expect('face-pulls' in getAllExerciseMeta()).toBe(false);
   });
 
+  it('a pull merge cannot resurrect a tombstoned exercise', () => {
+    deleteExerciseFromLibrary('face-pulls');
+    mergeExerciseLibrary([{ id: 'face-pulls', name: 'Face Pulls', sets: 3, repLow: 15, repHigh: 20 }]);
+    expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(false);
+  });
+
   it('explicitly re-adding an exercise lifts its tombstone', () => {
     deleteExerciseFromLibrary('face-pulls');
     addToExerciseLibrary({ id: 'face-pulls', name: 'Face Pulls', sets: 3, repLow: 15, repHigh: 20 });
     expect(getDeletedExerciseIds().has('face-pulls')).toBe(false);
     expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(true);
+  });
+});
+
+describe('mergeExerciseLibrary — pull merge keeps local-only exercises', () => {
+  const custom = { id: 'jefferson-split-squats-1782324854942', name: 'Jefferson Split Squats', sets: 3, repLow: 8, repHigh: 12 };
+
+  it('keeps a local-only custom exercise when the server copy lacks it', () => {
+    addToExerciseLibrary(custom);
+    // Server library from before the custom exercise existed
+    const serverCopy = getExerciseLibrary().filter(e => e.id !== custom.id);
+    mergeExerciseLibrary(serverCopy);
+    expect(getExerciseLibrary().some(e => e.id === custom.id)).toBe(true);
+  });
+
+  it('lets the incoming copy win per id', () => {
+    addToExerciseLibrary(custom);
+    mergeExerciseLibrary([{ ...custom, sets: 5 }]);
+    expect(getExerciseLibrary().find(e => e.id === custom.id)?.sets).toBe(5);
+  });
+
+  it('adds server-only exercises', () => {
+    mergeExerciseLibrary([custom]);
+    expect(getExerciseLibrary().some(e => e.id === custom.id)).toBe(true);
+  });
+});
+
+describe('ensureProgramExercisesInLibrary — repairs a gutted library', () => {
+  it('rebuilds a missing library entry from the program slot', () => {
+    const program: WorkoutDay[] = [{
+      id: 1, label: 'Day 1', muscleGroups: 'Legs',
+      exercises: [{ id: 'jefferson-split-squats-1782324854942', name: 'Jefferson Split Squats', sets: 3, repLow: 8, repHigh: 12 }],
+    }];
+    ensureProgramExercisesInLibrary(program);
+    const entry = getExerciseLibrary().find(e => e.id === 'jefferson-split-squats-1782324854942');
+    expect(entry?.name).toBe('Jefferson Split Squats');
+  });
+
+  it('does not resurrect a tombstoned exercise', () => {
+    addDeletedExerciseIds(['gone-lift-1782324854942']);
+    ensureProgramExercisesInLibrary([{
+      id: 1, label: 'Day 1', muscleGroups: 'Legs',
+      exercises: [{ id: 'gone-lift-1782324854942', name: 'Gone Lift', sets: 3, repLow: 8, repHigh: 12 }],
+    }]);
+    expect(getExerciseLibrary().some(e => e.id === 'gone-lift-1782324854942')).toBe(false);
+  });
+});
+
+describe('getExerciseName — orphaned timestamped ids', () => {
+  it('humanizes an id whose library entry was lost instead of showing the raw id', () => {
+    expect(getExerciseName('jefferson-split-squats-1782324854942')).toBe('Jefferson Split Squats');
+    expect(getExerciseName('dead-bugs-1782325691122')).toBe('Dead Bugs');
+  });
+
+  it('still prefers catalog and library names', () => {
+    expect(getExerciseName('face-pulls')).toBe('Face Pulls');
+    addToExerciseLibrary({ id: 'my-lift-1782324854942', name: 'My Fancy Lift', sets: 3, repLow: 8, repHigh: 12 });
+    expect(getExerciseName('my-lift-1782324854942')).toBe('My Fancy Lift');
   });
 });

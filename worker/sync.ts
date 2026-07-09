@@ -357,16 +357,28 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   // Deleting them here would risk losing history if a client pushed after a
   // failed pull (before ever merging the legacy data).
 
-  // App-wide exercise library: replace wholesale with the pushed copy, minus
-  // anything tombstoned. (Clients pull before they push, so the pushed library
-  // already includes exercises other accounts added.)
+  // App-wide exercise library: UPSERT each pushed exercise, never delete-and-
+  // replace. A client whose local library is missing an exercise another device
+  // just added (its pull raced that device's push) must not erase it here —
+  // deletion happens exclusively through deleted_exercises tombstones, which
+  // every read filters.
   if (data.exercises) {
-    stmts.push(env.DB.prepare('DELETE FROM app_exercises'));
     for (const e of data.exercises) {
       if (tombstoned.has(e.id)) continue;
       stmts.push(env.DB.prepare(
-        'INSERT INTO app_exercises (id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?)',
+        `INSERT INTO app_exercises (id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name     = excluded.name,
+           sets     = excluded.sets,
+           rep_low  = excluded.rep_low,
+           rep_high = excluded.rep_high,
+           archived = excluded.archived`,
       ).bind(e.id, e.name, e.sets, e.repLow, e.repHigh, e.archived ? 1 : 0));
+    }
+    // Tombstoned rows may still exist from before this push carried the
+    // tombstone — scrub them (reads already filter, this is hygiene).
+    for (const id of tombstoned) {
+      stmts.push(env.DB.prepare('DELETE FROM app_exercises WHERE id = ?').bind(id));
     }
   }
 
@@ -378,14 +390,24 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   for (const d of (data.exerciseDetails ?? [])) {
     metaMap.set(d.exerciseId, { ...metaMap.get(d.exerciseId), ...d });
   }
-  stmts.push(env.DB.prepare('DELETE FROM app_exercise_metadata'));
+  // Same rule as the library: upsert per exercise, never delete-and-replace,
+  // so a push from a device that hasn't pulled another device's fresh metadata
+  // yet can't erase it. Tombstoned rows are scrubbed explicitly below.
   for (const [exId, m] of metaMap) {
     if (tombstoned.has(exId)) continue;
     stmts.push(env.DB.prepare(
       `INSERT INTO app_exercise_metadata
          (exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
           workout_type, equipment, weight_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(exercise_id) DO UPDATE SET
+         primary_muscle    = excluded.primary_muscle,
+         secondary_muscle1 = excluded.secondary_muscle1,
+         secondary_muscle2 = excluded.secondary_muscle2,
+         secondary_muscle3 = excluded.secondary_muscle3,
+         workout_type      = excluded.workout_type,
+         equipment         = excluded.equipment,
+         weight_type       = excluded.weight_type`,
     ).bind(
       exId,
       (m.primaryMuscle    as string | null) ?? null,
@@ -396,6 +418,9 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
       (m.equipment        as string | null) ?? null,
       (m.weightType       as string | null) ?? null,
     ));
+  }
+  for (const id of tombstoned) {
+    stmts.push(env.DB.prepare('DELETE FROM app_exercise_metadata WHERE exercise_id = ?').bind(id));
   }
 
   if (data.program && data.exercises) {
