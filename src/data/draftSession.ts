@@ -31,7 +31,10 @@ export function clearDraftSession(): void {
   localStorage.removeItem(KEY);
 }
 
-// The draft for this day, if one exists and is fresh enough to resume.
+// The draft for this day, if one exists and is fresh enough to resume. A draft
+// with no sets yet is still resumable — a *started* workout is stored from the
+// moment the view opens, so an app kill before the first set keeps its start
+// time (and duration tracking) intact.
 export function getResumableDraft(dayId: number, now = Date.now()): DraftSession | null {
   try {
     const raw = localStorage.getItem(KEY);
@@ -39,9 +42,14 @@ export function getResumableDraft(dayId: number, now = Date.now()): DraftSession
     const draft = JSON.parse(raw) as DraftSession;
     if (draft.dayId !== dayId) return null;
     if (now - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
-    if (Object.values(draft.sets).every(s => s.length === 0)) return null;
     return draft;
   } catch {
     return null;
   }
+}
+
+// Whether a draft actually contains logged sets (drives the restore banner —
+// restoring just a start time isn't worth announcing).
+export function draftHasSets(draft: DraftSession | null): boolean {
+  return draft != null && Object.values(draft.sets).some(s => s.length > 0);
 }

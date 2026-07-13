@@ -79,6 +79,29 @@ describe('suggestReplacements', () => {
     expect(suggestions.length).toBeGreaterThan(0);
   });
 
+  it('never suggests the same movement twice under different names', () => {
+    // Target a triceps slot: the catalog holds both 'Cable Pushdown' and
+    // 'Tricep Cable Pushdown' — only one may make the shortlist.
+    const tricepsDay: WorkoutDay = {
+      id: 1, label: 'Day 1', muscleGroups: 'Triceps',
+      exercises: [
+        { id: 'overhead-tricep-ext', name: 'Overhead Tricep Extension', sets: 3, repLow: 10, repHigh: 12 },
+      ],
+    };
+    const suggestions = suggestReplacements(tricepsDay.exercises[0], tricepsDay, null, 3, NOW);
+    expect(suggestions.length).toBeGreaterThan(0);
+
+    const tokens = (name: string) => new Set(name.toLowerCase().split(/\s+/));
+    for (let i = 0; i < suggestions.length; i++) {
+      for (let j = i + 1; j < suggestions.length; j++) {
+        const a = tokens(suggestions[i].exercise.name);
+        const b = tokens(suggestions[j].exercise.name);
+        const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+        expect([...small].every(t => large.has(t))).toBe(false);
+      }
+    }
+  });
+
   it('prefers exercises the user has trained before and says so', () => {
     const flyDay: WorkoutDay = {
       id: 1, label: 'Day 1', muscleGroups: 'Chest',

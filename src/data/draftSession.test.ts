@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  saveDraftSession, getResumableDraft, clearDraftSession, DRAFT_MAX_AGE_MS,
+  saveDraftSession, getResumableDraft, clearDraftSession, draftHasSets, DRAFT_MAX_AGE_MS,
 } from './draftSession';
 import type { DraftSession } from './draftSession';
 
@@ -36,9 +36,12 @@ describe('draft session persistence', () => {
     expect(getResumableDraft(2, NOW)).toBeNull();
   });
 
-  it('ignores drafts with no actual sets', () => {
+  it('resumes a set-less draft (started workout keeps its start time) but flags it as empty', () => {
     saveDraftSession(draft({ sets: { 'face-pulls': [] } }));
-    expect(getResumableDraft(2, NOW)).toBeNull();
+    const restored = getResumableDraft(2, NOW);
+    expect(restored?.startedAt).toBe(NOW - 20 * 60_000);
+    expect(draftHasSets(restored)).toBe(false);
+    expect(draftHasSets(draft())).toBe(true);
   });
 
   it('clearDraftSession removes the draft', () => {

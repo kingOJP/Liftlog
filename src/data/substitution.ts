@@ -199,7 +199,18 @@ export function suggestReplacements(
   suggestions.sort(
     (a, b) => b.score - a.score || a.exercise.name.localeCompare(b.exercise.name),
   );
-  return suggestions.slice(0, limit);
+
+  // The shortlist must be genuinely distinct movements: the candidate pool can
+  // contain the same lift under two names ("Cable Pushdown" / "Tricep Cable
+  // Pushdown"), and offering both wastes a suggestion slot. Keep the
+  // higher-ranked one and let the next-best distinct movement through.
+  const unique: ReplacementSuggestion[] = [];
+  for (const s of suggestions) {
+    if (unique.some(u => sameLift(u.exercise.name, s.exercise.name))) continue;
+    unique.push(s);
+    if (unique.length >= limit) break;
+  }
+  return unique;
 }
 
 function buildContext(

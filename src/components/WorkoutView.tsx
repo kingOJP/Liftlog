@@ -20,7 +20,7 @@ import { getExerciseMeta } from '../data/exercises';
 import { getActivePhase } from '../data/planStore';
 import { PHASE_INFO } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
-import { getResumableDraft, saveDraftSession, clearDraftSession } from '../data/draftSession';
+import { getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
 import './WorkoutView.css';
@@ -85,6 +85,32 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // final logged set. completedAt − startedAt is the workout duration.
   const [sessionStart, setSessionStart] = useState(() => restoredDraft?.startedAt ?? Date.now());
   const lastSetAtRef = useRef<number | null>(null);
+  // The finish bar only appears once the user has scrolled to the bottom of
+  // the workout — it sits where "Log Set" muscle memory expects a button, so
+  // keeping it off-screen mid-workout prevents accidental early saves.
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const doc = document.documentElement;
+      const scrollBottom = window.innerHeight + window.scrollY;
+      setAtBottom(scrollBottom >= doc.scrollHeight - 24);
+    };
+    check();
+    window.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    return () => {
+      window.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
+
+  // Content height changes without a scroll event (sets logged, banners
+  // dismissed, coach adjustments loaded) — re-check whether we're at the bottom.
+  useEffect(() => {
+    const doc = document.documentElement;
+    setAtBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - 24);
+  }, [sets, effectiveDay, planDismissed, restRunId, loading]);
 
   // Stamp the time of the most recent set activity — completedAt uses it so
   // the session duration reflects training time, not phone-in-hand time.
@@ -93,15 +119,17 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     if (totalSets > 0) lastSetAtRef.current = Date.now();
   }, [sets, totalSets]);
 
-  // Persist the in-progress workout on every set change so an app kill or tab
-  // eviction can't lose it. Cleared at Finish (or when the draft is discarded).
+  // Persist the in-progress workout locally from the moment it starts (view
+  // open) and on every set change, so an app kill or tab eviction can't lose
+  // anything — not even the start time before the first set is logged.
+  // Cleared at Finish (or when the draft is discarded).
   useEffect(() => {
-    if (isEditMode || totalSets === 0) return;
+    if (isEditMode) return;
     saveDraftSession({
       dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets,
       order: exerciseOrderRef.current,
     });
-  }, [sets, totalSets, isEditMode, day.id, sessionStart]);
+  }, [sets, isEditMode, day.id, sessionStart]);
 
   function handleDiscardDraft() {
     clearDraftSession();
@@ -292,7 +320,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             />
           </div>
         )}
-        {restoredDraft && (
+        {draftHasSets(restoredDraft) && (
           <div className="draft-banner">
             <span className="draft-banner-text">
               Restored your in-progress workout — keep logging or discard it
@@ -346,9 +374,10 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
 
       {!isEditMode && <RestTimer runId={restRunId} onDismiss={() => setRestRunId(0)} />}
 
-      <div className="finish-bar">
+      <div className={`finish-bar${atBottom ? '' : ' finish-bar--hidden'}`}>
         <button
           className="finish-btn"
+          tabIndex={atBottom ? 0 : -1}
           disabled={totalSets === 0 || finishing}
           onClick={handleFinish}
         >
