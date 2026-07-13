@@ -11,7 +11,7 @@ const REST_KEY = 'liftlog_rest_seconds';
 // their own start date in Settings.
 export const DEFAULT_PROGRAM_START = '2026-06-09';
 
-export const REST_PRESETS = [60, 90, 120, 180];
+export const REST_PRESETS = [60, 120, 180, 300];
 export const DEFAULT_REST_SECONDS = 120;
 
 interface Settings {

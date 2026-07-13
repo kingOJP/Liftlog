@@ -68,7 +68,12 @@ describe('rest duration setting', () => {
   });
 
   it('round-trips a preset', () => {
-    saveRestDuration(90);
-    expect(getRestDuration()).toBe(90);
+    saveRestDuration(300);
+    expect(getRestDuration()).toBe(300);
+  });
+
+  it('falls back to the default for a retired preset (old stored 90s)', () => {
+    localStorage.setItem('liftlog_rest_seconds', '90');
+    expect(getRestDuration()).toBe(DEFAULT_REST_SECONDS);
   });
 });
