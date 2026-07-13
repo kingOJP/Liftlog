@@ -56,11 +56,21 @@
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   background: var(--bg);
   border-top: 1px solid var(--border);
+  transition: transform 0.2s ease;
 }
 
+/* Hidden until the user scrolls to the bottom of the workout — prevents
+   fat-fingering "Finish" where "Log Set" muscle memory expects a button */
+.finish-bar--hidden {
+  transform: translateY(110%);
+  pointer-events: none;
+}
+
+/* Green, not purple: visually distinct from the per-exercise "Log Set"
+   buttons so the two can't be confused at a glance */
 .finish-btn {
   width: 100%;
-  background: var(--purple);
+  background: var(--green);
   color: #fff;
   border: none;
   border-radius: 10px;

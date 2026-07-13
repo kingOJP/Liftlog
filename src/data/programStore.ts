@@ -63,10 +63,18 @@ export function clearStoredProgram(): void {
   localStorage.removeItem(PROGRAM_KEY);
 }
 
+// Account switch: the exercise library and its tombstones are user-owned under
+// the ownership model — they must not leak into (or delete from) the next
+// account. The incoming account's sync pull restores theirs.
+export function clearExerciseLibraryData(): void {
+  localStorage.removeItem(LIBRARY_KEY);
+  localStorage.removeItem(DELETED_KEY);
+}
+
 // ── Deleted-exercise tombstones ──────────────────────────────────────────────
 // A deleted exercise must STAY deleted: the library used to resurrect through
 // sync (a stale server/device copy re-adding it) and through the default
-// library rebuild. Tombstones are synced app-wide and filtered on every read.
+// library rebuild. Tombstones are per-user, synced, filtered on every read.
 
 export function getDeletedExerciseIds(): Set<string> {
   try {

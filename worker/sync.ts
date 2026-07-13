@@ -1,5 +1,11 @@
 import type { Env } from './types';
 import { getAuthenticatedUser } from './auth';
+import { getUserRole } from './roles';
+
+// Custom exercises are stamped `${slug}-${Date.now()}` by the client
+// (generateExerciseId) — a trailing 10+ digit timestamp marks user-created
+// content, which enters the lifecycle queue for admin review.
+const CUSTOM_ID_RE = /-\d{10,}$/;
 
 export async function handleSync(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
@@ -88,17 +94,27 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
 }
 
 async function pull(userId: string, env: Env): Promise<Response> {
-  const [sessionDocs, sessionTombstones, program, appExercises, appMeta, tombstones, planRow] = await Promise.all([
+  const [sessionDocs, sessionTombstones, program, userExercises, userMeta,
+         userTombstones, legacyTombstones, globalExercises, globalMeta, role, planRow] = await Promise.all([
     loadSessionDocs(userId, env),
     env.DB.prepare('SELECT guid FROM deleted_sessions WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare(
       'SELECT program_json, exercises_json FROM user_programs WHERE user_id = ?',
     ).bind(userId).first<{ program_json: string; exercises_json: string }>(),
     env.DB.prepare(
-      'SELECT id, name, sets, rep_low, rep_high, archived FROM app_exercises',
-    ).all(),
-    env.DB.prepare(`SELECT ${META_COLUMNS} FROM app_exercise_metadata`).all(),
+      'SELECT id, name, sets, rep_low, rep_high, archived FROM user_exercises WHERE user_id = ?',
+    ).bind(userId).all(),
+    env.DB.prepare(
+      `SELECT ${META_COLUMNS} FROM exercise_metadata WHERE user_id = ?`,
+    ).bind(userId).all(),
+    env.DB.prepare('SELECT exercise_id FROM user_deleted_exercises WHERE user_id = ?').bind(userId).all(),
+    // Deletions made while deletion was app-wide still apply to everyone.
     env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
+    env.DB.prepare(
+      'SELECT id, name, sets, rep_low, rep_high, archived FROM global_exercises',
+    ).all(),
+    env.DB.prepare(`SELECT ${META_COLUMNS} FROM global_exercise_metadata`).all(),
+    getUserRole(userId, env),
     env.DB.prepare(
       'SELECT plan_json FROM training_plans WHERE user_id = ?',
     ).bind(userId).first<{ plan_json: string }>(),
@@ -128,36 +144,61 @@ async function pull(userId: string, env: Env): Promise<Response> {
     }
   });
 
-  const deletedIds = new Set(tombstones.results.map(r => r.exercise_id as string));
+  // The user's deleted set: their own tombstones plus the legacy app-wide ones
+  // (deletions that happened before deletion became per-user).
+  const deletedIds = new Set<string>([
+    ...userTombstones.results.map(r => r.exercise_id as string),
+    ...legacyTombstones.results.map(r => r.exercise_id as string),
+  ]);
 
-  // Exercises + metadata are app-wide (shared by every account). Until the
-  // first post-deploy push populates the global tables, fall back to this
-  // user's legacy per-user copies. Tombstoned exercises are never returned.
-  let metaRows = appMeta.results;
+  // Layer 2 (user-owned) metadata. A user with no per-user rows yet is adopted
+  // from the legacy app-wide table once; their next push snapshots the adopted
+  // data into their own rows and the fallback goes inert.
+  let metaRows = userMeta.results;
   if (metaRows.length === 0) {
     metaRows = (await env.DB.prepare(
-      `SELECT ${META_COLUMNS} FROM exercise_metadata WHERE user_id = ?`,
-    ).bind(userId).all()).results;
+      `SELECT ${META_COLUMNS} FROM app_exercise_metadata`,
+    ).all()).results;
   }
   metaRows = metaRows.filter(r => !deletedIds.has(r.exercise_id as string));
 
-  let exercises: unknown = null;
-  if (appExercises.results.length > 0) {
-    exercises = appExercises.results
-      .filter(r => !deletedIds.has(r.id as string))
-      .map(r => ({
-        id:      r.id,
-        name:    r.name,
-        sets:    r.sets,
-        repLow:  r.rep_low,
-        repHigh: r.rep_high,
-        ...(r.archived ? { archived: true } : {}),
-      }));
-  } else if (program?.exercises_json) {
-    const legacy: unknown = JSON.parse(program.exercises_json);
-    exercises = Array.isArray(legacy)
-      ? legacy.filter((e: { id?: string }) => !deletedIds.has(e.id ?? ''))
-      : legacy;
+  const rowToExercise = (r: Record<string, unknown>) => ({
+    id:      r.id as string,
+    name:    r.name,
+    sets:    r.sets,
+    repLow:  r.rep_low,
+    repHigh: r.rep_high,
+    ...(r.archived ? { archived: true } : {}),
+  });
+
+  // Layer 2 (user-owned) library, with the same one-time adoption fallback
+  // chain: user rows → legacy app-wide table → legacy per-user JSON blob.
+  let exercises: Array<{ id?: string }> | null = null;
+  if (userExercises.results.length > 0) {
+    exercises = userExercises.results.map(rowToExercise);
+  } else {
+    const appExercises = await env.DB.prepare(
+      'SELECT id, name, sets, rep_low, rep_high, archived FROM app_exercises',
+    ).all();
+    if (appExercises.results.length > 0) {
+      exercises = appExercises.results.map(rowToExercise);
+    } else if (program?.exercises_json) {
+      const legacy: unknown = JSON.parse(program.exercises_json);
+      if (Array.isArray(legacy)) exercises = legacy as Array<{ id?: string }>;
+    }
+  }
+  if (exercises) {
+    exercises = exercises.filter(e => !deletedIds.has(e.id ?? ''));
+  }
+
+  // Layer 1 (application-owned): admin-curated global exercises flow to every
+  // user unless the user's own copy or tombstone says otherwise.
+  const haveIds = new Set((exercises ?? []).map(e => e.id));
+  const globalAdds = globalExercises.results
+    .filter(r => !r.archived && !deletedIds.has(r.id as string) && !haveIds.has(r.id as string))
+    .map(rowToExercise);
+  if (globalAdds.length > 0) {
+    exercises = [...(exercises ?? []), ...globalAdds];
   }
 
   return Response.json({
@@ -184,6 +225,21 @@ async function pull(userId: string, env: Env): Promise<Response> {
     program:   program?.program_json ? JSON.parse(program.program_json) : null,
     exercises,
     plan:      planRow?.plan_json ? JSON.parse(planRow.plan_json) : null,
+    // Layer 1 metadata (admin-curated), kept separate from the user's own
+    // overrides so the client can apply catalog < global < user precedence.
+    globalExerciseMetadata: globalMeta.results
+      .filter(r => !deletedIds.has(r.exercise_id as string))
+      .map(r => ({
+        exerciseId:       r.exercise_id,
+        primaryMuscle:    r.primary_muscle    ?? null,
+        secondaryMuscle1: r.secondary_muscle1 ?? null,
+        secondaryMuscle2: r.secondary_muscle2 ?? null,
+        secondaryMuscle3: r.secondary_muscle3 ?? null,
+        workoutType:      r.workout_type      ?? null,
+        equipment:        r.equipment         ?? null,
+        weightType:       r.weight_type       ?? null,
+      })),
+    role,
   });
 }
 
@@ -286,11 +342,18 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const invalid = validatePush(data);
   if (invalid) return Response.json({ error: invalid }, { status: 400 });
 
-  // Exercise deletions are permanent: union the client's tombstones with the
-  // server's, so no stale library copy — from any device or account — can
-  // resurrect a deleted exercise.
-  const existing = await env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all();
-  const tombstoned = new Set(existing.results.map(r => r.exercise_id as string));
+  // Exercise deletions are permanent but scoped to this user: union the
+  // client's tombstones with the user's own (plus the read-only legacy
+  // app-wide set), so no stale copy from another device can resurrect a
+  // deleted exercise — and no user's deletion touches anyone else.
+  const [existingUser, existingLegacy] = await Promise.all([
+    env.DB.prepare('SELECT exercise_id FROM user_deleted_exercises WHERE user_id = ?').bind(userId).all(),
+    env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
+  ]);
+  const tombstoned = new Set([
+    ...existingUser.results.map(r => r.exercise_id as string),
+    ...existingLegacy.results.map(r => r.exercise_id as string),
+  ]);
   const newTombstones = (data.deletedExerciseIds ?? []).filter(id => !tombstoned.has(id));
   for (const id of newTombstones) tombstoned.add(id);
 
@@ -307,8 +370,8 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
 
   for (const id of newTombstones) {
     stmts.push(env.DB.prepare(
-      'INSERT OR IGNORE INTO deleted_exercises (exercise_id, deleted_at) VALUES (?, ?)',
-    ).bind(id, now));
+      'INSERT OR IGNORE INTO user_deleted_exercises (user_id, exercise_id, deleted_at) VALUES (?, ?, ?)',
+    ).bind(userId, id, now));
   }
   for (const g of newSessionTombs) {
     stmts.push(env.DB.prepare(
@@ -357,32 +420,47 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   // Deleting them here would risk losing history if a client pushed after a
   // failed pull (before ever merging the legacy data).
 
-  // App-wide exercise library: UPSERT each pushed exercise, never delete-and-
-  // replace. A client whose local library is missing an exercise another device
-  // just added (its pull raced that device's push) must not erase it here —
-  // deletion happens exclusively through deleted_exercises tombstones, which
-  // every read filters.
+  // Layer 2: the user's own exercise library. UPSERT each pushed exercise per
+  // user, never delete-and-replace — a client whose local library is missing
+  // an exercise another of this user's devices just added must not erase it.
+  // Deletion happens exclusively through tombstones, which every read filters.
   if (data.exercises) {
     for (const e of data.exercises) {
       if (tombstoned.has(e.id)) continue;
       stmts.push(env.DB.prepare(
-        `INSERT INTO app_exercises (id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
+        `INSERT INTO user_exercises (user_id, id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, id) DO UPDATE SET
            name     = excluded.name,
            sets     = excluded.sets,
            rep_low  = excluded.rep_low,
            rep_high = excluded.rep_high,
            archived = excluded.archived`,
-      ).bind(e.id, e.name, e.sets, e.repLow, e.repHigh, e.archived ? 1 : 0));
+      ).bind(userId, e.id, e.name, e.sets, e.repLow, e.repHigh, e.archived ? 1 : 0));
     }
     // Tombstoned rows may still exist from before this push carried the
     // tombstone — scrub them (reads already filter, this is hygiene).
     for (const id of tombstoned) {
-      stmts.push(env.DB.prepare('DELETE FROM app_exercises WHERE id = ?').bind(id));
+      stmts.push(env.DB.prepare('DELETE FROM user_exercises WHERE user_id = ? AND id = ?').bind(userId, id));
+    }
+
+    // Exercise lifecycle: a custom exercise (timestamped id) enters the review
+    // queue the first time any user pushes it. INSERT OR IGNORE keeps the
+    // first submission; approval/rejection is an admin action (/api/admin).
+    const musclesById = new Map((data.exerciseMuscles ?? []).map(m => [m.exerciseId, m]));
+    const detailsById = new Map((data.exerciseDetails ?? []).map(d => [d.exerciseId, d]));
+    for (const e of data.exercises) {
+      if (tombstoned.has(e.id) || !CUSTOM_ID_RE.test(e.id)) continue;
+      const meta = { ...musclesById.get(e.id), ...detailsById.get(e.id) };
+      stmts.push(env.DB.prepare(
+        `INSERT OR IGNORE INTO pending_exercises (id, name, submitted_by, source, metadata_json, status, created_at)
+         VALUES (?, ?, ?, 'user', ?, 'pending', ?)`,
+      ).bind(e.id, e.name, userId, Object.keys(meta).length > 1 ? JSON.stringify(meta) : null, now));
     }
   }
 
-  // Merge exerciseMuscles + exerciseDetails into one app-wide row per exerciseId
+  // Merge exerciseMuscles + exerciseDetails into one per-user row per
+  // exerciseId — Layer 2 metadata overrides. Editing metadata personalizes the
+  // exercise for this user only; it never touches anyone else's coaching.
   const metaMap = new Map<string, Record<string, unknown>>();
   for (const m of (data.exerciseMuscles ?? [])) {
     metaMap.set(m.exerciseId, { ...metaMap.get(m.exerciseId), ...m });
@@ -396,11 +474,11 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   for (const [exId, m] of metaMap) {
     if (tombstoned.has(exId)) continue;
     stmts.push(env.DB.prepare(
-      `INSERT INTO app_exercise_metadata
-         (exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
+      `INSERT INTO exercise_metadata
+         (exercise_id, user_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
           workout_type, equipment, weight_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(exercise_id) DO UPDATE SET
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(exercise_id, user_id) DO UPDATE SET
          primary_muscle    = excluded.primary_muscle,
          secondary_muscle1 = excluded.secondary_muscle1,
          secondary_muscle2 = excluded.secondary_muscle2,
@@ -410,6 +488,7 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
          weight_type       = excluded.weight_type`,
     ).bind(
       exId,
+      userId,
       (m.primaryMuscle    as string | null) ?? null,
       (m.secondaryMuscle1 as string | null) ?? null,
       (m.secondaryMuscle2 as string | null) ?? null,
@@ -420,7 +499,7 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     ));
   }
   for (const id of tombstoned) {
-    stmts.push(env.DB.prepare('DELETE FROM app_exercise_metadata WHERE exercise_id = ?').bind(id));
+    stmts.push(env.DB.prepare('DELETE FROM exercise_metadata WHERE exercise_id = ? AND user_id = ?').bind(id, userId));
   }
 
   if (data.program && data.exercises) {

@@ -79,6 +79,54 @@ describe('suggestReplacements', () => {
     expect(suggestions.length).toBeGreaterThan(0);
   });
 
+  it('never suggests the same movement twice under different names', () => {
+    // Target a triceps slot: the catalog holds both 'Cable Pushdown' and
+    // 'Tricep Cable Pushdown' — only one may make the shortlist.
+    const tricepsDay: WorkoutDay = {
+      id: 1, label: 'Day 1', muscleGroups: 'Triceps',
+      exercises: [
+        { id: 'overhead-tricep-ext', name: 'Overhead Tricep Extension', sets: 3, repLow: 10, repHigh: 12 },
+      ],
+    };
+    const suggestions = suggestReplacements(tricepsDay.exercises[0], tricepsDay, null, 3, NOW);
+    expect(suggestions.length).toBeGreaterThan(0);
+
+    const tokens = (name: string) => new Set(name.toLowerCase().split(/\s+/));
+    for (let i = 0; i < suggestions.length; i++) {
+      for (let j = i + 1; j < suggestions.length; j++) {
+        const a = tokens(suggestions[i].exercise.name);
+        const b = tokens(suggestions[j].exercise.name);
+        const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+        expect([...small].every(t => large.has(t))).toBe(false);
+      }
+    }
+  });
+
+  it('collapses a library/catalog twin pair into one suggestion, keeping the trained one', () => {
+    // The user's library carries a duplicate of a catalog exercise under a
+    // custom id (how the "Standing Calf Raises twice" bug looked in the wild):
+    // only one may be suggested, and it must be the id the history lives under.
+    localStorage.setItem('liftlog_library_v3', '1');
+    localStorage.setItem('liftlog_exercises', JSON.stringify([
+      { id: 'standing-calf-raises',            name: 'Standing Calf Raises', sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'standing-calf-raises-1780000000000', name: 'Standing Calf Raises', sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'seated-calf-raises',              name: 'Seated Calf Raises',   sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'leg-press-calf-raise',            name: 'Leg Press Calf Raise', sets: 3, repLow: 12, repHigh: 20 },
+    ]));
+    const calfDay: WorkoutDay = {
+      id: 4, label: 'Day 4', muscleGroups: 'Legs',
+      exercises: [{ id: 'leg-press-calf-raise', name: 'Leg Press Calf Raise', sets: 3, repLow: 12, repHigh: 20 }],
+    };
+    // History logged under the custom-id twin
+    const snapshot = makeSnapshot('standing-calf-raises-1780000000000', [100, 95, 90]);
+    const suggestions = suggestReplacements(calfDay.exercises[0], calfDay, snapshot, 3, NOW);
+
+    const standing = suggestions.filter(s => s.exercise.name === 'Standing Calf Raises');
+    expect(standing).toHaveLength(1);
+    expect(standing[0].exercise.id).toBe('standing-calf-raises-1780000000000');
+    expect(standing[0].reasons.join(' ')).toMatch(/trained it before/);
+  });
+
   it('prefers exercises the user has trained before and says so', () => {
     const flyDay: WorkoutDay = {
       id: 1, label: 'Day 1', muscleGroups: 'Chest',

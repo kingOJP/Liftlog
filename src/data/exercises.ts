@@ -207,9 +207,36 @@ function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
   }
 }
 
+// ── Layer 1: admin-curated global metadata (read-only, replaced on pull) ─────
+// Served by the worker from global_exercise_metadata. Sits between the user's
+// own overrides and the compiled-in catalog: catalog < global < user. Kept in
+// a separate key so global improvements keep flowing without ever freezing
+// into (or clobbering) the user's personal overrides.
+
+const GLOBAL_META_KEY = 'liftlog_global_meta';
+
+function loadGlobalMeta(): Record<string, ExerciseMetaOverride> {
+  try {
+    const raw = localStorage.getItem(GLOBAL_META_KEY);
+    const meta = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    for (const o of Object.values(meta)) normalizeOverride(o);
+    return meta;
+  } catch {
+    return {};
+  }
+}
+
+// The server is authoritative for the global layer — whole-document replace.
+export function saveGlobalExerciseMeta(meta: Record<string, ExerciseMetaOverride>): void {
+  localStorage.setItem(GLOBAL_META_KEY, JSON.stringify(meta));
+}
+
 export function getExerciseMeta(id: string): ExerciseMetaOverride {
   const overrides = loadMetaOverrides();
   if (overrides[id]) return overrides[id];
+
+  const globalMeta = loadGlobalMeta();
+  if (globalMeta[id]) return globalMeta[id];
 
   // Fall back to the catalog def, recognising timestamped custom ids whose
   // slug is a catalog exercise (back-extensions-1782… → back-extensions).
@@ -252,4 +279,11 @@ export function mergeExerciseMeta(incoming: Record<string, ExerciseMetaOverride>
   if (Object.keys(incoming).length === 0) return;
   const merged = { ...loadMetaOverrides(), ...incoming };
   localStorage.setItem(META_KEY, JSON.stringify(merged));
+}
+
+// Account switch: metadata overrides are user-owned — wipe them so one
+// account's personalization can't color another's coaching. The global layer
+// is application-owned and survives.
+export function clearExerciseMeta(): void {
+  localStorage.removeItem(META_KEY);
 }

@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { handleAuth } from './auth';
 import { handleSync } from './sync';
+import { handleAdmin } from './admin';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -12,6 +13,9 @@ export default {
       }
       if (url.pathname === '/api/sync') {
         return await handleSync(request, env);
+      }
+      if (url.pathname.startsWith('/api/admin')) {
+        return await handleAdmin(request, env, url);
       }
     } catch (err) {
       const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);

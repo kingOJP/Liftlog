@@ -7,10 +7,13 @@ import { clearDraftSession } from './draftSession';
 import {
   getStoredProgram, saveStoredProgram, clearStoredProgram,
   getExerciseLibrary, saveExerciseLibrary, mergeExerciseLibrary,
-  ensureProgramExercisesInLibrary,
+  ensureProgramExercisesInLibrary, clearExerciseLibraryData,
   getDeletedExerciseIds, addDeletedExerciseIds,
 } from './programStore';
-import { getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta } from './exercises';
+import {
+  getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta,
+  saveGlobalExerciseMeta, clearExerciseMeta,
+} from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
 import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
@@ -105,6 +108,18 @@ export function getLoggedInUser(): SyncUser | null {
   }
 }
 
+// The signed-in account's role ('user' | 'admin' | 'tester'), as reported by
+// the server on every pull. Purely a UI hint — every privileged action is
+// enforced server-side by /api/admin.
+const ROLE_KEY = 'liftlog_role';
+
+export type UserRole = 'user' | 'admin' | 'tester';
+
+export function getUserRole(): UserRole {
+  const r = localStorage.getItem(ROLE_KEY);
+  return r === 'admin' || r === 'tester' ? r : 'user';
+}
+
 // Tracks which account the *local* data belongs to. Without this, signing in
 // with a different account on the same device shows the previous account's
 // workouts — and worse, the startup push uploads them into the new account.
@@ -116,14 +131,18 @@ export async function ensureLocalDataOwner(): Promise<void> {
   const owner = localStorage.getItem(OWNER_KEY);
   if (owner && owner !== user.email) {
     // Account switch: wipe user-scoped data (workout history, program, session
-    // tombstones, training journey, any in-progress draft). App-wide data —
-    // exercise library, metadata, deletion tombstones — and device settings
-    // survive the switch.
+    // tombstones, training journey, drafts — and, under the ownership model,
+    // the exercise library, metadata overrides and deletion tombstones, which
+    // are user-owned too). Application-owned data (the compiled-in catalog,
+    // the pulled global metadata layer) and device settings survive.
     await clearIDB();
     clearStoredProgram();
     clearSessionTombstones();
     clearDraftSession();
     clearPlanState();
+    clearExerciseLibraryData();
+    clearExerciseMeta();
+    localStorage.removeItem(ROLE_KEY);
   }
   localStorage.setItem(OWNER_KEY, user.email);
 }
@@ -190,7 +209,28 @@ export async function pullSync(): Promise<boolean> {
     exerciseDetails:     ExerciseDetailsRow[] | null;
     deletedExerciseIds:  string[]             | null;
     plan?:               PlanState            | null;
+    /** Layer 1: admin-curated global metadata (combined muscles + details rows) */
+    globalExerciseMetadata?: Array<ExerciseMusclesRow & ExerciseDetailsRow> | null;
+    role?:               string               | null;
   };
+
+  if (data.role) localStorage.setItem(ROLE_KEY, data.role);
+
+  // Layer 1 global metadata: server-authoritative, replaced wholesale. Sits
+  // below the user's own overrides in getExerciseMeta precedence.
+  if (data.globalExerciseMetadata) {
+    saveGlobalExerciseMeta(Object.fromEntries(
+      data.globalExerciseMetadata.map(g => [g.exerciseId, {
+        primaryMuscle:    g.primaryMuscle,
+        secondaryMuscle1: g.secondaryMuscle1,
+        secondaryMuscle2: g.secondaryMuscle2,
+        secondaryMuscle3: g.secondaryMuscle3,
+        workoutType:      g.workoutType,
+        equipment:        g.equipment,
+        weightType:       g.weightType,
+      } as ExerciseMetaOverride]),
+    ));
+  }
 
   // Exercise deletions are permanent and app-wide: merge the server's
   // tombstones, then scrub any local trace of the deleted exercises so a stale

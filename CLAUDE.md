@@ -52,6 +52,11 @@ Long-term milestones (roughly):
     deload/recovery weeks override recommendations and pause the set-planner),
     legacy history migrated into an open-ended "Foundation" block, journey
     document synced LWW (D1 `training_plans`)
+19. ✅ Exercise ownership architecture (`docs/ownership-architecture.md`) — exercises
+    split into application-owned (catalog + admin-curated global layer, audited),
+    user-owned (per-user library/metadata/tombstones — one user's edits can never
+    affect another), and workout-instance layers; role system (user/admin/tester);
+    custom-exercise lifecycle (pending queue → admin review → global promotion)
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
@@ -294,7 +299,9 @@ src/
 | `liftlog_exercise_meta` | `exercises.ts` | Per-exercise metadata overrides (muscle, equipment, etc.) |
 | `liftlog_settings` | `settings.ts` | Device-local settings (program start date) |
 | `liftlog_rest_seconds` | `settings.ts` | Rest-timer default duration (pre-Rev-2 key, kept) |
-| `liftlog_deleted_exercises` | `programStore.ts` | Deleted-exercise tombstones (synced app-wide; filtered on every library read) |
+| `liftlog_deleted_exercises` | `programStore.ts` | Deleted-exercise tombstones (user-scoped, synced; filtered on every library read) |
+| `liftlog_global_meta` | `exercises.ts` | Layer-1 admin-curated global exercise metadata (read-only, replaced on every pull) |
+| `liftlog_role` | `sync.ts` | Signed-in account's role (`user`/`admin`/`tester`) from the server — UI hint only |
 | `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
 | `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives; user-scoped, synced LWW) |
@@ -335,9 +342,10 @@ Anything that *analyzes* history (dashboard, metrics, coaching, recommendations,
 
 On app mount, `App.tsx` runs this sequence (only when logged in):
 1. `ensureLocalDataOwner()` — if a *different* account signed in on this device, wipe
-   user-scoped local data (IDB history, program, session tombstones, draft) **before** any
-   sync so one account's data can never be shown to — or pushed into — another account.
-   App-wide exercise data and device settings survive the switch (`liftlog_data_owner`).
+   user-scoped local data (IDB history, program, session tombstones, draft, exercise
+   library, metadata overrides, deleted-exercise tombstones) **before** any sync so one
+   account's data can never be shown to — or pushed into — another account. Application-owned
+   data (global metadata layer) and device settings survive the switch (`liftlog_data_owner`).
 2. `migrateExerciseIds()` + `ensureSessionGuids()` — local IDB fixes, must run **before**
    anything reads logs or the first merge runs
 3. `pullSync()` — merges server data into IDB + localStorage (see below)
@@ -369,21 +377,30 @@ is *merged* into local (server wins per exercise; unsynced local edits survive).
 `pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
 resurrect through sync (the server additionally refuses to store empty session docs).
 
-**Per-user vs app-wide on the server (D1):** session docs, tombstones and the program are
-per-user (`user_id`-keyed). The exercise library and its metadata are **app-wide** — global
-`app_exercises` / `app_exercise_metadata` tables shared by every account (the per-user
-`exercise_metadata` table and `user_programs.exercises_json` remain only as legacy pull
-fallbacks). **Library and metadata sync are merge-based, never replace**: the worker upserts
-per exercise on push (no `DELETE FROM app_exercises`) and the client merges on pull
-(`mergeExerciseLibrary` — incoming wins per id, local-only entries survive), so a background
-pull racing an unpushed library write, or a stale device's push, can no longer silently delete
-a custom exercise — only tombstones delete. `ensureProgramExercisesInLibrary` (end of every
-pull) rebuilds any library entry the program references but the library lost, and
-`getExerciseName` humanizes orphaned timestamped ids (`jefferson-split-squats-1782…` →
-"Jefferson Split Squats") as a last-resort display fallback. Exercise deletion writes a tombstone (`deleted_exercises` server table,
-`liftlog_deleted_exercises` locally, synced both ways); tombstoned IDs are filtered from every
-library read, sync push/pull, and the default-library rebuild, so a deleted exercise stays
-deleted no matter which device or account pushes a stale copy.
+**Ownership on the server (D1)** — full design in `docs/ownership-architecture.md`.
+Exercises live in three owned layers. **Layer 1 (application-owned):** the compiled-in
+catalog (`exercises.ts`) plus admin-curated `global_exercises`/`global_exercise_metadata`,
+served to every user on pull and written only through the audited `/api/admin` API
+(`worker/admin.ts`; every change requires a reason and lands in `global_exercise_audit`).
+**Layer 2 (user-owned):** `user_exercises` (the user's library), per-user `exercise_metadata`
+rows (metadata overrides) and `user_deleted_exercises` (per-user tombstones) — all
+`user_id`-keyed like session docs and the program, so nothing a user creates, edits or
+deletes can affect another account. **Layer 3:** workout instances (program slots + session
+docs, unchanged). Client metadata precedence: catalog < global (`liftlog_global_meta`,
+replaced wholesale on every pull) < user override (`liftlog_exercise_meta`).
+The pre-ownership app-wide tables (`app_exercises`/`app_exercise_metadata`/
+`deleted_exercises`) are read-only legacy fallbacks: a user with no per-user rows adopts them
+on pull, the startup push then snapshots their copy per-user, and legacy global tombstones
+stay honored for everyone. **Library and metadata sync remain merge-based, never replace**:
+the worker upserts per exercise per user on push and the client merges on pull
+(`mergeExerciseLibrary` — incoming wins per id, local-only entries survive); only tombstones
+delete. `ensureProgramExercisesInLibrary` (end of every pull) rebuilds any library entry the
+program references but the library lost, and `getExerciseName` humanizes orphaned timestamped
+ids as a last-resort display fallback. **Lifecycle:** custom exercises (timestamped ids) are
+queued into `pending_exercises` on push; admins review via `/api/admin/pending`, and approval
+promotes into the global layer. **Roles:** `user_roles` table (`user`/`admin`/`tester`,
+absent = user), resolved server-side (`worker/roles.ts`), enforced on `/api/admin`, reported
+on pull and cached in `liftlog_role` as a UI hint only.
 
 ---
 
