@@ -102,6 +102,31 @@ describe('suggestReplacements', () => {
     }
   });
 
+  it('collapses a library/catalog twin pair into one suggestion, keeping the trained one', () => {
+    // The user's library carries a duplicate of a catalog exercise under a
+    // custom id (how the "Standing Calf Raises twice" bug looked in the wild):
+    // only one may be suggested, and it must be the id the history lives under.
+    localStorage.setItem('liftlog_library_v3', '1');
+    localStorage.setItem('liftlog_exercises', JSON.stringify([
+      { id: 'standing-calf-raises',            name: 'Standing Calf Raises', sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'standing-calf-raises-1780000000000', name: 'Standing Calf Raises', sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'seated-calf-raises',              name: 'Seated Calf Raises',   sets: 3, repLow: 12, repHigh: 20 },
+      { id: 'leg-press-calf-raise',            name: 'Leg Press Calf Raise', sets: 3, repLow: 12, repHigh: 20 },
+    ]));
+    const calfDay: WorkoutDay = {
+      id: 4, label: 'Day 4', muscleGroups: 'Legs',
+      exercises: [{ id: 'leg-press-calf-raise', name: 'Leg Press Calf Raise', sets: 3, repLow: 12, repHigh: 20 }],
+    };
+    // History logged under the custom-id twin
+    const snapshot = makeSnapshot('standing-calf-raises-1780000000000', [100, 95, 90]);
+    const suggestions = suggestReplacements(calfDay.exercises[0], calfDay, snapshot, 3, NOW);
+
+    const standing = suggestions.filter(s => s.exercise.name === 'Standing Calf Raises');
+    expect(standing).toHaveLength(1);
+    expect(standing[0].exercise.id).toBe('standing-calf-raises-1780000000000');
+    expect(standing[0].reasons.join(' ')).toMatch(/trained it before/);
+  });
+
   it('prefers exercises the user has trained before and says so', () => {
     const flyDay: WorkoutDay = {
       id: 1, label: 'Day 1', muscleGroups: 'Chest',
