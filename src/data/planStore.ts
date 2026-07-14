@@ -17,8 +17,8 @@ import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { loadTrainingSnapshot } from './analytics';
 import type { TrainingSnapshot } from './analytics';
-import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan } from './plan';
-import { blockAnchor, currentPhase, generatePlanId, goalLabel, nextMonday, toPlanDate } from './plan';
+import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, TrainingProfile } from './plan';
+import { blockAnchor, currentPhase, defaultTrainingProfile, generatePlanId, goalLabel, nextMonday, toPlanDate } from './plan';
 import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
 
@@ -39,6 +39,8 @@ export interface PlanState {
   /** every plan, oldest first; at most one with status 'active' */
   plans: TrainingPlan[];
   pendingActivation?: PendingActivation;
+  /** the athlete profile (Tier 1/2 onboarding inputs) — rides the same LWW sync */
+  profile?: TrainingProfile;
   updatedAt: number;
 }
 
@@ -66,6 +68,29 @@ function savePlanState(state: PlanState): void {
 
 export function clearPlanState(): void {
   localStorage.removeItem(PLAN_KEY);
+}
+
+// ── Training profile ──────────────────────────────────────────────────────────
+
+/** The stored profile, or null when the user hasn't onboarded yet. */
+export function getTrainingProfile(): TrainingProfile | null {
+  return getPlanState().profile ?? null;
+}
+
+/** The profile to plan with — stored if present, else sane defaults. */
+export function getProfileOrDefault(): TrainingProfile {
+  return getPlanState().profile ?? defaultTrainingProfile();
+}
+
+export function hasOnboarded(): boolean {
+  return getPlanState().profile != null;
+}
+
+export function saveTrainingProfile(profile: TrainingProfile, now = Date.now()): void {
+  const state = getPlanState();
+  state.profile = { ...profile, updatedAt: now };
+  state.updatedAt = now;
+  savePlanState(state);
 }
 
 // ── Readers ───────────────────────────────────────────────────────────────────

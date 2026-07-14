@@ -33,7 +33,8 @@ import {
   sessionTimestamp,
 } from './analytics';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, catalogDefFor, getExerciseMeta } from './exercises';
+import { EXERCISES, EXERCISE_MAP, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor } from './exercises';
+import type { ExerciseDifficulty } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
 // ── Exercise profiles ─────────────────────────────────────────────────────────
@@ -52,6 +53,10 @@ export interface ExerciseProfile {
   equipment: Equipment | null;
   weightType: WeightType | null;
   mechanics: Mechanics;
+  /** intrinsic skill/risk tier (exercises.ts) — drives beginner-safe selection */
+  difficulty: ExerciseDifficulty;
+  /** exercise ids that should be trained before this one (advanced lifts) */
+  prerequisites: string[];
 }
 
 // Multi-joint movement patterns — used to derive compound/isolation rather
@@ -95,6 +100,8 @@ export function profileFor(id: string, fallbackName?: string): ExerciseProfile {
     equipment,
     weightType,
     mechanics: workoutType && COMPOUND_PATTERNS.has(workoutType) ? 'compound' : 'isolation',
+    difficulty: difficultyFor(id),
+    prerequisites: prerequisitesFor(id),
   };
 }
 

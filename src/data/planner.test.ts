@@ -22,6 +22,7 @@ function input(overrides: Partial<PlannerInput> = {}): PlannerInput {
     openWithRecovery: false,
     startDate: '2026-07-06',
     notes: '',
+    experience: 'intermediate',
     ...overrides,
   };
 }
@@ -174,5 +175,66 @@ describe('parseGuidance', () => {
 
   it('stays silent on empty notes', () => {
     expect(parseGuidance('  ').notes).toHaveLength(0);
+  });
+});
+
+describe('experience-aware planning', () => {
+  const flat = (id: string) => EXERCISE_MAP.get(id);
+
+  it('never programs sub-6 rep ranges for a beginner', () => {
+    const p = buildPlanProposal(input({ experience: 'beginner', goal: 'strength', daysPerWeek: 3 }), [], null);
+    for (const day of p.days) {
+      for (const ex of day.exercises) {
+        expect(ex.repLow).toBeGreaterThanOrEqual(8);
+      }
+    }
+  });
+
+  it('keeps a beginner off skill-heavy advanced lifts they have not earned', () => {
+    const p = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 3 }), [], null);
+    const ids = new Set(p.days.flatMap(d => d.exercises.map(e => e.id)));
+    expect(ids.has('conventional-deadlift')).toBe(false);
+    expect(ids.has('barbell-back-squat')).toBe(false);
+    // ...and fills quad/hamstring slots with beginner-appropriate movements
+    const legIds = [...ids].filter(id => flat(id)?.primaryMuscle === 'Quads');
+    expect(legIds.length).toBeGreaterThan(0);
+  });
+
+  it('lets an advanced lifter get the barbell compounds', () => {
+    const p = buildPlanProposal(input({ experience: 'advanced', daysPerWeek: 4 }), [], null);
+    const ids = new Set(p.days.flatMap(d => d.exercises.map(e => e.id)));
+    // A barbell squat or deadlift should appear somewhere for an advanced plan
+    expect(ids.has('barbell-back-squat') || ids.has('conventional-deadlift')).toBe(true);
+  });
+
+  it('caps a beginner at a full-body/upper-lower split and warns on high frequency', () => {
+    const p = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 6 }), [], null);
+    expect(p.days.length).toBeLessThanOrEqual(4);
+    expect(p.warnings.some(w => /beginner/i.test(w))).toBe(true);
+  });
+
+  it('gives lower total weekly volume to a beginner than an advanced lifter', () => {
+    const beginner = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 3 }), [], null);
+    const advanced = buildPlanProposal(input({ experience: 'advanced', daysPerWeek: 3 }), [], null);
+    const totalSets = (p: typeof beginner) => p.days.flatMap(d => d.exercises).reduce((s, e) => s + e.sets, 0);
+    expect(totalSets(beginner)).toBeLessThan(totalSets(advanced));
+  });
+
+  it('biases extra volume toward flagged priority muscles', () => {
+    const base = buildPlanProposal(input({ daysPerWeek: 3 }), [], null);
+    const primed = buildPlanProposal(input({ daysPerWeek: 3, priorityMuscles: ['Chest'] }), [], null);
+    const chestSets = (p: typeof base) => p.days.flatMap(d => d.exercises)
+      .filter(e => EXERCISE_MAP.get(e.id)?.primaryMuscle === 'Chest')
+      .reduce((s, e) => s + e.sets, 0);
+    expect(chestSets(primed)).toBe(chestSets(base) + 1);
+  });
+
+  it('honors structured dumbbells-only equipment access', () => {
+    const p = buildPlanProposal(input({ equipmentAccess: 'dumbbells-only', daysPerWeek: 3 }), [], null);
+    for (const ex of p.days.flatMap(d => d.exercises)) {
+      const wt = EXERCISE_MAP.get(ex.id)?.weightType;
+      expect(wt === 'Barbell' || wt === 'Machine').toBe(false);
+    }
+    expect(p.guidanceNotes.some(n => /dumbbell/i.test(n))).toBe(true);
   });
 });

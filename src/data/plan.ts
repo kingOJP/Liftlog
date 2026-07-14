@@ -38,6 +38,73 @@ export function goalLabel(goal: Goal): string {
   return GOALS.find(g => g.id === goal)?.label ?? goal;
 }
 
+// ── Training profile (the athlete, not the plan) ──────────────────────────────
+// Everything the coach needs to know about *the person* to design a safe,
+// appropriate plan — collected once at onboarding, pre-filled on every replan,
+// and refined from logged data over time. Split into the tiers the request
+// laid out: hard constraints that directly gate exercise selection, and
+// calibration inputs that tune volume, loading and movement choice.
+
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export const EXPERIENCE_LEVELS: { id: ExperienceLevel; label: string; blurb: string }[] = [
+  { id: 'beginner',     label: 'Beginner',     blurb: 'New to lifting, or back after a long time off — learning the movements' },
+  { id: 'intermediate', label: 'Intermediate', blurb: 'A year or two of consistent training — the big lifts feel familiar' },
+  { id: 'advanced',     label: 'Advanced',     blurb: 'Years under the bar — you know your body and progress is hard-won' },
+];
+
+export function experienceLabel(x: ExperienceLevel): string {
+  return EXPERIENCE_LEVELS.find(e => e.id === x)?.label ?? x;
+}
+
+export type EquipmentAccess = 'full-gym' | 'home-rack' | 'dumbbells-only' | 'minimal';
+
+export const EQUIPMENT_ACCESS: { id: EquipmentAccess; label: string; blurb: string }[] = [
+  { id: 'full-gym',       label: 'Full gym',        blurb: 'Barbells, machines, cables, dumbbells — the works' },
+  { id: 'home-rack',      label: 'Home gym',        blurb: 'A rack, barbell and some plates; maybe a few dumbbells' },
+  { id: 'dumbbells-only', label: 'Dumbbells only',  blurb: 'A pair (or a set) of dumbbells and a bench' },
+  { id: 'minimal',        label: 'Minimal / bands', blurb: 'Bodyweight, bands, the odd dumbbell — travel or home light' },
+];
+
+export type CardioLevel = 'none' | 'light' | 'moderate' | 'high';
+
+export const CARDIO_LEVELS: { id: CardioLevel; label: string; blurb: string }[] = [
+  { id: 'none',     label: 'Little to none', blurb: 'Lifting is basically all of it' },
+  { id: 'light',    label: 'Light',          blurb: 'A walk or easy session or two a week' },
+  { id: 'moderate', label: 'Moderate',       blurb: 'A few real cardio or sport sessions a week' },
+  { id: 'high',     label: 'High',           blurb: 'Endurance training or a demanding sport on top of lifting' },
+];
+
+export interface TrainingProfile {
+  // ── Tier 1: hard constraints (gate exercise selection) ──
+  /** free-text injuries / limitations, parsed conservatively by the planner */
+  injuries: string;
+  equipment: EquipmentAccess;
+  daysPerWeek: number;
+  /** optional: which weekdays (0=Sun…6=Sat) the user can train */
+  preferredDays?: number[];
+  // ── Tier 2: calibration ──
+  /** self-reported at onboarding; the effective level maxes this with inference */
+  experience: ExperienceLevel;
+  trainingAgeMonths?: number;
+  /** weak points / muscles to bias volume toward */
+  priorityMuscles: MuscleGroup[];
+  cardioLevel: CardioLevel;
+  updatedAt: number;
+}
+
+export function defaultTrainingProfile(): TrainingProfile {
+  return {
+    injuries: '',
+    equipment: 'full-gym',
+    daysPerWeek: 3,
+    experience: 'beginner',
+    priorityMuscles: [],
+    cardioLevel: 'light',
+    updatedAt: 0,
+  };
+}
+
 // ── Phases ────────────────────────────────────────────────────────────────────
 
 export type PhaseKind = 'recovery' | 'accumulation' | 'intensification' | 'peak' | 'deload';

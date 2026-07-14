@@ -107,9 +107,14 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
 
   // Content height changes without a scroll event (sets logged, banners
   // dismissed, coach adjustments loaded) — re-check whether we're at the bottom.
+  // Deferred to a frame so the measurement reads the committed layout (and so
+  // it isn't a synchronous setState during the effect's commit).
   useEffect(() => {
-    const doc = document.documentElement;
-    setAtBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - 24);
+    const raf = requestAnimationFrame(() => {
+      const doc = document.documentElement;
+      setAtBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - 24);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [sets, effectiveDay, planDismissed, restRunId, loading]);
 
   // Stamp the time of the most recent set activity — completedAt uses it so

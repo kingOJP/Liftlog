@@ -18,9 +18,14 @@ import {
   getLatestRetrospective,
   getPendingActivation,
   getPlanState,
+  getProfileOrDefault,
+  getTrainingProfile,
+  hasOnboarded,
   mergeServerPlanState,
+  saveTrainingProfile,
   startPendingActivation,
 } from './planStore';
+import { defaultTrainingProfile } from './plan';
 
 beforeEach(() => localStorage.clear());
 
@@ -33,7 +38,7 @@ function makeProposal(overrides: Partial<PlanProposal['input']> = {}): PlanPropo
   return {
     input: {
       goal: 'hypertrophy', daysPerWeek: 1, weeks: 4, includeDeload: true,
-      openWithRecovery: false, startDate: '2026-06-01', notes: '',
+      openWithRecovery: false, startDate: '2026-06-01', notes: '', experience: 'intermediate',
       ...overrides,
     },
     confidence: { level: 'low', sessions: 0, detail: '' },
@@ -227,5 +232,35 @@ describe('mergeServerPlanState', () => {
     expect(mergeServerPlanState(null)).toBe(false);
     expect(mergeServerPlanState({ version: 2, plans: [], updatedAt: 1 })).toBe(false);
     expect(mergeServerPlanState({ version: 1, plans: 'junk', updatedAt: 1 })).toBe(false);
+  });
+});
+
+describe('training profile persistence', () => {
+  it('reports not-onboarded until a profile is saved, then persists it', () => {
+    expect(hasOnboarded()).toBe(false);
+    expect(getTrainingProfile()).toBeNull();
+    expect(getProfileOrDefault().experience).toBe('beginner'); // sane default
+
+    const p = { ...defaultTrainingProfile(), experience: 'intermediate' as const, daysPerWeek: 4, equipment: 'home-rack' as const, priorityMuscles: ['Chest' as const] };
+    saveTrainingProfile(p, 5000);
+
+    expect(hasOnboarded()).toBe(true);
+    const stored = getTrainingProfile()!;
+    expect(stored.experience).toBe('intermediate');
+    expect(stored.daysPerWeek).toBe(4);
+    expect(stored.equipment).toBe('home-rack');
+    expect(stored.priorityMuscles).toEqual(['Chest']);
+    expect(stored.updatedAt).toBe(5000);
+    // bumps the document clock so it syncs
+    expect(getPlanState().updatedAt).toBe(5000);
+  });
+
+  it('survives round-trips through the whole-document sync merge', () => {
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'advanced' }, 1000);
+    const doc = getPlanState();
+    localStorage.clear();
+    // a newer server document (carrying the profile) replaces local
+    expect(mergeServerPlanState({ ...doc, updatedAt: 2000 })).toBe(true);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
   });
 });

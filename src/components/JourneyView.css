@@ -317,3 +317,15 @@
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* ── Experience-level nudge ── */
+.journey-nudge {
+  border-color: var(--purple-dim, rgba(124, 114, 232, 0.4));
+  background: linear-gradient(135deg, rgba(124, 114, 232, 0.12), rgba(124, 114, 232, 0.03));
+}
+.journey-nudge-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+}

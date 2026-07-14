@@ -152,6 +152,74 @@ export function catalogDefFor(id: string): ExerciseDef | null {
   return base !== id ? (EXERCISE_MAP.get(base) ?? null) : null;
 }
 
+// ── Exercise difficulty + prerequisites ───────────────────────────────────────
+// Difficulty is an *intrinsic* property of the movement (skill demand + injury
+// risk), so it lives here in the app-owned catalog, not in the user-editable
+// metadata layer — it's compiled in and never synced. It drives beginner-safe
+// exercise selection in the planner: a novice is steered toward low-skill
+// machine/dumbbell work; skill-heavy barbell lifts are gated behind their
+// prerequisites (train the RDL before the pull deadlift).
+
+export type ExerciseDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
+export const DIFFICULTY_RANK: Record<ExerciseDifficulty, number> = {
+  beginner: 0, intermediate: 1, advanced: 2,
+};
+
+// Only exceptions to the default (intermediate) are listed. Beginner = machine
+// or supported movements a first-timer can load safely on day one; advanced =
+// free-weight lifts that reward a technique base and punish a missing one.
+const DIFFICULTY: Record<string, ExerciseDifficulty> = {
+  // Beginner — machines, cables, supported & low-skill free weights
+  'cable-fly': 'beginner', 'machine-chest-press': 'beginner', 'pec-deck-fly': 'beginner',
+  'dumbbell-fly': 'beginner', 'push-ups': 'beginner',
+  'seated-db-overhead-press': 'beginner', 'machine-shoulder-press': 'beginner',
+  'cable-lateral-raises': 'beginner', 'dumbbell-lateral-raises': 'beginner',
+  'machine-lateral-raise': 'beginner', 'reverse-pec-deck': 'beginner',
+  'dumbbell-rear-delt-fly': 'beginner', 'face-pulls': 'beginner',
+  'barbell-shrugs': 'beginner', 'dumbbell-shrugs': 'beginner',
+  'seated-cable-row': 'beginner', 'chest-supported-row': 'beginner',
+  'lat-pull-down': 'beginner', 'straight-arm-pulldowns': 'beginner',
+  'back-extensions': 'beginner',
+  'overhead-tricep-ext': 'beginner', 'tricep-cable-pushdown': 'beginner',
+  'cable-pushdown': 'beginner', 'cable-kick-backs': 'beginner',
+  'incline-db-curls': 'beginner', 'hammer-curls': 'beginner', 'reverse-curls': 'beginner',
+  'cable-curls': 'beginner', 'preacher-curls': 'beginner', 'wrist-curls': 'beginner',
+  'leg-press': 'beginner', 'leg-extension': 'beginner',
+  'seated-leg-curl': 'beginner', 'lying-leg-curl': 'beginner',
+  'hack-squat': 'beginner', 'smith-machine-squat': 'beginner', 'goblet-squat': 'beginner',
+  'leg-press-calf-raise': 'beginner', 'seated-calf-raises': 'beginner',
+  'standing-calf-raises': 'beginner', 'cable-pull-through': 'beginner',
+  'machine-crunch': 'beginner', 'cable-crunch': 'beginner',
+
+  // Advanced — high skill / high axial load / gated behind prerequisites
+  'conventional-deadlift': 'advanced', 'barbell-back-squat': 'advanced',
+  'weighted-pull-ups': 'advanced', 'good-mornings': 'advanced',
+  'hanging-leg-raise': 'advanced',
+  // everything else (barbell/dumbbell pressing, rows, RDLs, hip thrusts,
+  // dips, chin-ups, lunges) defaults to intermediate
+};
+
+// Advanced lifts a novice should earn: at least one prerequisite trained (or
+// an intermediate+ profile) before the planner will program them.
+const PREREQUISITES: Record<string, string[]> = {
+  'conventional-deadlift': ['romanian-deadlifts', 'dumbbell-rdl'],
+  'barbell-back-squat':    ['goblet-squat', 'leg-press', 'hack-squat'],
+  'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],
+  'good-mornings':         ['romanian-deadlifts', 'dumbbell-rdl'],
+  'hanging-leg-raise':     ['machine-crunch', 'cable-crunch'],
+};
+
+export function difficultyFor(id: string): ExerciseDifficulty {
+  const def = catalogDefFor(id);
+  return (def && DIFFICULTY[def.id]) ?? 'intermediate';
+}
+
+export function prerequisitesFor(id: string): string[] {
+  const def = catalogDefFor(id);
+  return (def && PREREQUISITES[def.id]) ?? [];
+}
+
 // ── Per-exercise metadata overrides (user edits stored in localStorage) ───────
 
 const META_KEY = 'liftlog_exercise_meta';
