@@ -150,6 +150,41 @@ export function completeActiveBlock(
   }
   state.updatedAt = now;
   savePlanState(state);
+  // Between blocks, weeks count from when the last block ended — the anchor
+  // is managed automatically (no user-facing setting).
+  if (block) saveProgramStart(toPlanDate(new Date(now)));
+}
+
+/**
+ * Keep the (device-local) week-numbering anchor consistent with the (synced)
+ * journey document: an active block anchors weeks at its start; between
+ * blocks, at the last block's end. Fixes cross-device drift — activation only
+ * ran saveProgramStart on the activating device — and replaces the manual
+ * "training block start" setting. Returns true when the anchor moved.
+ */
+export function ensureWeekAnchor(): boolean {
+  const state = getPlanState();
+  const active = state.plans
+    .find(p => p.status === 'active')?.blocks.find(b => b.status === 'active');
+
+  let desired: string | null = null;
+  if (active) {
+    desired = active.startDate;
+  } else {
+    let lastEnd = 0;
+    for (const plan of state.plans) {
+      for (const block of plan.blocks) {
+        if (block.status === 'completed' && (block.completedAt ?? 0) > lastEnd) {
+          lastEnd = block.completedAt!;
+        }
+      }
+    }
+    if (lastEnd > 0) desired = toPlanDate(new Date(lastEnd));
+  }
+
+  if (!desired || getProgramStartValue() === desired) return false;
+  saveProgramStart(desired);
+  return true;
 }
 
 /**

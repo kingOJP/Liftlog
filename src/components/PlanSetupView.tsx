@@ -4,11 +4,11 @@ import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import type { MuscleGroup } from '../data/taxonomy';
 import {
-  GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS, CARDIO_LEVELS,
+  GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS,
   nextMonday, parsePlanDate, experienceLabel,
 } from '../data/plan';
 import type {
-  Goal, ExperienceLevel, EquipmentAccess, CardioLevel, TrainingProfile,
+  Goal, ExperienceLevel, EquipmentAccess, TrainingProfile,
 } from '../data/plan';
 import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
@@ -33,19 +33,18 @@ interface Props {
 // are interleaved by conversational flow, not grouped by tier — the user just
 // answers a short series of quick taps.
 type QId =
-  | 'goal' | 'experience' | 'trainingAge' | 'days' | 'whichDays'
-  | 'equipment' | 'injuries' | 'priority' | 'cardio' | 'schedule' | 'startDate';
+  | 'goal' | 'experience' | 'trainingAge' | 'days'
+  | 'equipment' | 'injuries' | 'priority' | 'schedule' | 'startDate';
 
 const QUESTION_ORDER: QId[] = [
-  'goal', 'experience', 'trainingAge', 'days', 'whichDays',
-  'equipment', 'injuries', 'priority', 'cardio', 'schedule', 'startDate',
+  'goal', 'experience', 'trainingAge', 'days',
+  'equipment', 'injuries', 'priority', 'schedule', 'startDate',
 ];
 
 type Stage = 'questions' | 'structure' | 'workouts';
 
 const WEEK_OPTIONS = [4, 5, 6, 8];
 const DAY_OPTIONS = [2, 3, 4, 5, 6];
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; // value = index+1 mod 7 handled below
 
 const TRAINING_AGE_OPTIONS: { label: string; months: number }[] = [
   { label: 'Just starting', months: 0 },
@@ -87,11 +86,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [experience, setExperience] = useState<ExperienceLevel>(saved.experience);
   const [trainingAgeMonths, setTrainingAgeMonths] = useState<number | undefined>(saved.trainingAgeMonths);
   const [daysPerWeek, setDaysPerWeek] = useState(saved.daysPerWeek);
-  const [preferredDays, setPreferredDays] = useState<number[]>(saved.preferredDays ?? []);
   const [equipment, setEquipment] = useState<EquipmentAccess>(saved.equipment);
   const [injuries, setInjuries] = useState(saved.injuries);
   const [priorityMuscles, setPriorityMuscles] = useState<MuscleGroup[]>(saved.priorityMuscles);
-  const [cardioLevel, setCardioLevel] = useState<CardioLevel>(saved.cardioLevel);
   const [weeks, setWeeks] = useState(defaultBlockWeeks());
   const [includeDeload, setIncludeDeload] = useState(saved.experience !== 'beginner');
   const [startDate, setStartDate] = useState(nextMonday());
@@ -163,11 +160,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       injuries: injuries.trim(),
       equipment,
       daysPerWeek,
-      preferredDays: preferredDays.length > 0 ? [...preferredDays].sort((a, b) => a - b) : undefined,
       experience,
       trainingAgeMonths,
       priorityMuscles,
-      cardioLevel,
       updatedAt: Date.now(),
     };
   }
@@ -241,9 +236,6 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     return suggestReplacements(ex, day, snapshot, 5).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
   }
 
-  function toggleDay(value: number) {
-    setPreferredDays(prev => prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]);
-  }
   function togglePriority(muscles: MuscleGroup[]) {
     setPriorityMuscles(prev => {
       const has = muscles.every(m => prev.includes(m));
@@ -254,7 +246,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   // ── Questions stage ───────────────────────────────────────────────────────────
   if (stage === 'questions') {
     const progress = ((qIndex + 1) / QUESTION_ORDER.length) * 100;
-    const optional = qId === 'trainingAge' || qId === 'whichDays' || qId === 'injuries' || qId === 'priority';
+    const optional = qId === 'trainingAge' || qId === 'injuries' || qId === 'priority';
 
     return (
       <div className="plan-setup">
@@ -447,7 +439,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   // ── Question rendering ────────────────────────────────────────────────────────
   function needsContinue(id: QId): boolean {
     // Single-select questions auto-advance; these need an explicit Continue.
-    return id === 'whichDays' || id === 'injuries' || id === 'priority'
+    return id === 'injuries' || id === 'priority'
       || id === 'schedule' || id === 'startDate';
   }
   function canContinue(): boolean {
@@ -518,24 +510,6 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
           </Question>
         );
 
-      case 'whichDays':
-        return (
-          <Question title="Which days work best?" subtitle="Optional — helps space your sessions. Tap the days you train." optional>
-            <div className="chip-grid">
-              {WEEKDAYS.map((label, i) => {
-                const value = i + 1; // Mon=1 … Sun=7 (7 == Sunday)
-                return (
-                  <button key={value}
-                    className={`setup-chip${preferredDays.includes(value) ? ' setup-chip--active' : ''}`}
-                    onClick={() => toggleDay(value)}>
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </Question>
-        );
-
       case 'equipment':
         return (
           <Question title="What can you train with?" subtitle="Every exercise picked will fit what you've got.">
@@ -577,18 +551,6 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                   </button>
                 );
               })}
-            </div>
-          </Question>
-        );
-
-      case 'cardio':
-        return (
-          <Question title="How much cardio or sport do you do?" subtitle="Outside activity eats into recovery — the coach accounts for it.">
-            <div className="opt-list">
-              {CARDIO_LEVELS.map(c => (
-                <OptionCard key={c.id} active={cardioLevel === c.id} label={c.label} blurb={c.blurb}
-                  onClick={() => pick(setCardioLevel, c.id)} />
-              ))}
             </div>
           </Question>
         );

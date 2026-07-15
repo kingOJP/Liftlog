@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { getWeekNumber } from '../data/program';
 import {
-  getProgramStartValue, saveProgramStart,
   getRestDuration, saveRestDuration, REST_PRESETS,
 } from '../data/settings';
 import type { SyncUser } from '../data/sync';
@@ -13,15 +11,7 @@ interface Props {
 }
 
 export default function SettingsView({ user, onBack }: Props) {
-  const [programStart, setProgramStart] = useState(getProgramStartValue);
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
-  const [startError, setStartError] = useState(false);
-
-  function handleStartChange(value: string) {
-    setProgramStart(value);
-    const ok = saveProgramStart(value);
-    setStartError(!ok);
-  }
 
   function handleRestChange(seconds: number) {
     setRestSeconds(seconds);
@@ -36,23 +26,6 @@ export default function SettingsView({ user, onBack }: Props) {
       </header>
 
       <div className="settings-body">
-        <section className="settings-section">
-          <span className="settings-label">Training block start</span>
-          <input
-            className="settings-date-input"
-            type="date"
-            value={programStart}
-            onChange={e => handleStartChange(e.target.value)}
-            aria-invalid={startError}
-          />
-          {startError
-            ? <p className="settings-hint settings-hint--error">Pick a valid date.</p>
-            : <p className="settings-hint">
-                Week numbering counts from this date — you're in week {getWeekNumber()}.
-                Changing it only affects how new workouts are grouped into weeks.
-              </p>}
-        </section>
-
         <section className="settings-section">
           <span className="settings-label">Default rest timer</span>
           <div className="settings-rest-presets">

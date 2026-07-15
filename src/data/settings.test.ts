@@ -1,20 +1,33 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  getProgramStartValue, saveProgramStart, DEFAULT_PROGRAM_START,
+  getProgramStartValue, saveProgramStart,
   getRestDuration, saveRestDuration, DEFAULT_REST_SECONDS,
 } from './settings';
 import { getWeekNumberForDate } from './program';
 
 beforeEach(() => localStorage.clear());
 
-describe('program start setting', () => {
-  it('falls back to the default when unset or corrupt', () => {
-    expect(getProgramStartValue()).toBe(DEFAULT_PROGRAM_START);
-    localStorage.setItem('liftlog_settings', 'not json');
-    expect(getProgramStartValue()).toBe(DEFAULT_PROGRAM_START);
+// yyyy-mm-dd of "today" in local time, matching the first-use stamp
+function todayValue(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+describe('program start (week anchor)', () => {
+  it('stamps first use of the app when nothing is stored, then stays stable', () => {
+    expect(getProgramStartValue()).toBe(todayValue());
+    // The stamp persists — subsequent reads return the same anchor
+    expect(JSON.parse(localStorage.getItem('liftlog_settings')!).programStart).toBe(todayValue());
+    expect(getProgramStartValue()).toBe(todayValue());
   });
 
-  it('round-trips a saved date', () => {
+  it('stamps today when the stored settings are corrupt', () => {
+    localStorage.setItem('liftlog_settings', 'not json');
+    expect(getProgramStartValue()).toBe(todayValue());
+  });
+
+  it('round-trips a saved date (written by block activation)', () => {
     expect(saveProgramStart('2026-01-05')).toBe(true);
     expect(getProgramStartValue()).toBe('2026-01-05');
   });
@@ -22,7 +35,6 @@ describe('program start setting', () => {
   it('rejects invalid dates', () => {
     expect(saveProgramStart('garbage')).toBe(false);
     expect(saveProgramStart('2026-13-40')).toBe(false);
-    expect(getProgramStartValue()).toBe(DEFAULT_PROGRAM_START);
   });
 });
 

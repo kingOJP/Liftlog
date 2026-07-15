@@ -66,30 +66,18 @@ export const EQUIPMENT_ACCESS: { id: EquipmentAccess; label: string; blurb: stri
   { id: 'minimal',        label: 'Minimal / bands', blurb: 'Bodyweight, bands, the odd dumbbell — travel or home light' },
 ];
 
-export type CardioLevel = 'none' | 'light' | 'moderate' | 'high';
-
-export const CARDIO_LEVELS: { id: CardioLevel; label: string; blurb: string }[] = [
-  { id: 'none',     label: 'Little to none', blurb: 'Lifting is basically all of it' },
-  { id: 'light',    label: 'Light',          blurb: 'A walk or easy session or two a week' },
-  { id: 'moderate', label: 'Moderate',       blurb: 'A few real cardio or sport sessions a week' },
-  { id: 'high',     label: 'High',           blurb: 'Endurance training or a demanding sport on top of lifting' },
-];
-
 export interface TrainingProfile {
   // ── Tier 1: hard constraints (gate exercise selection) ──
   /** free-text injuries / limitations, parsed conservatively by the planner */
   injuries: string;
   equipment: EquipmentAccess;
   daysPerWeek: number;
-  /** optional: which weekdays (0=Sun…6=Sat) the user can train */
-  preferredDays?: number[];
   // ── Tier 2: calibration ──
   /** self-reported at onboarding; the effective level maxes this with inference */
   experience: ExperienceLevel;
   trainingAgeMonths?: number;
   /** weak points / muscles to bias volume toward */
   priorityMuscles: MuscleGroup[];
-  cardioLevel: CardioLevel;
   updatedAt: number;
 }
 
@@ -100,7 +88,6 @@ export function defaultTrainingProfile(): TrainingProfile {
     daysPerWeek: 3,
     experience: 'beginner',
     priorityMuscles: [],
-    cardioLevel: 'light',
     updatedAt: 0,
   };
 }

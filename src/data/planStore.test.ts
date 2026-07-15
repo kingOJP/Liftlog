@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getStoredProgram } from './programStore';
-import { getProgramStartValue } from './settings';
+import { getProgramStartValue, saveProgramStart } from './settings';
 import { buildSnapshot } from './analytics';
 import type { BlockRetrospective } from './plan';
 import type { PlanProposal } from './planner';
@@ -12,6 +12,7 @@ import {
   canDeferActiveBlock,
   completeActiveBlock,
   deferActiveBlockToNextWeek,
+  ensureWeekAnchor,
   getActiveBlockInfo,
   getActivePhase,
   getActivePlan,
@@ -232,6 +233,38 @@ describe('mergeServerPlanState', () => {
     expect(mergeServerPlanState(null)).toBe(false);
     expect(mergeServerPlanState({ version: 2, plans: [], updatedAt: 1 })).toBe(false);
     expect(mergeServerPlanState({ version: 1, plans: 'junk', updatedAt: 1 })).toBe(false);
+  });
+});
+
+describe('automatic week anchor (no manual setting)', () => {
+  it('re-anchors weeks to the block end when a block wraps up', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const wrapAt = new Date('2026-06-28T18:00:00').getTime();
+    completeActiveBlock(makeRetro('x'), wrapAt);
+    expect(getProgramStartValue()).toBe('2026-06-28');
+  });
+
+  it('ensureWeekAnchor follows the synced journey on a fresh device', () => {
+    // Simulate a device that pulled the journey but never ran activation:
+    // plan doc says a block is active from 2026-06-01, local anchor differs.
+    activateProposal(makeProposal(), null, JUN1);
+    saveProgramStart('2026-01-05'); // stale local anchor
+    expect(ensureWeekAnchor()).toBe(true);
+    expect(getProgramStartValue()).toBe('2026-06-01');
+    // Already consistent → no-op
+    expect(ensureWeekAnchor()).toBe(false);
+  });
+
+  it('ensureWeekAnchor uses the last block end between blocks', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    completeActiveBlock(makeRetro('x'), new Date('2026-06-28T18:00:00').getTime());
+    saveProgramStart('2026-01-05'); // drift it
+    expect(ensureWeekAnchor()).toBe(true);
+    expect(getProgramStartValue()).toBe('2026-06-28');
+  });
+
+  it('ensureWeekAnchor leaves the first-use stamp alone with no journey', () => {
+    expect(ensureWeekAnchor()).toBe(false);
   });
 });
 

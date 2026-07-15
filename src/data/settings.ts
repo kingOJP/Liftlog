@@ -1,15 +1,11 @@
 // Device-local app settings (not synced), stored in localStorage.
-// Owns the training-block start date (drives week numbering) and the
-// default rest-timer duration.
+// Owns the week-numbering anchor (managed automatically by the training
+// journey — no user-facing setting) and the default rest-timer duration.
 
 const SETTINGS_KEY = 'liftlog_settings';
 // Pre-Rev-2 builds stored the rest duration under its own key; keep it so
 // existing devices don't lose their preference.
 const REST_KEY = 'liftlog_rest_seconds';
-
-// First Monday of the original training block — used until the user picks
-// their own start date in Settings.
-export const DEFAULT_PROGRAM_START = '2026-06-09';
 
 export const REST_PRESETS = [60, 120, 180, 300];
 export const DEFAULT_REST_SECONDS = 120;
@@ -43,9 +39,24 @@ function parseLocalDate(value: string): Date | null {
   return valid ? d : null;
 }
 
+function toDateValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// The week-numbering anchor. Nobody sets this by hand anymore: block
+// activation anchors it to the block's start, wrapping a block re-anchors it
+// to the block's end (planStore.ensureWeekAnchor keeps devices consistent),
+// and before any journey exists it defaults to first use of the app on this
+// device — stamped on first read so week numbers stay stable afterwards.
 export function getProgramStartValue(): string {
-  const stored = loadSettings().programStart;
-  return stored && parseLocalDate(stored) ? stored : DEFAULT_PROGRAM_START;
+  const settings = loadSettings();
+  if (settings.programStart && parseLocalDate(settings.programStart)) {
+    return settings.programStart;
+  }
+  const today = toDateValue(new Date());
+  saveSettings({ ...settings, programStart: today });
+  return today;
 }
 
 export function getProgramStart(): Date {
