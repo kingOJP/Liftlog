@@ -174,7 +174,9 @@ export async function pushSync(): Promise<void> {
     program:             getStoredProgram(),
     exercises:           getExerciseLibrary(),
     deletedExerciseIds:  [...deletedExercises],
-    plan:                getPlanState().plans.length > 0 ? getPlanState() : null,
+    // Send the journey document when there's anything to sync — plans OR just
+    // the onboarding profile (a user can onboard before activating a plan).
+    plan:                (() => { const s = getPlanState(); return s.plans.length > 0 || s.profile ? s : null; })(),
     ...splitMeta(meta),
   };
 

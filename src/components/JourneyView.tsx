@@ -5,8 +5,9 @@ import {
   PHASE_INFO, blockEndTs, blockEnded, blockWeekIndex, currentPhase, goalLabel,
 } from '../data/plan';
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
-import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, startPendingActivation } from '../data/planStore';
+import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, getTrainingProfile, saveTrainingProfile, startPendingActivation } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
+import { experienceSuggestion, experienceSuggestionText } from '../data/experience';
 import './JourneyView.css';
 
 interface Props {
@@ -123,6 +124,21 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
     onChanged();
   }
 
+  // Experience is self-reported at onboarding but keeps learning from data.
+  // When logged training clearly outranks the stored level, offer the bump.
+  const profile = useMemo(() => getTrainingProfile(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const expSuggestion = useMemo(
+    () => (profile ? experienceSuggestion(profile, snapshot) : null),
+    [profile, snapshot],
+  );
+
+  function acceptExperienceBump() {
+    if (!profile || !expSuggestion) return;
+    saveTrainingProfile({ ...profile, experience: expSuggestion.to });
+    setRefresh(r => r + 1);
+    onChanged();
+  }
+
   const ended = activeBlock ? blockEnded(activeBlock) : false;
   const phase = activeBlock ? currentPhase(activeBlock) : null;
   const week = activeBlock ? Math.max(0, blockWeekIndex(activeBlock)) + 1 : 0;
@@ -135,6 +151,18 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
       </header>
 
       <div className="journey-body">
+        {expSuggestion && (
+          <section className="journey-section journey-nudge">
+            <span className="journey-label">Level up</span>
+            <p className="journey-nudge-text">{experienceSuggestionText(expSuggestion)}</p>
+            <div className="journey-actions">
+              <button className="journey-primary-btn" onClick={acceptExperienceBump}>
+                Update to {expSuggestion.to.charAt(0).toUpperCase() + expSuggestion.to.slice(1)}
+              </button>
+            </div>
+          </section>
+        )}
+
         {pending && (
           <section className="journey-section journey-section--accent">
             <span className="journey-label">Up next</span>

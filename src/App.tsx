@@ -3,7 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
-import { ensureJourneyMigrated, startPendingActivation } from './data/planStore';
+import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -72,6 +72,9 @@ function App() {
         await ensureJourneyMigrated();
         // A block approved mid-week installs its workouts on its start date
         if (await startPendingActivation()) setProgram(getStoredProgram());
+        // Week numbering follows the synced journey (block start / last block
+        // end) — keeps devices consistent without a manual setting.
+        ensureWeekAnchor();
       } catch (err) {
         console.error(err);
       }
@@ -97,6 +100,7 @@ function App() {
         // A pending block whose start date arrived while the app was open
         // installs here (the interval doubles as its scheduler).
         const started = await startPendingActivation();
+        if (didPull) ensureWeekAnchor();
         if (didPull || started) setProgram(getStoredProgram());
         if (started) pushSync().catch(() => {});
       } catch {

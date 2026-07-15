@@ -25,8 +25,9 @@ import type { TrainingSnapshot } from './analytics';
 import { assessSnapshot, progressDirections } from './progress';
 import type { ExerciseProfile } from './substitution';
 import { candidateProfiles, profileFor } from './substitution';
-import type { Goal, PhaseKind, BlockRetrospective } from './plan';
-import { goalLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD } from './plan';
+import { DIFFICULTY_RANK } from './exercises';
+import type { Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel } from './plan';
+import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD } from './plan';
 
 // ── Input / output ────────────────────────────────────────────────────────────
 
@@ -39,6 +40,15 @@ export interface PlannerInput {
   openWithRecovery: boolean;
   startDate: string;          // yyyy-mm-dd
   notes: string;              // open-ended guidance, kept verbatim on the plan
+  // ── Athlete profile (from the onboarding TrainingProfile) ──
+  /** effective experience — self-report maxed with data-driven inference */
+  experience: ExperienceLevel;
+  /** structured equipment access; complements free-text notes for constraints */
+  equipmentAccess?: EquipmentAccess;
+  /** muscles to bias extra volume toward (weak points / priorities) */
+  priorityMuscles?: MuscleGroup[];
+  /** injuries/limitations — parsed alongside notes into hard constraints */
+  injuries?: string;
 }
 
 export interface PlannerConfidence {
@@ -142,6 +152,28 @@ export function parseGuidance(raw: string): Guidance {
   return g;
 }
 
+// Structured equipment access → the same constraint shape. Applied on top of
+// the free-text parse so a picked "Dumbbells only" and a typed "no barbell"
+// compound rather than fight.
+function applyEquipmentAccess(g: Guidance, access: EquipmentAccess | undefined): void {
+  if (!access || access === 'full-gym') return;
+  const ban = (ws: WeightType[], es: Equipment[]) => {
+    for (const w of ws) g.bannedWeightTypes.add(w);
+    for (const e of es) g.bannedEquipment.add(e);
+  };
+  if (access === 'home-rack') {
+    // Rack + barbell + some plates, but no selectorized machines or cables.
+    ban([], ['Cable Machine', 'Machine', 'Smith Machine']);
+    g.notes.push('Home gym with a rack — machine and cable work is swapped for barbell, dumbbell and bodyweight versions.');
+  } else if (access === 'dumbbells-only') {
+    ban(['Barbell', 'EZ Bar', 'Machine', 'Kettlebell'], ['Cable Machine', 'Machine', 'Smith Machine', 'Squat Rack', 'Pull Up Bar', 'Dip Station']);
+    g.notes.push('Dumbbell-only setup — the whole plan is built from dumbbell and bodyweight movements.');
+  } else if (access === 'minimal') {
+    ban(['Barbell', 'EZ Bar', 'Machine'], ['Cable Machine', 'Machine', 'Smith Machine', 'Squat Rack']);
+    g.notes.push('Minimal equipment — bodyweight, bands and dumbbell work carry the plan; loads matter less than effort here.');
+  }
+}
+
 // ── Split templates ───────────────────────────────────────────────────────────
 // Each slot names the training intent (muscle + acceptable movement patterns);
 // the selector fills it with the best exercise the user's history supports.
@@ -160,7 +192,10 @@ interface DayTemplate {
   slots: Slot[];
 }
 
-function splitFor(daysPerWeek: number): { name: string; reason: string; days: DayTemplate[] } {
+function splitFor(
+  daysPerWeek: number,
+  experience: ExperienceLevel = 'intermediate',
+): { name: string; reason: string; days: DayTemplate[]; warning?: string } {
   const upperA: DayTemplate = {
     title: 'Upper — Chest, Back, Arms',
     slots: [
@@ -267,7 +302,34 @@ function splitFor(daysPerWeek: number): { name: string; reason: string; days: Da
     ],
   };
 
-  switch (Math.min(6, Math.max(2, daysPerWeek))) {
+  const days = Math.min(6, Math.max(2, daysPerWeek));
+
+  // Beginners learn fastest and recover best on full-body, high-frequency
+  // training — every session is practice on every movement. Cap the split so a
+  // novice who picks 5–6 days still gets a beginner-appropriate layout (and a
+  // gentle nudge that fewer days would serve them better), never a bro-split.
+  if (experience === 'beginner') {
+    if (days <= 2) return {
+      name: 'Full Body ×2',
+      reason: 'Two full-body sessions a week hit every movement twice — the ideal way to build skill and strength when you\'re starting out.',
+      days: [fullA, fullB],
+    };
+    if (days === 3) return {
+      name: 'Full Body ×3',
+      reason: 'Three full-body days is the most-validated beginner program there is: you practise the big movements often, recover between sessions, and progress week to week.',
+      days: [fullA, fullB, fullC],
+    };
+    return {
+      name: 'Upper / Lower ×2',
+      reason: 'Four days split upper/lower keeps each session short while training everything twice a week — plenty of frequency without the volume of a body-part split.',
+      days: [upperA, lowerA, upperB, lowerB],
+      warning: days >= 5
+        ? `You picked ${days} days, but as a beginner you'll build faster on 3–4 — recovery, not gym time, is the limiter early on. This plan uses 4 focused days; add the extra day as a walk or mobility session.`
+        : undefined,
+    };
+  }
+
+  switch (days) {
     case 2: return {
       name: 'Full Body ×2',
       reason: 'Two sessions cover every muscle twice a week — at this schedule, full-body training is the only layout that hits the frequency research keeps validating.',
@@ -302,11 +364,27 @@ const HIGH_REP_PATTERNS = new Set<WorkoutType>([
   'Lateral Raise', 'Calf Raise', 'Face Pull', 'Reverse Fly', 'Crunch',
 ]);
 
-function dosage(goal: Goal, slot: Slot, profile: ExerciseProfile): Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> {
+function dosage(
+  goal: Goal,
+  slot: Slot,
+  profile: ExerciseProfile,
+  experience: ExperienceLevel,
+): Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> {
   if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
-    return { sets: 3, repLow: 12, repHigh: 20 };
+    return experience === 'beginner' ? { sets: 2, repLow: 12, repHigh: 20 } : { sets: 3, repLow: 12, repHigh: 20 };
   }
   const compound = profile.mechanics === 'compound';
+
+  // Beginners: submaximal loads, moderate reps, and fewer sets. Rep ranges
+  // never drop below 8 — a novice building technique should not be grinding
+  // near-maximal singles/triples, whatever their stated goal. Lower set counts
+  // keep total volume in the range a new lifter actually recovers from.
+  if (experience === 'beginner') {
+    if (slot.main && compound) return { sets: 3, repLow: 8, repHigh: 12 };
+    if (compound) return { sets: 2, repLow: 8, repHigh: 12 };
+    return { sets: 2, repLow: 10, repHigh: 15 };
+  }
+
   if (slot.main && compound) {
     if (goal === 'strength') return { sets: 4, repLow: 4, repHigh: 6 };
     if (goal === 'athletic') return { sets: 4, repLow: 5, repHigh: 8 };
@@ -385,6 +463,7 @@ export function buildPhases(
 
 interface SelectCtx {
   goal: Goal;
+  experience: ExperienceLevel;
   byMuscle: Map<MuscleGroup, ExerciseProfile[]>;
   used: Set<string>;
   currentIds: Set<string>;
@@ -394,6 +473,18 @@ interface SelectCtx {
   observedEquipment: Set<Equipment>;
   keep: Set<string>;
   review: Set<string>;
+}
+
+// Can this athlete be programmed this exercise right now? Advanced-tagged lifts
+// are gated for beginners behind their prerequisites: a novice shouldn't be
+// handed a conventional deadlift before they've trained a hinge. Intermediate+
+// lifters clear the gate outright.
+function meetsSkillGate(p: ExerciseProfile, ctx: SelectCtx): boolean {
+  if (ctx.experience !== 'beginner') return true;
+  if (DIFFICULTY_RANK[p.difficulty] < DIFFICULTY_RANK.advanced) return true;
+  // Advanced lift + beginner: allowed once they've trained the lift itself or
+  // at least one prerequisite for it.
+  return ctx.loggedIds.has(p.id) || p.prerequisites.some(id => ctx.loggedIds.has(id));
 }
 
 function allowedByGuidance(p: ExerciseProfile, g: Guidance): boolean {
@@ -421,6 +512,17 @@ function scoreCandidate(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): number 
   if (p.equipment && ctx.observedEquipment.size > 0) {
     score += ctx.observedEquipment.has(p.equipment) ? 4 : -5;
   }
+
+  // Difficulty fit. Beginners are steered hard toward low-skill movements they
+  // can load safely on day one; advanced lifters get a nudge toward the
+  // free-weight compounds that reward their base. Intermediate is neutral.
+  const rank = DIFFICULTY_RANK[p.difficulty];
+  if (ctx.experience === 'beginner') {
+    if (rank === DIFFICULTY_RANK.beginner) score += 14;
+    else if (rank === DIFFICULTY_RANK.advanced) score -= 16;
+  } else if (ctx.experience === 'advanced') {
+    if (rank >= DIFFICULTY_RANK.intermediate) score += 4;
+  }
   return score;
 }
 
@@ -434,15 +536,23 @@ function reasonFor(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): string {
     if (ctx.trendUp.has(p.id)) return 'Brought back — it was producing progress when you last trained it.';
     return 'You\'ve trained it before, so its progression history carries straight over.';
   }
+  if (ctx.experience === 'beginner' && p.difficulty === 'beginner') {
+    return `Beginner-friendly ${slot.muscle} work — easy to learn and load safely while you build a base.`;
+  }
   const pattern = p.workoutType ? ` (${p.workoutType.toLowerCase()})` : '';
   return `Direct ${slot.muscle} work${pattern} — an evidence-based pick for this slot.`;
 }
 
 function pickForSlot(slot: Slot, ctx: SelectCtx, guidance: Guidance): { profile: ExerciseProfile; reason: string } | null {
-  const pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(
+  let pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(
     p => !ctx.used.has(p.id) && allowedByGuidance(p, guidance),
   );
   if (pool.length === 0) return null;
+
+  // Skill gate: hide advanced lifts a beginner hasn't earned — unless nothing
+  // else is left for the muscle, in which case a scored penalty still applies.
+  const gated = pool.filter(p => meetsSkillGate(p, ctx));
+  if (gated.length > 0) pool = gated;
 
   // Prefer candidates matching the slot's movement patterns; fall back to any
   // exercise for the muscle when constraints (equipment, injuries) empty that set.
@@ -460,12 +570,12 @@ function pickForSlot(slot: Slot, ctx: SelectCtx, guidance: Guidance): { profile:
 
 // ── Confidence ────────────────────────────────────────────────────────────────
 
-function confidenceFor(snapshot: TrainingSnapshot | null): PlannerConfidence {
+function confidenceFor(snapshot: TrainingSnapshot | null, experience: ExperienceLevel = 'intermediate'): PlannerConfidence {
   const sessions = snapshot?.sessions.length ?? 0;
   if (sessions === 0) {
     return {
       level: 'low', sessions,
-      detail: 'No training history yet, so this plan leans on established exercise science. It gets personal fast — every workout you log sharpens the next block.',
+      detail: `No training history yet, so this plan leans on established exercise science, calibrated for a ${experienceLabel(experience).toLowerCase()} lifter. It gets personal fast — every workout you log sharpens the next block.`,
     };
   }
   if (sessions < 12) {
@@ -492,10 +602,14 @@ export function buildPlanProposal(
   snapshot: TrainingSnapshot | null,
   previousRetro: BlockRetrospective | null = null,
 ): PlanProposal {
-  const guidance = parseGuidance(input.notes);
-  const split = splitFor(input.daysPerWeek);
+  // Injuries and free-text notes are parsed together, then structured
+  // equipment access is layered on top.
+  const guidance = parseGuidance([input.notes, input.injuries ?? ''].join('. '));
+  applyEquipmentAccess(guidance, input.equipmentAccess);
+  const split = splitFor(input.daysPerWeek, input.experience);
   const { phases, notes: phaseNotes, warnings } = buildPhases(input, previousRetro);
-  const confidence = confidenceFor(snapshot);
+  if (split.warning) warnings.push(split.warning);
+  const confidence = confidenceFor(snapshot, input.experience);
 
   // History-derived context (all optional — the planner works from zero).
   // Direction comes from the shared multi-signal assessment (progress.ts),
@@ -532,6 +646,7 @@ export function buildPlanProposal(
 
   const ctx: SelectCtx = {
     goal: input.goal,
+    experience: input.experience,
     byMuscle,
     used: new Set<string>(),
     currentIds,
@@ -559,7 +674,7 @@ export function buildPlanProposal(
         continue;
       }
       ctx.used.add(picked.profile.id);
-      const dose = dosage(input.goal, slot, picked.profile);
+      const dose = dosage(input.goal, slot, picked.profile, input.experience);
       exercises.push({ id: picked.profile.id, name: picked.profile.name, ...dose });
       decisions.push({
         exerciseId: picked.profile.id,
@@ -598,6 +713,12 @@ export function buildPlanProposal(
     }
   }
 
+  // Priority muscles (weak points the athlete flagged) get an extra set each,
+  // within the same guardrails — a targeted bias toward what they care about.
+  for (const muscle of input.priorityMuscles ?? []) {
+    bumpSets(days, decisions, muscle, +1, `+1 set — you flagged ${muscle} as a priority, so it gets extra volume.`);
+  }
+
   // Projected weekly volume per muscle (primary 1, secondary 0.5)
   const weekly = new Map<MuscleGroup, number>();
   for (const day of days) {
@@ -631,7 +752,7 @@ export function buildPlanProposal(
     guidanceNotes: guidance.notes,
     muscleWeeklySets,
     intent: intentFor(input, split.name, phases),
-    progression: progressionFor(input.goal, phases),
+    progression: progressionFor(input.goal, phases, input.experience),
     warnings,
   };
 }
@@ -680,11 +801,22 @@ function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]):
   }
 }
 
-function progressionFor(goal: Goal, phases: PhaseKind[]): string {
+function progressionFor(goal: Goal, phases: PhaseKind[], experience: ExperienceLevel = 'intermediate'): string {
   const deloadWeek = phases.indexOf('deload') + 1;
   const deloadLine = deloadWeek > 0
     ? ` Week ${deloadWeek} is a planned deload — roughly 10% lighter across the board — so the rebound lands inside this block, not after it.`
     : ' No deload is scheduled; any lift that stalls still gets an automatic reactive deload from the in-workout coach.';
+
+  // Beginners get concrete starting-point and effort guidance — the thing a
+  // new lifter actually needs — and the reassurance that linear progression
+  // (add a little every session) is expected to work for a long while yet.
+  if (experience === 'beginner') {
+    return 'Start each new lift lighter than feels necessary — a weight you could do 3–4 more reps with — and focus on clean, controlled form. '
+      + 'Each session, if you hit the top of the rep range with good technique, add the smallest jump (usually 5 lbs, or 2.5 on smaller lifts) next time. '
+      + 'As a beginner this simple "add a little every week" progression works for months — the coach handles the bookkeeping and eases you back if a weight gets away from you.'
+      + deloadLine + ` ${goalLabel(goal)} stays the destination — just keep showing up.`;
+  }
+
   const base = goal === 'strength'
     ? 'Loading runs on double progression with bigger jumps on the main lifts: own the top of the rep range on every set and the coach adds weight next session. As the block moves into its peak weeks, reps drop and loads climb.'
     : 'Loading runs on double progression: hit the top of the rep range on every set and the coach adds weight next session; miss the bottom and it eases you back. Set counts stay adaptive week to week within the block\'s guardrails.';

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getStoredProgram } from './programStore';
-import { getProgramStartValue } from './settings';
+import { getProgramStartValue, saveProgramStart } from './settings';
 import { buildSnapshot } from './analytics';
 import type { BlockRetrospective } from './plan';
 import type { PlanProposal } from './planner';
@@ -12,15 +12,21 @@ import {
   canDeferActiveBlock,
   completeActiveBlock,
   deferActiveBlockToNextWeek,
+  ensureWeekAnchor,
   getActiveBlockInfo,
   getActivePhase,
   getActivePlan,
   getLatestRetrospective,
   getPendingActivation,
   getPlanState,
+  getProfileOrDefault,
+  getTrainingProfile,
+  hasOnboarded,
   mergeServerPlanState,
+  saveTrainingProfile,
   startPendingActivation,
 } from './planStore';
+import { defaultTrainingProfile } from './plan';
 
 beforeEach(() => localStorage.clear());
 
@@ -33,7 +39,7 @@ function makeProposal(overrides: Partial<PlanProposal['input']> = {}): PlanPropo
   return {
     input: {
       goal: 'hypertrophy', daysPerWeek: 1, weeks: 4, includeDeload: true,
-      openWithRecovery: false, startDate: '2026-06-01', notes: '',
+      openWithRecovery: false, startDate: '2026-06-01', notes: '', experience: 'intermediate',
       ...overrides,
     },
     confidence: { level: 'low', sessions: 0, detail: '' },
@@ -227,5 +233,67 @@ describe('mergeServerPlanState', () => {
     expect(mergeServerPlanState(null)).toBe(false);
     expect(mergeServerPlanState({ version: 2, plans: [], updatedAt: 1 })).toBe(false);
     expect(mergeServerPlanState({ version: 1, plans: 'junk', updatedAt: 1 })).toBe(false);
+  });
+});
+
+describe('automatic week anchor (no manual setting)', () => {
+  it('re-anchors weeks to the block end when a block wraps up', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const wrapAt = new Date('2026-06-28T18:00:00').getTime();
+    completeActiveBlock(makeRetro('x'), wrapAt);
+    expect(getProgramStartValue()).toBe('2026-06-28');
+  });
+
+  it('ensureWeekAnchor follows the synced journey on a fresh device', () => {
+    // Simulate a device that pulled the journey but never ran activation:
+    // plan doc says a block is active from 2026-06-01, local anchor differs.
+    activateProposal(makeProposal(), null, JUN1);
+    saveProgramStart('2026-01-05'); // stale local anchor
+    expect(ensureWeekAnchor()).toBe(true);
+    expect(getProgramStartValue()).toBe('2026-06-01');
+    // Already consistent → no-op
+    expect(ensureWeekAnchor()).toBe(false);
+  });
+
+  it('ensureWeekAnchor uses the last block end between blocks', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    completeActiveBlock(makeRetro('x'), new Date('2026-06-28T18:00:00').getTime());
+    saveProgramStart('2026-01-05'); // drift it
+    expect(ensureWeekAnchor()).toBe(true);
+    expect(getProgramStartValue()).toBe('2026-06-28');
+  });
+
+  it('ensureWeekAnchor leaves the first-use stamp alone with no journey', () => {
+    expect(ensureWeekAnchor()).toBe(false);
+  });
+});
+
+describe('training profile persistence', () => {
+  it('reports not-onboarded until a profile is saved, then persists it', () => {
+    expect(hasOnboarded()).toBe(false);
+    expect(getTrainingProfile()).toBeNull();
+    expect(getProfileOrDefault().experience).toBe('beginner'); // sane default
+
+    const p = { ...defaultTrainingProfile(), experience: 'intermediate' as const, daysPerWeek: 4, equipment: 'home-rack' as const, priorityMuscles: ['Chest' as const] };
+    saveTrainingProfile(p, 5000);
+
+    expect(hasOnboarded()).toBe(true);
+    const stored = getTrainingProfile()!;
+    expect(stored.experience).toBe('intermediate');
+    expect(stored.daysPerWeek).toBe(4);
+    expect(stored.equipment).toBe('home-rack');
+    expect(stored.priorityMuscles).toEqual(['Chest']);
+    expect(stored.updatedAt).toBe(5000);
+    // bumps the document clock so it syncs
+    expect(getPlanState().updatedAt).toBe(5000);
+  });
+
+  it('survives round-trips through the whole-document sync merge', () => {
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'advanced' }, 1000);
+    const doc = getPlanState();
+    localStorage.clear();
+    // a newer server document (carrying the profile) replaces local
+    expect(mergeServerPlanState({ ...doc, updatedAt: 2000 })).toBe(true);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
   });
 });

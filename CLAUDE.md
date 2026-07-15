@@ -57,6 +57,17 @@ Long-term milestones (roughly):
     user-owned (per-user library/metadata/tombstones — one user's edits can never
     affect another), and workout-instance layers; role system (user/admin/tester);
     custom-exercise lifecycle (pending queue → admin review → global promotion)
+20. ✅ Athlete profiling + beginner-safe planning — a `TrainingProfile` (`plan.ts`)
+    captures Tier-1 hard constraints (injuries, equipment access, days) and Tier-2
+    calibration (experience level + training age, priority muscles),
+    collected through a redesigned one-question-per-page onboarding wizard
+    (PlanSetupView, slide animation, pre-filled on replans). Exercises carry an
+    intrinsic difficulty tier + prerequisites (`exercises.ts`); the planner steers
+    beginners to low-skill machine/dumbbell work at higher reps and lower volume,
+    gates advanced lifts behind their prerequisites, and biases volume toward
+    priority muscles. Experience is inferred from logged data (`experience.ts`) and
+    only ratchets up: plans use the higher of self-reported and inferred, and the
+    Journey surfaces a "level up" nudge. Profile rides the LWW plan-document sync.
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
@@ -69,6 +80,12 @@ Long-term milestones (roughly):
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
   suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
   addition to set counts.
+- Reactive rest-day suggestions — instead of asking which weekdays the user trains
+  (removed: it was collected but unused), suggest rest days from the profile + logged
+  training rhythm ("you've trained 3 days straight — tomorrow looks like a rest day").
+- Cardio awareness — only worth doing with real data: integrate external activity
+  sources (Apple Health / Google Fit / Strava) and trim lifting volume when reported
+  cardio load is high. A self-reported "cardio level" was removed as too coarse to act on.
 - Exercise Intelligence v2 — external candidate sources behind the `ExerciseProfile`
   normalization seam (AI-generated suggestions, coach-curated collections), injury-aware
   and equipment-aware (travel/home-gym) substitution modes.
@@ -179,8 +196,9 @@ src/
     program.ts                 — Exercise/WorkoutDay interfaces, PROGRAM (4 days),
                                   getWeekNumber()/getWeekNumberForDate(), getWeekDateRange(),
                                   getExerciseName()
-    settings.ts                — device-local settings (localStorage): configurable program
-                                  start date (drives week numbering) + rest-timer default
+    settings.ts                — device-local settings (localStorage): the week-numbering
+                                  anchor (managed automatically — first-use stamp, then the
+                                  journey via planStore.ensureWeekAnchor) + rest-timer default
     exercises.ts               — Single source of truth for the ~68 built-in exercises
                                   (ExerciseDef), EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
                                   saveExerciseMeta() — metadata overrides in localStorage.
@@ -223,16 +241,25 @@ src/
     plan.ts                    — training-journey domain: TrainingPlan/TrainingBlock/
                                   BlockRetrospective types, PhaseKind week tags, Monday-anchored
                                   block week math (blockWeekIndex/currentPhase/blockEnded),
-                                  validatePhases() deload guardrails
+                                  validatePhases() deload guardrails. Also the athlete model:
+                                  TrainingProfile + ExperienceLevel/EquipmentAccess/CardioLevel
+                                  and their option arrays
     planner.ts                 — block planner: buildPlanProposal(input, program, snapshot,
                                   prevRetro) → PlanProposal (split, phase layout, generated
                                   workouts, per-exercise decisions with reasons, confidence,
-                                  parsed guidance notes) — pure, like every other engine
+                                  parsed guidance notes) — pure, like every other engine.
+                                  Experience-aware: beginner-safe dosage/split/selection,
+                                  prerequisite skill-gating, priority-muscle volume bias
+    experience.ts              — data-driven experience inference: inferExperience(snapshot)
+                                  (training age + consistency + difficulty mastered),
+                                  effectiveExperience() (max of self-report and inferred),
+                                  experienceSuggestion() (the "level up" nudge)
     retrospective.ts           — computeBlockRetrospective(block, snapshot) → adherence,
                                   per-lift e1RM change, muscle volume, coach-voice summary,
                                   carryover signals the next planner run consumes
     planStore.ts               — journey persistence (localStorage `liftlog_plan`):
                                   activateProposal(), completeActiveBlock(), getActivePhase(),
+                                  getTrainingProfile()/saveTrainingProfile()/getProfileOrDefault(),
                                   ensureJourneyMigrated() (wraps legacy history in a Foundation
                                   block), mergeServerPlanState() (LWW sync)
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
@@ -304,7 +331,7 @@ src/
 | `liftlog_role` | `sync.ts` | Signed-in account's role (`user`/`admin`/`tester`) from the server — UI hint only |
 | `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
-| `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives; user-scoped, synced LWW) |
+| `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
@@ -630,6 +657,51 @@ The planning layer above individual workouts. Two domain levels, deliberately no
 
 ---
 
+## Athlete profile + experience (`plan.ts` + `experience.ts` + `PlanSetupView`)
+
+The coach designs around **the person**, not just the goal. A `TrainingProfile` (stored
+inside `PlanState`, so it rides the existing `liftlog_plan` LWW sync with no backend change)
+holds two tiers, collected by the onboarding wizard:
+
+- **Tier 1 — hard constraints** (gate exercise selection): injuries/limitations (free text,
+  parsed by `parseGuidance`), `EquipmentAccess` (full-gym / home-rack / dumbbells-only /
+  minimal → banned weight/equipment sets), days per week.
+- **Tier 2 — calibration:** `ExperienceLevel` (+ training age), `priorityMuscles`
+  (weak points).
+
+(Preferred training days and a self-reported cardio level were considered and dropped —
+they collected input the planner couldn't honestly act on. Their better versions live in
+Future milestones: reactive rest-day suggestions and external cardio integrations.)
+
+**Experience drives beginner-safe planning** (`planner.ts`, all keyed off the *effective*
+level):
+- **Dosage** — beginners get fewer sets and never sub-8 reps (no near-maximal work while
+  learning technique), whatever the goal; advanced lifters keep 4×4–6 main work.
+- **Split** — beginners are capped at full-body (2–3d) / upper-lower (4d); picking 5–6 days
+  yields a 4-day layout + a warning that recovery, not gym time, is the early limiter.
+- **Selection** — every catalog exercise has an intrinsic `difficulty` tier + `prerequisites`
+  (`exercises.ts`, `difficultyFor()`/`prerequisitesFor()`, surfaced on `ExerciseProfile`).
+  Beginners are scored toward beginner-tagged movements; **advanced lifts are skill-gated** —
+  hidden unless the athlete has logged the lift itself or a prerequisite (train the RDL
+  before the pull deadlift). Advanced profiles get a nudge toward the barbell compounds.
+- **Priority muscles** get +1 set each (same guardrails as the retro under-muscle bump).
+- **Copy** — beginners get concrete starting-weight/effort guidance and a linear-progression
+  framing; the deload defaults off for them.
+
+**Experience is inferred, and only ratchets up** (`experience.ts`): `inferExperience(snapshot)`
+reads training age (weeks spanned), consistency (session count), and difficulty mastered
+(advanced lifts trained ≥3 sessions). `effectiveExperience()` = max(self-reported, inferred),
+so a beginner whose data says otherwise still gets the better plan; the wizard plans with the
+effective level and JourneyView shows a **"level up" nudge** (`experienceSuggestion`) to bump
+the stored profile. Never downgrades.
+
+**The wizard** (`PlanSetupView`) is **one question per screen** with a slide animation
+(`prefers-reduced-motion` respected), a progress bar, single-select auto-advance, Skip on
+optional questions, and pre-fill from the saved profile so replans are fast. Same component
+serves first-run onboarding and every replan; it saves the profile on activate.
+
+---
+
 ## Exercise data architecture
 
 `src/data/exercises.ts` is the single source of truth for the ~68 built-in exercises
@@ -646,6 +718,11 @@ program, not before):
   ends up with a catalog slug + timestamp; stripping a trailing `-<10+ digits>` recovers it.
   Used by `getExerciseMeta`, `getExerciseName` and `profileFor` so these resolve muscles/name
   instead of surfacing as unclassified "Other".
+- `difficultyFor(id)` / `prerequisitesFor(id)` — intrinsic skill tier (`beginner`/
+  `intermediate`/`advanced`, default intermediate) and prerequisite exercise ids for advanced
+  lifts. Compiled-in catalog data (a `DIFFICULTY`/`PREREQUISITES` map + `DIFFICULTY_RANK`),
+  **not** user metadata — never synced. Drives beginner-safe selection + skill-gating in the
+  planner; also on `ExerciseProfile`.
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
@@ -667,11 +744,16 @@ program, not before):
   per-user `user_programs` server row, restored by pull on any device).
 - **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
-- **Program start date** is user-configurable in Settings (`settings.ts`, default `2026-06-09`).
-  Changing it only affects the week numbering of *new* sessions — historical sessions keep the
-  `weekNumber` they were stored with.
+- **The week-numbering anchor is managed automatically** — the "Training block start"
+  setting was removed. `getProgramStartValue()` stamps first use of the app on this device
+  as the initial anchor; block activation anchors to the block's start; wrapping a block
+  re-anchors to the block's end; and `planStore.ensureWeekAnchor()` (App startup + after
+  every background pull) re-derives the anchor from the *synced* journey document so every
+  device agrees. Changing the anchor only affects the week numbering of *new* sessions —
+  historical sessions keep the `weekNumber` they were stored with.
 - **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced.
-  (Exercise metadata *is* synced as of the metadata-sync change — see Cloud sync.)
+  (The week anchor stays consistent across devices anyway because ensureWeekAnchor derives it
+  from the synced journey; exercise metadata *is* synced — see Cloud sync.)
 - **Empty workouts are purged** — a session with no set logs is a ghost/duplicate and is
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
@@ -727,12 +809,13 @@ WorkoutView shadows its set state into `liftlog_draft_session` on every change; 
 same day within 12 h auto-restores it (banner + Discard), Finish clears it. `startedAt` is
 preserved so duration tracking stays correct. See `data/draftSession.ts`.
 
-### 4. Mesocycle awareness
-The current deload is purely reactive (stall → deload). A planned accumulation/deload structure
-would let the engine front-run fatigue: e.g., 3 weeks accumulation → 1 deload week, cycling
-automatically. The configurable program start date (already in Settings) is the foundation —
-extend it to support a `mesocycleLengthWeeks` setting and expose the current mesocycle phase
-(accumulation / peak / deload) to the recommendation engine and Coach card.
+### 4. ~~Mesocycle awareness~~ — DONE (training blocks)
+Implemented as the training journey's block/phase system rather than a
+`mesocycleLengthWeeks` setting: blocks carry one phase tag per week
+(accumulation/intensification/peak/deload), planned deload weeks override the
+recommendation engine (~10% off) and pause the set-planner, and the week anchor
+is managed automatically by the journey (no manual setting). See the Training
+journey section.
 
 ### 5. Quality-of-life additions
 These are independent of each other and can land in any order:
