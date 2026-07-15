@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getExerciseName } from '../data/programStore';
+import { SHARED_DAY_ID } from '../data/share';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { Session, SetLog } from '../db/database';
 import './HistoryView.css';
@@ -90,7 +91,11 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                 <div className="history-card-left">
                   <span className="history-date">{formatDate(session.completedAt!)}</span>
                   <span className="history-day-label">
-                    {day ? `${day.label} — ${day.muscleGroups}` : `Day ${session.dayId}`}
+                    {day
+                      ? `${day.label} — ${day.muscleGroups}`
+                      : session.dayId === SHARED_DAY_ID
+                        ? 'Shared workout'
+                        : `Day ${session.dayId}`}
                   </span>
                   <span className="history-summary">
                     {orderedExercises.length} exercise{orderedExercises.length !== 1 ? 's' : ''} · {sets.length} sets

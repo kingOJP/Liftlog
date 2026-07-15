@@ -23,6 +23,7 @@ import { snapshotPositions } from '../data/progress';
 import { getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import RestTimer from './RestTimer';
+import ShareWorkoutModal from './ShareWorkoutModal';
 import './WorkoutView.css';
 
 interface Props {
@@ -77,6 +78,8 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   const [planChanges, setPlanChanges] = useState<PlanChange[]>([]);
   const [planDismissed, setPlanDismissed] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // Share-this-workout QR overlay (gym buddy scans it with their camera)
+  const [sharing, setSharing] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   // Increments on every logged set to (re)start the rest timer. Edit mode skips it.
   const [restRunId, setRestRunId] = useState(0);
@@ -306,7 +309,18 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
           <span className="workout-day-label">{day.label}</span>
           <span className="workout-muscles">{day.muscleGroups}</span>
         </div>
+        {!isEditMode && (
+          <button
+            className="workout-share-btn"
+            onClick={() => setSharing(true)}
+            aria-label="Share this workout"
+          >
+            ⇱
+          </button>
+        )}
       </header>
+
+      {sharing && <ShareWorkoutModal day={day} onClose={() => setSharing(false)} />}
 
       <div
         className="exercise-list"
