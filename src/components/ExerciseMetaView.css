@@ -244,3 +244,52 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Admin merge section ── */
+
+.meta-merge-section {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meta-merge-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.meta-merge-reason {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px; /* prevents iOS zoom-on-focus */
+  padding: 12px;
+}
+
+.meta-merge-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--red);
+}
+
+.meta-merge-btn {
+  background: none;
+  border: 1px solid var(--red);
+  border-radius: 10px;
+  color: var(--red);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.meta-merge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

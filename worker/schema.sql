@@ -214,6 +214,17 @@ CREATE TABLE IF NOT EXISTS global_exercise_audit (
   detail_json TEXT
 );
 
+-- Admin exercise merges: from→to id mapping served to every client on pull;
+-- each client remaps its own history/program/library through it (see
+-- worker/migrations/0006_exercise_merges.sql). Audited like every global edit.
+CREATE TABLE IF NOT EXISTS exercise_merges (
+  from_id   TEXT    PRIMARY KEY,
+  to_id     TEXT    NOT NULL,
+  merged_by TEXT    NOT NULL,
+  merged_at INTEGER NOT NULL,
+  reason    TEXT
+);
+
 -- Exercise lifecycle: custom exercises observed in user pushes queue here for
 -- admin review. status: 'pending' | 'approved' | 'rejected'.
 CREATE TABLE IF NOT EXISTS pending_exercises (

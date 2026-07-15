@@ -4,8 +4,10 @@ import {
   type MuscleGroup, type WorkoutType, type Equipment, type WeightType,
 } from '../data/taxonomy';
 import { getExerciseMeta, saveExerciseMeta } from '../data/exercises';
-import { archiveExercise, deleteExerciseFromLibrary } from '../data/programStore';
+import { archiveExercise, deleteExerciseFromLibrary, getExerciseLibrary } from '../data/programStore';
 import { hasSetLogsForExercise, deleteSetLogsByExerciseId } from '../db/database';
+import { getUserRole } from '../data/sync';
+import { getExerciseMerges, saveExerciseMerges, applyExerciseMerges } from '../data/merges';
 import './ExerciseMetaView.css';
 
 interface Props {
@@ -16,7 +18,7 @@ interface Props {
   onDeleted?: () => void;
 }
 
-type Modal = 'confirm-delete' | 'confirm-history';
+type Modal = 'confirm-delete' | 'confirm-history' | 'confirm-merge';
 
 export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onSaved, onDeleted }: Props) {
   const initial = getExerciseMeta(exerciseId);
@@ -32,6 +34,47 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
   const [saved, setSaved] = useState(false);
   const [modal, setModal] = useState<Modal | null>(null);
   const [working, setWorking] = useState(false);
+
+  // Admin-only: merge this exercise into another. The server records the
+  // from→to mapping (audited) and serves it to every client on pull; each
+  // client folds the merged exercise's history into the survivor.
+  const isAdmin = getUserRole() === 'admin';
+  const [mergeTargets] = useState(() =>
+    isAdmin
+      ? getExerciseLibrary()
+          .filter(e => e.id !== exerciseId && !e.archived)
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : [],
+  );
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeReason, setMergeReason] = useState('');
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const mergeTarget = mergeTargets.find(e => e.id === mergeTargetId) ?? null;
+
+  async function handleMerge() {
+    if (!mergeTarget || !mergeReason.trim() || working) return;
+    setWorking(true);
+    setMergeError(null);
+    try {
+      const res = await fetch('/api/admin/merges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromId: exerciseId, toId: mergeTarget.id, reason: mergeReason.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(err?.error ?? `Merge failed (${res.status})`);
+      }
+      // Apply locally right away — other devices pick the mapping up on pull
+      saveExerciseMerges({ ...getExerciseMerges(), [exerciseId]: mergeTarget.id });
+      await applyExerciseMerges();
+      onDeleted?.(); // the merged-away exercise no longer exists — leave the screen
+    } catch (err) {
+      setMergeError(err instanceof Error ? err.message : 'Merge failed');
+      setModal(null);
+      setWorking(false);
+    }
+  }
 
   function handleSave() {
     if (saving) return;
@@ -158,6 +201,39 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
           </div>
         </section>
 
+        {isAdmin && (
+          <section className="meta-section meta-merge-section">
+            <span className="meta-label">Merge into another exercise (admin)</span>
+            <p className="meta-merge-hint">
+              Folds this exercise — including everyone's logged history — into the
+              one you pick. Use it to clean up duplicates. This cannot be undone.
+            </p>
+            <select
+              className="meta-select"
+              value={mergeTargetId}
+              onChange={e => { setMergeTargetId(e.target.value); setMergeError(null); }}
+            >
+              <option value="">— Pick the surviving exercise —</option>
+              {mergeTargets.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <input
+              className="meta-merge-reason"
+              type="text"
+              placeholder="Reason (required, audited)"
+              value={mergeReason}
+              onChange={e => setMergeReason(e.target.value)}
+            />
+            {mergeError && <p className="meta-merge-error">{mergeError}</p>}
+            <button
+              className="meta-merge-btn"
+              disabled={!mergeTarget || !mergeReason.trim() || working}
+              onClick={() => setModal('confirm-merge')}
+            >
+              Merge…
+            </button>
+          </section>
+        )}
+
         <button className="meta-delete-btn" onClick={handleDeletePressed}>
           Delete Exercise
         </button>
@@ -183,6 +259,25 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
               <button className="meta-modal-cancel" onClick={() => setModal(null)}>Cancel</button>
               <button className="meta-modal-danger" onClick={handleDelete} disabled={working}>
                 {working ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Merge confirmation (admin) ── */}
+      {modal === 'confirm-merge' && mergeTarget && (
+        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
+          <div className="meta-modal" onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title">Merge "{exerciseName}" into "{mergeTarget.name}"?</p>
+            <p className="meta-modal-body">
+              All history logged under "{exerciseName}" — for every user — will count
+              as "{mergeTarget.name}" from now on. This cannot be undone.
+            </p>
+            <div className="meta-modal-actions">
+              <button className="meta-modal-cancel" onClick={() => setModal(null)} disabled={working}>Cancel</button>
+              <button className="meta-modal-danger" onClick={handleMerge} disabled={working}>
+                {working ? 'Merging…' : 'Merge'}
               </button>
             </div>
           </div>
