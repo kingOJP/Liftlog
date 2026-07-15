@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { WorkoutDay, Exercise } from '../data/program';
-import { addToExerciseLibrary, generateExerciseId, getExerciseLibrary } from '../data/programStore';
+import { addToExerciseLibrary, findExerciseByName, generateExerciseId, getExerciseLibrary } from '../data/programStore';
 import { getExerciseMeta } from '../data/exercises';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
@@ -129,6 +129,16 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   function handleCreateExercise() {
     const trimmed = search.trim();
     if (!trimmed) return;
+
+    // Never mint a new id for a name that already exists (library or catalog,
+    // slug-compared) — reusing the existing id keeps history in one place
+    // instead of spawning a duplicate exercise.
+    const existing = findExerciseByName(trimmed);
+    if (existing) {
+      if (!dayExerciseIds.has(existing.id)) handleAddFromLibrary(existing);
+      else closeAdd();
+      return;
+    }
 
     const exercise: Exercise = {
       id: generateExerciseId(trimmed),

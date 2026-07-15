@@ -5,6 +5,7 @@ import {
   deleteExerciseFromLibrary, addToExerciseLibrary,
   getDeletedExerciseIds, addDeletedExerciseIds,
   mergeExerciseLibrary, ensureProgramExercisesInLibrary, getExerciseName,
+  findExerciseByName,
 } from './programStore';
 import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta } from './exercises';
 import type { WorkoutDay } from './program';
@@ -169,5 +170,32 @@ describe('getExerciseName — orphaned timestamped ids', () => {
     expect(getExerciseName('face-pulls')).toBe('Face Pulls');
     addToExerciseLibrary({ id: 'my-lift-1782324854942', name: 'My Fancy Lift', sets: 3, repLow: 8, repHigh: 12 });
     expect(getExerciseName('my-lift-1782324854942')).toBe('My Fancy Lift');
+  });
+});
+
+describe('findExerciseByName', () => {
+  it('matches a library exercise regardless of casing, punctuation and spacing', () => {
+    const hit = findExerciseByName('  bench   press?? ');
+    // No "bench press" in the default catalog — seed one as a custom entry
+    expect(hit).toBeNull();
+    addToExerciseLibrary({ id: 'bench-press-1700000000000', name: 'Bench Press', sets: 3, repLow: 8, repHigh: 12 });
+    expect(findExerciseByName('BENCH press!')?.id).toBe('bench-press-1700000000000');
+  });
+
+  it('matches catalog exercises by name or id slug', () => {
+    expect(findExerciseByName('Face Pulls')?.id).toBe('face-pulls');
+    expect(findExerciseByName('face-pulls')?.id).toBe('face-pulls');
+  });
+
+  it('prefers the library entry (the id history is logged under) over the catalog', () => {
+    // A custom duplicate of a catalog exercise shadows it by name
+    addToExerciseLibrary({ id: 'face-pulls-1700000000001', name: 'Face  Pulls', sets: 4, repLow: 12, repHigh: 15 });
+    // Library still contains the canonical face-pulls entry, which sorts first
+    expect(findExerciseByName('Face Pulls')?.id).toBe('face-pulls');
+  });
+
+  it('returns null for unknown names and blank input', () => {
+    expect(findExerciseByName('Jefferson Deficit Zercher Squat')).toBeNull();
+    expect(findExerciseByName('   ')).toBeNull();
   });
 });
