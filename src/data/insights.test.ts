@@ -101,10 +101,39 @@ describe('computeCoaching', () => {
     expect(c.opportunities.length).toBeLessThanOrEqual(3);
   });
 
-  it('suggests the day that has gone longest without training', () => {
+  it('suggests the day after the most recently trained one, in program order', () => {
     const { sessions, setLogs } = flatBenchSessions(); // only day 1 ever trained
     const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
     expect(c.nextDay?.dayId).toBe(2);
     expect(c.nextDay?.lastTrained).toBeNull();
+  });
+
+  it('cycles chronologically even when a later day is staler', () => {
+    // Day 2 trained yesterday, day 3 (of 3) trained long ago, day 1 never:
+    // chronological order says day 3 is next — not day 1, and not staleness
+    // ranking (which would also pick day 1).
+    const threeDayProgram = [...program, {
+      id: 3, label: 'Day 3', muscleGroups: 'Legs',
+      exercises: [{ id: 'leg-press', name: 'Leg Press', sets: 3, repLow: 8, repHigh: 12 }],
+    }];
+    const sessions = [
+      { id: 1, dayId: 3, weekNumber: 1, startedAt: NOW - 30 * DAY, completedAt: NOW - 30 * DAY },
+      { id: 2, dayId: 2, weekNumber: 5, startedAt: NOW - DAY, completedAt: NOW - DAY },
+    ];
+    const setLogs = sessions.map((s, i) => ({
+      id: i + 1, sessionId: s.id, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8,
+    }));
+    const c = computeCoaching(threeDayProgram, buildSnapshot(sessions, setLogs), 5, NOW);
+    expect(c.nextDay?.dayId).toBe(3);
+  });
+
+  it('wraps around after the last program day', () => {
+    const sessions = [
+      { id: 1, dayId: 2, weekNumber: 1, startedAt: NOW - DAY, completedAt: NOW - DAY },
+    ];
+    const setLogs = [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8 }];
+    // program has days 1 and 2 — after day 2, cycle back to day 1
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 2, NOW);
+    expect(c.nextDay?.dayId).toBe(1);
   });
 });

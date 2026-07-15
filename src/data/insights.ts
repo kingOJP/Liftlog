@@ -262,7 +262,11 @@ function capitalize(s: string): string {
   return s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
-// Suggest the program day that has gone longest without being trained.
+// Suggest the next day in program order: the one after the most recently
+// trained program day, wrapping around. Chronological cycling ("did Day 2 →
+// next up is Day 3") beats ranking by time-since-trained, which could jump
+// ahead to a later day just because its last session — maybe in a previous
+// block — was older than the days actually up next.
 function nextDayFromProgram(
   program: WorkoutDay[],
   completed: { dayId: number; completedAt?: number }[],
@@ -273,10 +277,17 @@ function nextDayFromProgram(
     const ts = s.completedAt ?? 0;
     if (ts > (lastByDay.get(s.dayId) ?? 0)) lastByDay.set(s.dayId, ts);
   }
-  const ranked = [...program].sort(
-    (a, b) => (lastByDay.get(a.id) ?? 0) - (lastByDay.get(b.id) ?? 0),
-  );
-  const day = ranked[0];
+
+  // Most recently trained day that still exists in the program (one-off
+  // shared workouts and days removed by a re-plan don't advance the cycle)
+  let latestIdx = -1;
+  let latestTs = 0;
+  program.forEach((d, i) => {
+    const ts = lastByDay.get(d.id) ?? 0;
+    if (ts > latestTs) { latestTs = ts; latestIdx = i; }
+  });
+
+  const day = latestIdx >= 0 ? program[(latestIdx + 1) % program.length] : program[0];
   return {
     dayId: day.id,
     label: day.label,
