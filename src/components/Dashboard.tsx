@@ -14,11 +14,11 @@ interface Props {
   onStartWorkout: (dayId: number) => void;
   onEditDay: (dayId: number) => void;
   onViewHistory: () => void;
-  onViewExercises: () => void;
   onViewMetrics: () => void;
   onViewSettings: () => void;
   onViewJourney: () => void;
   onPlanSetup: () => void;
+  onQuickWorkout: () => void;
 }
 
 function startLabel(startDate: string): string {
@@ -34,8 +34,8 @@ function lastTrainedLabel(ts: number | null): string {
 }
 
 export default function Dashboard({
-  program, onStartWorkout, onEditDay, onViewHistory, onViewExercises, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup,
+  program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
+  onViewJourney, onPlanSetup, onQuickWorkout,
 }: Props) {
   const weekNumber = getWeekNumber();
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
@@ -184,19 +184,33 @@ export default function Dashboard({
             Tell the coach your goal above and it designs your program with you —
             every workout, explained, and yours to adjust before it starts.
           </span>
+          <div className="empty-quick-cta">
+            <span className="empty-quick-or">or</span>
+            <button className="quick-workout-btn" onClick={onQuickWorkout}>
+              ＋ Log a quick workout
+            </button>
+            <span className="empty-quick-hint">
+              Just want to train today? Log a one-off session — no plan required.
+            </span>
+          </div>
         </div>
       ) : (
-        <div className="day-list">
-          {program.map(day => (
-            <DayCard
-              key={day.id}
-              day={day}
-              done={completedDayIds.has(day.id)}
-              onClick={() => onStartWorkout(day.id)}
-              onEdit={() => onEditDay(day.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="day-list">
+            {program.map(day => (
+              <DayCard
+                key={day.id}
+                day={day}
+                done={completedDayIds.has(day.id)}
+                onClick={() => onStartWorkout(day.id)}
+                onEdit={() => onEditDay(day.id)}
+              />
+            ))}
+          </div>
+          <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
+            ＋ Log a one-off workout
+          </button>
+        </>
       )}
 
       <nav className="dash-nav">
@@ -207,10 +221,6 @@ export default function Dashboard({
         <button className="dash-nav-btn" onClick={onViewHistory}>
           <span className="dash-nav-icon">🗓️</span>
           <span>History</span>
-        </button>
-        <button className="dash-nav-btn" onClick={onViewExercises}>
-          <span className="dash-nav-icon">📋</span>
-          <span>Exercises</span>
         </button>
         <button className="dash-nav-btn" onClick={onViewSettings}>
           <span className="dash-nav-icon">⚙️</span>

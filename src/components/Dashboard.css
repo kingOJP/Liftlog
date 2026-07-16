@@ -52,6 +52,61 @@
   max-width: 300px;
 }
 
+/* ── Quick / one-off workout CTA ── */
+.empty-quick-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.empty-quick-or {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty-quick-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+.quick-workout-btn {
+  width: 100%;
+  max-width: 300px;
+  background: var(--bg-card);
+  border: 1px solid var(--purple);
+  border-radius: 12px;
+  color: var(--purple);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+
+.quick-workout-btn:active {
+  background: var(--bg-input);
+}
+
+/* Subtle variant shown below the day list for users who already have a program */
+.quick-workout-btn--inline {
+  max-width: none;
+  margin-top: 12px;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+}
+
 /* ── Journey card ── */
 .journey-card {
   display: flex;
@@ -203,7 +258,7 @@
 /* ── Bottom nav ── */
 .dash-nav {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 

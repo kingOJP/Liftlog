@@ -1,0 +1,15 @@
+.quick-intro {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+/* The Start button is gated until at least one exercise is added. */
+.day-edit-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

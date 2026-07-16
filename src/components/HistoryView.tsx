@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getExerciseName } from '../data/programStore';
 import { SHARED_DAY_ID } from '../data/share';
+import { isQuickWorkout } from '../data/quickWorkout';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { Session, SetLog } from '../db/database';
 import './HistoryView.css';
@@ -36,9 +37,11 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
     let cancelled = false;
     loadTrainingSnapshot().then(snapshot => {
       if (cancelled) return;
+      // allSetsBySession so warm-ups show in history (they're excluded from
+      // metrics, but the user logged them and wants to see them here).
       setEntries(snapshot.sessions.map(session => ({
         session,
-        sets: snapshot.setsBySession.get(session.id!) ?? [],
+        sets: snapshot.allSetsBySession.get(session.id!) ?? [],
       })));
       setLoading(false);
     });
@@ -93,12 +96,14 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                   <span className="history-day-label">
                     {day
                       ? `${day.label} — ${day.muscleGroups}`
-                      : session.dayId === SHARED_DAY_ID
-                        ? 'Shared workout'
-                        : `Day ${session.dayId}`}
+                      : isQuickWorkout(session.dayId)
+                        ? 'Quick workout'
+                        : session.dayId === SHARED_DAY_ID
+                          ? 'Shared workout'
+                          : `Day ${session.dayId}`}
                   </span>
                   <span className="history-summary">
-                    {orderedExercises.length} exercise{orderedExercises.length !== 1 ? 's' : ''} · {sets.length} sets
+                    {orderedExercises.length} exercise{orderedExercises.length !== 1 ? 's' : ''} · {sets.filter(s => !s.warmup).length} sets
                   </span>
                 </div>
                 <span className="history-chevron">{isExpanded ? '▲' : '▼'}</span>
@@ -111,10 +116,11 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                       <span className="history-ex-name">{getExerciseName(exId)}</span>
                       <div className="history-sets">
                         {(grouped[exId] ?? []).map((s, i) => (
-                          <div key={i} className="history-set-row">
+                          <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}`}>
                             <span className="history-set-num">Set {s.setNumber}</span>
                             <span className="history-set-weight">{s.weight} lbs</span>
                             <span className="history-set-reps">{s.reps} reps</span>
+                            {s.warmup && <span className="history-set-warmup">warm-up</span>}
                           </div>
                         ))}
                       </div>

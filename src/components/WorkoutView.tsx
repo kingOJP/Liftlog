@@ -35,7 +35,7 @@ interface Props {
   onComplete: () => void;
 }
 
-type SetEntry = { weight: number; reps: number };
+type SetEntry = { weight: number; reps: number; warmup?: boolean };
 
 // Local-time yyyy-mm-dd for an <input type="date"> value
 function toDateInputValue(ts: number): string {
@@ -209,7 +209,9 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
       for (const sl of setLogs) {
-        (groupedSets[sl.exerciseId] ??= []).push({ weight: sl.weight, reps: sl.reps });
+        (groupedSets[sl.exerciseId] ??= []).push({
+          weight: sl.weight, reps: sl.reps, ...(sl.warmup ? { warmup: true } : {}),
+        });
       }
       setSets(groupedSets);
       // Preserve the session's original exercise order through the rewrite
@@ -218,22 +220,23 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     });
   }, [existingSessionId]);
 
-  function handleLogSet(exerciseId: string, weight: number, reps: number) {
+  function handleLogSet(exerciseId: string, weight: number, reps: number, warmup: boolean) {
     if (!exerciseOrderRef.current.includes(exerciseId)) {
       exerciseOrderRef.current = [...exerciseOrderRef.current, exerciseId];
     }
     setSets(prev => ({
       ...prev,
-      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps }],
+      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps, ...(warmup ? { warmup: true } : {}) }],
     }));
-    if (!isEditMode) setRestRunId(id => id + 1);
+    // Warm-up sets don't start the rest timer — you're not resting between them.
+    if (!isEditMode && !warmup) setRestRunId(id => id + 1);
   }
 
-  function handleEditSet(exerciseId: string, index: number, weight: number, reps: number) {
+  function handleEditSet(exerciseId: string, index: number, weight: number, reps: number, warmup: boolean) {
     setSets(prev => ({
       ...prev,
       [exerciseId]: (prev[exerciseId] ?? []).map((s, i) =>
-        i === index ? { weight, reps } : s
+        i === index ? { weight, reps, ...(warmup ? { warmup: true } : {}) } : s
       ),
     }));
   }
@@ -269,7 +272,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       const orderIdx = exerciseOrderRef.current.indexOf(exerciseId);
       const order = orderIdx >= 0 ? orderIdx : undefined;
       for (let i = 0; i < exerciseSets.length; i++) {
-        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order);
+        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order, exerciseSets[i].warmup);
       }
     }
 
@@ -384,8 +387,8 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             sets={sets[ex.id] ?? []}
             recommendation={recommendations[ex.id]}
             lastSession={lastSessions[ex.id]}
-            onLogSet={(w, r) => handleLogSet(ex.id, w, r)}
-            onEditSet={(i, w, r) => handleEditSet(ex.id, i, w, r)}
+            onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
+            onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
           />
         ))}

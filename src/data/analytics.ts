@@ -23,8 +23,18 @@ export const SETS_TARGET_HIGH = 20;
 export interface TrainingSnapshot {
   /** Completed sessions, newest first */
   sessions: Session[];
-  /** sessionId → its set logs */
+  /**
+   * sessionId → its *working* set logs (warm-ups excluded). This is THE input
+   * to every analytical read — metrics, recommendations, progress, volume,
+   * muscle sets — so warm-up sets can never skew a number. A session that is
+   * all warm-ups simply has no entry here.
+   */
   setsBySession: Map<number, SetLog[]>;
+  /**
+   * sessionId → every logged set, including warm-ups. For display only
+   * (history, editing) — analytics must use setsBySession.
+   */
+  allSetsBySession: Map<number, SetLog[]>;
 }
 
 export function buildSnapshot(sessions: Session[], setLogs: SetLog[]): TrainingSnapshot {
@@ -33,12 +43,18 @@ export function buildSnapshot(sessions: Session[], setLogs: SetLog[]): TrainingS
     .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
 
   const setsBySession = new Map<number, SetLog[]>();
+  const allSetsBySession = new Map<number, SetLog[]>();
   for (const log of setLogs) {
-    const arr = setsBySession.get(log.sessionId);
-    if (arr) arr.push(log);
+    const all = allSetsBySession.get(log.sessionId);
+    if (all) all.push(log);
+    else allSetsBySession.set(log.sessionId, [log]);
+
+    if (log.warmup) continue; // warm-ups are logged and displayed, never counted
+    const working = setsBySession.get(log.sessionId);
+    if (working) working.push(log);
     else setsBySession.set(log.sessionId, [log]);
   }
-  return { sessions: completed, setsBySession };
+  return { sessions: completed, setsBySession, allSetsBySession };
 }
 
 export async function loadTrainingSnapshot(): Promise<TrainingSnapshot> {
