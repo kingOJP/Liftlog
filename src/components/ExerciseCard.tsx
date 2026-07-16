@@ -11,6 +11,9 @@ interface Props {
   onLogSet: (weight: number, reps: number, warmup: boolean) => void;
   onEditSet: (index: number, weight: number, reps: number, warmup: boolean) => void;
   onDeleteSet: (index: number) => void;
+  /** When provided, shows a control to remove this exercise from the workout
+   *  (used for exercises added mid-session). */
+  onRemove?: () => void;
 }
 
 // "100×10, 100×9, 95×8" — compressed to "100 lbs × 10, 9, 8" when the weight
@@ -39,7 +42,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 
 export default function ExerciseCard({
   exercise, sets, recommendation, lastSession,
-  onLogSet, onEditSet, onDeleteSet,
+  onLogSet, onEditSet, onDeleteSet, onRemove,
 }: Props) {
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
@@ -119,6 +122,15 @@ export default function ExerciseCard({
       <div className="ex-header">
         <span className="ex-name">{exercise.name}</span>
         <span className="ex-target">{targetLabel}</span>
+        {onRemove && (
+          <button
+            className="ex-remove-btn"
+            onClick={onRemove}
+            aria-label={`Remove ${exercise.name} from this workout`}
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {recommendation && (

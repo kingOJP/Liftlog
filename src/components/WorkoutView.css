@@ -259,3 +259,23 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Add-an-exercise-mid-workout trigger (the picker panel reuses DayEditView styles) */
+.add-exercise-mid-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.add-exercise-mid-btn:active {
+  border-color: var(--purple);
+  color: var(--purple);
+}
