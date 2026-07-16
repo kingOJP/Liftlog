@@ -298,6 +298,31 @@ export async function migrateExerciseIds(): Promise<number> {
   return toFix.length;
 }
 
+// Remap set-log exercise ids through an admin merge map (data/merges.ts).
+// Same mechanics as migrateExerciseIds, but the map is dynamic (pulled from
+// the server) and every affected session gets its updatedAt bumped so the
+// remapped copy propagates through merge sync as the newer document.
+export async function remapSetLogExerciseIds(map: Record<string, string>): Promise<number> {
+  const db = await openDB();
+  const logs = await idbReq<SetLog[]>(
+    db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
+  );
+  const toFix = logs.filter(l => map[l.exerciseId]);
+  if (toFix.length === 0) return 0;
+
+  const tx = db.transaction('setLogs', 'readwrite');
+  const store = tx.objectStore('setLogs');
+  for (const log of toFix) {
+    store.put({ ...log, exerciseId: map[log.exerciseId] });
+  }
+  await txDone(tx);
+
+  for (const sessionId of new Set(toFix.map(l => l.sessionId))) {
+    await touchSession(sessionId);
+  }
+  return toFix.length;
+}
+
 // Wipes every store. Used when a different account signs in on this device so
 // one user's workout history can never leak into (or be pushed up to) another
 // account.

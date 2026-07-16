@@ -95,7 +95,8 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
 
 async function pull(userId: string, env: Env): Promise<Response> {
   const [sessionDocs, sessionTombstones, program, userExercises, userMeta,
-         userTombstones, legacyTombstones, globalExercises, globalMeta, role, planRow] = await Promise.all([
+         userTombstones, legacyTombstones, globalExercises, globalMeta, role, planRow,
+         mergeRows] = await Promise.all([
     loadSessionDocs(userId, env),
     env.DB.prepare('SELECT guid FROM deleted_sessions WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare(
@@ -118,6 +119,7 @@ async function pull(userId: string, env: Env): Promise<Response> {
     env.DB.prepare(
       'SELECT plan_json FROM training_plans WHERE user_id = ?',
     ).bind(userId).first<{ plan_json: string }>(),
+    env.DB.prepare('SELECT from_id, to_id FROM exercise_merges').all(),
   ]);
 
   const deletedSessionGuids = new Set(sessionTombstones.results.map(r => r.guid as string));
@@ -239,6 +241,11 @@ async function pull(userId: string, env: Env): Promise<Response> {
         equipment:        r.equipment         ?? null,
         weightType:       r.weight_type       ?? null,
       })),
+    // Admin exercise merges (from→to id map) — clients remap their own data
+    exerciseMerges: mergeRows.results.map(r => ({
+      fromId: r.from_id as string,
+      toId:   r.to_id as string,
+    })),
     role,
   });
 }

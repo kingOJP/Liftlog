@@ -16,6 +16,11 @@ import SettingsView from './components/SettingsView';
 import LoginView from './components/LoginView';
 import JourneyView from './components/JourneyView';
 import PlanSetupView from './components/PlanSetupView';
+import SharedWorkoutView from './components/SharedWorkoutView';
+import {
+  captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
+  acceptSharedWorkout, SHARED_DAY_ID,
+} from './data/share';
 import './App.css';
 
 type View =
@@ -29,12 +34,22 @@ type View =
   | { screen: 'metrics' }
   | { screen: 'settings' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' };
+  | { screen: 'plan-setup' }
+  | { screen: 'shared-preview' }
+  | { screen: 'shared-workout' };
 
 function App() {
-  const [view, setView]       = useState<View>({ screen: 'dashboard' });
+  // A scanned share link (/#share=…) is stashed in localStorage before
+  // anything else — including the login redirect — so the import survives
+  // OAuth and lands on the preview screen once the user is signed in.
+  const [view, setView] = useState<View>(() => {
+    captureShareFromUrl();
+    return getPendingSharedWorkout() ? { screen: 'shared-preview' } : { screen: 'dashboard' };
+  });
   const [program, setProgram] = useState<WorkoutDay[]>(getStoredProgram);
   const [user]                = useState<SyncUser | null>(() => getLoggedInUser());
+  // A shared workout being done as a one-off (never added to the program)
+  const [sharedDay, setSharedDay] = useState<WorkoutDay | null>(null);
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
   // The exercise-ID migration runs independently of pull so a sync failure can't
@@ -241,6 +256,53 @@ function App() {
             }}
           />
         );
+      case 'shared-preview': {
+        const shared = getPendingSharedWorkout();
+        if (!shared) break;
+        return (
+          <SharedWorkoutView
+            shared={shared}
+            onStart={() => {
+              // One-off session: the shared exercises join the library (so
+              // history resolves them) but the program stays untouched.
+              const day = acceptSharedWorkout(shared, SHARED_DAY_ID);
+              clearPendingShare();
+              setSharedDay(day);
+              setView({ screen: 'shared-workout' });
+              sync();
+            }}
+            onAddToProgram={() => {
+              const nextId = program.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+              const day = acceptSharedWorkout(shared, nextId, `Day ${program.length + 1}`);
+              clearPendingShare();
+              const next = [...program, day];
+              setProgram(next);
+              saveStoredProgram(next);
+              setView({ screen: 'dashboard' });
+              sync();
+            }}
+            onDismiss={() => {
+              clearPendingShare();
+              setView({ screen: 'dashboard' });
+            }}
+          />
+        );
+      }
+      case 'shared-workout': {
+        if (!sharedDay) break;
+        return (
+          <WorkoutView
+            day={sharedDay}
+            program={program}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onComplete={() => {
+              setSharedDay(null);
+              setView({ screen: 'dashboard' });
+              sync();
+            }}
+          />
+        );
+      }
       case 'dashboard':
         break;
     }

@@ -216,9 +216,29 @@ function humanizeExerciseId(id: string): string {
     .join(' ') || id;
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 export function generateExerciseId(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `${slug}-${Date.now()}`;
+  return `${slugify(name)}-${Date.now()}`;
+}
+
+// Resolve a typed exercise name to an existing exercise so "create" never
+// mints a duplicate identity for something that already exists. Matching is
+// by slug ("Bench  Press!" ≡ "bench press"), library first (the id the user's
+// history is logged under wins), then the built-in catalog — a catalog match
+// also revives a tombstoned entry once it's explicitly re-added.
+export function findExerciseByName(name: string): Exercise | null {
+  const slug = slugify(name);
+  if (!slug) return null;
+  const lib = getExerciseLibrary().find(e => slugify(e.name) === slug);
+  if (lib) return lib;
+  const def = EXERCISES.find(e => e.id === slug || slugify(e.name) === slug);
+  if (def) {
+    return { id: def.id, name: def.name, sets: 3, repLow: 8, repHigh: 12 };
+  }
+  return null;
 }
 
 export function archiveExercise(id: string): void {

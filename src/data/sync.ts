@@ -17,6 +17,8 @@ import {
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
 import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
+import { saveExerciseMerges, applyExerciseMerges } from './merges';
+import type { MergeMap } from './merges';
 import type { PlanState } from './planStore';
 
 export interface SyncUser {
@@ -213,6 +215,8 @@ export async function pullSync(): Promise<boolean> {
     plan?:               PlanState            | null;
     /** Layer 1: admin-curated global metadata (combined muscles + details rows) */
     globalExerciseMetadata?: Array<ExerciseMusclesRow & ExerciseDetailsRow> | null;
+    /** admin exercise merges (from→to id map) — applied to local data below */
+    exerciseMerges?:     Array<{ fromId: string; toId: string }> | null;
     role?:               string               | null;
   };
 
@@ -293,6 +297,20 @@ export async function pullSync(): Promise<boolean> {
       changed = true;
     }
   }
+
+  // Admin exercise merges: replace the stored map wholesale (application-owned,
+  // like the global metadata layer), then apply it to everything local — set
+  // logs, program, library. Runs after the session merge so server documents
+  // that still carry a merged-away id get remapped too; the touched sessions
+  // upload on the next push, converging the server copy.
+  if (data.exerciseMerges) {
+    const map: MergeMap = {};
+    for (const m of data.exerciseMerges) {
+      if (m.fromId && m.toId && m.fromId !== m.toId) map[m.fromId] = m.toId;
+    }
+    saveExerciseMerges(map);
+  }
+  if (await applyExerciseMerges()) changed = true;
 
   // Repair pass: an exercise the program references but the library lost (the
   // old replace-on-pull sync could gut it) is rebuilt from the program slot so

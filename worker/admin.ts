@@ -12,6 +12,10 @@ import { getUserRole } from './roles';
 //                                             { name?, sets?, repLow?, repHigh?, archived?,
 //                                               metadata?: {...}, reason }
 //   GET  /api/admin/audit?exerciseId=...    — change history
+//   GET  /api/admin/merges                  — list exercise merges
+//   POST /api/admin/merges                  — { fromId, toId, reason }: merge one
+//                                             exercise into another (clients remap
+//                                             their history/program/library on pull)
 
 interface PendingReviewBody {
   action: 'approve' | 'reject';
@@ -71,6 +75,17 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     return editGlobal(request, env, user.id, id);
   }
 
+  if (section === 'merges' && request.method === 'GET') {
+    const rows = await env.DB.prepare(
+      'SELECT from_id, to_id, merged_by, merged_at, reason FROM exercise_merges ORDER BY merged_at DESC',
+    ).all();
+    return Response.json({ merges: rows.results });
+  }
+
+  if (section === 'merges' && request.method === 'POST') {
+    return mergeExercises(request, env, user.id);
+  }
+
   if (section === 'audit' && request.method === 'GET') {
     const exerciseId = url.searchParams.get('exerciseId');
     const rows = exerciseId
@@ -84,6 +99,66 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
   }
 
   return new Response('Not Found', { status: 404 });
+}
+
+interface MergeBody {
+  fromId: string;
+  toId: string;
+  reason: string;
+}
+
+// Record a from→to exercise merge. The mapping is served to every client on
+// pull; each client remaps its own set logs / program / library through it,
+// so all history converges under the surviving id. Guards against self-merges
+// and cycles (merging A→B when B already resolves back to A).
+async function mergeExercises(request: Request, env: Env, adminId: string): Promise<Response> {
+  let body: MergeBody;
+  try {
+    body = await request.json() as MergeBody;
+  } catch {
+    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  if (typeof body.fromId !== 'string' || !body.fromId.trim() ||
+      typeof body.toId !== 'string' || !body.toId.trim()) {
+    return Response.json({ error: 'fromId and toId are required' }, { status: 400 });
+  }
+  if (!body.reason || typeof body.reason !== 'string') {
+    return Response.json({ error: 'A reason is required for every merge' }, { status: 400 });
+  }
+  const fromId = body.fromId.trim();
+  const toId = body.toId.trim();
+  if (fromId === toId) {
+    return Response.json({ error: 'Cannot merge an exercise into itself' }, { status: 400 });
+  }
+
+  // Cycle guard: follow the existing chain from toId; if it reaches fromId,
+  // this merge would make resolution loop forever on the clients.
+  const existing = await env.DB.prepare('SELECT from_id, to_id FROM exercise_merges').all();
+  const map = new Map(existing.results.map(r => [r.from_id as string, r.to_id as string]));
+  const seen = new Set<string>();
+  let cur = toId;
+  while (map.has(cur) && !seen.has(cur)) {
+    seen.add(cur);
+    cur = map.get(cur)!;
+    if (cur === fromId) {
+      return Response.json({ error: 'Merge would create a cycle' }, { status: 400 });
+    }
+  }
+
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO exercise_merges (from_id, to_id, merged_by, merged_at, reason) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(from_id) DO UPDATE SET
+         to_id = excluded.to_id, merged_by = excluded.merged_by,
+         merged_at = excluded.merged_at, reason = excluded.reason`,
+    ).bind(fromId, toId, adminId, now, body.reason),
+    env.DB.prepare(
+      `INSERT INTO global_exercise_audit (exercise_id, action, changed_by, changed_at, reason, detail_json)
+       VALUES (?, 'merge', ?, ?, ?, ?)`,
+    ).bind(fromId, adminId, now, body.reason, JSON.stringify({ fromId, toId })),
+  ]);
+  return Response.json({ ok: true });
 }
 
 async function reviewPending(request: Request, env: Env, adminId: string, id: string): Promise<Response> {
