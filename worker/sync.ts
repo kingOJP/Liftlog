@@ -509,7 +509,15 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     stmts.push(env.DB.prepare('DELETE FROM exercise_metadata WHERE exercise_id = ? AND user_id = ?').bind(id, userId));
   }
 
-  if (data.program && data.exercises) {
+  // SAFEGUARD: never let an empty program overwrite a stored one. An empty
+  // array is truthy in JS, so the old `if (data.program)` happily persisted a
+  // wiped program into user_programs, from where every device re-pulled it.
+  // A program with zero days is only valid for a brand-new account that has
+  // never stored one — and that case writes nothing here anyway (no data to
+  // lose). Requiring at least one day makes a bad/empty push a no-op instead
+  // of destroying the server's copy. The library still persists via the
+  // per-row user_exercises upserts above, independent of this row.
+  if (Array.isArray(data.program) && data.program.length > 0 && data.exercises) {
     stmts.push(env.DB.prepare(
       `INSERT INTO user_programs (user_id, program_json, exercises_json) VALUES (?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET

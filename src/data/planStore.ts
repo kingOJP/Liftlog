@@ -105,6 +105,26 @@ export function getActiveBlockInfo(): { plan: TrainingPlan; block: TrainingBlock
   return plan && block ? { plan, block } : null;
 }
 
+/**
+ * SAFEGUARD — self-heal the live program from the active block.
+ *
+ * The active block's program IS the live program (`liftlog_program`);
+ * activation copies it there. If the live program is ever empty while the
+ * active block still holds its workouts — a bad sync, a botched migration, an
+ * app update gone wrong — restore it from the block, which is the source of
+ * truth for what the user is training. This guarantees that having an active
+ * training block can't silently leave you with no workouts. It never fires
+ * when the live program is non-empty (so it can't undo real edits) or when the
+ * block itself has no program (nothing to restore). Returns true if it healed.
+ */
+export function reconcileActiveProgram(): boolean {
+  const info = getActiveBlockInfo();
+  if (!info || info.block.program.length === 0) return false;
+  if (getStoredProgram().length > 0) return false;
+  saveStoredProgram(info.block.program);
+  return true;
+}
+
 /** The phase governing this week's training, or null when nothing is scheduled. */
 export function getActivePhase(now = Date.now()): PhaseKind | null {
   const info = getActiveBlockInfo();

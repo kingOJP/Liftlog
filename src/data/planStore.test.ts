@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getStoredProgram } from './programStore';
+import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { buildSnapshot } from './analytics';
 import type { BlockRetrospective } from './plan';
@@ -23,6 +23,7 @@ import {
   getTrainingProfile,
   hasOnboarded,
   mergeServerPlanState,
+  reconcileActiveProgram,
   saveTrainingProfile,
   startPendingActivation,
 } from './planStore';
@@ -295,5 +296,32 @@ describe('training profile persistence', () => {
     // a newer server document (carrying the profile) replaces local
     expect(mergeServerPlanState({ ...doc, updatedAt: 2000 })).toBe(true);
     expect(getTrainingProfile()?.experience).toBe('advanced');
+  });
+});
+
+describe('reconcileActiveProgram (self-heal a wiped live program)', () => {
+  it('restores the live program from the active block when it was wiped', async () => {
+    activateProposal(makeProposal(), null, JUN1); // installs a 1-day program
+    expect(getStoredProgram()).toHaveLength(1);
+
+    // Simulate the wipe (bad sync / corrupted server row) — journey intact
+    saveStoredProgram([]);
+    expect(getStoredProgram()).toHaveLength(0);
+
+    expect(reconcileActiveProgram()).toBe(true);
+    expect(getStoredProgram()).toHaveLength(1);
+    expect(getStoredProgram()[0].exercises[0].id).toBe('leg-press');
+  });
+
+  it('never touches a non-empty live program (can not undo real edits)', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    saveStoredProgram([{ id: 9, label: 'Custom', muscleGroups: 'X', exercises: [] }]);
+    expect(reconcileActiveProgram()).toBe(false);
+    expect(getStoredProgram()[0].id).toBe(9);
+  });
+
+  it('is a no-op with no active block', () => {
+    expect(reconcileActiveProgram()).toBe(false);
+    expect(getStoredProgram()).toHaveLength(0);
   });
 });
