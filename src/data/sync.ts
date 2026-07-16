@@ -275,7 +275,14 @@ export async function pullSync(): Promise<boolean> {
   // (an older server copy is ignored; the next push uploads ours).
   if (mergeServerPlanState(data.plan ?? null)) changed = true;
 
-  if (data.program) {
+  // SAFEGUARD: an empty incoming program must never overwrite a non-empty
+  // local one. An empty array is a legitimate state only for a brand-new
+  // account; for an existing account it means data loss (a bug, a bad push, a
+  // corrupted server row). Applying it would wipe the user's workouts on every
+  // pull. So we only adopt the server program when it actually has days — or
+  // when the local program is itself empty (a genuinely new device adopting a
+  // real program still works, since that program is non-empty).
+  if (data.program && data.program.length > 0) {
     const incomingProgram = data.program.map(d => ({
       ...d,
       exercises: d.exercises.filter(e => !deleted.has(e.id)),

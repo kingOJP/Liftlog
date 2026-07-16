@@ -3,7 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
-import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation } from './data/planStore';
+import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -87,6 +87,10 @@ function App() {
         await ensureJourneyMigrated();
         // A block approved mid-week installs its workouts on its start date
         if (await startPendingActivation()) setProgram(getStoredProgram());
+        // Self-heal: if the live program was wiped (bad sync / update) but the
+        // active block still holds its workouts, restore them before the push
+        // below carries the repair up to the server.
+        if (reconcileActiveProgram()) setProgram(getStoredProgram());
         // Week numbering follows the synced journey (block start / last block
         // end) — keeps devices consistent without a manual setting.
         ensureWeekAnchor();
@@ -115,9 +119,10 @@ function App() {
         // A pending block whose start date arrived while the app was open
         // installs here (the interval doubles as its scheduler).
         const started = await startPendingActivation();
+        const healed = reconcileActiveProgram();
         if (didPull) ensureWeekAnchor();
-        if (didPull || started) setProgram(getStoredProgram());
-        if (started) pushSync().catch(() => {});
+        if (didPull || started || healed) setProgram(getStoredProgram());
+        if (started || healed) pushSync().catch(() => {});
       } catch {
         // silent — background refresh is best-effort
       }
