@@ -51,17 +51,23 @@ export default function MetricsView({ program, onBack }: Props) {
 
   // Progress report: current-program exercises with enough data, attention
   // items (declining, stalled) first so the page leads with what needs action.
+  // Capped at 5 so the list stays scannable — the top of the sort is the part
+  // that needs attention.
   const programIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
   const statusRank = { declining: 0, stalled: 1, progressing: 2, steady: 3 } as const;
-  const progressReport = (coaching?.progress ?? [])
+  const PROGRESS_LIMIT = 5;
+  const progressAll = (coaching?.progress ?? [])
     .filter(p => programIds.has(p.exerciseId))
     .sort((a, b) => statusRank[a.status] - statusRank[b.status] || b.totalSessions - a.totalSessions);
+  const progressReport = progressAll.slice(0, PROGRESS_LIMIT);
 
-  // PR timeline: every PR event in the recent assessment windows, newest first
+  // PR timeline: every PR event in the recent assessment windows, newest first,
+  // capped to the 5 most recent.
+  const PR_LIMIT = 5;
   const recentPRs = (coaching?.progress ?? [])
     .flatMap(p => p.recentPRs.map(pr => ({ ...pr, name: p.name })))
     .sort((a, b) => b.ts - a.ts)
-    .slice(0, 8);
+    .slice(0, PR_LIMIT);
 
   return (
     <div className="metrics-view">
@@ -174,6 +180,11 @@ export default function MetricsView({ program, onBack }: Props) {
                         </div>
                       ))}
                     </div>
+                    {progressAll.length > PROGRESS_LIMIT && (
+                      <p className="metric-sub">
+                        Showing the {PROGRESS_LIMIT} lifts that need attention most, of {progressAll.length} tracked.
+                      </p>
+                    )}
                   </div>
                 )}
 

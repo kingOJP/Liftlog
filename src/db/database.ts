@@ -31,6 +31,14 @@ export interface SetLog {
    * consumers fall back to set-log insertion order.
    */
   order?: number;
+  /**
+   * Warm-up set. Logged so the user can see it, but excluded from every
+   * analytical read (metrics, recommendations, progress, volume) — the
+   * snapshot keeps warm-ups out of `setsBySession`. Absent/false on working
+   * sets; schemaless like `order`, so no version bump. `undefined` is dropped
+   * by JSON so legacy docs stay byte-identical on the wire.
+   */
+  warmup?: boolean;
 }
 
 // Difficulty ratings — feature removed, store kept for compatibility
@@ -155,12 +163,14 @@ export async function addSetLog(
   weight: number,
   reps: number,
   order?: number,
+  warmup?: boolean,
 ): Promise<void> {
   const db = await openDB();
   await idbReq(
     db.transaction('setLogs', 'readwrite').objectStore('setLogs').add({
       sessionId, exerciseId, setNumber, weight, reps,
       ...(order != null ? { order } : {}),
+      ...(warmup ? { warmup: true } : {}),
     } as SetLog),
   );
 }
@@ -426,6 +436,7 @@ async function writeSessionDoc(db: IDBDatabase, doc: SessionDoc, localId?: numbe
       weight: s.weight,
       reps: s.reps,
       ...(s.order != null ? { order: s.order } : {}),
+      ...(s.warmup ? { warmup: true } : {}),
     } as SetLog);
   }
   await txDone(tx);

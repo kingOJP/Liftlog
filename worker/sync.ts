@@ -26,6 +26,8 @@ interface SetEntry {
   reps: number;
   /** 0-based exercise position within the workout (absent on legacy rows) */
   order?: number;
+  /** Warm-up set — logged but excluded from the client's analytics (absent on working sets) */
+  warmup?: boolean;
 }
 
 interface SessionDoc {
@@ -259,7 +261,7 @@ interface PushPayload {
   // the same deterministic fallbacks the client would (legacy-<startedAt>,
   // completedAt) so identities agree across versions.
   sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number; updatedAt?: number }>;
-  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number }>;
+  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean }>;
   /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
   exerciseLogs:  unknown[];
   deletedSessionGuids?: string[];
@@ -306,7 +308,8 @@ function validatePush(data: PushPayload): string | null {
     if (typeof s.id !== 'number' || typeof s.sessionId !== 'number' ||
         typeof s.exerciseId !== 'string' || typeof s.setNumber !== 'number' ||
         typeof s.weight !== 'number' || typeof s.reps !== 'number' ||
-        (s.order !== undefined && typeof s.order !== 'number')) {
+        (s.order !== undefined && typeof s.order !== 'number') ||
+        (s.warmup !== undefined && typeof s.warmup !== 'boolean')) {
       return 'malformed set log';
     }
   }
@@ -396,8 +399,8 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const setsBySession = new Map<number, SetEntry[]>();
   for (const s of data.setLogs) {
     const arr = setsBySession.get(s.sessionId) ?? [];
-    // undefined order is dropped by JSON.stringify, keeping legacy docs unchanged
-    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order });
+    // undefined order/warmup are dropped by JSON.stringify, keeping legacy docs unchanged
+    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order, warmup: s.warmup });
     setsBySession.set(s.sessionId, arr);
   }
 

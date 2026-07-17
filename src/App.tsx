@@ -13,9 +13,11 @@ import ExerciseListView from './components/ExerciseListView';
 import ExerciseMetaView from './components/ExerciseMetaView';
 import MetricsView from './components/MetricsView';
 import SettingsView from './components/SettingsView';
+import GlossaryView from './components/GlossaryView';
 import LoginView from './components/LoginView';
 import JourneyView from './components/JourneyView';
 import PlanSetupView from './components/PlanSetupView';
+import QuickWorkoutView from './components/QuickWorkoutView';
 import SharedWorkoutView from './components/SharedWorkoutView';
 import {
   captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
@@ -33,8 +35,11 @@ type View =
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
   | { screen: 'settings' }
+  | { screen: 'glossary' }
   | { screen: 'journey' }
   | { screen: 'plan-setup' }
+  | { screen: 'quick-setup' }
+  | { screen: 'quick-workout' }
   | { screen: 'shared-preview' }
   | { screen: 'shared-workout' };
 
@@ -50,6 +55,8 @@ function App() {
   const [user]                = useState<SyncUser | null>(() => getLoggedInUser());
   // A shared workout being done as a one-off (never added to the program)
   const [sharedDay, setSharedDay] = useState<WorkoutDay | null>(null);
+  // A quick/one-off workout assembled in QuickWorkoutView (never added to the program)
+  const [quickDay, setQuickDay] = useState<WorkoutDay | null>(null);
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
   // The exercise-ID migration runs independently of pull so a sync failure can't
@@ -215,7 +222,7 @@ function App() {
       case 'exercise-list':
         return (
           <ExerciseListView
-            onBack={() => setView({ screen: 'dashboard' })}
+            onBack={() => setView({ screen: 'settings' })}
             onSelectExercise={(exerciseId, exerciseName) =>
               setView({ screen: 'exercise-meta', exerciseId, exerciseName })
             }
@@ -239,7 +246,16 @@ function App() {
       case 'metrics':
         return <MetricsView program={program} onBack={() => setView({ screen: 'dashboard' })} />;
       case 'settings':
-        return <SettingsView user={user!} onBack={() => setView({ screen: 'dashboard' })} />;
+        return (
+          <SettingsView
+            user={user!}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onViewExercises={() => setView({ screen: 'exercise-list' })}
+            onViewGlossary={() => setView({ screen: 'glossary' })}
+          />
+        );
+      case 'glossary':
+        return <GlossaryView onBack={() => setView({ screen: 'settings' })} />;
       case 'journey':
         return (
           <JourneyView
@@ -261,6 +277,31 @@ function App() {
             }}
           />
         );
+      case 'quick-setup':
+        return (
+          <QuickWorkoutView
+            onBack={() => setView({ screen: 'dashboard' })}
+            onStart={day => {
+              setQuickDay(day);
+              setView({ screen: 'quick-workout' });
+            }}
+          />
+        );
+      case 'quick-workout': {
+        if (!quickDay) break;
+        return (
+          <WorkoutView
+            day={quickDay}
+            program={program}
+            onBack={() => { setQuickDay(null); setView({ screen: 'dashboard' }); }}
+            onComplete={() => {
+              setQuickDay(null);
+              setView({ screen: 'dashboard' });
+              sync();
+            }}
+          />
+        );
+      }
       case 'shared-preview': {
         const shared = getPendingSharedWorkout();
         if (!shared) break;
@@ -323,11 +364,11 @@ function App() {
             onStartWorkout={dayId => setView({ screen: 'workout', dayId })}
             onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
             onViewHistory={() => setView({ screen: 'history' })}
-            onViewExercises={() => setView({ screen: 'exercise-list' })}
             onViewMetrics={() => setView({ screen: 'metrics' })}
             onViewSettings={() => setView({ screen: 'settings' })}
             onViewJourney={() => setView({ screen: 'journey' })}
             onPlanSetup={() => setView({ screen: 'plan-setup' })}
+            onQuickWorkout={() => setView({ screen: 'quick-setup' })}
           />
         </main>
       </>

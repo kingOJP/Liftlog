@@ -134,6 +134,22 @@
   color: var(--text-muted);
 }
 
+.history-set-row--warmup .history-set-weight {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.history-set-warmup {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #E8A64C;
+  background: rgba(232, 166, 76, 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
 .edit-session-btn {
   margin-top: 4px;
   width: 100%;

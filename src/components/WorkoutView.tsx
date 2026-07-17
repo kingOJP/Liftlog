@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import type { WorkoutDay } from '../data/program';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import type { WorkoutDay, Exercise } from '../data/program';
 import { getWeekNumber, getWeekNumberForDate } from '../data/program';
 import { computeProgramPlan, applyPlanToDay } from '../data/coach';
 import type { PlanChange } from '../data/coach';
@@ -14,14 +14,18 @@ import {
   updateSessionDate,
 } from '../db/database';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
+import type { TrainingSnapshot } from '../data/analytics';
 import { calculateRecommendation } from '../data/recommendations';
 import type { WeightRec, ExerciseSession } from '../data/recommendations';
 import { getExerciseMeta } from '../data/exercises';
 import { getActivePhase } from '../data/planStore';
 import { PHASE_INFO } from '../data/plan';
+import type { PhaseKind } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
+import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
+import AddExercisePanel from './AddExercisePanel';
 import RestTimer from './RestTimer';
 import ShareWorkoutModal from './ShareWorkoutModal';
 import './WorkoutView.css';
@@ -35,7 +39,7 @@ interface Props {
   onComplete: () => void;
 }
 
-type SetEntry = { weight: number; reps: number };
+type SetEntry = { weight: number; reps: number; warmup?: boolean };
 
 // Local-time yyyy-mm-dd for an <input type="date"> value
 function toDateInputValue(ts: number): string {
@@ -55,6 +59,42 @@ function dateInputToTimestamp(value: string, originalTs: number): number {
   ).getTime();
 }
 
+// Build an Exercise for an id logged in the session but not part of the day's
+// design — added mid-workout, or (in edit mode) an exercise the day no longer
+// lists — so it still renders. Library entry first, then a sensible default.
+function exerciseFromId(id: string): Exercise {
+  const lib = getExerciseLibrary().find(e => e.id === id);
+  if (lib) return { id, name: lib.name, sets: lib.sets, repLow: lib.repLow, repHigh: lib.repHigh };
+  return { id, name: getExerciseName(id), sets: 3, repLow: 8, repHigh: 12 };
+}
+
+// Recommendation + "last time" context for one exercise, from a snapshot.
+function contextForExercise(
+  ex: Exercise,
+  snapshot: TrainingSnapshot,
+  positions: ReturnType<typeof snapshotPositions>,
+  phase: PhaseKind | null,
+): { rec?: WeightRec; last?: ExerciseSession } {
+  const history: ExerciseSession[] = [];
+  for (const session of snapshot.sessions) { // newest first
+    const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
+      .filter(s => s.exerciseId === ex.id)
+      .sort((a, b) => a.setNumber - b.setNumber)
+      .map(s => ({ weight: s.weight, reps: s.reps }));
+    if (exSets.length > 0) {
+      history.push({
+        completedAt: sessionTimestamp(session),
+        sets: exSets,
+        position: positions.get(session.id!)?.get(ex.id) ?? null,
+      });
+    }
+    if (history.length >= 4) break;
+  }
+  if (history.length === 0) return {};
+  const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType, phase);
+  return { last: history[0], rec: rec ?? undefined };
+}
+
 export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
   const isEditMode = existingSessionId !== undefined;
   // The training-block phase governing this week — planned deload/recovery
@@ -70,9 +110,18 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // every set log so the progress engine can tell "benched 4th" from
   // "benched 1st" when reading trends.
   const exerciseOrderRef = useRef<string[]>(restoredDraft?.order ?? []);
-  const [recommendations, setRecommendations] = useState<Record<string, WeightRec>>({});
-  // Per exercise: the most recent session it appeared in (for the "last time" line)
-  const [lastSessions, setLastSessions] = useState<Record<string, ExerciseSession>>({});
+  // Exercises added on the fly during the workout (or, in edit mode, ones the
+  // logged session has that the day's design no longer lists). They're appended
+  // after the day's exercises and logged like any other. Restored from a draft.
+  const [addedExercises, setAddedExercises] = useState<Exercise[]>(() => {
+    if (isEditMode || !restoredDraft) return [];
+    const dayIds = new Set(day.exercises.map(e => e.id));
+    return Object.keys(restoredDraft.sets).filter(id => !dayIds.has(id)).map(exerciseFromId);
+  });
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  // The loaded snapshot — kept so context for a mid-workout exercise can be
+  // computed without another IndexedDB read.
+  const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   // The day as the coach adjusted it (set counts), plus what changed and why
   const [effectiveDay, setEffectiveDay] = useState<WorkoutDay>(day);
   const [planChanges, setPlanChanges] = useState<PlanChange[]>([]);
@@ -118,7 +167,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       setAtBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - 24);
     });
     return () => cancelAnimationFrame(raf);
-  }, [sets, effectiveDay, planDismissed, restRunId, loading]);
+  }, [sets, effectiveDay, addedExercises, showAddPanel, planDismissed, restRunId, loading]);
 
   // Stamp the time of the most recent set activity — completedAt uses it so
   // the session duration reflects training time, not phone-in-hand time.
@@ -151,53 +200,39 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   const [dateInput, setDateInput] = useState('');
   const [maxDate] = useState(() => toDateInputValue(Date.now())); // can't re-date into the future
 
-  // Build each exercise's recent history (across all days it appears in, not
-  // just this one) to drive recommendations and the "last time" context line.
-  // The coach's program plan is overlaid first so recommendations target the
-  // adjusted set counts.
+  // Load the snapshot once and overlay the coach's program plan (adjusted set
+  // counts). The snapshot is kept in state so a mid-workout exercise can be
+  // given the same context without another read.
   useEffect(() => {
     if (isEditMode) return;
     let cancelled = false;
-    loadTrainingSnapshot().then(snapshot => {
+    loadTrainingSnapshot().then(snap => {
       if (cancelled) return;
-
-      const plan = computeProgramPlan(program, snapshot, Date.now(), phase);
+      setSnapshot(snap);
+      const plan = computeProgramPlan(program, snap, Date.now(), phase);
       const adjusted = applyPlanToDay(day, plan);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);
-
-      const recs: Record<string, WeightRec> = {};
-      const lasts: Record<string, ExerciseSession> = {};
-      // Where each exercise sat within each past workout — freshness context
-      // for the recommendation engine.
-      const positions = snapshotPositions(snapshot);
-
-      for (const ex of adjusted.exercises) {
-        const history: ExerciseSession[] = [];
-        for (const session of snapshot.sessions) { // newest first
-          const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
-            .filter(s => s.exerciseId === ex.id)
-            .sort((a, b) => a.setNumber - b.setNumber)
-            .map(s => ({ weight: s.weight, reps: s.reps }));
-          if (exSets.length > 0) {
-            history.push({
-              completedAt: sessionTimestamp(session),
-              sets: exSets,
-              position: positions.get(session.id!)?.get(ex.id) ?? null,
-            });
-          }
-          if (history.length >= 4) break;
-        }
-        if (history.length === 0) continue;
-        lasts[ex.id] = history[0];
-        const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType, phase);
-        if (rec != null) recs[ex.id] = rec;
-      }
-      setRecommendations(recs);
-      setLastSessions(lasts);
     });
     return () => { cancelled = true; };
   }, [day, program, isEditMode, phase]);
+
+  // Recommendations + "last time" context for every rendered exercise (the
+  // day's plus any added mid-workout), derived from the snapshot. Recomputes
+  // when an exercise is added so a newcomer gets its history-driven rec too.
+  const { recommendations, lastSessions } = useMemo(() => {
+    const recs: Record<string, WeightRec> = {};
+    const lasts: Record<string, ExerciseSession> = {};
+    if (snapshot) {
+      const positions = snapshotPositions(snapshot);
+      for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
+        const { rec, last } = contextForExercise(ex, snapshot, positions, phase);
+        if (last) lasts[ex.id] = last;
+        if (rec) recs[ex.id] = rec;
+      }
+    }
+    return { recommendations: recs, lastSessions: lasts };
+  }, [snapshot, effectiveDay, addedExercises, phase]);
 
   useEffect(() => {
     if (!existingSessionId) return;
@@ -209,31 +244,39 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
       for (const sl of setLogs) {
-        (groupedSets[sl.exerciseId] ??= []).push({ weight: sl.weight, reps: sl.reps });
+        (groupedSets[sl.exerciseId] ??= []).push({
+          weight: sl.weight, reps: sl.reps, ...(sl.warmup ? { warmup: true } : {}),
+        });
       }
       setSets(groupedSets);
       // Preserve the session's original exercise order through the rewrite
       exerciseOrderRef.current = Object.keys(groupedSets);
+      // Any logged exercise the day's design no longer lists still needs to
+      // render (and stay editable) — surface it as an "added" exercise.
+      const dayIds = new Set(day.exercises.map(e => e.id));
+      const extras = Object.keys(groupedSets).filter(id => !dayIds.has(id));
+      if (extras.length > 0) setAddedExercises(extras.map(exerciseFromId));
       setLoading(false);
     });
-  }, [existingSessionId]);
+  }, [existingSessionId, day]);
 
-  function handleLogSet(exerciseId: string, weight: number, reps: number) {
+  function handleLogSet(exerciseId: string, weight: number, reps: number, warmup: boolean) {
     if (!exerciseOrderRef.current.includes(exerciseId)) {
       exerciseOrderRef.current = [...exerciseOrderRef.current, exerciseId];
     }
     setSets(prev => ({
       ...prev,
-      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps }],
+      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps, ...(warmup ? { warmup: true } : {}) }],
     }));
-    if (!isEditMode) setRestRunId(id => id + 1);
+    // Warm-up sets don't start the rest timer — you're not resting between them.
+    if (!isEditMode && !warmup) setRestRunId(id => id + 1);
   }
 
-  function handleEditSet(exerciseId: string, index: number, weight: number, reps: number) {
+  function handleEditSet(exerciseId: string, index: number, weight: number, reps: number, warmup: boolean) {
     setSets(prev => ({
       ...prev,
       [exerciseId]: (prev[exerciseId] ?? []).map((s, i) =>
-        i === index ? { weight, reps } : s
+        i === index ? { weight, reps, ...(warmup ? { warmup: true } : {}) } : s
       ),
     }));
   }
@@ -243,6 +286,29 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       ...prev,
       [exerciseId]: (prev[exerciseId] ?? []).filter((_, i) => i !== index),
     }));
+  }
+
+  // Append an exercise picked mid-workout. Its identity/library membership is
+  // already settled by AddExercisePanel; here we just render it (deduped) and
+  // the context effect gives it a recommendation.
+  function handleAddExercise(ex: Exercise) {
+    setShowAddPanel(false);
+    const present = new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id));
+    if (present.has(ex.id)) return;
+    setAddedExercises(prev => [...prev, ex]);
+  }
+
+  // Remove a mid-workout exercise (and any sets logged under it). Only exercises
+  // added this session are removable here — the day's own exercises are edited
+  // from the day editor.
+  function handleRemoveAdded(exerciseId: string) {
+    setAddedExercises(prev => prev.filter(e => e.id !== exerciseId));
+    setSets(prev => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
+    exerciseOrderRef.current = exerciseOrderRef.current.filter(id => id !== exerciseId);
   }
 
   async function handleFinish() {
@@ -269,7 +335,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       const orderIdx = exerciseOrderRef.current.indexOf(exerciseId);
       const order = orderIdx >= 0 ? orderIdx : undefined;
       for (let i = 0; i < exerciseSets.length; i++) {
-        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order);
+        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order, exerciseSets[i].warmup);
       }
     }
 
@@ -384,11 +450,36 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             sets={sets[ex.id] ?? []}
             recommendation={recommendations[ex.id]}
             lastSession={lastSessions[ex.id]}
-            onLogSet={(w, r) => handleLogSet(ex.id, w, r)}
-            onEditSet={(i, w, r) => handleEditSet(ex.id, i, w, r)}
+            onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
+            onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
           />
         ))}
+        {addedExercises.map(ex => (
+          <ExerciseCard
+            key={ex.id}
+            exercise={ex}
+            sets={sets[ex.id] ?? []}
+            recommendation={recommendations[ex.id]}
+            lastSession={lastSessions[ex.id]}
+            onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
+            onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
+            onDeleteSet={i => handleDeleteSet(ex.id, i)}
+            onRemove={() => handleRemoveAdded(ex.id)}
+          />
+        ))}
+
+        {showAddPanel ? (
+          <AddExercisePanel
+            excludeIds={new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id))}
+            onAdd={handleAddExercise}
+            onClose={() => setShowAddPanel(false)}
+          />
+        ) : (
+          <button className="add-exercise-mid-btn" onClick={() => setShowAddPanel(true)}>
+            ＋ Add exercise
+          </button>
+        )}
       </div>
 
       {!isEditMode && <RestTimer runId={restRunId} onDismiss={() => setRestRunId(0)} />}

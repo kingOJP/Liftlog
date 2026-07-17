@@ -8,9 +8,11 @@ import './SettingsView.css';
 interface Props {
   user: SyncUser;
   onBack: () => void;
+  onViewExercises: () => void;
+  onViewGlossary: () => void;
 }
 
-export default function SettingsView({ user, onBack }: Props) {
+export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
 
   function handleRestChange(seconds: number) {
@@ -26,6 +28,26 @@ export default function SettingsView({ user, onBack }: Props) {
       </header>
 
       <div className="settings-body">
+        <section className="settings-section">
+          <span className="settings-label">Library</span>
+          <button className="settings-nav-row" onClick={onViewExercises}>
+            <span className="settings-nav-icon">📋</span>
+            <span className="settings-nav-text">
+              <span className="settings-nav-title">Exercises</span>
+              <span className="settings-nav-sub">Browse the library and edit muscle groups &amp; equipment</span>
+            </span>
+            <span className="settings-nav-chevron">›</span>
+          </button>
+          <button className="settings-nav-row" onClick={onViewGlossary}>
+            <span className="settings-nav-icon">📖</span>
+            <span className="settings-nav-text">
+              <span className="settings-nav-title">Glossary of terms</span>
+              <span className="settings-nav-sub">What e1RM, hard sets, deloads and blocks mean</span>
+            </span>
+            <span className="settings-nav-chevron">›</span>
+          </button>
+        </section>
+
         <section className="settings-section">
           <span className="settings-label">Default rest timer</span>
           <div className="settings-rest-presets">

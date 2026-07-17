@@ -13,7 +13,7 @@ export interface DraftSession {
   /** When the workout view was opened — preserved so duration stays correct */
   startedAt: number;
   savedAt: number;
-  sets: Record<string, Array<{ weight: number; reps: number }>>;
+  sets: Record<string, Array<{ weight: number; reps: number; warmup?: boolean }>>;
   /** exercise ids in the order they were first trained (order tracking) */
   order?: string[];
 }
