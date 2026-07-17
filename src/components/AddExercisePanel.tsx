@@ -10,16 +10,23 @@ interface Props {
   /** Exercises already present — hidden from results and never re-added */
   excludeIds: Set<string>;
   onAdd: (ex: Exercise) => void;
-  onClose: () => void;
+  /** Close the panel. Optional in persistent mode (no Cancel button). */
+  onClose?: () => void;
+  /** Label on the create-confirm button (default "Add to Workout") */
+  confirmLabel?: string;
+  /** Stay open after adding (multi-add flows): resets the search instead of
+   *  closing, and hides the Cancel button. */
+  persistent?: boolean;
 }
 
-// Search-the-library-then-create exercise picker, shared by the workout view's
-// "add exercise mid-workout" flow. Resolving a typed name through
-// findExerciseByName reuses an existing identity so history stays in one place.
-export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) {
+// THE search-the-library-then-create exercise picker, shared by the workout
+// view's mid-session add, the day editor and the quick-workout builder.
+// Resolving a typed name through findExerciseByName reuses an existing
+// identity so history stays in one place instead of spawning duplicates.
+export default function AddExercisePanel({ excludeIds, onAdd, onClose, confirmLabel = 'Add to Workout', persistent = false }: Props) {
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
-  const [library] = useState<Exercise[]>(() => getExerciseLibrary());
+  const [library, setLibrary] = useState<Exercise[]>(() => getExerciseLibrary());
   const [newSets, setNewSets] = useState('3');
   const [newRepLow, setNewRepLow] = useState('8');
   const [newRepHigh, setNewRepHigh] = useState('12');
@@ -37,9 +44,21 @@ export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) 
     return q !== '' && library.some(e => e.name.trim().toLowerCase() === q);
   }, [library, search]);
 
+  // In persistent mode the panel resets for the next add; otherwise the parent
+  // closes it via onAdd/onClose.
+  function reset() {
+    setSearch('');
+    setCreating(false);
+    setNewSets('3');
+    setNewRepLow('8');
+    setNewRepHigh('12');
+    setLibrary(getExerciseLibrary()); // pick up anything just created
+  }
+
   function commit(ex: Exercise) {
     addToExerciseLibrary(ex);
     onAdd(ex);
+    if (persistent) reset();
   }
 
   function handleAddFromLibrary(ex: Exercise) {
@@ -52,7 +71,8 @@ export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) 
     const existing = findExerciseByName(trimmed);
     if (existing) {
       if (!excludeIds.has(existing.id)) handleAddFromLibrary(existing);
-      else onClose();
+      else if (persistent) reset();
+      else onClose?.();
       return;
     }
     commit({
@@ -72,7 +92,7 @@ export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) 
         placeholder="Search exercises…"
         value={search}
         onChange={e => setSearch(e.target.value)}
-        autoFocus
+        autoFocus={!persistent}
       />
 
       {!creating && (
@@ -102,7 +122,9 @@ export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) 
             </button>
           )}
 
-          <button className="add-panel-cancel" onClick={onClose}>Cancel</button>
+          {!persistent && (
+            <button className="add-panel-cancel" onClick={onClose}>Cancel</button>
+          )}
         </>
       )}
 
@@ -128,7 +150,7 @@ export default function AddExercisePanel({ excludeIds, onAdd, onClose }: Props) 
           </div>
           <div className="add-exercise-actions">
             <button className="add-ex-confirm-btn" onClick={handleCreate} disabled={!search.trim()}>
-              Add to Workout
+              {confirmLabel}
             </button>
             <button className="add-ex-cancel-btn" onClick={() => setCreating(false)}>Back</button>
           </div>

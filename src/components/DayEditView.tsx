@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { WorkoutDay, Exercise } from '../data/program';
-import { addToExerciseLibrary, findExerciseByName, generateExerciseId, getExerciseLibrary } from '../data/programStore';
-import { getExerciseMeta } from '../data/exercises';
+import { addToExerciseLibrary } from '../data/programStore';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { suggestReplacements, profileFor } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
+import AddExercisePanel from './AddExercisePanel';
 import './DayEditView.css';
 
 interface Props {
@@ -18,15 +18,9 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   const [muscleGroups, setMuscleGroups] = useState(day.muscleGroups);
   const [exercises, setExercises] = useState<Exercise[]>(day.exercises);
 
-  // Add-exercise flow: a search box filters the existing library first; only
-  // when nothing matches does the user fall through to creating a new exercise.
+  // Add-exercise flow: the shared AddExercisePanel searches the library first;
+  // only when nothing matches does the user fall through to creating one.
   const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [library, setLibrary] = useState<Exercise[]>([]);
-  const [newSets, setNewSets] = useState('3');
-  const [newRepLow, setNewRepLow] = useState('8');
-  const [newRepHigh, setNewRepHigh] = useState('12');
 
   // Replacement suggestions personalize on training history (familiarity,
   // strength trends, weekly volume balance) — loaded once, used lazily.
@@ -47,21 +41,6 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
 
   // Exercises already in this day can't be added again (id is the row key).
   const dayExerciseIds = useMemo(() => new Set(exercises.map(e => e.id)), [exercises]);
-
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return library
-      .filter(e => !e.archived && !dayExerciseIds.has(e.id))
-      .filter(e => q === '' || e.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [library, dayExerciseIds, search]);
-
-  // Only offer "create new" when the typed name isn't already a library entry
-  // (regardless of day membership), so we never spawn a duplicate name.
-  const exactMatch = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return q !== '' && library.some(e => e.name.trim().toLowerCase() === q);
-  }, [library, search]);
 
   function handleReplace(oldEx: Exercise, s: ReplacementSuggestion) {
     // The accepted exercise becomes first-class: it joins the library (lifting
@@ -94,63 +73,6 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
 
   function handleRemove(id: string) {
     setExercises(prev => prev.filter(e => e.id !== id));
-  }
-
-  function openAdd() {
-    setLibrary(getExerciseLibrary());
-    setSearch('');
-    setCreating(false);
-    setShowAdd(true);
-  }
-
-  function closeAdd() {
-    setShowAdd(false);
-    setSearch('');
-    setCreating(false);
-    setNewSets('3');
-    setNewRepLow('8');
-    setNewRepHigh('12');
-  }
-
-  // Pick an existing library exercise: reuse its id (so history resolves) and
-  // its stored sets/rep range. addToExerciseLibrary lifts any deletion tombstone.
-  function handleAddFromLibrary(ex: Exercise) {
-    addToExerciseLibrary(ex);
-    setExercises(prev => [...prev, {
-      id: ex.id,
-      name: ex.name,
-      sets: ex.sets,
-      repLow: ex.repLow,
-      repHigh: ex.repHigh,
-    }]);
-    closeAdd();
-  }
-
-  function handleCreateExercise() {
-    const trimmed = search.trim();
-    if (!trimmed) return;
-
-    // Never mint a new id for a name that already exists (library or catalog,
-    // slug-compared) — reusing the existing id keeps history in one place
-    // instead of spawning a duplicate exercise.
-    const existing = findExerciseByName(trimmed);
-    if (existing) {
-      if (!dayExerciseIds.has(existing.id)) handleAddFromLibrary(existing);
-      else closeAdd();
-      return;
-    }
-
-    const exercise: Exercise = {
-      id: generateExerciseId(trimmed),
-      name: trimmed,
-      sets: Number(newSets) || 3,
-      repLow: Number(newRepLow) || 8,
-      repHigh: Number(newRepHigh) || 12,
-    };
-
-    addToExerciseLibrary(exercise);
-    setExercises(prev => [...prev, exercise]);
-    closeAdd();
   }
 
   function handleSave() {
@@ -267,119 +189,21 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
           </div>
 
           {!showAdd && (
-            <button className="add-exercise-trigger" onClick={openAdd}>
+            <button className="add-exercise-trigger" onClick={() => setShowAdd(true)}>
               + Add Exercise
             </button>
           )}
 
           {showAdd && (
-            <div className="add-exercise-panel">
-              <input
-                className="day-edit-text-input"
-                type="text"
-                placeholder="Search exercises…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                autoFocus
-              />
-
-              {!creating && (
-                <>
-                  <div className="add-search-results">
-                    {searchResults.map(ex => {
-                      const muscle = getExerciseMeta(ex.id).primaryMuscle;
-                      return (
-                        <button
-                          key={ex.id}
-                          className="add-search-result"
-                          onClick={() => handleAddFromLibrary(ex)}
-                        >
-                          <span className="add-search-name">{ex.name}</span>
-                          <span className="add-search-meta">
-                            {[muscle, `${ex.sets} × ${ex.repLow}–${ex.repHigh}`]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {searchResults.length === 0 && (
-                      <p className="add-search-empty">
-                        {search.trim()
-                          ? 'No matching exercise in your library.'
-                          : 'Type to search, or create a new exercise below.'}
-                      </p>
-                    )}
-                  </div>
-
-                  {search.trim() && !exactMatch && (
-                    <button className="add-create-trigger" onClick={() => setCreating(true)}>
-                      + Create “{search.trim()}”
-                    </button>
-                  )}
-
-                  <button className="add-panel-cancel" onClick={closeAdd}>
-                    Cancel
-                  </button>
-                </>
-              )}
-
-              {creating && (
-                <>
-                  <span className="add-create-name">New exercise: {search.trim()}</span>
-                  <div className="add-exercise-nums">
-                    <label className="num-label">
-                      <span>Sets</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newSets}
-                        onChange={e => setNewSets(e.target.value)}
-                      />
-                    </label>
-                    <label className="num-label">
-                      <span>Rep Low</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newRepLow}
-                        onChange={e => setNewRepLow(e.target.value)}
-                      />
-                    </label>
-                    <label className="num-label">
-                      <span>Rep High</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newRepHigh}
-                        onChange={e => setNewRepHigh(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="add-exercise-actions">
-                    <button
-                      className="add-ex-confirm-btn"
-                      onClick={handleCreateExercise}
-                      disabled={!search.trim()}
-                    >
-                      Add to Day
-                    </button>
-                    <button
-                      className="add-ex-cancel-btn"
-                      onClick={() => setCreating(false)}
-                    >
-                      Back
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <AddExercisePanel
+              excludeIds={dayExerciseIds}
+              confirmLabel="Add to Day"
+              onAdd={ex => {
+                setExercises(prev => [...prev, ex]);
+                setShowAdd(false);
+              }}
+              onClose={() => setShowAdd(false)}
+            />
           )}
         </section>
       </div>

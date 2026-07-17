@@ -79,6 +79,32 @@ describe('suggestReplacements', () => {
     expect(suggestions.length).toBeGreaterThan(0);
   });
 
+  it('does not treat a name-subset pair with different movement patterns as the same lift', () => {
+    // A custom exercise named just "Squat" token-subsets every squat-family
+    // name — but "Bulgarian Split Squat" is a Lunge-pattern movement, not the
+    // same lift, so it must stay suggestible.
+    localStorage.setItem('liftlog_library_v3', '1');
+    localStorage.setItem('liftlog_exercises', JSON.stringify([
+      { id: 'squat-1780000000000', name: 'Squat', sets: 3, repLow: 8, repHigh: 12 },
+    ]));
+    localStorage.setItem('liftlog_exercise_meta', JSON.stringify({
+      'squat-1780000000000': {
+        primaryMuscle: 'Quads', secondaryMuscle1: 'Glutes', secondaryMuscle2: null,
+        secondaryMuscle3: null, workoutType: 'Squat', equipment: 'Squat Rack', weightType: 'Barbell',
+      },
+    }));
+    const legDay: WorkoutDay = {
+      id: 3, label: 'Day 3', muscleGroups: 'Legs',
+      exercises: [{ id: 'squat-1780000000000', name: 'Squat', sets: 3, repLow: 8, repHigh: 12 }],
+    };
+    const suggestions = suggestReplacements(legDay.exercises[0], legDay, null, 20, NOW);
+    // Same pattern + subset name → same lift, excluded
+    expect(suggestions.some(s => s.exercise.id === 'hack-squat')).toBe(false);
+    expect(suggestions.some(s => s.exercise.id === 'goblet-squat')).toBe(false);
+    // Different pattern (Lunge) → a real alternative, allowed through
+    expect(suggestions.some(s => s.exercise.id === 'bulgarian-split-squat')).toBe(true);
+  });
+
   it('never suggests the same movement twice under different names', () => {
     // Target a triceps slot: the catalog holds both 'Cable Pushdown' and
     // 'Tricep Cable Pushdown' — only one may make the shortlist.

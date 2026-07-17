@@ -23,6 +23,7 @@ import {
   captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
   acceptSharedWorkout, SHARED_DAY_ID,
 } from './data/share';
+import { isQuickWorkout } from './data/quickWorkout';
 import './App.css';
 
 type View =
@@ -186,8 +187,19 @@ function App() {
         );
       }
       case 'edit-session': {
-        const day = findDay(view.dayId);
-        if (!day) break;
+        // Sessions can outlive their day's design: quick workouts (-2), shared
+        // one-offs (-1), and days removed by a re-plan. WorkoutView's edit mode
+        // renders every logged exercise regardless of the day's exercise list,
+        // so a stub day keeps those sessions editable instead of silently
+        // bouncing back to the dashboard.
+        const day = findDay(view.dayId) ?? {
+          id: view.dayId,
+          label: isQuickWorkout(view.dayId) ? 'Quick Workout'
+            : view.dayId === SHARED_DAY_ID ? 'Shared Workout'
+            : `Day ${view.dayId}`,
+          muscleGroups: 'Logged session',
+          exercises: [],
+        };
         return (
           <WorkoutView
             day={day}

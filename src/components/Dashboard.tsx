@@ -55,10 +55,15 @@ export default function Dashboard({
       if (cancelled) return;
       // "Done this week" is time-windowed (Mon–Sun), not weekNumber-matched:
       // activating a new block re-anchors week numbering, and old sessions
-      // sharing a week number must not mark this week's days as done.
+      // sharing a week number must not mark this week's days as done. Only
+      // program days count — quick/shared one-offs (negative dayIds) would
+      // otherwise inflate the "X of N done" tally.
       const weekStart = mondayOf(new Date()).getTime();
+      const programDayIds = new Set(program.map(d => d.id));
       setCompletedDayIds(new Set(
-        snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
+        snapshot.sessions
+          .filter(s => sessionTimestamp(s) >= weekStart && programDayIds.has(s.dayId))
+          .map(s => s.dayId),
       ));
       setCoaching(computeCoaching(program, snapshot, weekNumber, Date.now(), phase, goal));
     });

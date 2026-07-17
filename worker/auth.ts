@@ -100,6 +100,11 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
     `INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
   ).bind(token, gUser.sub, expiresAt).run();
 
+  // Opportunistic hygiene: expired sessions are dead weight (and dead tokens)
+  // — sweep them whenever someone signs in.
+  await env.DB.prepare(`DELETE FROM user_sessions WHERE expires_at < ?`)
+    .bind(Date.now()).run();
+
   // Non-sensitive user info readable by JS (no passwords, no session token)
   const userJson = encodeURIComponent(JSON.stringify({ email: gUser.email, name: gUser.name }));
 

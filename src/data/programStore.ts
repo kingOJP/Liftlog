@@ -76,13 +76,22 @@ export function clearExerciseLibraryData(): void {
 // sync (a stale server/device copy re-adding it) and through the default
 // library rebuild. Tombstones are per-user, synced, filtered on every read.
 
+// Parse-cache keyed on the raw stored string (same pattern as the metadata
+// caches in exercises.ts): tombstones are re-read for every library read, and
+// keying on the raw string keeps direct writes naturally cache-coherent.
+let deletedCacheRaw: string | null = null;
+let deletedCache = new Set<string>();
+
 export function getDeletedExerciseIds(): Set<string> {
+  const raw = localStorage.getItem(DELETED_KEY);
+  if (raw === deletedCacheRaw) return new Set(deletedCache);
   try {
-    const raw = localStorage.getItem(DELETED_KEY);
-    return new Set(raw ? JSON.parse(raw) as string[] : []);
+    deletedCache = new Set(raw ? JSON.parse(raw) as string[] : []);
   } catch {
-    return new Set();
+    deletedCache = new Set();
   }
+  deletedCacheRaw = raw;
+  return new Set(deletedCache);
 }
 
 function saveDeletedExerciseIds(ids: Set<string>): void {
@@ -135,13 +144,25 @@ function migrateLibraryIfNeeded(): void {
   localStorage.setItem(MIGRATION_V3, '1');
 }
 
+// Raw-string parse-cache: getExerciseLibrary is called per unknown exercise id
+// by name-resolution fallbacks (history rendering, muscle mapping), so the
+// stored library shouldn't be re-parsed on every call.
+let libraryCacheRaw: string | null = null;
+let libraryCache: Exercise[] | null = null;
+
 export function getExerciseLibrary(): Exercise[] {
   migrateLibraryIfNeeded();
   const deleted = getDeletedExerciseIds();
-  try {
-    const raw = localStorage.getItem(LIBRARY_KEY);
-    if (raw) return (JSON.parse(raw) as Exercise[]).filter(e => !deleted.has(e.id));
-  } catch { /* fall through */ }
+  const raw = localStorage.getItem(LIBRARY_KEY);
+  if (raw !== libraryCacheRaw) {
+    try {
+      libraryCache = raw ? JSON.parse(raw) as Exercise[] : null;
+    } catch {
+      libraryCache = null;
+    }
+    libraryCacheRaw = raw;
+  }
+  if (libraryCache) return libraryCache.filter(e => !deleted.has(e.id));
   return buildDefaultLibrary().filter(e => !deleted.has(e.id));
 }
 

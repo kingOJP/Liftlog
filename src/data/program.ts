@@ -1,4 +1,3 @@
-import { EXERCISE_MAP } from './exercises';
 import { getProgramStart } from './settings';
 
 export interface Exercise {
@@ -76,10 +75,6 @@ export const PROGRAM: WorkoutDay[] = [
     ],
   },
 ];
-
-export function getExerciseName(id: string): string {
-  return EXERCISE_MAP.get(id)?.name ?? id;
-}
 
 // Program week numbering is anchored to the user-configurable training-block
 // start date (Settings screen). The anchor is snapped back to the Monday of

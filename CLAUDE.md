@@ -69,6 +69,20 @@ Long-term milestones (roughly):
     only ratchets up: plans use the higher of self-reported and inferred, and the
     Journey surfaces a "level up" nudge. Profile rides the LWW plan-document sync.
 
+21. ✅ Workout sharing (QR: `share.ts`, fragment-encoded, no server storage),
+    exercise dedupe (`findExerciseByName` — typed names resolve to existing
+    identities), admin exercise merges (`merges.ts` + D1 `exercise_merges`),
+    program-loss safeguards (empty-program guards on both sync ends +
+    `reconcileActiveProgram` self-heal from the active block)
+22. ✅ Launch prep: quick workouts (one-off sessions, dayId −2), warm-up sets
+    (logged + shown, excluded from every analytical read), glossary screen,
+    add-exercise-mid-workout (shared `AddExercisePanel`), finish bar appears
+    only at scroll bottom
+23. ✅ Full-app audit (July 2026, `docs/audit-2026-07.md`): dashboard done-count
+    fix, quick/shared sessions editable from History, worker hardening (no
+    stack traces in 500s, program size cap, session sweep), localStorage
+    parse caches, exercise-picker consolidation, pattern-aware `sameLift`
+
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
 - Journey v2 — deload-position editing in the wizard (`validatePhases` already
@@ -170,13 +184,21 @@ type View =
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
   | { screen: 'settings' }
+  | { screen: 'glossary' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' };
+  | { screen: 'plan-setup' }
+  | { screen: 'quick-setup' }      // assemble a one-off workout
+  | { screen: 'quick-workout' }    // run it (dayId −2)
+  | { screen: 'shared-preview' }   // scanned share link landing screen
+  | { screen: 'shared-workout' };  // run a shared workout one-off (dayId −1)
 ```
 
-Day-scoped views (`workout`, `edit-session`, `edit-day`) look the day up with a fallback:
-if the `dayId` no longer exists (program replaced by a sync), the app renders the
-dashboard instead of crashing.
+Day-scoped views (`workout`, `edit-day`) look the day up with a fallback: if
+the `dayId` no longer exists (program replaced by a sync), the app renders the
+dashboard instead of crashing. `edit-session` instead synthesizes a stub day
+when the lookup fails — quick workouts (−2), shared one-offs (−1) and sessions
+from re-planned-away days stay editable because WorkoutView's edit mode
+renders every logged exercise regardless of the day's design.
 
 `program: WorkoutDay[]` state lives in `App.tsx`, initialized from `getStoredProgram()` (localStorage). On day edits it's updated and saved back.
 
@@ -270,6 +292,14 @@ src/
                                   highlights + 3 highest-impact opportunities, e1RM trend/plateau
                                   detection, weekly muscle volume, next-workout suggestion, and
                                   the coach plan (embeds computeProgramPlan)
+    share.ts                   — workout sharing: QR payload encode/decode (base64url JSON in the
+                                  URL fragment — never reaches the server), pending-share capture
+                                  (survives the OAuth redirect via localStorage), import resolution
+                                  (findExerciseByName — recipient's identities win). SHARED_DAY_ID = −1
+    quickWorkout.ts            — one-off ("quick") workouts: QUICK_DAY_ID = −2, buildQuickWorkoutDay()
+    merges.ts                  — admin exercise merges: from→to id map pulled from the server
+                                  (localStorage `liftlog_exercise_merges`, replaced wholesale),
+                                  applied to local set logs / program / library on every pull
     sync.ts                    — pushSync(), pullSync(), getLoggedInUser(), ensureLocalDataOwner()
                                   — merge-based cloud sync via /api/sync (see Cloud sync section)
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
@@ -293,6 +323,16 @@ src/
     ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
                                   set logging, tap-to-edit
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
+                                  (warm-up sets don't start it)
+    AddExercisePanel.tsx       — THE search-library-then-create exercise picker, shared by
+                                  WorkoutView (mid-workout add), DayEditView and QuickWorkoutView
+                                  (props: excludeIds, confirmLabel, persistent multi-add mode)
+    QuickWorkoutView.tsx/css   — assemble a one-off workout (no plan required), then run it
+                                  through WorkoutView under QUICK_DAY_ID
+    ShareWorkoutModal.tsx/css  — QR overlay for handing a workout day to a friend
+    SharedWorkoutView.tsx/css  — landing screen for a scanned share: preview + start one-off
+                                  or add as a new program day
+    GlossaryView.tsx/css       — plain-language glossary (e1RM, hard sets, deload, block…)
     HistoryView.tsx/css        — all past sessions in reverse chronological order
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
                                   per-exercise "Find replacement" (⇄) suggestion panel
@@ -332,6 +372,8 @@ src/
 | `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
 | `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
+| `liftlog_pending_share` | `share.ts` | Scanned share payload awaiting the preview screen (survives the OAuth redirect) |
+| `liftlog_exercise_merges` | `merges.ts` | Admin exercise-merge map (application-owned, replaced wholesale on every pull) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
@@ -346,7 +388,11 @@ src/
   `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync)
 
 **`setLogs`** — index: `sessionId`
-- `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`, `order?`
+- `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`, `order?`, `warmup?`
+- `warmup`: true on warm-up sets — logged and displayed (history, in-workout list) but
+  excluded from every analytical read: `buildSnapshot` keeps warm-ups out of
+  `setsBySession`, so metrics/recommendations/progress/volume/heatmap are warm-up-clean
+  by construction (`allSetsBySession` exists for display). Schemaless like `order`.
 - `order`: 0-based position of the exercise within the workout (the order it was trained),
   written for every set by WorkoutView. Absent on pre-order rows; the progress engine falls
   back to set-log insertion order. Schemaless field — no version bump (see below). Travels in
@@ -758,6 +804,23 @@ program, not before):
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
+- **Negative dayIds mark one-off sessions** — shared workouts log under −1
+  (`SHARED_DAY_ID`), quick workouts under −2 (`QUICK_DAY_ID`). They never collide with
+  program days (positive), never advance the "next workout" cycle, and are excluded
+  from the dashboard's weekly done-count. History labels them, and edit-session
+  synthesizes a stub day so they stay editable.
+- **Typed exercise names never mint duplicate identities** — every create path
+  (day editor, quick workout, mid-workout add, share import) goes through
+  `findExerciseByName` (slug comparison, library first, then catalog) so history
+  stays under one id. All three pickers are the shared `AddExercisePanel`.
+- **localStorage parse caches are keyed on the raw stored string** —
+  `exercises.ts` (meta overrides, global meta) and `programStore.ts` (library,
+  deleted-ids) cache their JSON parses and compare the raw string on each read, so
+  any write path (including tests writing localStorage directly and the
+  account-switch wipe) invalidates naturally. Don't add explicit invalidation calls.
+- **Latest audit** — `docs/audit-2026-07.md` records the July 2026 full-app audit:
+  what was fixed, what was verified sound, and the ranked list of recommended
+  next improvements (surfacing sync failures is the top open item).
 - **Session timestamps are the duration signal** — `startedAt` is stamped when WorkoutView
   opens and `completedAt` at the *final logged set* (not the "Finish" tap), so
   `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions

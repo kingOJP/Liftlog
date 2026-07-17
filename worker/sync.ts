@@ -281,6 +281,7 @@ const MAX_SET_LOGS  = 200_000;
 const MAX_EXERCISES = 10_000;
 const MAX_PLANS      = 200;
 const MAX_PLAN_BYTES = 1_000_000;
+const MAX_PROGRAM_BYTES = 1_000_000;
 
 function validatePush(data: PushPayload): string | null {
   if (typeof data !== 'object' || data === null) return 'payload must be an object';
@@ -328,6 +329,10 @@ function validatePush(data: PushPayload): string | null {
     if (!Array.isArray(data.deletedExerciseIds)) return 'deletedExerciseIds must be an array';
     if (data.deletedExerciseIds.length > MAX_EXERCISES) return 'too many deleted exercise ids';
     if (data.deletedExerciseIds.some(id => typeof id !== 'string')) return 'malformed deleted exercise id';
+  }
+  if (data.program != null) {
+    if (!Array.isArray(data.program)) return 'program must be an array';
+    if (JSON.stringify(data.program).length > MAX_PROGRAM_BYTES) return 'program too large';
   }
   if (data.plan != null) {
     if (typeof data.plan !== 'object') return 'malformed plan';

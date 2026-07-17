@@ -264,15 +264,28 @@ function normalizeOverride(o: ExerciseMetaOverride): void {
   if ((o.equipment as string) === 'Leg Press Machine') o.equipment = 'Machine';
 }
 
+// Parse-cache keyed on the raw stored string: getExerciseMeta/profileFor are
+// called per exercise in hot loops (candidate ranking, the planner, muscle
+// resolution), and re-parsing the whole override blob each time is the single
+// biggest repeated cost. Keying on the raw string keeps every write path —
+// including direct localStorage writes in tests and the account-switch wipe —
+// naturally cache-coherent without explicit invalidation.
+let metaCacheRaw: string | null = null;
+let metaCache: Record<string, ExerciseMetaOverride> = {};
+
 function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
+  const raw = localStorage.getItem(META_KEY);
+  if (raw === metaCacheRaw) return metaCache;
+  let overrides: Record<string, ExerciseMetaOverride>;
   try {
-    const raw = localStorage.getItem(META_KEY);
-    const overrides = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    overrides = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
     for (const o of Object.values(overrides)) normalizeOverride(o);
-    return overrides;
   } catch {
-    return {};
+    overrides = {};
   }
+  metaCacheRaw = raw;
+  metaCache = overrides;
+  return overrides;
 }
 
 // ── Layer 1: admin-curated global metadata (read-only, replaced on pull) ─────
@@ -283,15 +296,23 @@ function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
 
 const GLOBAL_META_KEY = 'liftlog_global_meta';
 
+// Same raw-string parse-cache as loadMetaOverrides (see comment there).
+let globalCacheRaw: string | null = null;
+let globalCache: Record<string, ExerciseMetaOverride> = {};
+
 function loadGlobalMeta(): Record<string, ExerciseMetaOverride> {
+  const raw = localStorage.getItem(GLOBAL_META_KEY);
+  if (raw === globalCacheRaw) return globalCache;
+  let meta: Record<string, ExerciseMetaOverride>;
   try {
-    const raw = localStorage.getItem(GLOBAL_META_KEY);
-    const meta = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    meta = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
     for (const o of Object.values(meta)) normalizeOverride(o);
-    return meta;
   } catch {
-    return {};
+    meta = {};
   }
+  globalCacheRaw = raw;
+  globalCache = meta;
+  return meta;
 }
 
 // The server is authoritative for the global layer — whole-document replace.

@@ -186,7 +186,7 @@ export function suggestReplacements(
   const suggestions: ReplacementSuggestion[] = [];
   for (const cand of candidateProfiles()) {
     if (cand.id === target.id || dayIds.has(cand.id)) continue;
-    if (sameLift(cand.name, target.name)) continue; // same movement under another name
+    if (sameLift(cand, targetProfile)) continue; // same movement under another name
     const candMuscles = [cand.primaryMuscle!, ...cand.secondaryMuscles];
     if (!candMuscles.includes(targetProfile.primaryMuscle)) continue;
 
@@ -213,7 +213,7 @@ export function suggestReplacements(
   // higher-ranked one and let the next-best distinct movement through.
   const unique: ReplacementSuggestion[] = [];
   for (const s of suggestions) {
-    if (unique.some(u => sameLift(u.exercise.name, s.exercise.name))) continue;
+    if (unique.some(u => sameLift(u.exercise, s.exercise))) continue;
     unique.push(s);
     if (unique.length >= limit) break;
   }
@@ -382,9 +382,14 @@ function scoreCandidate(cand: ExerciseProfile, ctx: RankContext): Factor[] {
 // "Cable Pushdown" vs "Tricep Cable Pushdown" is the same movement wearing a
 // different name — when one name's tokens are a subset of the other's, treat
 // them as duplicates rather than suggesting one as a replacement for the other.
-function sameLift(a: string, b: string): boolean {
-  const ta = new Set(normalizeName(a).split(' '));
-  const tb = new Set(normalizeName(b).split(' '));
+// The movement pattern breaks ties for generic names: a custom "Squat" is the
+// same lift as "Hack Squat" (both Squat pattern) but NOT as "Bulgarian Split
+// Squat" (Lunge pattern) — without the pattern check, every name containing
+// "squat" would be blocked from ever being suggested.
+function sameLift(a: Pick<ExerciseProfile, 'name' | 'workoutType'>, b: Pick<ExerciseProfile, 'name' | 'workoutType'>): boolean {
+  if (a.workoutType && b.workoutType && a.workoutType !== b.workoutType) return false;
+  const ta = new Set(normalizeName(a.name).split(' '));
+  const tb = new Set(normalizeName(b.name).split(' '));
   const [small, large] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
   return [...small].every(t => large.has(t));
 }

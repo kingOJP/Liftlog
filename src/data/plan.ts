@@ -239,10 +239,6 @@ export function blockWeekIndex(block: TrainingBlock, now = Date.now()): number {
   return Math.floor(days / 7);
 }
 
-export function blockLengthWeeks(block: TrainingBlock): number | null {
-  return block.openEnded ? null : block.phases.length;
-}
-
 export function blockEnded(block: TrainingBlock, now = Date.now()): boolean {
   if (block.openEnded) return false;
   return blockWeekIndex(block, now) >= block.phases.length;

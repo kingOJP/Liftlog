@@ -18,9 +18,11 @@ export default {
         return await handleAdmin(request, env, url);
       }
     } catch (err) {
+      // Log the full error server-side, but never echo messages/stack traces
+      // back to the client — they can leak internals (queries, table names).
       const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
       console.error('Worker error:', message);
-      return Response.json({ error: 'Internal server error', detail: message }, { status: 500 });
+      return Response.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return env.ASSETS.fetch(request);

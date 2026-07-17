@@ -757,8 +757,10 @@ export function buildPlanProposal(
   };
 }
 
-// +/- one set on the exercise doing the most direct work for the muscle,
-// within the same 2–5 set guardrails the in-block coach uses.
+// ±1 set on an exercise whose primary muscle matches, within the same 2–5 set
+// guardrails the in-block coach uses. Adds go to the lightest qualifying slot
+// (spreading volume instead of stacking the workhorse); trims come off the
+// heaviest one.
 function bumpSets(
   days: WorkoutDay[],
   decisions: ExerciseDecision[],
