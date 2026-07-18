@@ -6,6 +6,8 @@ import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
 import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
+import { formatSyncAge } from '../data/syncStatus';
+import { useSyncStatus } from './useSyncStatus';
 import DayCard from './DayCard';
 import './Dashboard.css';
 
@@ -40,6 +42,7 @@ export default function Dashboard({
   const weekNumber = getWeekNumber();
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  const syncStatus = useSyncStatus();
 
   // Training-journey context (sync localStorage reads — cheap per render)
   const journey = getActiveBlockInfo();
@@ -161,6 +164,28 @@ export default function Dashboard({
           <span className="week-progress">{completedDayIds.size} of {program.length} done</span>
         )}
       </div>
+
+      {syncStatus.state !== 'ok' && (
+        <div className={`sync-banner sync-banner--${syncStatus.state}`} role="status">
+          <span className="sync-banner-title">
+            {syncStatus.state === 'offline' && 'Offline'}
+            {syncStatus.state === 'auth' && 'Signed out of sync'}
+            {syncStatus.state === 'error' && 'Sync isn’t reaching the server'}
+          </span>
+          <span className="sync-banner-detail">
+            {syncStatus.state === 'offline' &&
+              'Workouts keep saving on this phone and upload when you’re back online.'}
+            {syncStatus.state === 'auth' && (
+              <>Your session expired — workouts save here but aren’t backing up.{' '}
+                <a className="sync-banner-link" href="/api/auth/google">Sign in again</a></>
+            )}
+            {syncStatus.state === 'error' &&
+              'Your data is safe on this phone — retrying automatically.'}
+            {syncStatus.lastSyncAt != null &&
+              ` Last backed up ${formatSyncAge(syncStatus.lastSyncAt)}.`}
+          </span>
+        </div>
+      )}
 
       {journeyCard}
 

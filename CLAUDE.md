@@ -302,6 +302,11 @@ src/
                                   applied to local set logs / program / library on every pull
     sync.ts                    — pushSync(), pullSync(), getLoggedInUser(), ensureLocalDataOwner()
                                   — merge-based cloud sync via /api/sync (see Cloud sync section)
+    syncStatus.ts              — sync-status store: every push/pull outcome lands here
+                                  (ok/offline/auth/error + pushPending + last-success timestamp,
+                                  persisted in `liftlog_last_sync`). Subscribed by the UI via
+                                  components/useSyncStatus.ts; pushPending drives the automatic
+                                  push retry in App's background tick
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
@@ -324,6 +329,8 @@ src/
                                   set logging, tap-to-edit
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
                                   (warm-up sets don't start it)
+    useSyncStatus.ts           — useSyncExternalStore hook over data/syncStatus.ts (Dashboard
+                                  banner + Settings status line)
     AddExercisePanel.tsx       — THE search-library-then-create exercise picker, shared by
                                   WorkoutView (mid-workout add), DayEditView and QuickWorkoutView
                                   (props: excludeIds, confirmLabel, persistent multi-add mode)
@@ -374,6 +381,7 @@ src/
 | `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
 | `liftlog_pending_share` | `share.ts` | Scanned share payload awaiting the preview screen (survives the OAuth redirect) |
 | `liftlog_exercise_merges` | `merges.ts` | Admin exercise-merge map (application-owned, replaced wholesale on every pull) |
+| `liftlog_last_sync` | `syncStatus.ts` | Timestamp of the last successful push/pull on this device (user-scoped, wiped on account switch) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
@@ -820,7 +828,10 @@ program, not before):
   account-switch wipe) invalidates naturally. Don't add explicit invalidation calls.
 - **Latest audit** — `docs/audit-2026-07.md` records the July 2026 full-app audit:
   what was fixed, what was verified sound, and the ranked list of recommended
-  next improvements (surfacing sync failures is the top open item).
+  next improvements. Its top open item — surfacing sync failures — was
+  implemented right after: `syncStatus.ts` + the dashboard sync banner,
+  Settings status line, and automatic push retry (background tick, focus, and
+  the browser `online` event).
 - **Session timestamps are the duration signal** — `startedAt` is stamped when WorkoutView
   opens and `completedAt` at the *final logged set* (not the "Finish" tap), so
   `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions

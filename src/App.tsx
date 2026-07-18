@@ -3,6 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
+import { getSyncStatus } from './data/syncStatus';
 import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import Dashboard from './components/Dashboard';
@@ -130,9 +131,13 @@ function App() {
         const healed = reconcileActiveProgram();
         if (didPull) ensureWeekAnchor();
         if (didPull || started || healed) setProgram(getStoredProgram());
-        if (started || healed) pushSync().catch(() => {});
+        // Also retry a push that previously failed (pushPending) — this tick
+        // is the retry loop that backs the sync-status banner's "retrying
+        // automatically" promise.
+        if (started || healed || getSyncStatus().pushPending) pushSync().catch(() => {});
       } catch {
-        // silent — background refresh is best-effort
+        // silent — background refresh is best-effort (failures are surfaced
+        // through the sync-status store, not thrown at the user)
       }
     }
 
@@ -140,9 +145,13 @@ function App() {
 
     const interval = setInterval(backgroundPull, 60_000);
     window.addEventListener('focus', onFocus);
+    // Regaining connectivity is the moment a queued push is most likely to
+    // succeed — don't wait out the rest of the 60 s tick.
+    window.addEventListener('online', onFocus);
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onFocus);
     };
   }, [user]);
 

@@ -3,6 +3,8 @@ import {
   getRestDuration, saveRestDuration, REST_PRESETS,
 } from '../data/settings';
 import type { SyncUser } from '../data/sync';
+import { formatSyncAge } from '../data/syncStatus';
+import { useSyncStatus } from './useSyncStatus';
 import './SettingsView.css';
 
 interface Props {
@@ -14,6 +16,16 @@ interface Props {
 
 export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
+  const syncStatus = useSyncStatus();
+
+  const lastSync = syncStatus.lastSyncAt != null
+    ? `last sync ${formatSyncAge(syncStatus.lastSyncAt)}`
+    : 'not synced yet';
+  const syncLine =
+    syncStatus.state === 'ok' ? `✓ Backed up · ${lastSync}`
+    : syncStatus.state === 'offline' ? `Offline — will sync when you're back · ${lastSync}`
+    : syncStatus.state === 'auth' ? `Session expired — sign in again to back up · ${lastSync}`
+    : `Sync failing — retrying automatically · ${lastSync}`;
 
   function handleRestChange(seconds: number) {
     setRestSeconds(seconds);
@@ -73,6 +85,7 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
             </div>
             <a href="/api/auth/logout" className="settings-logout">Sign out</a>
           </div>
+          <p className={`settings-sync settings-sync--${syncStatus.state}`}>{syncLine}</p>
           <p className="settings-hint">
             Workouts sync to your account. Exercise muscle metadata and these settings stay on this device.
           </p>

@@ -182,3 +182,19 @@
   border-radius: 8px;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ── Sync status line (Account section) ── */
+.settings-sync {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--green);
+}
+
+.settings-sync--offline {
+  color: var(--text-muted);
+}
+
+.settings-sync--auth,
+.settings-sync--error {
+  color: var(--red);
+}

@@ -17,6 +17,7 @@ import {
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, Exercise } from './program';
 import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
+import { reportSyncSuccess, reportSyncFailure, clearSyncStatus } from './syncStatus';
 import { saveExerciseMerges, applyExerciseMerges } from './merges';
 import type { MergeMap } from './merges';
 import type { PlanState } from './planStore';
@@ -144,6 +145,7 @@ export async function ensureLocalDataOwner(): Promise<void> {
     clearPlanState();
     clearExerciseLibraryData();
     clearExerciseMeta();
+    clearSyncStatus();
     localStorage.removeItem(ROLE_KEY);
   }
   localStorage.setItem(OWNER_KEY, user.email);
@@ -182,24 +184,55 @@ export async function pushSync(): Promise<void> {
     ...splitMeta(meta),
   };
 
-  const res = await fetch('/api/sync', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  });
+  // Every outcome is reported to the sync-status store so a failing push is
+  // visible (dashboard banner) and retried (App's background tick) instead of
+  // dying silently in the console.
+  let res: Response;
+  try {
+    res = await fetch('/api/sync', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+  } catch (err) {
+    reportSyncFailure('push', navigator.onLine === false ? 'offline' : 'error');
+    throw err;
+  }
 
-  if (res.status === 401) return;
-  if (!res.ok) throw new Error(`Sync push failed: ${res.status}`);
+  if (res.status === 401) {
+    // Cookie present but the server session expired — the app looks signed in
+    // while nothing uploads. Surface it; the banner offers re-login.
+    reportSyncFailure('push', 'auth');
+    return;
+  }
+  if (!res.ok) {
+    reportSyncFailure('push', 'error');
+    throw new Error(`Sync push failed: ${res.status}`);
+  }
+  reportSyncSuccess('push');
 }
 
 // Returns true if local state changed (caller should refresh UI state)
 export async function pullSync(): Promise<boolean> {
-  const res = await fetch('/api/sync');
-  if (res.status === 401) return false;
-  if (!res.ok) throw new Error(`Sync pull failed: ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch('/api/sync');
+  } catch (err) {
+    reportSyncFailure('pull', navigator.onLine === false ? 'offline' : 'error');
+    throw err;
+  }
+  if (res.status === 401) {
+    reportSyncFailure('pull', 'auth');
+    return false;
+  }
+  if (!res.ok) {
+    reportSyncFailure('pull', 'error');
+    throw new Error(`Sync pull failed: ${res.status}`);
+  }
   // Guard against non-API responses served with a 200 (dev server fallback,
   // captive portals, misbehaving proxies) — never parse HTML as sync data.
   if (!res.headers.get('content-type')?.includes('application/json')) {
+    reportSyncFailure('pull', 'error');
     throw new Error('Sync pull failed: non-JSON response');
   }
 
@@ -323,6 +356,10 @@ export async function pullSync(): Promise<boolean> {
   // old replace-on-pull sync could gut it) is rebuilt from the program slot so
   // history and the Exercises screen resolve its name again.
   ensureProgramExercisesInLibrary(getStoredProgram());
+
+  // Reported only once the whole merge applied — a pull that downloaded fine
+  // but failed to merge shouldn't read as a healthy sync.
+  reportSyncSuccess('pull');
 
   return changed;
 }
