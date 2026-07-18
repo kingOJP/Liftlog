@@ -111,21 +111,29 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
 
               {isExpanded && (
                 <div className="history-detail">
-                  {orderedExercises.map(exId => (
-                    <div key={exId} className="history-exercise">
-                      <span className="history-ex-name">{getExerciseName(exId)}</span>
-                      <div className="history-sets">
-                        {(grouped[exId] ?? []).map((s, i) => (
-                          <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}`}>
-                            <span className="history-set-num">Set {s.setNumber}</span>
-                            <span className="history-set-weight">{s.weight} lbs</span>
-                            <span className="history-set-reps">{s.reps} reps</span>
-                            {s.warmup && <span className="history-set-warmup">warm-up</span>}
-                          </div>
-                        ))}
+                  {orderedExercises.map(exId => {
+                    // Stored setNumber is positional (warm-ups included), so
+                    // renumber at render: warm-ups carry a label, not a
+                    // number, and "Set 1" is always the first working set —
+                    // the same labeling ExerciseCard uses in the workout.
+                    const rows = [...(grouped[exId] ?? [])].sort((a, b) => a.setNumber - b.setNumber);
+                    let working = 0;
+                    const labels = rows.map(s => (s.warmup ? 'Warm-up' : `Set ${++working}`));
+                    return (
+                      <div key={exId} className="history-exercise">
+                        <span className="history-ex-name">{getExerciseName(exId)}</span>
+                        <div className="history-sets">
+                          {rows.map((s, i) => (
+                            <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}`}>
+                              <span className="history-set-num">{labels[i]}</span>
+                              <span className="history-set-weight">{s.weight} lbs</span>
+                              <span className="history-set-reps">{s.reps} reps</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <button
                     className="edit-session-btn"
