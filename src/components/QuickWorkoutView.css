@@ -13,3 +13,55 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Resume-unfinished-draft card ── */
+.quick-resume-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--purple);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.quick-resume-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quick-resume-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.quick-resume-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quick-resume-btn {
+  flex: 1;
+  background: var(--purple);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quick-resume-discard {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}

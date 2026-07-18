@@ -296,7 +296,11 @@ src/
                                   URL fragment — never reaches the server), pending-share capture
                                   (survives the OAuth redirect via localStorage), import resolution
                                   (findExerciseByName — recipient's identities win). SHARED_DAY_ID = −1
-    quickWorkout.ts            — one-off ("quick") workouts: QUICK_DAY_ID = −2, buildQuickWorkoutDay()
+    quickWorkout.ts            — one-off ("quick") workouts: QUICK_DAY_ID = −2, buildQuickWorkoutDay();
+                                  interrupted-quick-workout resume (getResumableQuickDraft +
+                                  buildQuickDayFromDraft — the quick-setup screen offers Resume/Discard,
+                                  and starting fresh clears the old draft so one-offs never inherit
+                                  a previous one-off's sets)
     merges.ts                  — admin exercise merges: from→to id map pulled from the server
                                   (localStorage `liftlog_exercise_merges`, replaced wholesale),
                                   applied to local set logs / program / library on every pull
@@ -790,7 +794,10 @@ program, not before):
   inline editing/deletion free (no DB rollback needed). A localStorage draft
   (`draftSession.ts`) shadows the state on every set change so an app kill mid-workout loses
   nothing: reopening the same day within 12 h auto-restores it (with a Discard button); the
-  draft is cleared at Finish. Edit-session mode never drafts.
+  draft is cleared at Finish. Edit-session mode never drafts. One-off sessions share their
+  reserved dayId (−1/−2), so they never auto-restore blindly: the quick-setup screen offers
+  Resume/Discard for an interrupted quick workout, and starting any fresh one-off clears its
+  day's leftover draft (`clearDraftForDay`) — program-day drafts are never touched by this.
 - **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session, re-writes them, and calls `touchSession()` so merge sync propagates the edit.
 - **New accounts get no default program** — `getStoredProgram()` falls back to `[]`, not
   `PROGRAM`. The dashboard shows an empty state + plan CTA; the wizard builds the first

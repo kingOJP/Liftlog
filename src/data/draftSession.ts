@@ -31,6 +31,23 @@ export function clearDraftSession(): void {
   localStorage.removeItem(KEY);
 }
 
+/**
+ * Drop the draft only if it belongs to the given day. Used when starting a
+ * fresh one-off (quick −2 / shared −1) session: every one-off shares its
+ * reserved dayId, so a stale draft from a *previous* one-off would otherwise
+ * restore into the new session and merge old sets into it. A draft for a
+ * different day (an interrupted program workout) is left alone.
+ */
+export function clearDraftForDay(dayId: number): void {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    if ((JSON.parse(raw) as DraftSession).dayId === dayId) localStorage.removeItem(KEY);
+  } catch {
+    localStorage.removeItem(KEY); // corrupt draft — never restorable anyway
+  }
+}
+
 // The draft for this day, if one exists and is fresh enough to resume. A draft
 // with no sets yet is still resumable — a *started* workout is stored from the
 // moment the view opens, so an app kill before the first set keeps its start

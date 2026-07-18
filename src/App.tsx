@@ -25,6 +25,7 @@ import {
   acceptSharedWorkout, SHARED_DAY_ID,
 } from './data/share';
 import { isQuickWorkout } from './data/quickWorkout';
+import { clearDraftForDay } from './data/draftSession';
 import './App.css';
 
 type View =
@@ -332,6 +333,10 @@ function App() {
             onStart={() => {
               // One-off session: the shared exercises join the library (so
               // history resolves them) but the program stays untouched.
+              // All shared one-offs run under dayId −1, so a draft left by an
+              // interrupted *previous* shared workout must not restore into
+              // this one (same collision the quick-setup screen resolves).
+              clearDraftForDay(SHARED_DAY_ID);
               const day = acceptSharedWorkout(shared, SHARED_DAY_ID);
               clearPendingShare();
               setSharedDay(day);
