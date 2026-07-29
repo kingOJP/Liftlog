@@ -81,21 +81,51 @@ export function getExerciseName(id: string): string {
   return EXERCISE_MAP.get(id)?.name ?? id;
 }
 
-// Program week numbering is anchored to the user-configurable training-block
-// start date (Settings screen). The anchor is snapped back to the Monday of
-// that week so week numbers roll over on Monday — matching the Mon–Sun range
-// the dashboard displays — even when the start date itself falls mid-week.
-export function getWeekNumberForDate(date: Date, programStart = getProgramStart()): number {
-  const start = new Date(programStart);
-  start.setHours(0, 0, 0, 0);
-  const startDay = start.getDay();
-  start.setDate(start.getDate() - (startDay === 0 ? 6 : startDay - 1));
+// ── Calendar weeks (Monday-anchored) ─────────────────────────────────────────
+// The *calendar* week a date falls in, independent of any program anchor. This
+// is what every week-bucketed analytic groups by: a session's stored
+// `weekNumber` is computed from the week anchor in force when it was logged,
+// and that anchor moves (every block activation re-anchors it), so two sessions
+// from the same real week can carry different numbers — and two sessions months
+// apart can collide on the same one. Wall-clock Mondays never drift.
 
+/** Monday 00:00 local time of the week containing `date`, as a timestamp. */
+export function startOfWeek(date: Date | number): number {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d.getTime();
+}
+
+/** `n` weeks after a week-start timestamp — calendar math, so DST can't drift it. */
+export function addWeeks(weekStart: number, n: number): number {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + n * 7);
+  return d.getTime();
+}
+
+/** Whole weeks between two week starts (b − a). */
+export function weeksBetween(a: number, b: number): number {
+  return Math.round((b - a) / (7 * 86_400_000));
+}
+
+/** "7/27" — the Monday that starts the week, how the volume chart labels bars. */
+export function weekStartLabel(weekStart: number): string {
+  return new Date(weekStart).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+}
+
+// Program week numbering is anchored to the training-block start date (managed
+// by the journey). The anchor is snapped back to the Monday of that week so
+// week numbers roll over on Monday — matching the Mon–Sun range the dashboard
+// displays — even when the start date itself falls mid-week.
+export function getWeekNumberForDate(date: Date, programStart = getProgramStart()): number {
+  const start = startOfWeek(programStart);
   const current = new Date(date);
   current.setHours(0, 0, 0, 0);
 
   // Count whole days (rounded, so DST's 23/25-hour days can't drift the boundary)
-  const days = Math.round((current.getTime() - start.getTime()) / 86_400_000);
+  const days = Math.round((current.getTime() - start) / 86_400_000);
   return Math.max(1, Math.floor(days / 7) + 1);
 }
 
@@ -104,13 +134,7 @@ export function getWeekNumber(): number {
 }
 
 export function getWeekDateRange(): string {
-  const now = new Date();
-  const day = now.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
-
+  const monday = new Date(startOfWeek(Date.now()));
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
 

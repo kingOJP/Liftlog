@@ -1,7 +1,7 @@
-import { getWeekNumber } from './program';
+import { addWeeks, startOfWeek, weekStartLabel, weeksBetween } from './program';
 import { getExerciseName } from './programStore';
 import type { TrainingSnapshot } from './analytics';
-import { e1rmSeries, muscleSetTotals, sessionTimestamp } from './analytics';
+import { e1rmSeries, muscleSetTotals, sessionTimestamp, sessionWeekStart } from './analytics';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,9 +14,13 @@ export interface MetricsSummary {
 }
 
 export interface WeeklyVolumePoint {
-  week: number;
+  /** Monday 00:00 of the calendar week, as a timestamp */
+  weekStart: number;
+  /** "7/27" — the Monday the week starts on */
   label: string;
   value: number;
+  /** true for the week the user is training in right now */
+  isCurrent: boolean;
 }
 
 export interface SeriesPoint {
@@ -38,9 +42,13 @@ export interface MuscleSets {
   sets: number;
 }
 
+/** How many calendar weeks the volume chart looks back over. */
+export const VOLUME_WEEKS = 8;
+
 export interface Metrics {
   hasData: boolean;
   summary: MetricsSummary;
+  /** Oldest → newest, one entry per calendar week (gaps included as zeroes) */
   weeklyVolume: WeeklyVolumePoint[];
   exercises: ExerciseSeries[];     // most-tracked first (for the default selection)
   muscleSets: MuscleSets[];
@@ -54,8 +62,9 @@ function shortDate(ts: number): string {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeekNumber()): Metrics {
+export function computeMetrics(snapshot: TrainingSnapshot, now = Date.now()): Metrics {
   const { sessions, setsBySession } = snapshot;
+  const currentWeekStart = startOfWeek(now);
 
   const empty: Metrics = {
     hasData: false,
@@ -69,36 +78,46 @@ export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeek
   if (sessions.length === 0 || setsBySession.size === 0) return empty;
 
   // ── Weekly volume + totals ──
-  const weekBuckets = new Map<number, { value: number; latestTs: number }>();
+  // Bucketed by the Monday-anchored calendar week the workout actually happened
+  // in (see sessionWeekStart) — never by the stored weekNumber, which is
+  // relative to a program anchor that moves when a training block activates.
+  const weekBuckets = new Map<number, number>();
   let totalVolume = 0;
 
   for (const session of sessions) {
     const logs = setsBySession.get(session.id!) ?? [];
     if (logs.length === 0) continue;
-    const ts = sessionTimestamp(session);
 
     let sessionVolume = 0;
     for (const s of logs) sessionVolume += s.weight * s.reps;
     totalVolume += sessionVolume;
 
-    const bucket = weekBuckets.get(session.weekNumber);
-    if (bucket) {
-      bucket.value += sessionVolume;
-      if (ts > bucket.latestTs) bucket.latestTs = ts;
-    } else {
-      weekBuckets.set(session.weekNumber, { value: sessionVolume, latestTs: ts });
-    }
+    const weekStart = sessionWeekStart(session);
+    weekBuckets.set(weekStart, (weekBuckets.get(weekStart) ?? 0) + sessionVolume);
   }
 
-  // Weekly volume — sorted ascending, last 8 weeks
-  const weeklyVolume: WeeklyVolumePoint[] = [...weekBuckets.entries()]
-    .map(([week, b]) => ({ week, label: shortDate(b.latestTs), value: Math.round(b.value) }))
-    .sort((a, b) => a.week - b.week)
-    .slice(-8);
+  // Weekly volume — a continuous timeline, oldest → newest, ending on the
+  // current week (which is always shown, even at zero: "this week so far" is
+  // the number the lifter is trying to beat). Weeks with no training show as
+  // real gaps rather than being collapsed away, so the trend doesn't lie.
+  const trainedWeeks = [...weekBuckets.keys()].filter(w => w <= currentWeekStart);
+  const earliest = trainedWeeks.length > 0 ? Math.min(...trainedWeeks) : currentWeekStart;
+  const windowStart = Math.max(earliest, addWeeks(currentWeekStart, -(VOLUME_WEEKS - 1)));
 
-  // Summary — this/last program week
-  const thisWeekVolume = Math.round(weekBuckets.get(currentWeek)?.value ?? 0);
-  const lastWeekVolume = Math.round(weekBuckets.get(currentWeek - 1)?.value ?? 0);
+  const weeklyVolume: WeeklyVolumePoint[] = [];
+  for (let i = 0; i <= weeksBetween(windowStart, currentWeekStart); i++) {
+    const weekStart = addWeeks(windowStart, i);
+    weeklyVolume.push({
+      weekStart,
+      label: weekStartLabel(weekStart),
+      value: Math.round(weekBuckets.get(weekStart) ?? 0),
+      isCurrent: weekStart === currentWeekStart,
+    });
+  }
+
+  // Summary — this/last calendar week
+  const thisWeekVolume = Math.round(weekBuckets.get(currentWeekStart) ?? 0);
+  const lastWeekVolume = Math.round(weekBuckets.get(addWeeks(currentWeekStart, -1)) ?? 0);
   const deltaPct = lastWeekVolume > 0
     ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100)
     : null;
@@ -138,9 +157,9 @@ export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeek
   // agrees with the coach, insights and heatmap — and with the 10–20
   // hard-set target it's displayed against.
   const weeksWithData = [...weekBuckets.keys()].sort((a, b) => b - a);
-  const muscleWeek = weekBuckets.has(currentWeek) ? currentWeek : (weeksWithData[0] ?? currentWeek);
+  const muscleWeek = weekBuckets.has(currentWeekStart) ? currentWeekStart : (weeksWithData[0] ?? currentWeekStart);
 
-  const week = muscleSetTotals(snapshot, s => s.weekNumber === muscleWeek);
+  const week = muscleSetTotals(snapshot, s => sessionWeekStart(s) === muscleWeek);
   const muscleSets: MuscleSets[] = [...week.totals.entries()]
     .map(([muscle, sets]) => ({ muscle: muscle as string, sets: Math.round(sets * 2) / 2 }));
   if (week.unmappedSets > 0) muscleSets.push({ muscle: 'Other', sets: week.unmappedSets });
@@ -164,7 +183,9 @@ export function computeMetrics(snapshot: TrainingSnapshot, currentWeek = getWeek
     weeklyVolume,
     exercises,
     muscleSets,
-    muscleWeekLabel: muscleWeek === currentWeek ? 'This week' : shortDate(weekBuckets.get(muscleWeek)!.latestTs),
+    muscleWeekLabel: muscleWeek === currentWeekStart
+      ? 'This week'
+      : `Week of ${weekStartLabel(muscleWeek)}`,
     unclassifiedExercises,
   };
 }

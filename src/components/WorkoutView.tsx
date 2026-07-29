@@ -15,8 +15,8 @@ import {
 } from '../db/database';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
-import { calculateRecommendation } from '../data/recommendations';
-import type { WeightRec, ExerciseSession } from '../data/recommendations';
+import { buildSetPlan } from '../data/recommendations';
+import type { WeightRec, ExerciseSession, SetPlan } from '../data/recommendations';
 import { getExerciseMeta } from '../data/exercises';
 import { getActivePhase } from '../data/planStore';
 import { PHASE_INFO } from '../data/plan';
@@ -68,13 +68,15 @@ function exerciseFromId(id: string): Exercise {
   return { id, name: getExerciseName(id), sets: 3, repLow: 8, repHigh: 12 };
 }
 
-// Recommendation + "last time" context for one exercise, from a snapshot.
+// Per-set prescription + "last time" context for one exercise, from a snapshot.
+// Every exercise gets a plan — one without history still prescribes the rep
+// range, it just leaves the load for the lifter to pick.
 function contextForExercise(
   ex: Exercise,
   snapshot: TrainingSnapshot,
   positions: ReturnType<typeof snapshotPositions>,
   phase: PhaseKind | null,
-): { rec?: WeightRec; last?: ExerciseSession } {
+): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession } {
   const history: ExerciseSession[] = [];
   for (const session of snapshot.sessions) { // newest first
     const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
@@ -90,9 +92,8 @@ function contextForExercise(
     }
     if (history.length >= 4) break;
   }
-  if (history.length === 0) return {};
-  const rec = calculateRecommendation(history, ex, getExerciseMeta(ex.id).weightType, phase);
-  return { last: history[0], rec: rec ?? undefined };
+  const plan = buildSetPlan(history, ex, getExerciseMeta(ex.id).weightType, phase);
+  return { plan, last: history[0], rec: plan.rec ?? undefined };
 }
 
 export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
@@ -220,18 +221,20 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // Recommendations + "last time" context for every rendered exercise (the
   // day's plus any added mid-workout), derived from the snapshot. Recomputes
   // when an exercise is added so a newcomer gets its history-driven rec too.
-  const { recommendations, lastSessions } = useMemo(() => {
+  const { recommendations, lastSessions, setPlans } = useMemo(() => {
     const recs: Record<string, WeightRec> = {};
     const lasts: Record<string, ExerciseSession> = {};
+    const plans: Record<string, SetPlan> = {};
     if (snapshot) {
       const positions = snapshotPositions(snapshot);
       for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
-        const { rec, last } = contextForExercise(ex, snapshot, positions, phase);
+        const { plan, rec, last } = contextForExercise(ex, snapshot, positions, phase);
+        plans[ex.id] = plan;
         if (last) lasts[ex.id] = last;
         if (rec) recs[ex.id] = rec;
       }
     }
-    return { recommendations: recs, lastSessions: lasts };
+    return { recommendations: recs, lastSessions: lasts, setPlans: plans };
   }, [snapshot, effectiveDay, addedExercises, phase]);
 
   useEffect(() => {
@@ -449,6 +452,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             exercise={ex}
             sets={sets[ex.id] ?? []}
             recommendation={recommendations[ex.id]}
+            plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
@@ -461,6 +465,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
             exercise={ex}
             sets={sets[ex.id] ?? []}
             recommendation={recommendations[ex.id]}
+            plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateRecommendation } from './recommendations';
+import { buildSetPlan, calculateRecommendation } from './recommendations';
 import type { ExerciseSession } from './recommendations';
 
 const exercise = { sets: 3, repLow: 8, repHigh: 12 };
@@ -136,11 +136,12 @@ describe('calculateRecommendation — bodyweight (rep progression)', () => {
   });
 
   it('uses the normal weight engine when a bodyweight exercise is loaded', () => {
-    // Weighted pull-ups with a 25 lb belt — progress load, not reps
+    // Weighted pull-ups with a 25 lb belt — progress load, not reps. A belt
+    // takes 2.5 lb plates, so the increment microloads rather than jumping 20%.
     const rec = calculateRecommendation(
       [session([[25, 12], [25, 12], [25, 12]])], exercise, 'Bodyweight',
     );
-    expect(rec).toMatchObject({ weight: 30, kind: 'increase' });
+    expect(rec).toMatchObject({ weight: 27.5, kind: 'increase' });
     expect(rec!.targetReps).toBeUndefined();
   });
 });
@@ -208,5 +209,131 @@ describe('exercise-order freshness', () => {
     const rec = calculateRecommendation(history, exercise);
     expect(rec!.kind).toBe('hold');
     expect(rec!.reason).toMatch(/later in your workout/i);
+  });
+});
+
+describe('calculateRecommendation — rep-total progression', () => {
+  it('adds load on the rep TOTAL, not a perfect set-by-set score', () => {
+    // 13/12/11 = 36 reps, the same work as 3×12. The old per-set rule would
+    // hold this lifter at 100 lbs forever because one set fell a rep short.
+    const rec = calculateRecommendation([session([[100, 13], [100, 12], [100, 11]])], exercise);
+    expect(rec).toMatchObject({ kind: 'increase', weight: 105 });
+    expect(rec!.reason).toContain('36 reps');
+  });
+
+  it('still holds when the rep total is genuinely short', () => {
+    // 11/10/10 = 31 of 36
+    const rec = calculateRecommendation([session([[100, 11], [100, 10], [100, 10]])], exercise);
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+  });
+
+  it('takes a double jump when the load is clearly too light', () => {
+    // Averaging 14 reps in an 8–12 range — that weight is a warm-up
+    const rec = calculateRecommendation([session([[100, 15], [100, 14], [100, 14]])], exercise);
+    expect(rec).toMatchObject({ kind: 'increase', weight: 110 });
+    expect(rec!.reason).toMatch(/too light/i);
+  });
+
+  it('adds load when est. 1RM breaks out at an unchanged weight near the top of the range', () => {
+    const history = [
+      session([[100, 12], [100, 11], [100, 11]], 3),   // 34 reps — short of 36
+      session([[100, 10], [100, 10], [100, 9]], 2),
+      session([[100, 10], [100, 9], [100, 9]], 1),
+    ];
+    const rec = calculateRecommendation(history, exercise);
+    expect(rec).toMatchObject({ kind: 'increase', weight: 105 });
+    expect(rec!.reason).toMatch(/est\. 1RM up/i);
+  });
+
+  it('microloads light cable/machine work instead of jumping 30%', () => {
+    const rec = calculateRecommendation(
+      [session([[20, 20], [20, 20], [20, 20]])],
+      { sets: 3, repLow: 16, repHigh: 20 },
+      'Machine',
+    );
+    expect(rec).toMatchObject({ kind: 'increase', weight: 22.5 });
+  });
+
+  it('keeps 5 lb jumps on dumbbells — the rack has no half-plates', () => {
+    const rec = calculateRecommendation(
+      [session([[20, 20], [20, 20], [20, 20]])],
+      { sets: 3, repLow: 16, repHigh: 20 },
+      'Dumbbell',
+    );
+    expect(rec).toMatchObject({ kind: 'increase', weight: 25 });
+  });
+});
+
+describe('buildSetPlan', () => {
+  it('prescribes one row per programmed set at the recommended load', () => {
+    const plan = buildSetPlan([session([[100, 10], [100, 9], [100, 9]])], exercise);
+    expect(plan.sets).toHaveLength(3);
+    expect(plan.sets.map(s => s.setNumber)).toEqual([1, 2, 3]);
+    expect(plan.sets.every(s => s.weight === 100)).toBe(true);
+  });
+
+  it('targets descending reps, fitted to the lifter\'s own drop-off', () => {
+    // This lifter reliably loses 2 reps by set 3 at their working weight
+    const history = [
+      session([[100, 10], [100, 9], [100, 8]], 2),
+      session([[100, 10], [100, 9], [100, 8]], 1),
+    ];
+    const plan = buildSetPlan(history, exercise);
+    // Set 1 chases one more rep than last time; the drop-off carries down
+    expect(plan.sets.map(s => s.targetReps)).toEqual([11, 10, 9]);
+  });
+
+  it('falls back to a decay model for sets the lifter has never reached', () => {
+    // Only ever done one set — sets 2 and 3 have no observed drop-off
+    const plan = buildSetPlan([session([[100, 10]])], exercise);
+    const targets = plan.sets.map(s => s.targetReps);
+    expect(targets[0]).toBeGreaterThanOrEqual(targets[1]);
+    expect(targets[1]).toBeGreaterThanOrEqual(targets[2]);
+  });
+
+  it('never targets outside the programmed rep range', () => {
+    const plan = buildSetPlan([session([[100, 12], [100, 12], [100, 4]])], exercise);
+    for (const s of plan.sets) {
+      expect(s.targetReps).toBeGreaterThanOrEqual(exercise.repLow);
+      expect(s.targetReps).toBeLessThanOrEqual(exercise.repHigh);
+    }
+  });
+
+  it('aims at the bottom of the range after a load increase', () => {
+    const plan = buildSetPlan([session([[100, 12], [100, 12], [100, 12]])], exercise);
+    expect(plan.rec!.kind).toBe('increase');
+    expect(plan.sets.every(s => s.weight === 105 && s.targetReps === exercise.repLow)).toBe(true);
+  });
+
+  it('prescribes rep targets with no weight for a never-trained exercise', () => {
+    const plan = buildSetPlan([], exercise);
+    expect(plan.rec).toBeNull();
+    expect(plan.sets).toHaveLength(3);
+    expect(plan.sets.every(s => s.weight === null && s.targetReps === exercise.repLow)).toBe(true);
+    expect(plan.goal).toMatch(/first time/i);
+  });
+
+  it('follows the coach-adjusted set count, not the last session\'s', () => {
+    const plan = buildSetPlan(
+      [session([[100, 10], [100, 9]])],
+      { ...exercise, sets: 5 },
+    );
+    expect(plan.sets).toHaveLength(5);
+  });
+
+  it('flattens targets during a planned deload week', () => {
+    const plan = buildSetPlan(
+      [session([[100, 10], [100, 9], [100, 9]])], exercise, null, 'deload',
+    );
+    expect(plan.sets.every(s => s.weight === 90 && s.targetReps === exercise.repLow)).toBe(true);
+    expect(plan.goal).toMatch(/reserve/i);
+  });
+
+  it('prescribes bodyweight work at 0 lbs with rep targets', () => {
+    const plan = buildSetPlan(
+      [session([[0, 10], [0, 9], [0, 8]])], exercise, 'Bodyweight',
+    );
+    expect(plan.sets.every(s => s.weight === 0)).toBe(true);
+    expect(plan.sets[0].targetReps).toBeGreaterThanOrEqual(plan.sets[2].targetReps);
   });
 });

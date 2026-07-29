@@ -35,7 +35,7 @@ function flatBenchSessions(): { sessions: Session[]; setLogs: SetLog[] } {
 
 describe('computeCoaching', () => {
   it('reports no data when nothing is logged, but still suggests a next day', () => {
-    const c = computeCoaching(program, buildSnapshot([], []), 1, NOW);
+    const c = computeCoaching(program, buildSnapshot([], []), NOW);
     expect(c.hasData).toBe(false);
     expect(c.nextDay).not.toBeNull();
     expect(c.plan.ready).toBe(false);
@@ -43,7 +43,7 @@ describe('computeCoaching', () => {
 
   it('never nags about under-trained muscles — the planner handles volume', () => {
     const { sessions, setLogs } = flatBenchSessions();
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     // Chest volume is still measured and reported...
     const chest = c.muscleVolume.find(v => v.muscle === 'Chest')!;
     expect(chest.status).toBe('low');
@@ -54,7 +54,7 @@ describe('computeCoaching', () => {
 
   it('surfaces a plateau as an opportunity — no PRs and flat strength/volume', () => {
     const { sessions, setLogs } = flatBenchSessions();
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     const p = c.progress.find(x => x.exerciseId === 'dumbbell-bench-press')!;
     expect(p.status).toBe('stalled');
     expect(p.weightPRs + p.repPRs).toBe(0);
@@ -72,7 +72,7 @@ describe('computeCoaching', () => {
       id: i + 1, sessionId: s.id!, exerciseId: 'dumbbell-bench-press',
       setNumber: 1, weight: 100 - i * 10, reps: 10,
     }));
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 1, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     expect(c.opportunities[0].kind).toBe('trend-down');
     expect(c.opportunities[0].detail).toMatch(/recovery/i);
   });
@@ -86,7 +86,7 @@ describe('computeCoaching', () => {
       id: i + 1, sessionId: s.id!, exerciseId: 'dumbbell-bench-press',
       setNumber: 1, weight: 100 + i * 10, reps: 10,
     }));
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 1, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     const p = c.progress.find(x => x.exerciseId === 'dumbbell-bench-press')!;
     expect(p.status).toBe('progressing');
     expect(p.weightPRs).toBeGreaterThan(0);
@@ -96,14 +96,14 @@ describe('computeCoaching', () => {
 
   it('caps highlights and opportunities at three each', () => {
     const { sessions, setLogs } = flatBenchSessions();
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     expect(c.highlights.length).toBeLessThanOrEqual(3);
     expect(c.opportunities.length).toBeLessThanOrEqual(3);
   });
 
   it('suggests the day after the most recently trained one, in program order', () => {
     const { sessions, setLogs } = flatBenchSessions(); // only day 1 ever trained
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 3, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     expect(c.nextDay?.dayId).toBe(2);
     expect(c.nextDay?.lastTrained).toBeNull();
   });
@@ -123,7 +123,7 @@ describe('computeCoaching', () => {
     const setLogs = sessions.map((s, i) => ({
       id: i + 1, sessionId: s.id, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8,
     }));
-    const c = computeCoaching(threeDayProgram, buildSnapshot(sessions, setLogs), 5, NOW);
+    const c = computeCoaching(threeDayProgram, buildSnapshot(sessions, setLogs), NOW);
     expect(c.nextDay?.dayId).toBe(3);
   });
 
@@ -133,7 +133,7 @@ describe('computeCoaching', () => {
     ];
     const setLogs = [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8 }];
     // program has days 1 and 2 — after day 2, cycle back to day 1
-    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), 2, NOW);
+    const c = computeCoaching(program, buildSnapshot(sessions, setLogs), NOW);
     expect(c.nextDay?.dayId).toBe(1);
   });
 });

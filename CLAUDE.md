@@ -68,6 +68,14 @@ Long-term milestones (roughly):
     priority muscles. Experience is inferred from logged data (`experience.ts`) and
     only ratchets up: plans use the higher of self-reported and inferred, and the
     Journey surfaces a "level up" nudge. Profile rides the LWW plan-document sync.
+21. ✅ Calendar-week analytics + per-set prescriptions — every week-bucketed metric
+    groups by the Monday-anchored wall-clock week (`sessionWeekStart`) instead of the
+    re-anchorable stored `weekNumber`, so weekly volume is chronological, gap-honest
+    and highlights the current week. `buildSetPlan()` turns the single recommended
+    weight into a full `SetPlan`: one pre-filled row per programmed set, with rep
+    targets fitted to the lifter's own set-to-set fatigue drop-off, rep-total and
+    e1RM-breakout progression triggers, and equipment-aware load increments.
+    Warm-ups became an explicit ＋ Warm-up set row instead of a mode toggle.
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
@@ -195,7 +203,9 @@ src/
                                   WeightType types + the option arrays the UI renders
     program.ts                 — Exercise/WorkoutDay interfaces, PROGRAM (4 days),
                                   getWeekNumber()/getWeekNumberForDate(), getWeekDateRange(),
-                                  getExerciseName()
+                                  getExerciseName(). Also THE calendar-week math:
+                                  startOfWeek()/addWeeks()/weeksBetween()/weekStartLabel()
+                                  (Monday-anchored; plan.mondayOf delegates here)
     settings.ts                — device-local settings (localStorage): the week-numbering
                                   anchor (managed automatically — first-use stamp, then the
                                   journey via planStore.ensureWeekAnchor) + rest-timer default
@@ -216,7 +226,9 @@ src/
                                   powering every consumer), buildSnapshot() (pure, for tests),
                                   epley1RM, e1rmSeries(), musclesForExercise()/primaryMuscleFor()
                                   (override → master list → name match), SETS_TARGET_LOW/HIGH,
-                                  sessionDurationMs()/avgDurationByDay() (workout durations)
+                                  sessionDurationMs()/avgDurationByDay() (workout durations),
+                                  sessionWeekStart() — the grouping key for every week-bucketed
+                                  analytic (see the weekly-bucketing note below)
     progress.ts                — THE progress/stall assessment: assessSnapshot(snapshot, goal) →
                                   per-exercise ExerciseProgress (status progressing/steady/
                                   stalled/declining) blending e1RM trend + volume-load trend +
@@ -226,9 +238,12 @@ src/
                                   across insights, recommendations, retrospective, planner,
                                   substitution (see progress engine section below)
     recommendations.ts         — calculateRecommendation(history, exercise) → WeightRec | null
-                                  ({ weight, direction, kind, reason }); double progression +
-                                  stall-triggered deload, order-aware (late-slot sessions skipped
-                                  as the baseline) (see algorithm section below)
+                                  ({ weight, direction, kind, reason }) and buildSetPlan(...) →
+                                  SetPlan (one PrescribedSet per programmed set + a goal line);
+                                  rep-total double progression + e1RM breakout + stall-triggered
+                                  deload, equipment-aware increments, per-set fatigue targets,
+                                  order-aware (late-slot sessions skipped as the baseline)
+                                  (see algorithm section below)
     coach.ts                   — adaptive programming engine: computeProgramPlan(program, snapshot)
                                   → ProgramPlan (conservative set additions/trims across future
                                   workouts, each with a plain-language reason) + applyPlanToDay()
@@ -265,7 +280,8 @@ src/
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
                                   heatColor()/heatLabel() (blue→green→yellow→red weekly-rate
                                   gradient), presetWindow()/mesocycleWindow()
-    metrics.ts                 — computeMetrics(snapshot) → Metrics (volume, e1RM series, muscle sets)
+    metrics.ts                 — computeMetrics(snapshot, now) → Metrics (weekly volume bucketed
+                                  by calendar week, e1RM series, muscle sets)
     insights.ts                — computeCoaching(program, snapshot) → Coaching: 3 positive
                                   highlights + 3 highest-impact opportunities, e1RM trend/plateau
                                   detection, weekly muscle volume, next-workout suggestion, and
@@ -291,7 +307,9 @@ src/
     WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest
                                   timer + coach-plan overlay/banner + duration capture
     ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
-                                  set logging, tap-to-edit
+                                  goal line, the whole prescription (next set pre-filled and
+                                  editable, remaining sets previewed), ＋ Warm-up / ＋ Extra
+                                  set, tap-to-edit logged sets
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
     HistoryView.tsx/css        — all past sessions in reverse chronological order
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
@@ -312,7 +330,8 @@ src/
                                   → activate
     SettingsView.tsx/css       — program start date, rest-timer default, account/sign-out
     LoginView.tsx/css          — Google OAuth login screen
-    charts.tsx/css             — reusable BarChart and LineChart (hand-rolled CSS/SVG)
+    charts.tsx/css             — reusable BarChart (highlightIndex / highlightMax, zero-value
+                                  gap bars) and LineChart (hand-rolled CSS/SVG)
 ```
 
 ---
@@ -462,14 +481,26 @@ each exercise, builds its recent history **across every day it appears in** (up 
 sessions containing that exercise, newest first). `calculateRecommendation(history, exercise)`
 implements **double progression** with stall detection, evaluated in order:
 
-1. **Increase** — the last session had at least `exercise.sets` working sets and *every* one hit
-   `repHigh`+ reps → add load. Increment = `max(5, round5(weight × 0.025))` (5 lbs normally,
-   ~2.5% for heavy lifts like leg press).
-2. **Deload** — 3+ consecutive sessions at the same working weight with no e1RM improvement
+1. **Increase (rep total)** — the last session had at least `exercise.sets` working sets and
+   its **rep total** reached `sets × repHigh` → add load. Counting the total rather than
+   demanding *every* set hit `repHigh` is what stops the engine parroting last week's weight:
+   13/12/11 is the same 36 reps as 12/12/12 and has equally earned the jump, but the old
+   per-set rule froze that lifter indefinitely. Averaging ≥2 reps past `repHigh` means the
+   load was too light → double increment.
+2. **Increase (e1RM breakout)** — 2+ recent sessions at the same load, reps already at
+   `repHigh − 1`+, and best e1RM up ≥3% across them → move up now rather than waiting for a
+   perfect rep total.
+3. **Deload** — 3+ consecutive sessions at the same working weight with no e1RM improvement
    (>1%) → drop ~10% and build back up.
-3. **Decrease** — average working-set reps fell under `repLow` → ease back ~5%.
-4. **Hold** (double progression) — reps are in range → keep the weight, chase reps until
-   `sets × repHigh` earns the increase.
+4. **Decrease** — average working-set reps fell under `repLow` → ease back ~5%.
+5. **Hold** (double progression) — reps are in range → keep the weight, chase reps. The reason
+   names the exact gap ("2 more reps than last time earns +5 lbs").
+
+**Increments are equipment-aware** (`incrementFor(weight, weightType)`): a dumbbell rack only
+goes up in 5s, but a barbell, a dip belt or a machine takes 2.5 lb microloading — so light
+non-rack work moves in 2.5s instead of taking a 30% jump, and heavy lifts scale to ~2.5%
+(a 400 lb leg press moves 10 lbs). Back-offs (`easeBack`) snap to the same increment and never
+go below 5 lbs.
 
 The **working weight** of a session is the most-used weight (tie → heaviest), so logged
 warm-up/ramp-up sets don't skew the recommendation.
@@ -490,9 +521,42 @@ range → build back to `repLow`; in range → chase one more rep). If external 
 "↑ N reps" instead of a weight when `targetReps` is set.
 
 Returns `{ weight, targetReps?, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
-ExerciseCard pre-fills the weight input (only while untouched) and shows the reason as a
-colour-coded chip, plus a "Last time" line with the previous session's sets. The engine is fully
-covered by `recommendations.test.ts`.
+
+### Per-set prescription (`buildSetPlan`)
+
+One weight is a recommendation; a plan is what a coach writes down. `buildSetPlan(history,
+exercise, weightType?, phase?)` wraps `calculateRecommendation` and returns a **`SetPlan`**:
+one `PrescribedSet { setNumber, weight, targetReps }` per programmed working set, plus a
+plain-language `goal` line stating what this session must do to earn the next increase.
+
+- **Rep targets descend across sets**, because reps do. The drop-off is fitted from the
+  lifter's *own* recent sessions (reps of set N minus set 1 at the working weight, averaged
+  over the last 3 sessions); set indices they've never reached fall back to a ~7%-per-set
+  decay. Targets are clamped inside `repLow…repHigh`. Prescribing a flat `3 × repHigh` to
+  someone who has never beaten 12/11/10 is prescribing a failure — and beating the fitted
+  targets is exactly the rep total that triggers rule 1.
+- **Set 1's target** is `lastSet1Reps + 1` on a hold, and `repLow` after any load change
+  (increase/decrease/deload) — the new load resets the rep chase.
+- **A planned deload/recovery week** flattens every target to `repLow` at the backed-off load;
+  no fatigue-chasing in a scheduled easy week.
+- **Never-trained exercises still get a plan** — `rec` is null, weights are `null` (the card
+  shows an empty input), targets are `repLow`, and the goal says to find a working weight.
+- The plan is built from the **coach-adjusted** set count (`effectiveDay`), so a planner set
+  addition shows up as a real prescribed row.
+
+ExerciseCard renders the plan directly: the next unlogged set is an editable row **pre-filled
+with its prescribed weight and reps** (one tap to log), the remaining sets are previewed
+dimmed below it, and logging a set at a weight of your own carries that weight forward to the
+rest of the session instead of snapping back to the recommendation. Above them sit the
+colour-coded reason chip, the "Last time" line and the goal line. Both engines are covered by
+`recommendations.test.ts`.
+
+**Warm-ups are an explicit addition, not a mode.** With working sets pre-filled, a "tag the
+next set as a warm-up" toggle would fight the prescription, so warm-ups are added with a
+**＋ Warm-up set** button that opens an empty amber row above the working sets (`＋ Extra set`
+appears once the prescription is complete). Warm-up sets still never count toward analytics
+(`setsBySession` excludes them), don't start the rest timer, and can still be re-tagged from
+the inline set editor's `W` chip.
 
 ---
 
@@ -751,6 +815,20 @@ program, not before):
   every background pull) re-derives the anchor from the *synced* journey document so every
   device agrees. Changing the anchor only affects the week numbering of *new* sessions —
   historical sessions keep the `weekNumber` they were stored with.
+- **Analytics bucket by CALENDAR week, never by `session.weekNumber`** — this follows directly
+  from the bullet above. `weekNumber` is stamped from whatever anchor was in force at logging
+  time, so re-anchoring leaves stored numbers out of chronological order (a July session
+  carrying week 9 sorting after a later one carrying week 1) and colliding across blocks.
+  Grouping by the Monday-anchored wall-clock week (`sessionWeekStart()` in `analytics.ts`,
+  built on `startOfWeek()` in `program.ts`) is stable forever. This is what weekly volume,
+  weekly muscle sets and every week-over-week delta use; `weekNumber` survives only as a
+  per-session record and a sync field. `computeMetrics(snapshot, now)` and
+  `computeCoaching(program, snapshot, now, …)` take a timestamp, not a week number.
+- **The weekly volume chart is a continuous timeline** — oldest week on the left, current week
+  on the right and highlighted (`BarChart`'s `highlightIndex`, not `highlightMax`). It always
+  ends on the current week even at zero ("this week so far" is the number to beat), spans at
+  most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
+  collapsing them — a skipped week must look like a skipped week.
 - **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced.
   (The week anchor stays consistent across devices anyway because ensureWeekAnchor derives it
   from the synced journey; exercise metadata *is* synced — see Cloud sync.)

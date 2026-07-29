@@ -129,12 +129,38 @@
   color: var(--text-muted);
 }
 
-.set-row {
+.set-row--done {
   cursor: pointer;
 }
 
-.set-row:active:not(.editing) {
+.set-row--done:active:not(.editing) {
   opacity: 0.7;
+}
+
+/* ── Today's prescription ── */
+/* The goal line states what this session has to do to earn the next increase. */
+.ex-goal {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Sets prescribed but not yet logged — visible up front, dimmed so they can't
+   be mistaken for logged work. */
+.set-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.set-row--planned {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.set-row--planned .set-weight {
+  font-weight: 500;
 }
 
 .delete-set-btn {
@@ -215,6 +241,19 @@
 .input-row {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+/* The active row carries its own set number, so the pre-filled inputs read as
+   "Set 2 · 100 lbs · 9 reps" — the same shape as the logged rows above it. */
+.set-num--active {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.set-inputs--warmup .set-num--active {
+  color: #E8A64C;
 }
 
 .weight-wrap {
@@ -223,7 +262,8 @@
 }
 
 .reps-wrap {
-  width: 88px;
+  width: 92px;
+  position: relative;
 }
 
 .num-input {
@@ -244,8 +284,17 @@
   border-color: var(--purple);
 }
 
-.weight-wrap .num-input {
-  padding-right: 36px;
+/* Chromium still draws spin buttons despite appearance:none — they'd sit on
+   top of the "lbs"/"reps" unit labels. */
+.num-input::-webkit-outer-spin-button,
+.num-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weight-wrap .num-input,
+.reps-wrap .num-input {
+  padding-right: 40px;
 }
 
 .input-unit {
@@ -267,24 +316,45 @@
   align-items: stretch;
 }
 
-.warmup-toggle {
+/* Adding a warm-up / extra set: secondary to logging the prescribed set */
+.ex-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ex-action-btn {
+  flex: 1;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ex-action-btn:active {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.draft-cancel-btn {
   flex: 0 0 auto;
   background: var(--bg-input);
-  color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: 8px;
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   padding: 11px 14px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.warmup-toggle--on {
-  color: #E8A64C;
+.set-inputs--warmup .num-input:focus {
   border-color: #E8A64C;
-  background: rgba(232, 166, 76, 0.12);
 }
 
 /* A logged warm-up row: amber label, muted weight — one clear signal. */

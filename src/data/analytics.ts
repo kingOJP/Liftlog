@@ -7,6 +7,7 @@
 import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
 import type { MuscleGroup } from './taxonomy';
+import { startOfWeek } from './program';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
 import { getExerciseLibrary } from './programStore';
 
@@ -64,6 +65,20 @@ export async function loadTrainingSnapshot(): Promise<TrainingSnapshot> {
 
 export function sessionTimestamp(s: Session): number {
   return s.completedAt ?? s.startedAt;
+}
+
+/**
+ * The Monday-anchored calendar week a session belongs to, as a timestamp.
+ *
+ * THE grouping key for every week-bucketed analytic (weekly volume, weekly
+ * muscle sets, week-over-week deltas). Deliberately *not* `session.weekNumber`:
+ * that field is stamped from the week anchor in force at logging time, and the
+ * anchor is re-derived on every block activation — so stored week numbers drift
+ * out of chronological order and collide across blocks. The wall-clock week a
+ * workout happened in never changes.
+ */
+export function sessionWeekStart(s: Session): number {
+  return startOfWeek(sessionTimestamp(s));
 }
 
 // ── Workout duration ──────────────────────────────────────────────────────────

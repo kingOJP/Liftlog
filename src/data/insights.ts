@@ -13,7 +13,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { Goal, PhaseKind } from './plan';
-import { getWeekNumber } from './program';
+import { addWeeks, startOfWeek, weekStartLabel } from './program';
 import type { WorkoutDay } from './program';
 import type { TrainingSnapshot } from './analytics';
 import {
@@ -22,6 +22,7 @@ import {
   muscleSetTotals,
   primaryMuscleFor,
   sessionTimestamp,
+  sessionWeekStart,
 } from './analytics';
 import { assessSnapshot, MIN_TREND_SESSIONS } from './progress';
 import type { ExerciseProgress } from './progress';
@@ -90,13 +91,13 @@ function volumeStatus(sets: number): VolumeStatus {
 export function computeCoaching(
   program: WorkoutDay[],
   snapshot: TrainingSnapshot,
-  currentWeek = getWeekNumber(),
   now = Date.now(),
   phase: PhaseKind | null = null,
   goal: Goal = 'general',
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
   const plan = computeProgramPlan(program, snapshot, now, phase);
+  const currentWeekStart = startOfWeek(now);
 
   const empty: Coaching = {
     hasData: false,
@@ -110,13 +111,14 @@ export function computeCoaching(
   };
   if (sessions.length === 0 || setsBySession.size === 0) return empty;
 
-  // Which week are we coaching? Current program week, else the latest with data.
-  const weeksWithData = [...new Set(sessions.map(s => s.weekNumber))].sort((a, b) => b - a);
-  const coachWeek = weeksWithData.includes(currentWeek) ? currentWeek : (weeksWithData[0] ?? currentWeek);
-  const weekLabel = coachWeek === currentWeek ? 'This week' : `Week ${coachWeek}`;
+  // Which week are we coaching? The current calendar week, else the latest with
+  // data. Calendar weeks, not stored weekNumbers — see sessionWeekStart.
+  const weeksWithData = [...new Set(sessions.map(sessionWeekStart))].sort((a, b) => b - a);
+  const coachWeek = weeksWithData.includes(currentWeekStart) ? currentWeekStart : (weeksWithData[0] ?? currentWeekStart);
+  const weekLabel = coachWeek === currentWeekStart ? 'This week' : `Week of ${weekStartLabel(coachWeek)}`;
 
   // ── Fractional set volume per muscle for the coaching week ──
-  const volumeMap = muscleSetTotals(snapshot, s => s.weekNumber === coachWeek).totals;
+  const volumeMap = muscleSetTotals(snapshot, s => sessionWeekStart(s) === coachWeek).totals;
 
   // Muscles the program directly targets
   const programMuscles = new Set<MuscleGroup>();
@@ -175,10 +177,11 @@ export function computeCoaching(
   for (const session of sessions) {
     let v = 0;
     for (const s of setsBySession.get(session.id!) ?? []) v += s.weight * s.reps;
-    weekVolume.set(session.weekNumber, (weekVolume.get(session.weekNumber) ?? 0) + v);
+    const w = sessionWeekStart(session);
+    weekVolume.set(w, (weekVolume.get(w) ?? 0) + v);
   }
   const thisWeekVol = weekVolume.get(coachWeek) ?? 0;
-  const lastWeekVol = weekVolume.get(coachWeek - 1) ?? 0;
+  const lastWeekVol = weekVolume.get(addWeeks(coachWeek, -1)) ?? 0;
   if (lastWeekVol > 0 && thisWeekVol > lastWeekVol * (1 + VOLUME_UP_PCT / 100)) {
     const pct = Math.round(((thisWeekVol - lastWeekVol) / lastWeekVol) * 100);
     highlights.push({
