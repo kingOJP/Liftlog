@@ -274,6 +274,7 @@
 }
 
 .structure-week--recovery        { border-left-color: #3D6BE8; }
+.structure-week--intro           { border-left-color: #7fa3ff; }
 .structure-week--accumulation    { border-left-color: var(--green); }
 .structure-week--intensification { border-left-color: #E8C44A; }
 .structure-week--peak            { border-left-color: var(--red); }

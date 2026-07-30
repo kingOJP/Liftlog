@@ -358,8 +358,13 @@ export function calculateRecommendation(
       ? 'Planned deload week — ~10% lighter, crisp reps, let fatigue drain'
       : phase === 'race-week'
         ? 'Race week — ~30% lighter and just a couple of sets. Sharpness, not fitness'
-        : 'Recovery week — ~10% lighter while you ramp back into training';
-    const factor = phase === 'race-week' ? 0.7 : 0.9;
+        : phase === 'intro'
+          ? 'Intro week — well short of your working weight. Learn the movement, leave 4–5 reps in the tank'
+          : 'Recovery week — ~10% lighter while you ramp back into training';
+    // An intro week isn't shedding fatigue, it's avoiding creating any: on a
+    // movement the athlete has done before, a bigger cut than a deload is right,
+    // because the point is a comfortably submaximal first exposure.
+    const factor = phase === 'race-week' ? 0.7 : phase === 'intro' ? 0.8 : 0.9;
     if (weightType === 'Bodyweight' && weight === 0) {
       return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }

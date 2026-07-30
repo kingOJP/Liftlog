@@ -5,15 +5,15 @@ import type { TrainingSnapshot } from '../data/analytics';
 import type { MuscleGroup } from '../data/taxonomy';
 import {
   GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS,
-  ENDURANCE_LOADS, DISCIPLINES, defaultSportContext,
-  nextMonday, parsePlanDate, toPlanDate, experienceLabel,
+  ENDURANCE_LOADS, DISCIPLINES, RACE_PROXIMITY, defaultSportContext,
+  nextMonday, parsePlanDate, experienceLabel,
 } from '../data/plan';
 import type {
   Goal, ExperienceLevel, EquipmentAccess, TrainingProfile,
-  SportId, SportEvent, EnduranceLoad, Discipline, SportContext,
+  SportId, SportEvent, EnduranceLoad, Discipline, SportContext, RaceProximity,
 } from '../data/plan';
-import { SPORTS, NIGGLES, sportLabel } from '../data/sports';
-import { buildPlanProposal, defaultBlockWeeks, weeksToRace } from '../data/planner';
+import { SPORTS, sportLabel, eventsFor, defaultEventFor, nigglesFor } from '../data/sports';
+import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
 import {
   activateProposal, getActiveBlockInfo, getLatestRetrospective,
@@ -40,7 +40,8 @@ type QId =
   | 'goal' | 'experience' | 'trainingAge' | 'days'
   | 'equipment' | 'injuries' | 'priority' | 'schedule' | 'startDate'
   // sport-support only
-  | 'sport' | 'sportEvent' | 'raceDate' | 'sportLoad' | 'weakLink' | 'niggles';
+  | 'sport' | 'sportEvent' | 'raceProximity' | 'sportLoad' | 'weakLink'
+  | 'niggles' | 'sportWeeks';
 
 const BASE_ORDER: QId[] = [
   'goal', 'experience', 'trainingAge', 'days',
@@ -49,37 +50,33 @@ const BASE_ORDER: QId[] = [
 
 // Supporting another sport asks a different set of questions, because the
 // answers do different work: the sport and its weekly hours set the volume
-// ceiling, the race date drives the periodization, and the weak link biases
-// exercise selection. The generic priority-muscle question is dropped — a
-// sport prescription is already at its volume ceiling, so there is nothing
-// honest to do with the answer.
+// ceiling, the race distance sets the rep ranges and whether plyometrics earn
+// their place, and race proximity sets how much of the block builds versus
+// holds. The generic priority-muscle question is dropped — a sport prescription
+// is already at its volume ceiling, so there is nothing honest to do with it.
 const SPORT_ORDER: QId[] = [
-  'goal', 'sport', 'sportEvent', 'raceDate', 'sportLoad', 'weakLink',
-  'experience', 'days', 'equipment', 'niggles', 'injuries', 'startDate',
+  'goal', 'sport', 'sportEvent', 'raceProximity', 'sportLoad', 'weakLink',
+  'experience', 'days', 'equipment', 'niggles', 'injuries', 'sportWeeks', 'startDate',
 ];
 
-function orderFor(goal: Goal): QId[] {
-  return goal === 'sport-support' ? SPORT_ORDER : BASE_ORDER;
+// Questions that only apply to some sports. Triathlon is the only multi-sport
+// event here, so it is the only one with a weak discipline to bias toward.
+const SPORT_ONLY_QUESTIONS: Partial<Record<QId, SportId[]>> = {
+  weakLink: ['triathlon'],
+};
+
+function orderFor(goal: Goal, sport: SportId): QId[] {
+  if (goal !== 'sport-support') return BASE_ORDER;
+  return SPORT_ORDER.filter(q => {
+    const limited = SPORT_ONLY_QUESTIONS[q];
+    return !limited || limited.includes(sport);
+  });
 }
-
-const TRI_EVENTS: { id: SportEvent; label: string; blurb: string }[] = [
-  { id: 'sprint',      label: 'Sprint',       blurb: '750m / 20k / 5k — strength and power transfer strongly' },
-  { id: 'olympic',     label: 'Olympic',      blurb: '1.5k / 40k / 10k — moderate volume, real room for strength work' },
-  { id: 'half',        label: 'Half (70.3)',  blurb: '1.9k / 90k / 21k — lifting shifts toward durability' },
-  { id: 'full',        label: 'Full (140.6)', blurb: '3.8k / 180k / 42k — minimum effective dose only' },
-  { id: 'unspecified', label: 'Not sure yet', blurb: 'A balanced template you can adjust once you pick a race' },
-];
-
-const RACE_WINDOWS: { label: string; weeks: number | null; blurb: string }[] = [
-  { label: 'No date yet',    weeks: null, blurb: 'Base training — the best window for heavier strength work' },
-  { label: 'Within 8 weeks', weeks: 8,    blurb: 'Race-specific: lifting tapers to one session, then race week' },
-  { label: '3–4 months',     weeks: 14,   blurb: 'Straight into build; strength holds while your sport takes priority' },
-  { label: '5–6 months',     weeks: 22,   blurb: 'Full arc available: build, hold, taper, race' },
-];
 
 type Stage = 'questions' | 'structure' | 'workouts';
 
 const WEEK_OPTIONS = [4, 5, 6, 8];
+const SPORT_WEEK_OPTIONS = [4, 6, 8, 10, 12];
 const DAY_OPTIONS = [2, 3, 4, 5, 6];
 
 const TRAINING_AGE_OPTIONS: { label: string; months: number }[] = [
@@ -133,10 +130,20 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const savedSport = saved.sport ?? defaultSportContext();
   const [sportId, setSportId] = useState<SportId>(savedSport.sport);
   const [sportEvent, setSportEvent] = useState<SportEvent>(savedSport.event);
-  const [raceDate, setRaceDate] = useState<string | undefined>(savedSport.raceDate);
+  const [proximity, setProximity] = useState<RaceProximity>(savedSport.proximity);
   const [sportLoad, setSportLoad] = useState<EnduranceLoad>(savedSport.load);
   const [weakLink, setWeakLink] = useState<Discipline>(savedSport.weakLink);
   const [niggles, setNiggles] = useState<string[]>(savedSport.niggles);
+
+  // Changing sport invalidates the distance and any sport-specific niggles.
+  function chooseSport(next: SportId) {
+    if (next !== sportId) {
+      setSportEvent(defaultEventFor(next));
+      const allowed = new Set(nigglesFor(next).map(n => n.id));
+      setNiggles(prev => prev.filter(n => allowed.has(n)));
+    }
+    pick(setSportId, next);
+  }
 
   // Proposal + review
   const [proposal, setProposal] = useState<PlanProposal | null>(null);
@@ -175,7 +182,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   });
 
   const startDateValid = parsePlanDate(startDate) != null;
-  const order = orderFor(goal);
+  const order = orderFor(goal, sportId);
   // Switching goal can shorten the flow underneath us; clamp rather than crash.
   const qId = order[Math.min(qIndex, order.length - 1)];
 
@@ -206,9 +213,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     return {
       sport: sportId,
       event: sportEvent,
-      ...(raceDate ? { raceDate } : {}),
+      proximity,
       load: sportLoad,
-      weakLink,
+      // Only triathlon asks; a single-sport athlete has no weak discipline.
+      weakLink: sportId === 'triathlon' ? weakLink : 'even',
       niggles,
     };
   }
@@ -240,9 +248,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       equipmentAccess: equipment,
       priorityMuscles,
       injuries: injuries.trim(),
-      // The sport registry sizes the block itself from the race date, so the
-      // generic week/deload answers aren't asked on this path.
-      ...(goal === 'sport-support' ? { sport: sportContext(), weeks: sportBlockWeeks() } : {}),
+      // A goal change is one of the things that earns an introductory week.
+      previousGoal: activeGoal ?? null,
+      ...(goal === 'sport-support' ? { sport: sportContext() } : {}),
     };
     const p = buildPlanProposal(input, program, snapshot, plannerRetro);
     setProposal(p);
@@ -291,26 +299,6 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       : null;
     activateProposal({ ...proposal, days }, outgoingRetro);
     onActivated();
-  }
-
-  // The sport path never asks "how long should this block run?" — the race date
-  // answers it. Without a race, a 6-week base block is the default.
-  function sportBlockWeeks(): number {
-    const w = raceDate ? weeksToRace(startDate, raceDate) : null;
-    return w == null ? defaultBlockWeeks() : Math.min(12, Math.max(2, w));
-  }
-
-  function pickRaceWindow(weeksOut: number | null) {
-    if (weeksOut == null) {
-      setRaceDate(undefined);
-    } else {
-      const monday = parsePlanDate(startDate) ?? new Date();
-      const race = new Date(monday);
-      race.setDate(race.getDate() + weeksOut * 7 - 1);
-      setRaceDate(toPlanDate(race));
-    }
-    if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    advanceTimer.current = window.setTimeout(goNext, 240);
   }
 
   function toggleNiggle(id: string) {
@@ -531,7 +519,8 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   function needsContinue(id: QId): boolean {
     // Single-select questions auto-advance; these need an explicit Continue.
     return id === 'injuries' || id === 'priority'
-      || id === 'schedule' || id === 'startDate' || id === 'niggles';
+      || id === 'schedule' || id === 'startDate' || id === 'niggles'
+      || id === 'sportWeeks';
   }
   function canContinue(): boolean {
     if (qId === 'startDate') return startDateValid && snapshotReady;
@@ -674,13 +663,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
         return (
           <Question title="Which sport are you supporting?" subtitle="Your sport sets the ceiling — the plan is built to fit around it, not compete with it.">
             <div className="opt-list">
-              {SPORTS.filter(sp => sp.id !== 'other').map(sp => (
+              {SPORTS.map(sp => (
                 <OptionCard key={sp.id} active={sportId === sp.id} label={sp.label} blurb={sp.blurb}
-                  onClick={() => pick(setSportId, sp.id)} />
+                  onClick={() => chooseSport(sp.id)} />
               ))}
-              <OptionCard active={sportId === 'other'} label="Something else"
-                blurb="A general strength-support template you can adjust in review"
-                onClick={() => pick(setSportId, 'other' as SportId)} />
             </div>
           </Question>
         );
@@ -688,9 +674,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       case 'sportEvent':
         return (
           <Question title={`Which ${sportLabel(sportId).toLowerCase()} distance?`}
-            subtitle="Distance changes the job: short races reward strength and power, long ones reward durability.">
+            subtitle="Distance changes the job: short races reward strength and power, long ones reward staying in one piece.">
             <div className="opt-list">
-              {TRI_EVENTS.map(e => (
+              {eventsFor(sportId).map(e => (
                 <OptionCard key={e.id} active={sportEvent === e.id} label={e.label} blurb={e.blurb}
                   onClick={() => pick(setSportEvent, e.id)} />
               ))}
@@ -698,27 +684,15 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
           </Question>
         );
 
-      case 'raceDate':
+      case 'raceProximity':
         return (
-          <Question title="When's your A race?" subtitle="This drives the whole shape of the block — how long you build, and when the lifting tapers.">
+          <Question title="When's your next race?" subtitle="This decides how much of the block builds strength and how much just holds it.">
             <div className="opt-list">
-              {RACE_WINDOWS.map(w => {
-                const active = w.weeks == null
-                  ? raceDate == null
-                  : raceDate != null && weeksToRace(startDate, raceDate) === w.weeks;
-                return (
-                  <OptionCard key={w.label} active={active} label={w.label} blurb={w.blurb}
-                    onClick={() => pickRaceWindow(w.weeks)} />
-                );
-              })}
+              {RACE_PROXIMITY.map(r => (
+                <OptionCard key={r.id} active={proximity === r.id} label={r.label} blurb={r.blurb}
+                  onClick={() => pick(setProximity, r.id)} />
+              ))}
             </div>
-            {raceDate && (
-              <label className="setup-exact-date">
-                <span>Exact date</span>
-                <input className="setup-date-input wizard-date" type="date" value={raceDate}
-                  onChange={e => setRaceDate(e.target.value)} />
-              </label>
-            )}
           </Question>
         );
 
@@ -751,12 +725,34 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
         return (
           <Question title="Any recurring niggles?" subtitle="Pick anything that flares up. Each one reroutes the plan rather than just being noted." optional>
             <div className="opt-list">
-              {NIGGLES.map(n => (
+              {nigglesFor(sportId).map(n => (
                 <OptionCard key={n.id} active={niggles.includes(n.id)} label={n.label} blurb={n.blurb}
                   onClick={() => toggleNiggle(n.id)} />
               ))}
             </div>
             <p className="setup-hint">Leave everything unpicked if nothing's bothering you.</p>
+          </Question>
+        );
+
+      case 'sportWeeks':
+        return (
+          <Question title="How long should this block run?" subtitle="One focused training cycle before you reassess. Your call — the plan shapes itself around the length you pick.">
+            <div className="chip-grid">
+              {SPORT_WEEK_OPTIONS.map(n => (
+                <button key={n}
+                  className={`setup-chip${weeks === n ? ' setup-chip--active' : ''}`}
+                  onClick={() => setWeeks(n)}>
+                  {n} wk
+                </button>
+              ))}
+            </div>
+            <p className="setup-hint">
+              {proximity === 'soon'
+                ? 'With a race inside 8 weeks, most of whatever length you pick will be spent holding strength rather than building it.'
+                : proximity === 'none' || proximity === 'far'
+                  ? 'With no race close, the whole block can build — longer means more strength banked before race season.'
+                  : 'The plan builds through the first part of the block and holds through the rest.'}
+            </p>
           </Question>
         );
 

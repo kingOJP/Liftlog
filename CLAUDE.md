@@ -93,18 +93,33 @@ Long-term milestones (roughly):
     Warm-ups became an explicit ＋ Warm-up set row instead of a mode toggle.
 
 21. ✅ Sport-support training (`docs/sport-support.md`) — a `sport-support` goal for
-    athletes whose primary training is elsewhere (triathlon, running, Hyrox). The
+    athletes whose primary training is elsewhere (**triathlon and running**). The
     weekly volume band is now goal-derived (`volumeTargetFor` in analytics.ts:
     4–10 sets/muscle here vs 10–20) rather than a global constant, which removes
     the ratchet where the coach added volume, insights called it low, and the
     retrospective carried "under-target" into the next block. `sports.ts` owns the
-    research layer as data — day templates with per-slot dose and rationale, the
-    interference budget (`liftBudget`: the sport's own weekly hours cap lifting
-    days and weekly sets), race-date periodization (build → maintain → taper →
-    race week, never a lifting peak near an A race), and niggle routing.
+    research layer as data — per-sport day templates with per-slot dose and
+    rationale, per-event `EventProfile`s (distance sets the main lifts' rep range,
+    whether plyometrics earn a place, the volume scale and the tissue emphases),
+    the interference budget (`liftBudget`: weekly sport hours × race distance cap
+    lifting days and weekly sets), proximity-driven periodization
+    (`buildSportPhases`: how much of the block builds vs holds — **no race week**,
+    since there is no exact race-date input), and niggle routing.
     `WorkoutDay.phases` gates a day by block phase so the lifting taper is
-    enforced, not merely described. Timed exercises (`ExerciseDef.unit`) log
-    seconds.
+    enforced, not merely described. Wizard questions are scoped to the sport
+    (`SPORT_ONLY_QUESTIONS`, `nigglesFor`). Timed exercises (`ExerciseDef.unit`)
+    log seconds.
+22. ✅ Introductory weeks — the `intro` PhaseKind, decided by *novelty* rather than
+    training age (`introWeeksFor` in planner.ts): beginners always get one (two on
+    a block ≥8 weeks), and an experienced lifter earns one when the goal changed
+    or ≥50% of the block's exercises are new (`NOVEL_SELECTION_SHARE`). Grounded
+    in the repeated-bout effect — the first exposure to an unaccustomed movement
+    or rep range is the sore one. Not a deload: ~20% off, no set additions, and it
+    doesn't count toward earning a deload. Required computing phases **after** day
+    generation in `buildPlanProposal` so `stimulusChange()` can compare the
+    proposal against the current program. Also: the vague 'Athletic Performance'
+    goal was removed from `GOALS` (the `Goal` type keeps the member so stored
+    plans still resolve).
 
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
@@ -293,10 +308,11 @@ src/
     plan.ts                    — training-journey domain: TrainingPlan/TrainingBlock/
                                   BlockRetrospective types, PhaseKind week tags, Monday-anchored
                                   block week math (blockWeekIndex/currentPhase/blockEnded),
-<<<<<<< HEAD
-                                  validatePhases() deload guardrails. Also the athlete model:
-                                  TrainingProfile + ExperienceLevel/EquipmentAccess/CardioLevel
-                                  and their option arrays
+                                  validatePhases() deload + opener guardrails, isEasyPhase()/
+                                  isOpenerPhase(). Also the athlete model: TrainingProfile +
+                                  ExperienceLevel/EquipmentAccess and their option arrays, plus
+                                  SportContext (SportId/SportEvent/RaceProximity/EnduranceLoad/
+                                  Discipline) for sport-support
     dosage.ts                  — THE prescription resolver (pure): dosage(goal, slot, profile,
                                   experience) → sets × rep range, isHeavyAxial() (barbell hinge/
                                   squat → low narrow ranges), rangeFromHistory() (read the range
@@ -304,24 +320,23 @@ src/
     prescribe.ts               — the store-reading wrapper: prescribeFor(id, opts) and
                                   slotFor(id, name, opts) → a dosed program slot. Every route an
                                   exercise takes into a workout goes through here
-=======
-                                  validatePhases() deload guardrails, isEasyPhase(). Also the
-                                  athlete model: TrainingProfile + ExperienceLevel/
-                                  EquipmentAccess and their option arrays, plus SportContext
-                                  (SportId/SportEvent/EnduranceLoad/Discipline) for sport-support
-    sports.ts                  — sport-support research layer as data: SPORTS registry,
+    sports.ts                  — sport-support research layer as data: SPORTS (triathlon,
+                                  running) + SPORT_EVENTS with per-distance EventProfile,
                                   Slot/DayTemplate vocabulary (shared with planner.ts),
                                   liftBudget() interference ceiling, buildSportPhases()
-                                  race-date periodization, buildSportPlan() (templates +
-                                  weak-link bias + niggle routing + two capping passes),
-                                  NIGGLES. See docs/sport-support.md
->>>>>>> b9cd6a6 (Document sport-support training and polish the timed-set UI)
+                                  proximity-driven periodization, buildSportPlan()
+                                  (per-sport templates + distance emphases + weak-link
+                                  bias + niggle routing + two capping passes),
+                                  NIGGLES/nigglesFor. See docs/sport-support.md
     planner.ts                 — block planner: buildPlanProposal(input, program, snapshot,
                                   prevRetro) → PlanProposal (split, phase layout, generated
                                   workouts, per-exercise decisions with reasons, confidence,
                                   parsed guidance notes) — pure, like every other engine.
                                   Experience-aware: beginner-safe dosage/split/selection,
-                                  prerequisite skill-gating, priority-muscle volume bias
+                                  prerequisite skill-gating, priority-muscle volume bias.
+                                  Also introWeeksFor()/stimulusChange() — novelty-driven
+                                  intro weeks (phases are computed AFTER the days, so
+                                  selection novelty can be measured)
     experience.ts              — data-driven experience inference: inferExperience(snapshot)
                                   (training age + consistency + difficulty mastered),
                                   effectiveExperience() (max of self-report and inferred),
@@ -1006,7 +1021,6 @@ dosage comes from instead.
   every background pull) re-derives the anchor from the *synced* journey document so every
   device agrees. Changing the anchor only affects the week numbering of *new* sessions —
   historical sessions keep the `weekNumber` they were stored with.
-<<<<<<< HEAD
 - **Analytics bucket by CALENDAR week, never by `session.weekNumber`** — this follows directly
   from the bullet above. `weekNumber` is stamped from whatever anchor was in force at logging
   time, so re-anchoring leaves stored numbers out of chronological order (a July session
@@ -1021,14 +1035,12 @@ dosage comes from instead.
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
   collapsing them — a skipped week must look like a skipped week.
-=======
 - **The weekly set band belongs to the goal, not the app** — every engine takes a
   `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
   A new goal that needs a different dose changes one function. On `sport-support` the coach
   planner may **trim but never add** sets (also true in any `maintenance` week): volume
   creep is the specific failure mode of concurrent training, and the coach cannot see the
   swim/bike/run sessions its extra set would cost.
->>>>>>> b9cd6a6 (Document sport-support training and polish the timed-set UI)
 - **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced.
   (The week anchor stays consistent across devices anyway because ensureWeekAnchor derives it
   from the synced journey; exercise metadata *is* synced — see Cloud sync.)

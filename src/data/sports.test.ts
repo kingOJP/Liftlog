@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  buildSportPlan, buildSportPhases, liftBudget, sportMeta, NIGGLES,
+  buildSportPlan, buildSportPhases, liftBudget, eventsFor, nigglesFor, NIGGLES,
 } from './sports';
 import type { SportContext } from './plan';
 import { validatePhases } from './plan';
@@ -15,7 +15,8 @@ beforeEach(() => localStorage.clear());
 function sport(overrides: Partial<SportContext> = {}): SportContext {
   return {
     sport: 'triathlon',
-    event: 'sprint',
+    event: 'tri-sprint',
+    proximity: 'soon',
     load: 'moderate',
     weakLink: 'even',
     niggles: [],
@@ -38,7 +39,7 @@ function triInput(overrides: Partial<PlannerInput> = {}): PlannerInput {
     equipmentAccess: 'full-gym',
     priorityMuscles: [],
     injuries: '',
-    sport: sport({ raceDate: '2026-09-26', weakLink: 'bike' }),
+    sport: sport({ weakLink: 'bike' }),
     ...overrides,
   };
 }
@@ -65,56 +66,66 @@ describe('interference budget', () => {
     expect(high).toBeLessThan(low);
   });
 
+  it('shrinks the ceiling as race distance grows', () => {
+    const short = liftBudget(sport({ event: 'run-5k' }), 3).maxWeeklySets;
+    const long = liftBudget(sport({ event: 'run-full' }), 3).maxWeeklySets;
+    expect(long).toBeLessThan(short);
+  });
+
   it('caps beginners at two days regardless of available time', () => {
     expect(liftBudget(sport({ load: 'low' }), 3, 'beginner').days).toBe(2);
   });
-
-  it('does not tax a power sport the way it taxes an endurance one', () => {
-    const power = liftBudget(sport({ sport: 'sprint', load: 'moderate' }), 4).maxWeeklySets;
-    const endurance = liftBudget(sport({ sport: 'triathlon', load: 'moderate' }), 4).maxWeeklySets;
-    expect(power).toBeGreaterThan(endurance);
-  });
 });
 
-describe('race-date periodization', () => {
-  it('lays out build → maintain → taper → race week for an 8-week run-in', () => {
-    const { phases } = buildSportPhases(8, 8, 'triathlon');
-    expect(phases).toEqual([
-      'accumulation', 'intensification', 'intensification',
-      'maintenance', 'maintenance', 'maintenance',
-      'deload', 'race-week',
-    ]);
+describe('race proximity shapes the block', () => {
+  it('builds the whole way when there is no race close', () => {
+    const { phases } = buildSportPhases(8, 'none', 'triathlon');
+    expect(phases).not.toContain('maintenance');
+    expect(phases.filter(p => p === 'accumulation' || p === 'intensification')).toHaveLength(8);
   });
 
-  it('never programs a lifting peak in a race build', () => {
-    const { phases } = buildSportPhases(10, 10, 'triathlon');
-    expect(phases).not.toContain('peak');
+  it('spends most of a race-close block holding rather than building', () => {
+    const { phases } = buildSportPhases(8, 'soon', 'triathlon');
+    const building = phases.filter(p => p === 'accumulation' || p === 'intensification').length;
+    const holding = phases.filter(p => p === 'maintenance').length;
+    expect(holding).toBeGreaterThan(building);
   });
 
-  it('always closes a race build with race week', () => {
-    for (const weeks of [3, 5, 6, 8, 12]) {
-      const { phases } = buildSportPhases(weeks, weeks, 'triathlon');
-      expect(phases[phases.length - 1]).toBe('race-week');
+  it('builds then holds at mid-range proximity', () => {
+    const { phases } = buildSportPhases(10, 'mid', 'triathlon');
+    expect(phases).toContain('intensification');
+    expect(phases).toContain('maintenance');
+  });
+
+  it('never labels a week race week — there is no exact race date to justify it', () => {
+    for (const proximity of ['none', 'soon', 'mid', 'far'] as const) {
+      for (const weeks of [2, 4, 6, 8, 10, 12]) {
+        expect(buildSportPhases(weeks, proximity, 'running').phases).not.toContain('race-week');
+      }
+    }
+  });
+
+  it('honours the requested block length exactly', () => {
+    for (const weeks of [4, 6, 8, 10, 12]) {
+      expect(buildSportPhases(weeks, 'mid', 'running').phases).toHaveLength(weeks);
     }
   });
 
   it('produces layouts the shared phase guardrails accept', () => {
-    for (const weeks of [3, 4, 5, 6, 8, 10, 12]) {
-      expect(validatePhases(buildSportPhases(weeks, weeks, 'triathlon').phases)).toBeNull();
-      expect(validatePhases(buildSportPhases(weeks, null, 'triathlon').phases)).toBeNull();
+    for (const proximity of ['none', 'soon', 'mid', 'far'] as const) {
+      for (const weeks of [2, 3, 4, 5, 6, 8, 10, 12]) {
+        for (const intro of [0, 1, 2]) {
+          const { phases } = buildSportPhases(weeks, proximity, 'triathlon', intro);
+          expect(validatePhases(phases), `${proximity}/${weeks}/${intro}`).toBeNull();
+        }
+      }
     }
   });
 
-  it('treats a block with no race date as base training — no taper, no race week', () => {
-    const { phases, notes } = buildSportPhases(6, null, 'triathlon');
-    expect(phases).not.toContain('race-week');
-    expect(phases[phases.length - 1]).toBe('deload');
-    expect(notes.join(' ')).toMatch(/base training/i);
-  });
-
-  it('warns when the race sits beyond the block it was given', () => {
-    const { warnings } = buildSportPhases(6, 14, 'triathlon');
-    expect(warnings.join(' ')).toMatch(/another block/i);
+  it('opens with the intro weeks it was given', () => {
+    const { phases } = buildSportPhases(8, 'mid', 'running', 2);
+    expect(phases.slice(0, 2)).toEqual(['intro', 'intro']);
+    expect(phases).toHaveLength(8);
   });
 });
 
@@ -131,13 +142,14 @@ describe('triathlon template', () => {
     expect(plan.days.map(d => d.title).join(' ')).not.toMatch(/Power/);
   });
 
-  it('gates the taper: the power day is build-only, the second day stops before race week', () => {
+  it('gates the taper: the power day is build-only, the second day stops before the deload', () => {
     const plan = buildSportPlan(sport(), 3);
     const [strength, unilateral, power] = plan.days;
     expect(strength.phases).toBeUndefined();               // every week
-    expect(unilateral.phases).not.toContain('race-week');
+    expect(unilateral.phases).toContain('maintenance');
     expect(unilateral.phases).not.toContain('deload');
-    expect(power.phases).toEqual(['recovery', 'accumulation', 'intensification', 'peak']);
+    expect(power.phases).not.toContain('maintenance');
+    expect(power.phases).toContain('intensification');
   });
 
   it('keeps every slot inside the sport-support weekly band', () => {
@@ -190,10 +202,78 @@ describe('triathlon template', () => {
     expect(upper.slots.some(s => s.preferIds?.includes('straight-arm-pulldowns'))).toBe(true);
   });
 
-  it('flags sports that have no specialised template yet', () => {
-    expect(sportMeta('hyrox').specialised).toBe(false);
-    const plan = buildSportPlan(sport({ sport: 'hyrox' }), 3);
-    expect(plan.warnings.join(' ')).toMatch(/specialised template/i);
+  it('offers only triathlon distances for triathlon', () => {
+    const ids = eventsFor('triathlon').map(e => e.id);
+    expect(ids).toEqual(['tri-sprint', 'tri-olympic', 'tri-half', 'tri-full']);
+  });
+});
+
+describe('race distance changes the programming', () => {
+  it('offers 5k through marathon for running', () => {
+    const ids = eventsFor('running').map(e => e.id);
+    expect(ids).toEqual(['run-5k', 'run-10k', 'run-half', 'run-full']);
+  });
+
+  it('keeps plyometrics for short races and drops them for long ones', () => {
+    const jumps = (event: SportContext['event']) =>
+      buildSportPlan(sport({ sport: event.startsWith('run') ? 'running' : 'triathlon', event }), 3)
+        .days.flatMap(d => d.slots).filter(sl => sl.patterns?.includes('Jump')).length;
+    expect(jumps('run-5k')).toBeGreaterThan(0);
+    expect(jumps('run-10k')).toBeGreaterThan(0);
+    expect(jumps('run-half')).toBe(0);
+    expect(jumps('run-full')).toBe(0);
+    expect(jumps('tri-sprint')).toBeGreaterThan(0);
+    expect(jumps('tri-full')).toBe(0);
+  });
+
+  it('raises the main lifts\' rep range as the distance grows', () => {
+    const reps = (event: SportContext['event'], sportId: SportContext['sport']) => {
+      const plan = buildSportPlan(sport({ sport: sportId, event }), 3);
+      return plan.days.flatMap(d => d.slots).find(sl => sl.main)!.dose!;
+    };
+    expect(reps('run-5k', 'running').repHigh).toBe(6);
+    expect(reps('run-full', 'running').repHigh).toBe(8);
+    expect(reps('tri-sprint', 'triathlon').repHigh).toBe(6);
+    expect(reps('tri-full', 'triathlon').repHigh).toBe(8);
+  });
+
+  it('explains the distance choice on the plan', () => {
+    const plan = buildSportPlan(sport({ sport: 'running', event: 'run-full' }), 3);
+    expect(plan.rationale.join(' ')).toMatch(/Marathon:/);
+    expect(plan.rationale.join(' ')).toMatch(/mileage is the training/i);
+  });
+
+  it('says why a long-distance plan uses fewer days than requested', () => {
+    const plan = buildSportPlan(sport({ sport: 'running', event: 'run-full', load: 'low' }), 3);
+    expect(plan.warnings.join(' ')).toMatch(/plyometric day/i);
+  });
+});
+
+describe('running is programmed as running, not as a triathlon', () => {
+  it('spends no volume on swim-specific upper body', () => {
+    const plan = buildSportPlan(sport({ sport: 'running', event: 'run-10k' }), 3);
+    const ids = plan.days.flatMap(d => d.slots).flatMap(sl => sl.preferIds ?? []);
+    expect(ids).not.toContain('db-external-rotation');
+    expect(ids).not.toContain('chin-ups');
+  });
+
+  it('programs hip abduction and single-leg calf work instead', () => {
+    const plan = buildSportPlan(sport({ sport: 'running', event: 'run-10k' }), 3);
+    const ids = plan.days.flatMap(d => d.slots).flatMap(sl => sl.preferIds ?? []);
+    expect(ids).toContain('hip-abduction');
+    expect(ids).toContain('single-leg-calf-raise');
+  });
+
+  it('ignores the weak-link answer, which only means something for triathlon', () => {
+    const even = buildSportPlan(sport({ sport: 'running', event: 'run-10k', weakLink: 'even' }), 3);
+    const bike = buildSportPlan(sport({ sport: 'running', event: 'run-10k', weakLink: 'bike' }), 3);
+    const total = (p: typeof even) => p.days.reduce((s, d) => s + d.slots.reduce((a, sl) => a + sl.dose!.sets, 0), 0);
+    expect(total(bike)).toBe(total(even));
+  });
+
+  it('never offers a swim niggle to a runner', () => {
+    expect(nigglesFor('running').map(n => n.id)).not.toContain('shoulder');
+    expect(nigglesFor('triathlon').map(n => n.id)).toContain('shoulder');
   });
 });
 
@@ -238,11 +318,9 @@ describe('the full proposal for a sprint triathlon 8 weeks out', () => {
     const p = buildPlanProposal(triInput(), [], null, null);
     expect(p.splitName).toBe('Strength · Unilateral · Power');
     expect(p.days).toHaveLength(3);
-    expect(p.phases).toEqual([
-      'accumulation', 'intensification', 'intensification',
-      'maintenance', 'maintenance', 'maintenance',
-      'deload', 'race-week',
-    ]);
+    expect(p.phases).toHaveLength(8);
+    expect(p.phases).not.toContain('race-week');
+    expect(p.phases).toContain('maintenance');
   });
 
   it('anchors day one on a heavy bilateral squat at 4–6 reps', () => {
@@ -304,9 +382,15 @@ describe('the full proposal for a sprint triathlon 8 weeks out', () => {
     expect(p.progression).toMatch(/never add sets/i);
   });
 
+  it('runs for exactly the number of weeks the athlete chose', () => {
+    for (const weeks of [4, 6, 8, 10, 12]) {
+      expect(buildPlanProposal(triInput({ weeks }), [], null, null).phases).toHaveLength(weeks);
+    }
+  });
+
   it('reduces the plan to two days and warns when sport hours are high', () => {
     const p = buildPlanProposal(
-      triInput({ sport: sport({ raceDate: '2026-09-26', weakLink: 'bike', load: 'high' }) }),
+      triInput({ sport: sport({ weakLink: 'bike', load: 'high' }) }),
       [], null, null,
     );
     expect(p.days).toHaveLength(2);

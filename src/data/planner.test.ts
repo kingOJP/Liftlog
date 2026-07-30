@@ -5,7 +5,8 @@ import type { Session, SetLog } from '../db/database';
 import type { WorkoutDay } from './program';
 import { EXERCISE_MAP } from './exercises';
 import type { BlockRetrospective } from './plan';
-import { buildPlanProposal, buildPhases, parseGuidance } from './planner';
+import { validatePhases } from './plan';
+import { buildPlanProposal, buildPhases, parseGuidance, stimulusChange } from './planner';
 import type { PlannerInput } from './planner';
 
 beforeEach(() => localStorage.clear());
@@ -236,5 +237,116 @@ describe('experience-aware planning', () => {
       expect(wt === 'Barbell' || wt === 'Machine').toBe(false);
     }
     expect(p.guidanceNotes.some(n => /dumbbell/i.test(n))).toBe(true);
+  });
+});
+
+// ── Introductory weeks ────────────────────────────────────────────────────────
+// The rule is about *novelty*, not training age: an unaccustomed movement or rep
+// range causes disproportionate soreness on its first exposure (the repeated-bout
+// effect), and one easy week spends that cheaply. Novices additionally need time
+// on task before load matters at all.
+describe('introductory weeks', () => {
+  const beginner = input({ experience: 'beginner', weeks: 6, includeDeload: false });
+
+  it('opens a beginner block with an intro week', () => {
+    const { phases } = buildPhases(beginner);
+    expect(phases[0]).toBe('intro');
+    expect(phases).toHaveLength(6);
+  });
+
+  it('gives a beginner two intro weeks when the block is long enough', () => {
+    const { phases } = buildPhases({ ...beginner, weeks: 10 });
+    expect(phases.slice(0, 2)).toEqual(['intro', 'intro']);
+  });
+
+  it('leaves an experienced lifter on a familiar program alone', () => {
+    const { phases } = buildPhases(input({ experience: 'intermediate' }));
+    expect(phases).not.toContain('intro');
+  });
+
+  it('earns an intro week when the goal — and so the rep ranges — changed', () => {
+    const { phases, notes } = buildPhases(
+      input({ experience: 'advanced' }), null,
+      { newExerciseShare: 0, goalChanged: true },
+    );
+    expect(phases[0]).toBe('intro');
+    expect(notes.join(' ')).toMatch(/rep ranges/i);
+  });
+
+  it('earns an intro week when most of the lifts are new', () => {
+    const { phases, notes } = buildPhases(
+      input({ experience: 'advanced' }), null,
+      { newExerciseShare: 0.8, goalChanged: false },
+    );
+    expect(phases[0]).toBe('intro');
+    expect(notes.join(' ')).toMatch(/new to you/i);
+  });
+
+  it('does not stack an intro week on top of a recovery opener', () => {
+    const { phases } = buildPhases(
+      input({ experience: 'beginner', openWithRecovery: true }), null,
+      { newExerciseShare: 1, goalChanged: true },
+    );
+    expect(phases.filter(p => p === 'intro')).toHaveLength(0);
+    expect(phases[0]).toBe('recovery');
+  });
+
+  it('still honours the requested block length', () => {
+    for (const weeks of [4, 5, 6, 8]) {
+      const { phases } = buildPhases({ ...beginner, weeks });
+      expect(phases, `${weeks}`).toHaveLength(weeks);
+    }
+  });
+
+  it('produces layouts the phase guardrails accept', () => {
+    for (const experience of ['beginner', 'intermediate', 'advanced'] as const) {
+      for (const weeks of [3, 4, 5, 6, 8, 10, 12]) {
+        for (const includeDeload of [true, false]) {
+          for (const openWithRecovery of [true, false]) {
+            const { phases } = buildPhases(
+              input({ experience, weeks, includeDeload, openWithRecovery }), null,
+              { newExerciseShare: 1, goalChanged: true },
+            );
+            expect(
+              validatePhases(phases),
+              `${experience}/${weeks}/${includeDeload}/${openWithRecovery}`,
+            ).toBeNull();
+          }
+        }
+      }
+    }
+  });
+
+  it('does not count intro weeks toward earning a deload', () => {
+    // 6 weeks, beginner (1 intro), deload requested → 4 productive weeks, which
+    // still earns it. At 4 weeks it should not.
+    const short = buildPhases(input({ experience: 'beginner', weeks: 4, includeDeload: true }));
+    expect(short.phases).not.toContain('deload');
+    expect(short.warnings.join(' ')).toMatch(/deload/i);
+  });
+
+  it('measures novelty against the current program, not in the abstract', () => {
+    const current: WorkoutDay[] = [{
+      id: 1, label: 'Day 1', muscleGroups: 'Legs',
+      exercises: [{ id: 'leg-press', name: 'Leg Press', sets: 3, repLow: 8, repHigh: 12 }],
+    }];
+    const proposed: WorkoutDay[] = [{
+      id: 1, label: 'Day 1', muscleGroups: 'Legs',
+      exercises: [
+        { id: 'leg-press', name: 'Leg Press', sets: 3, repLow: 8, repHigh: 12 },
+        { id: 'hack-squat', name: 'Hack Squat', sets: 3, repLow: 8, repHigh: 12 },
+      ],
+    }];
+    expect(stimulusChange(proposed, current, 'hypertrophy', 'hypertrophy').newExerciseShare).toBe(0.5);
+    expect(stimulusChange(proposed, [], 'hypertrophy', 'hypertrophy').newExerciseShare).toBe(0);
+    expect(stimulusChange(proposed, current, 'strength', 'hypertrophy').goalChanged).toBe(true);
+  });
+
+  it('tells a beginner what an intro week actually asks of them', () => {
+    const p = buildPlanProposal(
+      input({ experience: 'beginner', weeks: 6, includeDeload: false }), [], null, null,
+    );
+    expect(p.phases[0]).toBe('intro');
+    expect(p.progression).toMatch(/4–5 more reps/);
   });
 });

@@ -29,7 +29,7 @@ import { DIFFICULTY_RANK } from './exercises';
 import type {
   Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel, SportContext,
 } from './plan';
-import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, parsePlanDate, mondayOf } from './plan';
+import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_OPENER_WEEKS } from './plan';
 import { dosage } from './dosage';
 import type { Slot, DayTemplate } from './sports';
 import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
@@ -56,6 +56,8 @@ export interface PlannerInput {
   injuries?: string;
   /** required for goal 'sport-support' — the sport is a hard constraint */
   sport?: SportContext;
+  /** the active plan's goal, when there is one — a change earns an intro week */
+  previousGoal?: Goal | null;
 }
 
 export interface PlannerConfidence {
@@ -376,45 +378,121 @@ export function defaultBlockWeeks(): number {
   return 6;
 }
 
-/**
- * Whole weeks between the block's start Monday and the race, or null when
- * there's no race on the calendar. Week 1 containing the race counts as 1.
- */
-export function weeksToRace(startDate: string, raceDate: string | undefined): number | null {
-  if (!raceDate) return null;
-  const race = parsePlanDate(raceDate);
-  const start = parsePlanDate(startDate);
-  if (!race || !start) return null;
-  const weeks = Math.floor((mondayOf(race).getTime() - mondayOf(start).getTime()) / (7 * 86_400_000)) + 1;
-  return weeks >= 1 ? weeks : null;
+// ── Introductory weeks ────────────────────────────────────────────────────────
+// The repeated-bout effect is *exercise-specific*: the first exposure to an
+// unaccustomed movement (or an unaccustomed rep range) produces markedly more
+// muscle damage and soreness than the second, and that first bout confers
+// protection for weeks afterwards. Which means the case for an easy opening week
+// is about novelty, not about training age — a five-year lifter switching from
+// 4-rep strength work to 15-rep hypertrophy work is meeting a new stimulus just
+// as surely as a novice is.
+//
+// Novices additionally need time on task before load matters at all — the
+// classic "anatomical adaptation" phase — so they always get one, and get two
+// when the block is long enough to spare them.
+//
+// An intro week is NOT a deload: it exists before any fatigue has accumulated,
+// and its job is to teach the movements at loads that leave plenty in reserve.
+
+/** How much of this block is unfamiliar to the athlete. */
+export interface StimulusChange {
+  /** share of the new program's exercises the athlete isn't currently running (0–1) */
+  newExerciseShare: number;
+  /** the goal — and with it the rep ranges — changed from the active plan */
+  goalChanged: boolean;
+}
+
+/** Share of new exercises past which a block counts as a new stimulus. */
+export const NOVEL_SELECTION_SHARE = 0.5;
+
+export function introWeeksFor(
+  experience: ExperienceLevel,
+  weeks: number,
+  change: StimulusChange,
+  openWithRecovery: boolean,
+): { weeks: number; reason: string | null } {
+  // A recovery opener is already an easy week; stacking an intro on top of it
+  // would spend a third of a short block on ramp-up.
+  if (openWithRecovery) return { weeks: 0, reason: null };
+
+  if (experience === 'beginner') {
+    const n = weeks >= 8 ? 2 : 1;
+    return {
+      weeks: n,
+      reason: `You're starting out, so the block opens with ${n === 1 ? 'an introductory week' : 'two introductory weeks'}: same movements, easy loads, no chasing numbers. `
+        + 'Technique first is not a formality — it is what makes the following weeks trainable.',
+    };
+  }
+
+  const novelSelection = change.newExerciseShare >= NOVEL_SELECTION_SHARE;
+  if (change.goalChanged) {
+    return {
+      weeks: 1,
+      reason: 'You\'ve changed what you\'re training for, which changes the rep ranges your body is used to. '
+        + 'Week 1 is an introduction at easy loads — unaccustomed rep ranges cause disproportionate soreness the first time through, and one easy exposure removes most of it.',
+    };
+  }
+  if (novelSelection) {
+    return {
+      weeks: 1,
+      reason: 'Most of these lifts are new to you, so week 1 is an introduction at easy loads. '
+        + 'The first hard session on an unfamiliar movement causes far more soreness than the second — this spends that once, cheaply.',
+    };
+  }
+  return { weeks: 0, reason: null };
+}
+
+/** Compare a proposed program against what the athlete is currently running. */
+export function stimulusChange(
+  days: WorkoutDay[],
+  currentProgram: WorkoutDay[],
+  goal: Goal,
+  previousGoal: Goal | null,
+): StimulusChange {
+  const current = new Set(currentProgram.flatMap(d => d.exercises.map(e => e.id)));
+  const proposed = days.flatMap(d => d.exercises.map(e => e.id));
+  // No current program means a first plan — selection novelty is meaningless
+  // there (everything is new), and experience alone decides.
+  const newExerciseShare = current.size === 0 || proposed.length === 0
+    ? 0
+    : proposed.filter(id => !current.has(id)).length / proposed.length;
+  return {
+    newExerciseShare,
+    goalChanged: previousGoal != null && previousGoal !== goal,
+  };
 }
 
 export function buildPhases(
-  input: Pick<PlannerInput, 'goal' | 'weeks' | 'includeDeload' | 'openWithRecovery' | 'startDate' | 'sport'>,
+  input: Pick<PlannerInput, 'goal' | 'weeks' | 'includeDeload' | 'openWithRecovery' | 'experience' | 'sport'>,
   previousRetro?: BlockRetrospective | null,
+  change: StimulusChange = { newExerciseShare: 0, goalChanged: false },
 ): { phases: PhaseKind[]; notes: string[]; warnings: string[] } {
-  // Sport-support periodization runs off the race date, not a build-to-peak
-  // arc: build → maintain → taper → race week, with no lifting peak anywhere
-  // near an A race.
+  const intro = introWeeksFor(
+    input.experience, input.weeks, change, input.openWithRecovery,
+  );
+
+  // Sport-support periodization is driven by how close the race is, not by a
+  // generic build-to-peak arc.
   if (input.goal === 'sport-support' && input.sport) {
-    return buildSportPhases(
-      input.weeks,
-      weeksToRace(input.startDate, input.sport.raceDate),
-      input.sport.sport,
+    const out = buildSportPhases(
+      input.weeks, input.sport.proximity, input.sport.sport, intro.weeks,
     );
+    if (intro.weeks > 0 && intro.reason) out.notes.unshift(intro.reason);
+    return out;
   }
 
   const notes: string[] = [];
   const warnings: string[] = [];
   const weeks = Math.min(12, Math.max(3, Math.round(input.weeks)));
 
+  const introWeeks = Math.min(intro.weeks, MAX_OPENER_WEEKS, Math.max(0, weeks - 3));
   const recovery = input.openWithRecovery ? 1 : 0;
   let deload = input.includeDeload ? 1 : 0;
-  let productive = weeks - recovery - deload;
+  let productive = weeks - recovery - introWeeks - deload;
   if (deload && productive < MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD) {
     // A deload has to be earned — with too few hard weeks it's just detraining.
     deload = 0;
-    productive = weeks - recovery;
+    productive = weeks - recovery - introWeeks;
     warnings.push(
       `Dropped the closing deload: a ${weeks}-week block${recovery ? ' with a recovery opener' : ''} leaves fewer than ${MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD} productive weeks to earn one. Extend the block to get it back.`,
     );
@@ -422,6 +500,7 @@ export function buildPhases(
 
   const phases: PhaseKind[] = [];
   if (recovery) phases.push('recovery');
+  for (let i = 0; i < introWeeks; i++) phases.push('intro');
   if (input.goal === 'strength' && productive >= 4) {
     const acc = Math.ceil((productive - 1) / 2);
     const int = productive - 1 - acc;
@@ -436,6 +515,9 @@ export function buildPhases(
 
   if (recovery) {
     notes.push('Week 1 is a recovery week — you just closed out a block, and easing back in beats grinding back in.');
+  }
+  if (introWeeks > 0 && intro.reason) {
+    notes.push(intro.reason);
   }
   if (deload) {
     const stalls = previousRetro?.carryover.reviewExerciseIds.length ?? 0;
@@ -622,7 +704,10 @@ export function buildPlanProposal(
   const split = sportPlan
     ? { name: sportPlan.splitName, reason: sportPlan.splitReason, days: sportPlan.days, warning: undefined }
     : splitFor(input.daysPerWeek, input.experience);
-  const { phases, notes: phaseNotes, warnings } = buildPhases(input, previousRetro);
+  // Phases are resolved *after* the workouts, further down: whether the block
+  // opens with an introductory week depends on how much of the selection is new
+  // to this athlete, which isn't known until the days exist.
+  const warnings: string[] = [];
   if (split.warning) warnings.push(split.warning);
   if (sportPlan) {
     warnings.push(...sportPlan.warnings);
@@ -753,6 +838,13 @@ export function buildPlanProposal(
     }
   }
 
+  // ── Phase layout ──
+  // Now that the workouts exist we can tell how much of this block is new to the
+  // athlete, which is what decides whether it opens with an introductory week.
+  const change = stimulusChange(days, currentProgram, input.goal, input.previousGoal ?? null);
+  const { phases, notes: phaseNotes, warnings: phaseWarnings } = buildPhases(input, previousRetro, change);
+  warnings.push(...phaseWarnings);
+
   // Projected weekly volume per muscle (primary 1, secondary 0.5)
   const weekly = new Map<MuscleGroup, number>();
   for (const day of days) {
@@ -826,10 +918,10 @@ function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]):
   // the junior partner, because every week of the block is shaped by that.
   if (input.goal === 'sport-support' && input.sport) {
     const sport = sportLabel(input.sport.sport).toLowerCase();
-    const race = phases[phases.length - 1] === 'race-week';
-    const arc = race
-      ? 'build strength early, hold it through your heaviest training weeks, then taper the lifting so you arrive at the start line fresh'
-      : 'build strength while it is cheap to build, then hold it';
+    const holds = phases.includes('maintenance');
+    const arc = holds
+      ? 'build strength early, then hold it through your heaviest training weeks so your sport gets the recovery back'
+      : 'build strength while it is cheap to build — there is no race close enough for that to cost you anything';
     return `${weeks} weeks of lifting in service of your ${sport}: ${splitName} keeps the sessions short, heavy and well short of failure. `
       + `The plan is to ${arc}. If a session ever clashes with a quality ${sport} workout, the ${sport} workout wins — that is not a compromise, it is the design.`;
   }
@@ -852,29 +944,39 @@ function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]):
   }
 }
 
+// One consistent explanation of what an intro week asks for, wherever it's shown.
+function introSentence(count: number): string {
+  return count === 1
+    ? 'Week 1 is an introduction: run the prescribed sets and reps at a weight you could clearly do 4–5 more reps with. '
+      + 'Nothing is being tested — you are teaching your body the movements so the following weeks can be hard.'
+    : `Weeks 1–${count} are an introduction: the prescribed sets and reps at a weight you could clearly do 4–5 more reps with, `
+      + 'adding a little in the second week. Nothing is being tested yet.';
+}
+
 function progressionFor(
   goal: Goal,
   phases: PhaseKind[],
   experience: ExperienceLevel = 'intermediate',
   sport?: SportContext,
 ): string {
+  const introCount = phases.filter(p => p === 'intro').length;
   if (goal === 'sport-support' && sport) {
     const meta = sportMeta(sport.sport);
-    const raceWeek = phases.indexOf('race-week') + 1;
     const taperWeek = phases.indexOf('deload') + 1;
     const maintainFrom = phases.indexOf('maintenance') + 1;
-    const lines = [
+    const lines: string[] = [];
+    if (introCount > 0) {
+      lines.push(introSentence(introCount));
+    }
+    lines.push(
       'Load climbs on the main lifts whenever you own the top of the rep range with two or three reps still in the tank. '
       + 'If a set feels like a grind, it was too heavy — stop the set, not the session.',
-    ];
+    );
     if (maintainFrom > 0) {
       lines.push(`From week ${maintainFrom} the loads stop climbing and the sets come down. That is deliberate: strength is defended by intensity, and the volume is what your ${meta.label.toLowerCase()} training needs back.`);
     }
     if (taperWeek > 0) {
-      lines.push(`Week ${taperWeek} tapers — same kind of weight, a third of the work.`);
-    }
-    if (raceWeek > 0) {
-      lines.push(`Week ${raceWeek} is race week: one easy session early, nothing inside 72 hours of the start.`);
+      lines.push(`Week ${taperWeek} backs off — same kind of weight, a third of the work.`);
     }
     lines.push('The coach will never add sets to this plan. It can trim them, and it will if your logged sessions say you are running out of road.');
     return lines.join(' ');
@@ -888,8 +990,11 @@ function progressionFor(
   // Beginners get concrete starting-point and effort guidance — the thing a
   // new lifter actually needs — and the reassurance that linear progression
   // (add a little every session) is expected to work for a long while yet.
+  const introLine = introCount > 0 ? `${introSentence(introCount)} ` : '';
+
   if (experience === 'beginner') {
-    return 'Start each new lift lighter than feels necessary — a weight you could do 3–4 more reps with — and focus on clean, controlled form. '
+    return introLine
+      + 'Start each new lift lighter than feels necessary — a weight you could do 3–4 more reps with — and focus on clean, controlled form. '
       + 'Each session, if you hit the top of the rep range with good technique, add the smallest jump (usually 5 lbs, or 2.5 on smaller lifts) next time. '
       + 'As a beginner this simple "add a little every week" progression works for months — the coach handles the bookkeeping and eases you back if a weight gets away from you.'
       + deloadLine + ` ${goalLabel(goal)} stays the destination — just keep showing up.`;
@@ -898,5 +1003,5 @@ function progressionFor(
   const base = goal === 'strength'
     ? 'Loading runs on double progression with bigger jumps on the main lifts: own the top of the rep range on every set and the coach adds weight next session. As the block moves into its peak weeks, reps drop and loads climb.'
     : 'Loading runs on double progression: hit the top of the rep range on every set and the coach adds weight next session; miss the bottom and it eases you back. Set counts stay adaptive week to week within the block\'s guardrails.';
-  return base + deloadLine + ` ${goalLabel(goal)} stays the destination — the in-workout coach optimizes the route.`;
+  return introLine + base + deloadLine + ` ${goalLabel(goal)} stays the destination — the in-workout coach optimizes the route.`;
 }

@@ -1,8 +1,9 @@
 # Sport-support training
 
 The `sport-support` goal covers athletes whose primary training happens somewhere
-else — a triathlon build, a marathon block, a Hyrox season — and who lift to make
-that training better rather than as an end in itself.
+else — a triathlon build, a marathon block — and who lift to make that training
+better rather than as an end in itself. Triathlon and running are modelled today;
+`sports.ts` is the seam for adding more.
 
 It exists because the rest of LiftLog was, reasonably, built around a lifter. A
 triathlete who asked the plan wizard for help got a bodybuilding program: a
@@ -43,8 +44,9 @@ eccentric load. Strength is better preserved than hypertrophy or power.
 So the lifting ceiling cannot be a constant — it has to be a function of how much
 the athlete is already doing. `liftBudget()` takes self-reported weekly sport
 hours and returns the number of lifting days and the total weekly working sets
-the plan is allowed to spend. Power sports (sprinting, field sports) pay almost
-no tax; hybrid racing wants the volume, since strength endurance *is* the event.
+the plan is allowed to spend, and the race distance scales that ceiling on top:
+the same six hours spent on marathon-specific mileage costs the legs more than six
+hours of 5k work.
 
 **Where it lives:** `DAYS_BY_LOAD` / `SETS_BY_LOAD` and `liftBudget()` in
 `sports.ts`.
@@ -76,36 +78,73 @@ Two further guards:
   win. Without this the app labels lifts `stalled` mid-build and fires deloads
   that aren't needed. (`fat-loss` already worked this way for the same reason.)
 
-### Periodization runs off the race date
+### Periodization is shaped by race proximity, not by a race date
 
-There is no lifting peak in a race build. The arc is **build → maintain → taper →
-race week**, and `buildSportPhases()` derives it from the weeks between the
-block's start Monday and the race:
+The athlete chooses the block length. How close their race is decides how much of
+that length is spent building strength versus holding it:
 
-| Phase | What changes |
-|---|---|
-| `accumulation` / `intensification` | The real strength work. The only weeks where lifting is allowed to cost anything. |
-| `maintenance` | Loads held, sets cut. The sport takes priority; lifting defends what was built. |
-| `deload` (taper) | Same kind of weight, roughly a third of the work. |
-| `race-week` | One short session early, nothing inside 72 hours of the start. |
+| Proximity | Shape | Why |
+|---|---|---|
+| No date / 5–6 months | Build the whole way | Nothing is close enough for lifting to cost anything, and this is the cheapest window to raise maximal strength |
+| 3–4 months | Build roughly 60%, then hold | Enough runway to build, close enough that the sport starts taking priority |
+| Within 8 weeks | Build ~25%, mostly hold, close with an easy week | Strength is already banked; the job is keeping it without spending recovery the race needs |
 
-The taper is cheap because strength is maintained on a fraction of the volume
-that built it, provided intensity is held. That's why the taper cuts sets and not
-load, and why `calculateRecommendation` treats `maintenance` as a normal
-progression week rather than an easy one.
+The closing easy week doubles as the start of a taper when a race is near. It cuts
+sets and not load, because strength is maintained on a fraction of the volume that
+built it provided intensity is held.
 
-Two new `PhaseKind` values were needed (`maintenance`, `race-week`), which meant
-relaxing one guardrail in `validatePhases`: a deload may now sit immediately
-before a race week. A taper and the race itself are the one legitimate pair of
-consecutive easy weeks.
+**There is deliberately no "race week" phase emitted.** Without an exact race-date
+input the planner cannot know which week the start line falls in, and labelling the
+wrong week as race week is worse than saying nothing — a 12-week block for a race
+five months out would have called week 12 race week and been wrong by two months.
+The `race-week` `PhaseKind` remains in the type so any block stored by an earlier
+build still renders, and the copy for a near-term race says what to do in race week
+in prose instead. If an exact race date is ever collected, this is where it plugs in.
+
+Two `PhaseKind` values were added for this goal (`maintenance`) and for the intro
+rule below (`intro`), which meant relaxing `validatePhases`: openers must be
+contiguous and at the front of the block, capped at `MAX_OPENER_WEEKS`.
+
+### Distance changes the programming
+
+A 5k and a marathon are not the same job, and neither are a sprint tri and an
+Ironman. Each event carries an `EventProfile` (`SPORT_EVENTS` in `sports.ts`):
+
+| | Main reps | Plyometrics | Volume | Emphases |
+|---|---|---|---|---|
+| 5k / Sprint tri | 4–6 | yes | 100% | Calves, Quads |
+| 10k / Olympic tri | 4–6 | yes | 95–100% | Calves, Hamstrings |
+| Half / 70.3 | 5–8 | **no** | 85% | Calves, Hamstrings, Abductors |
+| Marathon / 140.6 | 6–8 | **no** | 70% | Calves, Hamstrings, Abductors |
+
+The shorter the race, the closer it is run to the athlete's ceiling, and the more
+maximal strength and rate of force development transfer. The longer it is, the more
+eccentric load the legs are already absorbing from the training itself — which is
+why plyometrics come out past half distance rather than being scaled down. Adding
+impact work to a marathon build is a poor trade at any dose. The volume that remains
+goes to the tissues that actually fail in long-distance training: calves, hamstrings
+and hip abductors.
+
+### Questions are scoped to the sport
+
+Triathlon is the only multi-sport event here, so it is the only one asked which
+discipline is its weak link — a runner has no equivalent answer, and asking anyway
+produced a question that visibly didn't apply. `SPORT_ONLY_QUESTIONS` in
+`PlanSetupView` drives this, and `nigglesFor(sport)` does the same for the niggle
+chips (swimmer's shoulder is not a runner's problem).
+
+Running gets its own templates rather than the triathlon ones with the swim slots
+removed: no vertical pull for the catch, no external rotation, one row for posture,
+and the volume redirected to single-leg work, hip abduction and single-leg calf
+raises.
 
 ### The taper is enforced, not described
 
-`WorkoutDay.phases` gates a day by block phase. A three-day triathlon block
-programs all three sessions during its build weeks, drops the short power session
-once maintenance starts, and runs a single session through the taper and race
-week. The Dashboard filters day cards by the current phase and says which
-sessions are paused and why.
+`WorkoutDay.phases` gates a day by block phase. A three-day block programs all
+three sessions during its build weeks, drops the short power session once
+maintenance starts, and runs a single session through the closing easy week. The
+Dashboard filters day cards by the current phase and says which sessions are
+paused and why.
 
 Without this the taper would be a paragraph of advice next to three unchanged day
 cards.
@@ -117,6 +156,9 @@ cards.
 Sprint through full distance, biased by the athlete's weak discipline and
 rerouted by any recurring niggles.
 
+Sprint/Olympic distance shown; half and full raise the main lifts to 5–8 or 6–8
+reps and drop Day C entirely.
+
 **Day A — Max Strength (every week of the block)**
 
 | Slot | Dose | Why |
@@ -126,7 +168,7 @@ rerouted by any recurring niggles.
 | Seated calf raise | 3 × 8–12 slow | **Bent knee = soleus**, the largest force contributor in running gait |
 | Pallof press | 2 × 8–12 | Anti-rotation trunk — holds the aero position without leaking power |
 
-**Day B — Unilateral + Upper (drops out for the taper and race week)**
+**Day B — Unilateral + Upper (drops out for the closing easy week)**
 
 | Slot | Dose | Why |
 |---|---|---|
@@ -147,8 +189,8 @@ rerouted by any recurring niggles.
 
 Plyometric and heavy-strength work improving running economy by a few percent
 (Balsalobre-Fernández and colleagues' meta-analysis) is what earns Day C its
-place — and its fragility is why it's the first thing cut when the schedule
-tightens.
+place — and its fragility is why it's the first thing cut, whether by the
+schedule or by the race distance.
 
 ### Capping
 
@@ -162,6 +204,13 @@ two:
 When accessory sets bottom out and the total is still over budget, a whole slot
 is dropped with a stated reason rather than thinning everything into two-set
 gestures. Fewer exercises done properly beats more done token.
+
+A muscle trained by two heavy slots can sit past the band with no accessory left
+to trim — a weak-link bonus on top of a distance emphasis will do it. There the
+band wins and a main lift loses a set, but never below three, which is the floor
+the strength research supports. Distance emphases only ever bump accessory slots
+for the same reason: an inflated main lift is one the capping pass can't undo.
+
 
 ### Niggles
 
@@ -200,6 +249,14 @@ template presented as authoritative.
 
 ## Known limitations
 
+- **Only triathlon and running are modelled.** Cycling, swimming, Hyrox and
+  power sports were removed rather than shipped as thin wrappers around an
+  endurance template. Adding one means a `SportMeta` entry, its events and
+  templates, and — for a non-endurance sport — restoring a load multiplier in
+  `liftBudget`, which currently assumes the athlete's weekly hours are endurance
+  hours.
+- **No exact race date.** Proximity is a four-way choice, so the plan can shape
+  the build-to-hold ratio but cannot place a taper or a race week on the calendar.
 - **Sport hours are self-reported and go stale.** They're captured at planning
   time and drive the whole budget. They should become editable from the Journey
   with a nudge when the block's logged rhythm diverges. A previous "cardio level"
@@ -213,3 +270,41 @@ template presented as authoritative.
   `MuscleHeatmap.tsx` don't render them.
 - **Per-day phase gating has no editor.** `WorkoutDay.phases` is set by the
   planner; the day editor can't change it.
+
+---
+
+## Introductory weeks (all goals, not just this one)
+
+The **repeated-bout effect** is exercise-specific: the first hard exposure to an
+unaccustomed movement — or an unaccustomed rep range — produces markedly more
+muscle damage and soreness than the second, and that first bout confers protection
+for weeks. So the case for an easy opening week is about *novelty*, not training
+age. A five-year lifter moving from 4-rep strength work to 15-rep hypertrophy work
+is meeting a new stimulus just as surely as a novice is.
+
+Novices additionally need time on task before load matters at all — the classic
+"anatomical adaptation" phase — so they always get one, and two when the block is
+long enough to spare them.
+
+`introWeeksFor()` in `planner.ts`:
+
+| Condition | Intro weeks |
+|---|---|
+| Beginner, block ≥ 8 weeks | 2 |
+| Beginner, shorter block | 1 |
+| Goal changed from the active plan (rep ranges change) | 1 |
+| ≥ 50% of the block's exercises are new to the athlete | 1 |
+| Otherwise | 0 |
+| A recovery opener is already scheduled | 0 — never stack two easy openers |
+
+An intro week is **not** a deload: it comes before any fatigue exists, and its job
+is a comfortably submaximal first exposure. `calculateRecommendation` prescribes
+~20% off in an intro week — a bigger cut than a deload's 10% — and the copy tells
+the athlete to leave 4–5 reps in the tank. `computeProgramPlan` adds no sets, and
+intro weeks don't count toward earning a deload.
+
+This required computing the phase layout **after** the workouts are generated in
+`buildPlanProposal`, since novelty can't be measured until the exercises exist.
+`stimulusChange()` compares the proposal against the athlete's current program; a
+first plan (no current program) scores zero novelty, because everything being new
+is not information — experience alone decides there.

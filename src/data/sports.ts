@@ -33,8 +33,14 @@
 //     the load, gut the sets.
 
 import type { MuscleGroup, WorkoutType } from './taxonomy';
-import type { PhaseKind, SportContext, SportId, Discipline, ExperienceLevel, EnduranceLoad } from './plan';
-import { enduranceHours, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD } from './plan';
+import type {
+  PhaseKind, SportContext, SportId, SportEvent, Discipline, ExperienceLevel,
+  EnduranceLoad, RaceProximity,
+} from './plan';
+import {
+  enduranceHours, validatePhases,
+  MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_BLOCK_WEEKS, MAX_OPENER_WEEKS,
+} from './plan';
 import type { VolumeTarget } from './analytics';
 import { volumeTargetFor } from './analytics';
 
@@ -87,14 +93,20 @@ export interface Niggle {
   id: string;
   label: string;
   blurb: string;
+  /** sports this applies to; absent = all of them */
+  sports?: SportId[];
 }
 
 export const NIGGLES: Niggle[] = [
   { id: 'achilles', label: 'Achilles or calf',          blurb: 'Swaps to heavy-slow calf loading and drops the jumping' },
   { id: 'knee',     label: "Knee (runner's knee / ITB)", blurb: 'Trims deep-knee loading, prioritises hip abduction and tempo' },
   { id: 'back',     label: 'Low back or hip',            blurb: 'Drops barbell hinges and axial loading for supported work' },
-  { id: 'shoulder', label: 'Shoulder (swim)',            blurb: 'No overhead pressing; rotation and posterior-cuff work stays' },
+  { id: 'shoulder', label: 'Shoulder',                   blurb: 'No overhead pressing; rotation and posterior-cuff work stays', sports: ['triathlon'] },
 ];
+
+export function nigglesFor(sport: SportId): Niggle[] {
+  return NIGGLES.filter(n => !n.sports || n.sports.includes(sport));
+}
 
 export function niggleLabel(id: string): string {
   return NIGGLES.find(n => n.id === id)?.label ?? id;
@@ -102,33 +114,133 @@ export function niggleLabel(id: string): string {
 
 // ── Sport metadata ────────────────────────────────────────────────────────────
 
-export type SportFamily = 'endurance' | 'hybrid' | 'power';
-
 export interface SportMeta {
   id: SportId;
   label: string;
-  family: SportFamily;
   blurb: string;
-  /** false while the sport falls back to a generic template of its family */
-  specialised: boolean;
 }
 
 export const SPORTS: SportMeta[] = [
-  { id: 'triathlon', label: 'Triathlon',       family: 'endurance', blurb: 'Swim, bike and run — the plan covers all three plus the durability they demand', specialised: true },
-  { id: 'running',   label: 'Running',         family: 'endurance', blurb: '5k to marathon — tendon stiffness, pelvic stability and eccentric control', specialised: true },
-  { id: 'cycling',   label: 'Cycling',         family: 'endurance', blurb: 'Road, gravel or track — hip-extension force and time-trial trunk strength', specialised: true },
-  { id: 'swimming',  label: 'Swimming',        family: 'endurance', blurb: 'Pull strength, shoulder durability and a trunk that holds a line', specialised: true },
-  { id: 'hyrox',     label: 'Hyrox / hybrid',  family: 'hybrid',    blurb: 'Strength endurance, carries and lunges at much higher lifting volume', specialised: false },
-  { id: 'sprint',    label: 'Sprint / field',  family: 'power',     blurb: 'Max strength and rate of force development, low interference', specialised: false },
-  { id: 'other',     label: 'Something else',  family: 'endurance', blurb: 'A general strength-support template you can adjust in review', specialised: false },
+  { id: 'triathlon', label: 'Triathlon', blurb: 'Swim, bike and run — the plan covers all three plus the durability they demand' },
+  { id: 'running',   label: 'Running',   blurb: '5k to marathon — tendon stiffness, pelvic stability and eccentric control' },
 ];
 
 export function sportMeta(id: SportId): SportMeta {
-  return SPORTS.find(s => s.id === id) ?? SPORTS[SPORTS.length - 1];
+  return SPORTS.find(s => s.id === id) ?? SPORTS[0];
 }
 
 export function sportLabel(id: SportId): string {
   return sportMeta(id).label;
+}
+
+// ── Events, and what each one changes ─────────────────────────────────────────
+// Distance is not decoration. The shorter the race, the more it rewards maximal
+// strength and rate of force development, and the more headroom there is to
+// train them; the longer it is, the more the athlete's legs are already
+// absorbing eccentric load, and the worse a trade adding impact work becomes.
+// Marathon and full-distance triathlon therefore get no plyometrics at all,
+// higher reps on the main lifts, and a smaller total dose — the lifting shifts
+// from "build force" to "survive the mileage".
+
+export interface EventProfile {
+  /** rep range for the main compound lifts */
+  mainReps: [number, number];
+  /** does a short plyometric/power session earn its place? */
+  plyometrics: boolean;
+  /** multiplier on the weekly set ceiling */
+  volumeScale: number;
+  /** muscles this distance loads hardest — one extra set each, budget allowing */
+  emphases: MuscleGroup[];
+  /** why this distance is programmed the way it is */
+  rationale: string;
+}
+
+export interface SportEventMeta {
+  id: SportEvent;
+  sport: SportId;
+  label: string;
+  blurb: string;
+  profile: EventProfile;
+}
+
+export const SPORT_EVENTS: SportEventMeta[] = [
+  {
+    id: 'tri-sprint', sport: 'triathlon', label: 'Sprint',
+    blurb: '750m / 20k / 5k — strength and power transfer strongly',
+    profile: {
+      mainReps: [4, 6], plyometrics: true, volumeScale: 1, emphases: ['Quads'],
+      rationale: 'Sprint distance is short and hard, so maximal strength and rate of force development transfer directly. Main lifts stay heavy at 4–6 reps and the power session earns its place.',
+    },
+  },
+  {
+    id: 'tri-olympic', sport: 'triathlon', label: 'Olympic',
+    blurb: '1.5k / 40k / 10k — moderate volume, real room for strength work',
+    profile: {
+      mainReps: [4, 6], plyometrics: true, volumeScale: 1, emphases: ['Quads', 'Hamstrings'],
+      rationale: 'Olympic distance still rewards heavy strength work, and your weekly sport hours leave room for it. Main lifts run at 4–6 reps.',
+    },
+  },
+  {
+    id: 'tri-half', sport: 'triathlon', label: 'Half (70.3)',
+    blurb: '1.9k / 90k / 21k — lifting shifts toward durability',
+    profile: {
+      mainReps: [5, 8], plyometrics: false, volumeScale: 0.85, emphases: ['Calves', 'Abductors'],
+      rationale: 'At half distance your legs are already absorbing a lot of eccentric load, so the plyometrics come out and the lifting shifts toward durability — calves and hip stability first, at 5–8 reps.',
+    },
+  },
+  {
+    id: 'tri-full', sport: 'triathlon', label: 'Full (140.6)',
+    blurb: '3.8k / 180k / 42k — minimum effective dose only',
+    profile: {
+      mainReps: [6, 8], plyometrics: false, volumeScale: 0.7, emphases: ['Calves', 'Abductors', 'Hamstrings'],
+      rationale: 'Full distance means the training itself is the limiter. Lifting drops to a minimum effective dose at 6–8 reps, aimed squarely at the tissues that break down over an Ironman — calves, hamstrings and hip stabilisers.',
+    },
+  },
+  {
+    id: 'run-5k', sport: 'running', label: '5k',
+    blurb: 'Short and fast — heavy strength and plyometrics pay off most here',
+    profile: {
+      mainReps: [4, 6], plyometrics: true, volumeScale: 1, emphases: ['Calves', 'Quads'],
+      rationale: '5k racing is run close to your ceiling, which is exactly where heavy strength work and plyometrics buy the most: better running economy and a stronger finishing kick. Main lifts stay at 4–6 reps.',
+    },
+  },
+  {
+    id: 'run-10k', sport: 'running', label: '10k',
+    blurb: 'Strength and economy, with slightly more mileage to respect',
+    profile: {
+      mainReps: [4, 6], plyometrics: true, volumeScale: 0.95, emphases: ['Calves', 'Hamstrings'],
+      rationale: '10k still rewards maximal strength and elastic return, so the heavy work and the power session both stay. Volume comes down a touch to respect the extra mileage.',
+    },
+  },
+  {
+    id: 'run-half', sport: 'running', label: 'Half marathon',
+    blurb: 'Economy plus durability — the tissues need to last',
+    profile: {
+      mainReps: [5, 8], plyometrics: false, volumeScale: 0.85, emphases: ['Calves', 'Hamstrings', 'Abductors'],
+      rationale: 'Half-marathon training piles up eccentric load, so the jumping comes out and heavy-slow calf, hamstring and hip-abduction work comes in. Main lifts run at 5–8 reps.',
+    },
+  },
+  {
+    id: 'run-full', sport: 'running', label: 'Marathon',
+    blurb: 'Injury-proofing first — the mileage is the training',
+    profile: {
+      mainReps: [6, 8], plyometrics: false, volumeScale: 0.7, emphases: ['Calves', 'Hamstrings', 'Abductors'],
+      rationale: 'Marathon mileage is the training; lifting exists to keep you intact through it. No jumping, a minimum effective dose at 6–8 reps, and the volume that remains goes to calves, hamstrings and hip stabilisers — where marathon injuries actually happen.',
+    },
+  },
+];
+
+export function eventsFor(sport: SportId): SportEventMeta[] {
+  return SPORT_EVENTS.filter(e => e.sport === sport);
+}
+
+export function eventMeta(id: SportEvent): SportEventMeta {
+  return SPORT_EVENTS.find(e => e.id === id) ?? SPORT_EVENTS[0];
+}
+
+/** The default event when a sport is picked — the mid-range distance. */
+export function defaultEventFor(sport: SportId): SportEvent {
+  return sport === 'running' ? 'run-10k' : 'tri-olympic';
 }
 
 // ── Interference budget ───────────────────────────────────────────────────────
@@ -164,20 +276,12 @@ export function liftBudget(
   requestedDays: number,
   experience: ExperienceLevel = 'intermediate',
 ): LiftBudget {
-  const family = sportMeta(ctx.sport).family;
+  const event = eventMeta(ctx.event).profile;
   let days = Math.min(requestedDays, DAYS_BY_LOAD[ctx.load]);
-  let maxWeeklySets = SETS_BY_LOAD[ctx.load];
-
-  // A power sport doesn't pay much of an interference tax — sprinting is not
-  // an endurance load, and the lifting *is* the training.
-  if (family === 'power') {
-    days = Math.min(requestedDays, 4);
-    maxWeeklySets = Math.round(maxWeeklySets * 1.3);
-  } else if (family === 'hybrid') {
-    // Hybrid racing is a strength-endurance event: more lifting volume is the
-    // point, not a cost to be minimised.
-    maxWeeklySets = Math.round(maxWeeklySets * 1.25);
-  }
+  // Race distance scales the ceiling on top of weekly hours: the same 6 hours
+  // spent on marathon-specific mileage costs the legs more than 6 hours of
+  // 5k work, and leaves less room for lifting.
+  let maxWeeklySets = Math.round(SETS_BY_LOAD[ctx.load] * event.volumeScale);
 
   // Beginners are limited by recovery and technique, not schedule.
   if (experience === 'beginner') {
@@ -210,75 +314,80 @@ export interface SportPhases {
   warnings: string[];
 }
 
+/**
+ * Periodization for a sport-support block. The athlete chooses the length; race
+ * proximity decides how much of it is spent building versus holding.
+ *
+ * There is deliberately no "race week" here. Without an exact race date the
+ * planner cannot know which week the start line falls in, and labelling the
+ * wrong week as race week is worse than leaving it out. What proximity *can*
+ * honestly change is the build-to-maintain ratio: far out, lifting is cheap and
+ * the block is all build; close in, the sport owns the recovery and lifting's
+ * job is to hold what's there.
+ */
 export function buildSportPhases(
   weeks: number,
-  weeksToRace: number | null,
+  proximity: RaceProximity,
   sport: SportId,
+  introWeeks = 0,
 ): SportPhases {
   const notes: string[] = [];
   const warnings: string[] = [];
   const label = sportLabel(sport).toLowerCase();
+  const total = Math.min(MAX_BLOCK_WEEKS, Math.max(2, Math.round(weeks)));
 
-  // No race on the calendar: this is base training, and base is where heavy
-  // strength work belongs. No taper, no race week.
-  if (weeksToRace == null) {
-    const total = Math.min(12, Math.max(3, Math.round(weeks)));
-    // A deload has to be earned here too — the shared guardrail wants three
-    // productive weeks before one, so a very short base block simply ends.
-    const deload = total - 1 >= MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD ? 1 : 0;
-    const productive = total - deload;
-    const build = Math.max(1, Math.ceil(productive * 0.5));
-    const phases: PhaseKind[] = [];
-    for (let i = 0; i < productive; i++) {
-      phases.push(i === 0 ? 'accumulation' : i < build ? 'intensification' : 'maintenance');
-    }
-    if (deload) phases.push('deload');
-    notes.push(
-      'No race on the calendar, so this block treats the time as base training — the one window where heavy strength work is cheap.'
-      + (deload ? ` The last week deloads so you start your next ${label} block fresh.` : ''),
-    );
-    return { phases, notes, warnings };
-  }
+  const intro = Math.min(introWeeks, MAX_OPENER_WEEKS, Math.max(0, total - 2));
+  // A closing easy week is earned the same way it is anywhere else. Close to a
+  // race it doubles as the start of the taper.
+  const wantsTaper = proximity === 'soon' || proximity === 'mid';
+  const deload = total - intro - 1 >= MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD && wantsTaper ? 1 : 0;
+  const productive = total - intro - deload;
 
-  const total = Math.min(12, Math.max(2, Math.min(Math.round(weeks), weeksToRace)));
-  if (weeksToRace > total) {
-    warnings.push(
-      `Your race is ${weeksToRace} weeks out but this block runs ${total} — plan another block after this one to cover the gap.`,
-    );
-  }
-
-  // Race week always closes the block. A taper week earns its place once the
-  // block is long enough to have built something worth tapering from.
-  const raceWeek = 1;
-  const taper = total >= 5 ? 1 : 0;
-  const remaining = Math.max(0, total - raceWeek - taper);
-  const build = Math.min(remaining, Math.max(1, Math.ceil(remaining / 2)));
-  const maintain = remaining - build;
+  // Share of the productive weeks spent building rather than holding.
+  const buildShare = proximity === 'soon' ? 0.25
+    : proximity === 'mid' ? 0.6
+      : 1;   // 'far' and 'none' are base training — build the whole way
+  const build = Math.max(1, Math.min(productive, Math.round(productive * buildShare)));
+  const maintain = productive - build;
 
   const phases: PhaseKind[] = [];
+  for (let i = 0; i < intro; i++) phases.push('intro');
   for (let i = 0; i < build; i++) phases.push(i === 0 ? 'accumulation' : 'intensification');
   for (let i = 0; i < maintain; i++) phases.push('maintenance');
-  if (taper) phases.push('deload');
-  phases.push('race-week');
+  if (deload) phases.push('deload');
 
-  if (build > 0) {
+  if (intro > 0) {
     notes.push(
-      `Weeks 1–${build} carry the real strength work — heavy, low-volume, well short of failure. This is the only part of the block where lifting is allowed to cost you anything.`,
+      `Week${intro > 1 ? 's 1–' + intro : ' 1'} ${intro > 1 ? 'are' : 'is'} an introduction — same movements, easy loads. `
+      + 'Adding lifting to an endurance week is a new stress in itself; the first week is for learning the lifts, not testing them.',
     );
   }
+  const buildFrom = intro + 1;
+  notes.push(
+    `Weeks ${buildFrom}–${intro + build} carry the strength work — heavy, low-volume, well short of failure. `
+    + (proximity === 'far' || proximity === 'none'
+      ? 'With no race close, this is the window where strength work is cheap, so the whole block builds.'
+      : 'This is the part of the block where lifting is allowed to cost you something.'),
+  );
   if (maintain > 0) {
     notes.push(
-      `Weeks ${build + 1}–${build + maintain} hold the loads and cut the sets. Your ${label} training is the priority from here; lifting exists to stop you losing what you built.`,
+      `Weeks ${intro + build + 1}–${intro + build + maintain} hold the loads and cut the sets. `
+      + `Your ${label} training is the priority from here; lifting exists to stop you losing what you built.`,
     );
   }
-  if (taper) {
+  if (deload) {
     notes.push(
-      `Week ${total - 1} is a taper — the load stays respectable but the volume is gutted, because intensity is the half of the dose that defends strength on reduced volume.`,
+      `Week ${total} backs off — the load stays respectable but the volume is gutted, because intensity is the half of the dose that defends strength on reduced volume.`,
     );
   }
-  notes.push(
-    `Week ${total} is race week: one short session early on and nothing inside 72 hours of the start. Nothing you lift that week makes you faster; plenty of it could make you slower.`,
-  );
+  if (proximity === 'soon') {
+    notes.push(
+      'Your race is close, so this block is mostly holding rather than building. In race week itself, lift once early if at all, and nothing inside 72 hours of the start.',
+    );
+  }
+
+  const problem = validatePhases(phases);
+  if (problem) warnings.push(problem);   // belt and braces
 
   return { phases, notes, warnings };
 }
@@ -395,6 +504,117 @@ const TRI_POWER_DAY = (): DayTemplate => ({
       preferIds: ['hip-abduction', 'banded-hip-abduction'],
       dose: { sets: 3, repLow: 12, repHigh: 15 },
       why: 'Glute-med strength controls the pelvis on every single-leg stance phase — the cheapest insurance there is against ITB and kneecap pain.',
+    },
+    {
+      muscle: 'Abs',
+      patterns: ['Plank'],
+      preferIds: ['side-plank', 'plank'],
+      dose: { sets: 2, repLow: 30, repHigh: 45 },
+      why: 'Lateral trunk stability under single-leg load. Logged in seconds — build the hold, not the reps.',
+    },
+  ],
+});
+
+// ── Running templates ─────────────────────────────────────────────────────────
+// A runner needs almost none of the triathlon plan's upper body: there is no
+// catch to pull and no aero position to hold for hours. What replaces it is more
+// unilateral and tissue-tolerance work, because everything that goes wrong in a
+// running block goes wrong below the knee or at the hip.
+
+const RUN_STRENGTH_DAY = (): DayTemplate => ({
+  title: 'Max Strength — legs, trunk',
+  slots: [
+    {
+      muscle: 'Quads', main: true, mechanics: 'compound',
+      patterns: ['Squat', 'Leg Press'],
+      preferIds: ['barbell-back-squat', 'hack-squat', 'leg-press', 'goblet-squat'],
+      dose: { sets: 4, repLow: 4, repHigh: 6 },
+      why: 'Heavy bilateral squatting is the most reliable route to better running economy — more force per stride means each one costs a smaller share of your ceiling.',
+    },
+    {
+      muscle: 'Hamstrings', main: true,
+      patterns: ['Hip Hinge'],
+      preferIds: ['romanian-deadlifts', 'dumbbell-rdl', 'cable-pull-through'],
+      dose: { sets: 3, repLow: 6, repHigh: 8 },
+      why: 'Hamstring strength is the single best-supported protective factor in running, and it drives hip extension through toe-off.',
+    },
+    {
+      muscle: 'Calves',
+      patterns: ['Calf Raise'],
+      preferIds: ['seated-calf-raises', 'single-leg-calf-raise'],
+      dose: { sets: 3, repLow: 8, repHigh: 12 },
+      why: 'Bent-knee calf raises load the soleus, which absorbs more force per stride than any other muscle in the chain and is the tissue most often under-prepared for it. Three seconds down on every rep.',
+    },
+    {
+      muscle: 'Abs',
+      patterns: ['Anti-Rotation'],
+      preferIds: ['pallof-press', 'dead-bug'],
+      dose: { sets: 2, repLow: 8, repHigh: 12 },
+      why: 'Anti-rotation strength keeps your pelvis from giving way as the miles accumulate — the point where form and economy fall apart together.',
+    },
+  ],
+});
+
+const RUN_DURABILITY_DAY = (): DayTemplate => ({
+  title: 'Unilateral & Durability — single leg, hips',
+  phases: THROUGH_MAINTENANCE,
+  slots: [
+    {
+      muscle: 'Quads', main: true, mechanics: 'compound',
+      patterns: ['Lunge'],
+      preferIds: ['dumbbell-step-up', 'bulgarian-split-squat', 'walking-lunges'],
+      dose: { sets: 3, repLow: 6, repHigh: 8 },
+      why: 'Running is a single-leg sport, and loaded single-leg work exposes the side-to-side asymmetry bilateral lifting hides.',
+    },
+    {
+      muscle: 'Hamstrings',
+      patterns: ['Hip Hinge'],
+      preferIds: ['single-leg-rdl', 'dumbbell-rdl'],
+      dose: { sets: 3, repLow: 8, repHigh: 10 },
+      why: 'Hamstring strength plus pelvic control in one movement — the combination that holds up in the last few miles.',
+    },
+    {
+      muscle: 'Abductors',
+      patterns: ['Abduction'],
+      preferIds: ['hip-abduction', 'banded-hip-abduction'],
+      dose: { sets: 3, repLow: 12, repHigh: 15 },
+      why: 'Glute-med strength controls the pelvis through every stance phase — the cheapest insurance there is against ITB pain and a sore kneecap.',
+    },
+    {
+      muscle: 'Calves',
+      patterns: ['Calf Raise'],
+      preferIds: ['single-leg-calf-raise', 'standing-calf-raises'],
+      dose: { sets: 2, repLow: 8, repHigh: 12 },
+      why: 'Straight-leg, single-leg calf work covers the gastrocnemius and the Achilles at the load a stride actually applies — one leg at a time, because that is how you run.',
+    },
+    {
+      muscle: 'Upper Back',
+      patterns: ['Row'],
+      preferIds: ['seated-cable-row', 'chest-supported-row', 'bent-over-db-row'],
+      dose: { sets: 2, repLow: 8, repHigh: 12 },
+      why: 'One pulling movement to keep your posture honest late in a race. A runner needs no more upper-body volume than this.',
+    },
+  ],
+});
+
+const RUN_POWER_DAY = (): DayTemplate => ({
+  title: 'Power & Stability — short session',
+  phases: BUILD_PHASES,
+  minLiftDays: 3,
+  slots: [
+    {
+      muscle: 'Calves',
+      patterns: ['Jump'],
+      preferIds: ['pogo-hops'],
+      dose: { sets: 3, repLow: 12, repHigh: 20 },
+      why: 'Low-amplitude hopping trains Achilles stiffness — the elastic return that makes each stride cost less. Quality over accumulation; stop when they stop feeling springy.',
+    },
+    {
+      muscle: 'Quads',
+      patterns: ['Jump'],
+      preferIds: ['box-jump'],
+      dose: { sets: 3, repLow: 4, repHigh: 6 },
+      why: 'Rate of force development — the quality behind a finishing kick. Full recovery between sets; this is a power slot, not conditioning.',
     },
     {
       muscle: 'Abs',
@@ -523,31 +743,55 @@ export function buildSportPlan(
   band: VolumeTarget = volumeTargetFor('sport-support'),
 ): SportPlan {
   const meta = sportMeta(ctx.sport);
+  const event = eventMeta(ctx.event);
+  const profile = event.profile;
   const budget = liftBudget(ctx, requestedDays, experience);
   const warnings: string[] = [];
   if (budget.warning) warnings.push(budget.warning);
 
-  let days = [TRI_STRENGTH_DAY(), TRI_UNILATERAL_DAY(), TRI_POWER_DAY()]
+  const templates = ctx.sport === 'running'
+    ? [RUN_STRENGTH_DAY(), RUN_DURABILITY_DAY(), RUN_POWER_DAY()]
+    : [TRI_STRENGTH_DAY(), TRI_UNILATERAL_DAY(), TRI_POWER_DAY()];
+
+  // The power/plyometric day only exists for distances where impact work is a
+  // good trade. Past half distance the athlete's legs are already absorbing
+  // more eccentric load than a box jump could usefully add.
+  const days = templates
+    .filter(d => profile.plyometrics || !d.slots.some(sl => sl.patterns?.includes('Jump')))
     .filter(d => (d.minLiftDays ?? 0) <= budget.days)
     .slice(0, budget.days);
+
+  // Distance sets the main lifts' rep range.
+  for (const day of days) {
+    for (const slot of day.slots) {
+      if (!slot.main || !slot.dose) continue;
+      slot.dose = { ...slot.dose, repLow: profile.mainReps[0], repHigh: profile.mainReps[1] };
+    }
+  }
 
   const rationale: string[] = [
     'Two or three sessions a week of heavy, low-volume, multi-joint lifting is the dose the concurrent-training research supports for endurance athletes — enough to raise maximal strength, cheap enough that your sport keeps its recovery.',
     'Every main lift stops two to three reps short of failure. The strength adaptation does not need the last rep; your next session does need the recovery it would cost.',
     'Volume sits well under a bodybuilding dose on purpose: added muscle mass is weight you carry for the whole race, and rising tonnage is a cost here rather than a sign of progress.',
+    `${event.label}: ${profile.rationale}`,
   ];
 
-  if (!meta.specialised) {
-    warnings.push(
-      `${meta.label} doesn't have a specialised template yet, so this plan uses the general strength-support layout. `
-      + 'Review the workouts below and swap anything that doesn\'t match your event.',
-    );
-  }
-  if (meta.family === 'endurance') {
-    rationale.push('Running-dominant training interferes with lifting more than cycling or swimming does, because of the eccentric load — which is why the plan tapers lifting as race day approaches instead of holding it flat.');
+  // Distance emphases: one extra set each on the tissues this race distance
+  // punishes hardest. Accessory slots only — a main lift's dose is the
+  // prescription, and inflating it puts the muscle past the band in a slot the
+  // capping pass is not allowed to trim.
+  for (const muscle of profile.emphases) {
+    const slot = days.flatMap(d => d.slots)
+      .filter(sl => sl.muscle === muscle && sl.dose && !sl.main)
+      .sort((a, b) => a.dose!.sets - b.dose!.sets)[0];
+    if (slot && slot.dose!.sets < 4) slot.dose!.sets += 1;
   }
 
-  rationale.push(...applyWeakLink(days, ctx.weakLink));
+  // Triathlon only: a weak discipline is worth biasing toward. A single-sport
+  // athlete has no equivalent question, so nothing to apply.
+  if (ctx.sport === 'triathlon') {
+    rationale.push(...applyWeakLink(days, ctx.weakLink));
+  }
   rationale.push(...applyNiggles(days, ctx.niggles));
 
   // ── Enforce the ceilings ──
@@ -567,11 +811,23 @@ export function buildSportPlan(
 
   const muscles = new Set(days.flatMap(d => d.slots.map(s => s.muscle)));
   for (const muscle of muscles) {
+    const slotsFor = () => days.flatMap(d => d.slots).filter(s => s.muscle === muscle);
     let guard = 0;
     while (setsFor(muscle) > band.high && guard++ < 20) {
-      const candidates = trimmableIn(days.flatMap(d => d.slots).filter(s => s.muscle === muscle));
-      if (candidates.length === 0) break;
-      candidates[0].dose!.sets -= 1;
+      const candidates = trimmableIn(slotsFor());
+      if (candidates.length > 0) {
+        candidates[0].dose!.sets -= 1;
+        continue;
+      }
+      // Last resort: a muscle trained by two heavy slots can sit past the band
+      // with no accessory left to trim. The band wins — it is the whole reason
+      // this goal exists — but a main lift never drops below three sets, which
+      // is the floor the strength research supports.
+      const heavy = slotsFor()
+        .filter(s => s.main && s.dose && s.dose.sets > 3)
+        .sort((a, b) => b.dose!.sets - a.dose!.sets)[0];
+      if (!heavy) break;
+      heavy.dose!.sets -= 1;
     }
   }
 
@@ -607,16 +863,24 @@ export function buildSportPlan(
     );
   }
 
-  const dayWord = budget.days === 1 ? 'day' : 'days';
-  const splitName = budget.days >= 3
-    ? 'Strength · Unilateral · Power'
-    : budget.days === 2 ? 'Strength · Unilateral' : 'Single strength session';
-  const splitReason = budget.days >= 3
-    ? `Three ${dayWord}: one heavy bilateral session, one single-leg and pulling session, and a short power/stability session that costs almost nothing to recover from. `
+  const hasPower = days.some(d => d.slots.some(sl => sl.patterns?.includes('Jump')));
+  const secondDayName = ctx.sport === 'running' ? 'Durability' : 'Unilateral';
+  const splitName = days.length >= 3 && hasPower
+    ? `Strength · ${secondDayName} · Power`
+    : days.length >= 2 ? `Strength · ${secondDayName}` : 'Single strength session';
+
+  const splitReason = days.length >= 3 && hasPower
+    ? `Three days: one heavy bilateral session, one single-leg and ${ctx.sport === 'running' ? 'hip-durability' : 'pulling'} session, and a short power/stability session that costs almost nothing to recover from. `
       + 'The power day is the first to go once your race gets close — you can see that in the week-by-week plan.'
-    : budget.days === 2
-      ? `Two ${dayWord} — the dose the research keeps validating for endurance athletes. One heavy bilateral session, one single-leg and pulling session, both under 40 minutes.`
-      : 'One session a week holds the strength you have. It won\'t build much, which is the right trade this close to a race.';
+    : days.length >= 2
+      ? `Two days — the dose the research keeps validating for endurance athletes. One heavy bilateral session, one single-leg and ${ctx.sport === 'running' ? 'hip-durability' : 'pulling'} session, both under 45 minutes.`
+      : 'One session a week holds the strength you have. It won\'t build much, which is the right trade at this point in your season.';
+
+  if (!profile.plyometrics && budget.days >= 3) {
+    warnings.push(
+      `${meta.label} at ${event.label.toLowerCase()} distance doesn't get a plyometric day — your legs are already taking more impact than jumping could usefully add, so the plan uses ${days.length} ${days.length === 1 ? 'session' : 'sessions'} rather than the ${budget.days} your schedule allows.`,
+    );
+  }
 
   return { splitName, splitReason, days, budget, rationale, warnings };
 }

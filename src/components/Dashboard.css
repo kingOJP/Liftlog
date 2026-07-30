@@ -177,6 +177,7 @@
 .journey-seg--past { opacity: 1; }
 .journey-seg--now { opacity: 1; outline: 1.5px solid var(--text); outline-offset: 1px; }
 .journey-seg--recovery        { background: #3D6BE8; }
+.journey-seg--intro           { background: #7fa3ff; }
 .journey-seg--accumulation    { background: var(--green); }
 .journey-seg--intensification { background: #E8C44A; }
 .journey-seg--peak            { background: var(--red); }

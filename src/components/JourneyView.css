@@ -109,6 +109,7 @@
 }
 
 .journey-week--recovery        .journey-week-phase { color: #7fa3ff; }
+.journey-week--intro           .journey-week-phase { color: #7fa3ff; }
 .journey-week--accumulation    .journey-week-phase { color: var(--green); }
 .journey-week--intensification .journey-week-phase { color: #E8C44A; }
 .journey-week--peak            .journey-week-phase { color: var(--red); }

@@ -27,13 +27,20 @@ import { startOfWeek } from './program';
 
 export type Goal = 'hypertrophy' | 'strength' | 'fat-loss' | 'athletic' | 'general' | 'sport-support';
 
+// The goals offered in the wizard. 'athletic' is deliberately absent — it was
+// too vague to program differently from General Fitness, and anyone who wanted
+// sport carryover is better served by 'sport-support'. The Goal type keeps the
+// member so plans already stored under it still resolve their label and weights.
 export const GOALS: { id: Goal; label: string; blurb: string }[] = [
   { id: 'hypertrophy',   label: 'Muscle Growth',        blurb: 'Build size with high-quality volume and double progression' },
   { id: 'strength',      label: 'Strength',             blurb: 'Move more weight on the big lifts — lower reps, longer rests' },
   { id: 'fat-loss',      label: 'Fat Loss',             blurb: 'Hold onto muscle while dieting — training defends what you built' },
-  { id: 'athletic',      label: 'Athletic Performance', blurb: 'Strength plus movement quality across the whole body' },
   { id: 'sport-support', label: 'Support Another Sport', blurb: 'Lifting that makes you better at your sport — without stealing its recovery' },
   { id: 'general',       label: 'General Fitness',      blurb: 'Balanced full-body training you can sustain for years' },
+];
+
+export const ALL_GOALS: Goal[] = [
+  'hypertrophy', 'strength', 'fat-loss', 'athletic', 'general', 'sport-support',
 ];
 
 export function goalLabel(goal: Goal): string {
@@ -75,10 +82,34 @@ export const EQUIPMENT_ACCESS: { id: EquipmentAccess; label: string; blurb: stri
 // The vocabulary lives here with the rest of the athlete model; the
 // research-backed prescriptions keyed off it live in sports.ts.
 
-export type SportId = 'triathlon' | 'running' | 'cycling' | 'swimming' | 'hyrox' | 'sprint' | 'other';
+export type SportId = 'triathlon' | 'running';
 
-/** Format within the sport — a sprint tri and an Ironman are different jobs. */
-export type SportEvent = 'sprint' | 'olympic' | 'half' | 'full' | 'unspecified';
+/**
+ * Format within the sport — a sprint tri and an Ironman are different jobs, and
+ * so are a 5k and a marathon. Ids are sport-prefixed because "half" means two
+ * different distances depending on the sport.
+ */
+export type SportEvent =
+  | 'tri-sprint' | 'tri-olympic' | 'tri-half' | 'tri-full'
+  | 'run-5k' | 'run-10k' | 'run-half' | 'run-full';
+
+/**
+ * How close the A race is. Deliberately coarse: the app has no exact race-date
+ * input yet, so the plan shifts the build-to-maintain ratio rather than
+ * pretending to know which week the start line falls in.
+ */
+export type RaceProximity = 'none' | 'soon' | 'mid' | 'far';
+
+export const RACE_PROXIMITY: { id: RaceProximity; label: string; blurb: string }[] = [
+  { id: 'none', label: 'No date yet',    blurb: 'Base training — the best window for heavier strength work' },
+  { id: 'soon', label: 'Within 8 weeks', blurb: 'Race-specific: strength holds, volume comes down, the block ends easy' },
+  { id: 'mid',  label: '3–4 months',     blurb: 'Build first, then hold while your sport takes priority' },
+  { id: 'far',  label: '5–6 months',     blurb: 'Plenty of runway — this block is all build' },
+];
+
+export function proximityLabel(p: RaceProximity): string {
+  return RACE_PROXIMITY.find(x => x.id === p)?.label ?? p;
+}
 
 /** Self-reported weekly hours of the sport itself — the interference input. */
 export type EnduranceLoad = 'low' | 'moderate' | 'high' | 'very-high';
@@ -106,16 +137,23 @@ export const DISCIPLINES: { id: Discipline; label: string; blurb: string }[] = [
 export interface SportContext {
   sport: SportId;
   event: SportEvent;
-  /** yyyy-mm-dd of the A race; absent means base phase / no date yet */
-  raceDate?: string;
+  proximity: RaceProximity;
   load: EnduranceLoad;
+  /** triathlon only — which discipline to bias toward; 'even' for single sports */
   weakLink: Discipline;
   /** recurring sport niggles, as ids from sports.ts NIGGLES */
   niggles: string[];
 }
 
 export function defaultSportContext(): SportContext {
-  return { sport: 'triathlon', event: 'unspecified', load: 'moderate', weakLink: 'even', niggles: [] };
+  return {
+    sport: 'triathlon',
+    event: 'tri-olympic',
+    proximity: 'none',
+    load: 'moderate',
+    weakLink: 'even',
+    niggles: [],
+  };
 }
 
 export interface TrainingProfile {
@@ -149,22 +187,32 @@ export function defaultTrainingProfile(): TrainingProfile {
 // ── Phases ────────────────────────────────────────────────────────────────────
 
 export type PhaseKind =
-  | 'recovery' | 'accumulation' | 'intensification' | 'peak' | 'deload'
+  | 'intro' | 'recovery' | 'accumulation' | 'intensification' | 'peak' | 'deload'
   | 'maintenance' | 'race-week';
 
 export const PHASE_INFO: Record<PhaseKind, { label: string; blurb: string }> = {
+  intro:           { label: 'Intro',      blurb: 'Learn the movements at easy loads — this week is practice, not a test' },
   recovery:        { label: 'Recovery',   blurb: 'Easy re-entry week — lighter loads, groove the movements' },
   accumulation:    { label: 'Build',      blurb: 'Add reps and sets — accumulate productive volume' },
   intensification: { label: 'Push',       blurb: 'Loads climb, effort climbs — chase the top of every rep range' },
   peak:            { label: 'Peak',       blurb: 'Heaviest work of the block — low reps, full recovery between sets' },
   deload:          { label: 'Deload',     blurb: 'Planned easy week — ~10% lighter so you rebound stronger' },
   maintenance:     { label: 'Maintain',   blurb: 'Loads held, volume trimmed — your sport takes priority this week' },
+  // Kept for blocks stored by a build that emitted it. The planner no longer
+  // does: without an exact race date it cannot know which week the start line
+  // falls in, and labelling the wrong week "race week" is worse than silence.
   'race-week':     { label: 'Race week',  blurb: 'One short session early in the week, then nothing. Show up fresh' },
 };
 
 /** Weeks where the plan deliberately backs off rather than trying to build. */
 export function isEasyPhase(phase: PhaseKind | null): boolean {
-  return phase === 'deload' || phase === 'recovery' || phase === 'race-week';
+  return phase === 'deload' || phase === 'recovery' || phase === 'race-week'
+    || phase === 'intro';
+}
+
+/** Opening weeks that ease an athlete into a block rather than training them hard. */
+export function isOpenerPhase(phase: PhaseKind): boolean {
+  return phase === 'intro' || phase === 'recovery';
 }
 
 // ── Domain objects ────────────────────────────────────────────────────────────
@@ -333,6 +381,7 @@ export function currentPhase(block: TrainingBlock, now = Date.now()): PhaseKind 
 
 export const MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD = 3;
 export const MAX_BLOCK_WEEKS = 12;
+export const MAX_OPENER_WEEKS = 2;
 
 export function productiveWeeks(phases: PhaseKind[]): number {
   return phases.filter(p => !isEasyPhase(p)).length;
@@ -344,8 +393,17 @@ export function validatePhases(phases: PhaseKind[]): string | null {
   if (phases.length > MAX_BLOCK_WEEKS) {
     return `Blocks longer than ${MAX_BLOCK_WEEKS} weeks outrun any plan — split this into two blocks.`;
   }
-  if (phases.slice(1).includes('recovery')) {
-    return 'A recovery week only makes sense as the opening week after a finished block.';
+  // Openers (intro, recovery) only make sense at the front of a block, and they
+  // have to be contiguous — an easy week in the middle is just a lost week.
+  const firstHard = phases.findIndex(p => !isOpenerPhase(p));
+  if (firstHard === -1) {
+    return 'A block needs at least one week of real training.';
+  }
+  if (phases.slice(firstHard).some(isOpenerPhase)) {
+    return 'Intro and recovery weeks only make sense at the start of a block, before the training proper.';
+  }
+  if (firstHard > MAX_OPENER_WEEKS) {
+    return `More than ${MAX_OPENER_WEEKS} easy opening weeks stops being an introduction and starts being the block.`;
   }
 
   // A race week closes the block and there is only ever one — everything after
