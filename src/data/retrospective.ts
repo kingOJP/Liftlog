@@ -11,12 +11,12 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { TrainingSnapshot } from './analytics';
+import type { VolumeTarget } from './analytics';
 import {
-  SETS_TARGET_LOW,
-  SETS_TARGET_HIGH,
   muscleSetTotals,
   sessionDurationMs,
   sessionTimestamp,
+  volumeTargetFor,
 } from './analytics';
 import { getExerciseName } from './programStore';
 import { primaryMuscleFor } from './analytics';
@@ -32,6 +32,11 @@ export function computeBlockRetrospective(
   snapshot: TrainingSnapshot,
   now = Date.now(),
 ): BlockRetrospective {
+  // The block records the goal it was designed for, so the volume verdict is
+  // judged against that goal's band rather than a global hypertrophy default —
+  // otherwise a sport-support block always reports every muscle as under-fed
+  // and hands the next planner run a bogus "add volume" carryover.
+  const band = volumeTargetFor(block.focus);
   const from = blockAnchor(block).getTime();
   const scheduledEnd = blockEndTs(block);
   const to = Math.min(now, scheduledEnd ?? now);
@@ -93,7 +98,7 @@ export function computeBlockRetrospective(
     .map(([muscle, sets]) => {
       const weeklySets = Math.round((sets / weeks) * 2) / 2;
       const status: MuscleOutcome['status'] =
-        weeklySets < SETS_TARGET_LOW ? 'low' : weeklySets > SETS_TARGET_HIGH ? 'high' : 'optimal';
+        weeklySets < band.low ? 'low' : weeklySets > band.high ? 'high' : 'optimal';
       return { muscle, weeklySets, status };
     })
     .sort((a, b) => b.weeklySets - a.weeklySets);
@@ -123,6 +128,7 @@ export function computeBlockRetrospective(
   const overMuscles = muscles.filter(m => m.status === 'high').map(m => m.muscle);
 
   const summary = buildSummary({
+    band,
     block, sessions: inWindow.length, sessionsPlanned, adherencePct,
     strength: trended, muscles, underMuscles, keepCount: keepExerciseIds.length,
     reviewNames: trended
@@ -157,8 +163,9 @@ function buildSummary(args: {
   keepCount: number;
   reviewNames: string[];
   blockPRs: number;
+  band: VolumeTarget;
 }): string[] {
-  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames, blockPRs } = args;
+  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames, blockPRs, band } = args;
   const out: string[] = [];
 
   if (sessions === 0) {
@@ -198,7 +205,7 @@ function buildSummary(args: {
   // Volume
   const optimal = muscles.filter(m => m.status === 'optimal').length;
   if (muscles.length > 0) {
-    let volumeLine = `${optimal} of ${muscles.length} trained muscles landed in the 10–20 weekly-set band.`;
+    let volumeLine = `${optimal} of ${muscles.length} trained muscles landed in the ${band.low}–${band.high} weekly-set band.`;
     if (underMuscles.length > 0) {
       volumeLine += ` ${underMuscles.slice(0, 3).join(', ')} came in under target — the next block adds a set there.`;
     }

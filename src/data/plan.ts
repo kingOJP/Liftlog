@@ -25,14 +25,15 @@ import { startOfWeek } from './program';
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
-export type Goal = 'hypertrophy' | 'strength' | 'fat-loss' | 'athletic' | 'general';
+export type Goal = 'hypertrophy' | 'strength' | 'fat-loss' | 'athletic' | 'general' | 'sport-support';
 
 export const GOALS: { id: Goal; label: string; blurb: string }[] = [
-  { id: 'hypertrophy', label: 'Muscle Growth',        blurb: 'Build size with high-quality volume and double progression' },
-  { id: 'strength',    label: 'Strength',             blurb: 'Move more weight on the big lifts — lower reps, longer rests' },
-  { id: 'fat-loss',    label: 'Fat Loss',             blurb: 'Hold onto muscle while dieting — training defends what you built' },
-  { id: 'athletic',    label: 'Athletic Performance', blurb: 'Strength plus movement quality across the whole body' },
-  { id: 'general',     label: 'General Fitness',      blurb: 'Balanced full-body training you can sustain for years' },
+  { id: 'hypertrophy',   label: 'Muscle Growth',        blurb: 'Build size with high-quality volume and double progression' },
+  { id: 'strength',      label: 'Strength',             blurb: 'Move more weight on the big lifts — lower reps, longer rests' },
+  { id: 'fat-loss',      label: 'Fat Loss',             blurb: 'Hold onto muscle while dieting — training defends what you built' },
+  { id: 'athletic',      label: 'Athletic Performance', blurb: 'Strength plus movement quality across the whole body' },
+  { id: 'sport-support', label: 'Support Another Sport', blurb: 'Lifting that makes you better at your sport — without stealing its recovery' },
+  { id: 'general',       label: 'General Fitness',      blurb: 'Balanced full-body training you can sustain for years' },
 ];
 
 export function goalLabel(goal: Goal): string {
@@ -67,6 +68,56 @@ export const EQUIPMENT_ACCESS: { id: EquipmentAccess; label: string; blurb: stri
   { id: 'minimal',        label: 'Minimal / bands', blurb: 'Bodyweight, bands, the odd dumbbell — travel or home light' },
 ];
 
+// ── Sport context (the 'sport-support' goal) ──────────────────────────────────
+// When lifting exists to serve another sport, the sport itself becomes a hard
+// constraint: it sets the volume ceiling, the movement emphases and the
+// periodization (which runs off a race date, not a generic build-to-peak arc).
+// The vocabulary lives here with the rest of the athlete model; the
+// research-backed prescriptions keyed off it live in sports.ts.
+
+export type SportId = 'triathlon' | 'running' | 'cycling' | 'swimming' | 'hyrox' | 'sprint' | 'other';
+
+/** Format within the sport — a sprint tri and an Ironman are different jobs. */
+export type SportEvent = 'sprint' | 'olympic' | 'half' | 'full' | 'unspecified';
+
+/** Self-reported weekly hours of the sport itself — the interference input. */
+export type EnduranceLoad = 'low' | 'moderate' | 'high' | 'very-high';
+
+export type Discipline = 'swim' | 'bike' | 'run' | 'even';
+
+export const ENDURANCE_LOADS: { id: EnduranceLoad; label: string; blurb: string; hours: number }[] = [
+  { id: 'low',       label: 'Under 4 hours', blurb: 'Low interference — room for 2–3 lifting days and heavier loading', hours: 3 },
+  { id: 'moderate',  label: '4–7 hours',     blurb: 'Moderate — two lifting days at a controlled dose is the sweet spot', hours: 5.5 },
+  { id: 'high',      label: '8–11 hours',    blurb: 'High — lifting caps at two short sessions and stops growing', hours: 9.5 },
+  { id: 'very-high', label: '12+ hours',     blurb: 'Very high — minimum effective dose purely to hold what you have', hours: 13 },
+];
+
+export function enduranceHours(load: EnduranceLoad): number {
+  return ENDURANCE_LOADS.find(l => l.id === load)?.hours ?? 5.5;
+}
+
+export const DISCIPLINES: { id: Discipline; label: string; blurb: string }[] = [
+  { id: 'swim', label: 'Swim', blurb: 'Biases toward lat/upper-back pulling strength and posterior-shoulder balance' },
+  { id: 'bike', label: 'Bike', blurb: 'Biases toward hip-extension force — heavier squat/hinge and single-leg work' },
+  { id: 'run',  label: 'Run',  blurb: 'Biases toward tendon stiffness, pelvic stability and eccentric control' },
+  { id: 'even', label: 'Fairly even', blurb: 'Balanced template — no discipline gets extra slots' },
+];
+
+export interface SportContext {
+  sport: SportId;
+  event: SportEvent;
+  /** yyyy-mm-dd of the A race; absent means base phase / no date yet */
+  raceDate?: string;
+  load: EnduranceLoad;
+  weakLink: Discipline;
+  /** recurring sport niggles, as ids from sports.ts NIGGLES */
+  niggles: string[];
+}
+
+export function defaultSportContext(): SportContext {
+  return { sport: 'triathlon', event: 'unspecified', load: 'moderate', weakLink: 'even', niggles: [] };
+}
+
 export interface TrainingProfile {
   // ── Tier 1: hard constraints (gate exercise selection) ──
   /** free-text injuries / limitations, parsed conservatively by the planner */
@@ -79,6 +130,8 @@ export interface TrainingProfile {
   trainingAgeMonths?: number;
   /** weak points / muscles to bias volume toward */
   priorityMuscles: MuscleGroup[];
+  /** present once the athlete has planned a 'sport-support' block */
+  sport?: SportContext;
   updatedAt: number;
 }
 
@@ -95,7 +148,9 @@ export function defaultTrainingProfile(): TrainingProfile {
 
 // ── Phases ────────────────────────────────────────────────────────────────────
 
-export type PhaseKind = 'recovery' | 'accumulation' | 'intensification' | 'peak' | 'deload';
+export type PhaseKind =
+  | 'recovery' | 'accumulation' | 'intensification' | 'peak' | 'deload'
+  | 'maintenance' | 'race-week';
 
 export const PHASE_INFO: Record<PhaseKind, { label: string; blurb: string }> = {
   recovery:        { label: 'Recovery',   blurb: 'Easy re-entry week — lighter loads, groove the movements' },
@@ -103,7 +158,14 @@ export const PHASE_INFO: Record<PhaseKind, { label: string; blurb: string }> = {
   intensification: { label: 'Push',       blurb: 'Loads climb, effort climbs — chase the top of every rep range' },
   peak:            { label: 'Peak',       blurb: 'Heaviest work of the block — low reps, full recovery between sets' },
   deload:          { label: 'Deload',     blurb: 'Planned easy week — ~10% lighter so you rebound stronger' },
+  maintenance:     { label: 'Maintain',   blurb: 'Loads held, volume trimmed — your sport takes priority this week' },
+  'race-week':     { label: 'Race week',  blurb: 'One short session early in the week, then nothing. Show up fresh' },
 };
+
+/** Weeks where the plan deliberately backs off rather than trying to build. */
+export function isEasyPhase(phase: PhaseKind | null): boolean {
+  return phase === 'deload' || phase === 'recovery' || phase === 'race-week';
+}
 
 // ── Domain objects ────────────────────────────────────────────────────────────
 
@@ -273,7 +335,7 @@ export const MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD = 3;
 export const MAX_BLOCK_WEEKS = 12;
 
 export function productiveWeeks(phases: PhaseKind[]): number {
-  return phases.filter(p => p !== 'recovery' && p !== 'deload').length;
+  return phases.filter(p => !isEasyPhase(p)).length;
 }
 
 /** Returns a plain-language problem, or null when the layout is sound. */
@@ -285,11 +347,24 @@ export function validatePhases(phases: PhaseKind[]): string | null {
   if (phases.slice(1).includes('recovery')) {
     return 'A recovery week only makes sense as the opening week after a finished block.';
   }
+
+  // A race week closes the block and there is only ever one — everything after
+  // the start line belongs to the next block.
+  const raceWeeks = phases.filter(p => p === 'race-week').length;
+  if (raceWeeks > 1) return 'One race week per block — a second race needs its own block.';
+  if (raceWeeks === 1 && phases[phases.length - 1] !== 'race-week') {
+    return 'Race week is the last week of the block — nothing gets programmed past the start line.';
+  }
+
   const deloads = phases.filter(p => p === 'deload').length;
   if (deloads > 1) return 'One deload per block — more than that is just detraining.';
   if (deloads === 1) {
     const at = phases.indexOf('deload');
-    if (at !== phases.length - 1) {
+    // The deload closes the block, or sits immediately before race week: a
+    // taper and the race itself are the one legitimate pair of easy weeks.
+    const closesBlock = at === phases.length - 1;
+    const tapersIntoRace = raceWeeks === 1 && at === phases.length - 2;
+    if (!closesBlock && !tapersIntoRace) {
       return 'The deload closes the block — training on tired legs after an easy week wastes both.';
     }
     if (productiveWeeks(phases.slice(0, at)) < MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD) {

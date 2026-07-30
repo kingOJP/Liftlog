@@ -1,4 +1,4 @@
-import type { MuscleGroup, WorkoutType, Equipment, WeightType } from './taxonomy';
+import type { MuscleGroup, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
 
 export interface ExerciseDef {
   id: string;
@@ -8,6 +8,9 @@ export interface ExerciseDef {
   workoutType: WorkoutType | null;
   equipment: Equipment | null;
   weightType: WeightType | null;
+  /** how a set is counted — omitted means 'reps' (the case for all barbell,
+   *  dumbbell and machine work). Only isometric holds and carries set this. */
+  unit?: MeasureUnit;
 }
 
 export const EXERCISES: ExerciseDef[] = [
@@ -133,6 +136,38 @@ export const EXERCISES: ExerciseDef[] = [
 
   // Forearms
   { id: 'wrist-curls',              name: 'Wrist Curls',                      primaryMuscle: 'Forearms',    secondaryMuscles: [null, null, null],               workoutType: 'Curl',             equipment: 'Bench',             weightType: 'Dumbbell'   },
+
+  // ── Athletic / sport-support layer ──────────────────────────────────────────
+  // Unilateral force production, tendon loading, pelvic stability, trunk
+  // anti-rotation and shoulder balance: the work that transfers to endurance
+  // and field sports but that a hypertrophy catalog has no reason to carry.
+
+  // Unilateral lower body — single-leg force and side-to-side symmetry
+  { id: 'dumbbell-step-up',         name: 'Dumbbell Step Up',                 primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', null],   workoutType: 'Lunge',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'single-leg-rdl',           name: 'Single Leg Romanian Deadlift',     primaryMuscle: 'Hamstrings',  secondaryMuscles: ['Glutes', 'Lower Back', null],   workoutType: 'Hip Hinge',        equipment: 'None',              weightType: 'Dumbbell'   },
+
+  // Hip abductors / adductors — pelvic control on every running stride
+  { id: 'hip-abduction',            name: 'Hip Abduction',                    primaryMuscle: 'Abductors',   secondaryMuscles: ['Glutes', null, null],           workoutType: 'Abduction',        equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'banded-hip-abduction',     name: 'Banded Hip Abduction',             primaryMuscle: 'Abductors',   secondaryMuscles: ['Glutes', null, null],           workoutType: 'Abduction',        equipment: 'None',              weightType: 'Resistance Band' },
+
+  // Tendon / calf — soleus and gastroc load tolerance for running
+  { id: 'single-leg-calf-raise',    name: 'Single Leg Calf Raise',            primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'None',              weightType: 'Bodyweight' },
+
+  // Plyometrics — rate of force development and tendon stiffness
+  { id: 'pogo-hops',                name: 'Pogo Hops',                        primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Jump',             equipment: 'None',              weightType: 'Bodyweight' },
+  { id: 'box-jump',                 name: 'Box Jump',                         primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Calves', null],       workoutType: 'Jump',             equipment: 'None',              weightType: 'Bodyweight' },
+
+  // Trunk — anti-rotation and isometric bracing rather than spinal flexion
+  { id: 'pallof-press',             name: 'Pallof Press',                     primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Anti-Rotation',    equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'dead-bug',                 name: 'Dead Bug',                         primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Anti-Rotation',    equipment: 'None',              weightType: 'Bodyweight' },
+  { id: 'plank',                    name: 'Plank',                            primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Plank',            equipment: 'None',              weightType: 'Bodyweight', unit: 'seconds' },
+  { id: 'side-plank',               name: 'Side Plank',                       primaryMuscle: 'Abs',         secondaryMuscles: ['Abductors', null, null],        workoutType: 'Plank',            equipment: 'None',              weightType: 'Bodyweight', unit: 'seconds' },
+  { id: 'copenhagen-plank',         name: 'Copenhagen Plank',                 primaryMuscle: 'Adductors',   secondaryMuscles: ['Abs', null, null],              workoutType: 'Plank',            equipment: 'Bench',             weightType: 'Bodyweight', unit: 'seconds' },
+  { id: 'farmer-carry',             name: 'Farmer Carry',                     primaryMuscle: 'Traps',       secondaryMuscles: ['Forearms', 'Abs', null],        workoutType: 'Carry',            equipment: 'None',              weightType: 'Dumbbell',   unit: 'seconds' },
+
+  // Shoulder rotation / posterior cuff — the swim's insurance policy
+  { id: 'db-external-rotation',     name: 'Dumbbell External Rotation',       primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Rotation',         equipment: 'None',              weightType: 'Dumbbell'   },
+  { id: 'db-y-raise',               name: 'Prone Dumbbell Y Raise',           primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Bench',             weightType: 'Dumbbell'   },
 ];
 
 export const EXERCISE_MAP = new Map<string, ExerciseDef>(EXERCISES.map(e => [e.id, e]));
@@ -191,13 +226,22 @@ const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   'leg-press-calf-raise': 'beginner', 'seated-calf-raises': 'beginner',
   'standing-calf-raises': 'beginner', 'cable-pull-through': 'beginner',
   'machine-crunch': 'beginner', 'cable-crunch': 'beginner',
+  // Sport-support layer — stability, cuff and abduction work is deliberately
+  // low-skill: it has to be safe to prescribe on day one to anyone.
+  'hip-abduction': 'beginner', 'banded-hip-abduction': 'beginner',
+  'dead-bug': 'beginner', 'plank': 'beginner', 'side-plank': 'beginner',
+  'db-external-rotation': 'beginner', 'db-y-raise': 'beginner',
+  'single-leg-calf-raise': 'beginner', 'dumbbell-step-up': 'beginner',
 
   // Advanced — high skill / high axial load / gated behind prerequisites
   'conventional-deadlift': 'advanced', 'barbell-back-squat': 'advanced',
   'weighted-pull-ups': 'advanced', 'good-mornings': 'advanced',
   'hanging-leg-raise': 'advanced',
+  // Copenhagen planks put a long lever through the adductors — a hard sell
+  // before a regular side plank is comfortable.
+  'copenhagen-plank': 'advanced',
   // everything else (barbell/dumbbell pressing, rows, RDLs, hip thrusts,
-  // dips, chin-ups, lunges) defaults to intermediate
+  // dips, chin-ups, lunges, plyometrics, carries) defaults to intermediate
 };
 
 // Advanced lifts a novice should earn: at least one prerequisite trained (or
@@ -208,11 +252,27 @@ const PREREQUISITES: Record<string, string[]> = {
   'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],
   'good-mornings':         ['romanian-deadlifts', 'dumbbell-rdl'],
   'hanging-leg-raise':     ['machine-crunch', 'cable-crunch'],
+  'copenhagen-plank':      ['side-plank', 'plank'],
 };
 
 export function difficultyFor(id: string): ExerciseDifficulty {
   const def = catalogDefFor(id);
   return (def && DIFFICULTY[def.id]) ?? 'intermediate';
+}
+
+/**
+ * How a set of this exercise is counted. Intrinsic to the movement (a plank is
+ * held, a squat is repeated), so it lives in the app-owned catalog beside
+ * difficulty rather than in the user-editable metadata layer. Unknown/custom
+ * exercises count reps — the assumption every existing log was written under.
+ */
+export function unitFor(id: string): MeasureUnit {
+  return catalogDefFor(id)?.unit ?? 'reps';
+}
+
+/** True when the exercise is held for time rather than repeated. */
+export function isTimedExercise(id: string): boolean {
+  return unitFor(id) === 'seconds';
 }
 
 export function prerequisitesFor(id: string): string[] {

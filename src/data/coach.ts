@@ -19,16 +19,16 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay, Exercise } from './program';
-import type { PhaseKind } from './plan';
+import type { Goal, PhaseKind } from './plan';
+import { isEasyPhase } from './plan';
 import type { TrainingSnapshot } from './analytics';
 import {
-  SETS_TARGET_LOW,
-  SETS_TARGET_HIGH,
   avgDurationByDay,
   e1rmSeries,
   muscleSetTotals,
   musclesForExercise,
   sessionTimestamp,
+  volumeTargetFor,
 } from './analytics';
 import { EXERCISES } from './exercises';
 
@@ -94,12 +94,20 @@ export function computeProgramPlan(
   snapshot: TrainingSnapshot,
   now = Date.now(),
   phase: PhaseKind | null = null,
+  goal: Goal | null = null,
 ): ProgramPlan {
   const { sessions } = snapshot;
-  // A planned deload/recovery week is deliberately lighter — adding or
+  // A planned deload/recovery/race week is deliberately lighter — adding or
   // trimming sets there would fight the block's design.
-  if (phase === 'deload' || phase === 'recovery') return EMPTY_PLAN;
+  if (isEasyPhase(phase)) return EMPTY_PLAN;
   if (sessions.length < MIN_SESSIONS_TO_ADAPT || program.length === 0) return EMPTY_PLAN;
+
+  const band = volumeTargetFor(goal);
+  // When lifting exists to serve another sport, the planner is allowed to trim
+  // but never to add. Volume creep is the specific failure mode of concurrent
+  // training: every set the coach bolts on is recovery taken from a session it
+  // cannot see. A maintenance week is the same bargain — hold, don't build.
+  const mayAddSets = goal !== 'sport-support' && phase !== 'maintenance';
 
   const windowStart = now - WINDOW_DAYS * DAY_MS;
   const windowSessions = sessions.filter(s => sessionTimestamp(s) >= windowStart);
@@ -169,10 +177,12 @@ export function computeProgramPlan(
   };
 
   // ── Under-target muscles: redistribute volume across future workouts ──
-  const gaps = [...programMuscles]
-    .map(muscle => ({ muscle, rate: weeklyMuscleSets.get(muscle) ?? 0 }))
-    .filter(({ rate }) => rate < SETS_TARGET_LOW)
-    .sort((a, b) => a.rate - b.rate);
+  const gaps = mayAddSets
+    ? [...programMuscles]
+        .map(muscle => ({ muscle, rate: weeklyMuscleSets.get(muscle) ?? 0 }))
+        .filter(({ rate }) => rate < band.low)
+        .sort((a, b) => a.rate - b.rate)
+    : [];
 
   let added = 0;
   for (const { muscle, rate } of gaps) {
@@ -217,7 +227,7 @@ export function computeProgramPlan(
         // Prefer lower-fatigue slots: fewer additional muscles dragged along
         score -= others.length * 0.1;
         // Never push a muscle that's already at/over the ceiling
-        if (others.some(o => (weeklyMuscleSets.get(o.muscle) ?? 0) >= SETS_TARGET_HIGH)) {
+        if (others.some(o => (weeklyMuscleSets.get(o.muscle) ?? 0) >= band.high)) {
           score -= 0.5;
         }
         // Spread volume across movements instead of stacking the workhorse
@@ -238,7 +248,7 @@ export function computeProgramPlan(
     if (!best) {
       // No slot can absorb the volume — a structural gap. Suggest a concrete
       // exercise instead of silently ignoring it (or nagging the user).
-      if (SETS_TARGET_LOW - rate >= SUGGEST_GAP) {
+      if (band.low - rate >= SUGGEST_GAP) {
         const inProgram = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
         const pick = EXERCISES.find(e => e.primaryMuscle === muscle && !inProgram.has(e.id));
         if (pick) {
@@ -265,7 +275,7 @@ export function computeProgramPlan(
       fromSets: best.ex.sets,
       toSets: best.ex.sets + 1,
       muscle,
-      reason: `${muscle} is averaging ${fmtRate(rate)} weekly sets — below the ${SETS_TARGET_LOW}–${SETS_TARGET_HIGH} target. One set added here because ${why}.`,
+      reason: `${muscle} is averaging ${fmtRate(rate)} weekly sets — below the ${band.low}–${band.high} target. One set added here because ${why}.`,
     });
     changedExercises.add(`${best.day.id}:${best.ex.id}`);
     addedMinutesByDay.set(best.day.id, (addedMinutesByDay.get(best.day.id) ?? 0) + MINUTES_PER_SET);
@@ -274,7 +284,7 @@ export function computeProgramPlan(
 
   // ── Over-target muscles: trim junk volume to protect recovery ──
   const overs = [...weeklyMuscleSets]
-    .filter(([, rate]) => rate > SETS_TARGET_HIGH + HIGH_VOLUME_BUFFER)
+    .filter(([, rate]) => rate > band.high + HIGH_VOLUME_BUFFER)
     .sort((a, b) => b[1] - a[1]);
 
   let removed = 0;
@@ -305,7 +315,7 @@ export function computeProgramPlan(
       fromSets: best.ex.sets,
       toSets: best.ex.sets - 1,
       muscle,
-      reason: `${muscle} is averaging ${fmtRate(rate)} weekly sets — past the ${SETS_TARGET_HIGH}-set ceiling, extra sets cost more recovery than they build. One set trimmed to keep quality high.`,
+      reason: `${muscle} is averaging ${fmtRate(rate)} weekly sets — past the ${band.high}-set ceiling, extra sets cost more recovery than they build. One set trimmed to keep quality high.`,
     });
     changedExercises.add(`${best.day.id}:${best.ex.id}`);
     addedMinutesByDay.set(best.day.id, (addedMinutesByDay.get(best.day.id) ?? 0) - MINUTES_PER_SET);

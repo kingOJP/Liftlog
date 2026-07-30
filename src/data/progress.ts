@@ -55,6 +55,10 @@ const GOAL_WEIGHTS: Record<Goal, { e1rm: number; volume: number; prs: number }> 
   'fat-loss':  { e1rm: 0.30, volume: 0.50, prs: 0.20 },
   athletic:    { e1rm: 0.45, volume: 0.30, prs: 0.25 },
   general:     { e1rm: 0.34, volume: 0.33, prs: 0.33 },
+  // Supporting another sport: strength per unit of fatigue is the whole point,
+  // so e1RM and PRs carry the verdict. Rising tonnage is explicitly *not* the
+  // goal here — extra volume is a cost paid out of the sport's recovery.
+  'sport-support': { e1rm: 0.50, volume: 0.15, prs: 0.35 },
 };
 
 // ── Per-session, per-exercise datapoints ──────────────────────────────────────
@@ -253,8 +257,11 @@ export function assessExercise(
   const weights = GOAL_WEIGHTS[goal];
 
   let e1rmComponent = e1rmChangePct == null ? null : clamp(e1rmChangePct / FULL_MARKS_E1RM_PCT, -1, 1);
-  // In a deficit, holding strength is a win — flat e1RM scores mildly positive.
-  if (goal === 'fat-loss' && e1rmChangePct != null && Math.abs(e1rmChangePct) <= 2) {
+  // When the training isn't aimed at adding strength — dieting, or lifting to
+  // support a sport whose own volume is climbing — *holding* it is the win, so
+  // a flat e1RM scores mildly positive instead of reading as a stall.
+  const holdingCounts = goal === 'fat-loss' || goal === 'sport-support';
+  if (holdingCounts && e1rmChangePct != null && Math.abs(e1rmChangePct) <= 2) {
     e1rmComponent = Math.max(e1rmComponent ?? 0, 0.35);
   }
   const volumeComponent = volumeChangePct == null ? null : clamp(volumeChangePct / FULL_MARKS_VOLUME_PCT, -1, 1);

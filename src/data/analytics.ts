@@ -8,6 +8,7 @@ import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
 import type { MuscleGroup } from './taxonomy';
 import { startOfWeek } from './program';
+import type { Goal } from './plan';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
 import { getExerciseLibrary } from './programStore';
 
@@ -15,9 +16,37 @@ import { getExerciseLibrary } from './programStore';
 export const SECONDARY_SET_WEIGHT = 0.5;
 
 // ~10–20 hard sets per muscle per week is the commonly cited effective range
-// for hypertrophy. Shared by the coach planner, insights, metrics and heatmap.
+// for hypertrophy, and the default band for every lifting-first goal. Shared by
+// the coach planner, insights, metrics and heatmap.
 export const SETS_TARGET_LOW = 10;
 export const SETS_TARGET_HIGH = 20;
+
+// ── Weekly volume band ────────────────────────────────────────────────────────
+// The band is a property of the *goal*, not a global constant: an athlete
+// lifting to support another sport is chasing strength per unit of fatigue, and
+// measuring them against a hypertrophy dose makes every engine push volume up
+// (coach adds sets → insights flags "low" → the retrospective carries
+// "under-target" into the next block). volumeTargetFor is the single place that
+// decision lives; every consumer takes a band rather than importing the
+// constants directly.
+
+export interface VolumeTarget {
+  low: number;
+  high: number;
+}
+
+export const DEFAULT_VOLUME_TARGET: VolumeTarget = { low: SETS_TARGET_LOW, high: SETS_TARGET_HIGH };
+
+/**
+ * Sport-support sits at 4–10 weekly sets per muscle: two sessions of two or
+ * three multi-joint lifts at 3–4 sets is the dose the concurrent-training
+ * literature supports (Rønnestad & Mujika 2014), and pushing past it buys
+ * fatigue that lands on the next endurance session rather than adaptation.
+ * Every other goal keeps the 10–20 band unchanged.
+ */
+export function volumeTargetFor(goal: Goal | null | undefined): VolumeTarget {
+  return goal === 'sport-support' ? { low: 4, high: 10 } : DEFAULT_VOLUME_TARGET;
+}
 
 // ── Training snapshot ─────────────────────────────────────────────────────────
 

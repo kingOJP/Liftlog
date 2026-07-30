@@ -6,9 +6,9 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { TrainingSnapshot } from './analytics';
+import type { VolumeTarget } from './analytics';
 import {
-  SETS_TARGET_LOW,
-  SETS_TARGET_HIGH,
+  DEFAULT_VOLUME_TARGET,
   muscleSetTotals,
   sessionTimestamp,
 } from './analytics';
@@ -66,8 +66,10 @@ export function presetWindow(preset: Exclude<HeatPreset, 'custom'>, now = Date.n
 }
 
 // ── Color scale ───────────────────────────────────────────────────────────────
-// Blue = no recent training → green = within the 10–20 set target →
-// yellow = elevated → red = very high / approaching recovery limits.
+// Blue = no recent training → green = inside the goal's weekly-set band →
+// yellow = elevated → red = very high / approaching recovery limits. The band
+// is passed in rather than fixed, so a sport-support athlete's 6 weekly sets
+// reads as "on target" instead of permanently blue.
 
 const HEAT_BLUE   = '#3D6BE8';
 const HEAT_GREEN  = '#1D9E75';
@@ -75,14 +77,18 @@ const HEAT_YELLOW = '#E8C44A';
 const HEAT_RED    = '#E85555';
 
 // Gradient stops in weekly-set space. Green holds across the whole target
-// range so "on target" reads as one state, not a spectrum.
-const STOPS: Array<[number, string]> = [
-  [0, HEAT_BLUE],
-  [SETS_TARGET_LOW, HEAT_GREEN],
-  [SETS_TARGET_HIGH, HEAT_GREEN],
-  [SETS_TARGET_HIGH + 6, HEAT_YELLOW],
-  [SETS_TARGET_HIGH + 12, HEAT_RED],
-];
+// range so "on target" reads as one state, not a spectrum. The two overshoot
+// stops scale with the band's width, so a narrower band saturates sooner.
+function stopsFor(band: VolumeTarget): Array<[number, string]> {
+  const overshoot = Math.max(3, Math.round((band.high - band.low) * 0.6));
+  return [
+    [0, HEAT_BLUE],
+    [band.low, HEAT_GREEN],
+    [band.high, HEAT_GREEN],
+    [band.high + overshoot, HEAT_YELLOW],
+    [band.high + overshoot * 2, HEAT_RED],
+  ];
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   return [
@@ -99,22 +105,24 @@ function mix(a: string, b: string, t: number): string {
   return `rgb(${c(r1, r2)}, ${c(g1, g2)}, ${c(b1, b2)})`;
 }
 
-export function heatColor(weeklyRate: number): string {
-  if (weeklyRate <= STOPS[0][0]) return STOPS[0][1];
-  for (let i = 1; i < STOPS.length; i++) {
-    const [prevRate, prevColor] = STOPS[i - 1];
-    const [rate, color] = STOPS[i];
+export function heatColor(weeklyRate: number, band: VolumeTarget = DEFAULT_VOLUME_TARGET): string {
+  const stops = stopsFor(band);
+  if (weeklyRate <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [prevRate, prevColor] = stops[i - 1];
+    const [rate, color] = stops[i];
     if (weeklyRate <= rate) {
       return mix(prevColor, color, (weeklyRate - prevRate) / (rate - prevRate));
     }
   }
-  return STOPS[STOPS.length - 1][1];
+  return stops[stops.length - 1][1];
 }
 
-export function heatLabel(weeklyRate: number): string {
+export function heatLabel(weeklyRate: number, band: VolumeTarget = DEFAULT_VOLUME_TARGET): string {
+  const overshoot = Math.max(3, Math.round((band.high - band.low) * 0.6));
   if (weeklyRate <= 0) return 'No recent training';
-  if (weeklyRate < SETS_TARGET_LOW) return 'Below target';
-  if (weeklyRate <= SETS_TARGET_HIGH) return 'On target';
-  if (weeklyRate <= SETS_TARGET_HIGH + 6) return 'Elevated';
+  if (weeklyRate < band.low) return 'Below target';
+  if (weeklyRate <= band.high) return 'On target';
+  if (weeklyRate <= band.high + overshoot) return 'Elevated';
   return 'Very high — watch recovery';
 }

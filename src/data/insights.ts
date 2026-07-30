@@ -23,7 +23,9 @@ import {
   primaryMuscleFor,
   sessionTimestamp,
   sessionWeekStart,
+  volumeTargetFor,
 } from './analytics';
+import type { VolumeTarget } from './analytics';
 import { assessSnapshot, MIN_TREND_SESSIONS } from './progress';
 import type { ExerciseProgress } from './progress';
 import { computeProgramPlan } from './coach';
@@ -80,9 +82,9 @@ export interface Coaching {
   plan: ProgramPlan;
 }
 
-function volumeStatus(sets: number): VolumeStatus {
-  if (sets < SETS_TARGET_LOW) return 'low';
-  if (sets > SETS_TARGET_HIGH) return 'high';
+function volumeStatus(sets: number, band: VolumeTarget): VolumeStatus {
+  if (sets < band.low) return 'low';
+  if (sets > band.high) return 'high';
   return 'optimal';
 }
 
@@ -96,8 +98,12 @@ export function computeCoaching(
   goal: Goal = 'general',
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
-  const plan = computeProgramPlan(program, snapshot, now, phase);
+  const plan = computeProgramPlan(program, snapshot, now, phase, goal);
   const currentWeekStart = startOfWeek(now);
+  // The weekly set band is a property of the goal, not a constant: a
+  // sport-support athlete measured against a hypertrophy dose reads as
+  // permanently under-trained.
+  const band = volumeTargetFor(goal);
 
   const empty: Coaching = {
     hasData: false,
@@ -132,7 +138,7 @@ export function computeCoaching(
   const muscleVolume: MuscleVolume[] = [...new Set([...volumeMap.keys(), ...programMuscles])]
     .map(muscle => {
       const sets = Math.round((volumeMap.get(muscle) ?? 0) * 2) / 2;
-      return { muscle, sets, status: volumeStatus(sets), inProgram: programMuscles.has(muscle) };
+      return { muscle, sets, status: volumeStatus(sets, band), inProgram: programMuscles.has(muscle) };
     })
     .sort((a, b) => b.sets - a.sets);
 
@@ -229,9 +235,9 @@ export function computeCoaching(
     if (mv.status === 'high' && mv.inProgram) {
       opportunities.push({
         kind: 'volume-high',
-        priority: 60 + (mv.sets - SETS_TARGET_HIGH),
+        priority: 60 + (mv.sets - band.high),
         title: `${mv.muscle} volume is running hot`,
-        detail: `${formatSets(mv.sets)} weekly sets — past the ${SETS_TARGET_HIGH}-set ceiling, extra sets mostly cost recovery. The coach will trim volume here if it persists.`,
+        detail: `${formatSets(mv.sets)} weekly sets — past the ${band.high}-set ceiling, extra sets mostly cost recovery. The coach will trim volume here if it persists.`,
       });
     }
   }

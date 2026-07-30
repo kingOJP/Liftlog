@@ -22,18 +22,18 @@
 //     recommendation engine are pure functions of (program, history), so once
 //     a swap is saved to the program nothing needs to be "notified".
 
-import type { MuscleGroup, WorkoutType, Equipment, WeightType } from './taxonomy';
+import type { MuscleGroup, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
-import type { TrainingSnapshot } from './analytics';
+import type { TrainingSnapshot, VolumeTarget } from './analytics';
 import {
-  SETS_TARGET_LOW,
-  SETS_TARGET_HIGH,
   muscleSetTotals,
   normalizeName,
   sessionTimestamp,
+  volumeTargetFor,
 } from './analytics';
+import type { Goal } from './plan';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor } from './exercises';
+import { EXERCISES, EXERCISE_MAP, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor, unitFor } from './exercises';
 import type { ExerciseDifficulty } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
@@ -57,13 +57,17 @@ export interface ExerciseProfile {
   difficulty: ExerciseDifficulty;
   /** exercise ids that should be trained before this one (advanced lifts) */
   prerequisites: string[];
+  /** reps vs a timed hold — the planner prescribes seconds for isometrics */
+  unit: MeasureUnit;
 }
 
 // Multi-joint movement patterns — used to derive compound/isolation rather
-// than hand-maintaining a flag on every catalog row.
+// than hand-maintaining a flag on every catalog row. Jumps and loaded carries
+// are whole-body efforts; isometric holds and single-joint rotation/abduction
+// work fall through to isolation.
 const COMPOUND_PATTERNS = new Set<WorkoutType>([
-  'Dip', 'Hip Hinge', 'Hip Thrust', 'Leg Press', 'Lunge', 'Press',
-  'Pull Down', 'Pull Up', 'Row', 'Squat',
+  'Carry', 'Dip', 'Hip Hinge', 'Hip Thrust', 'Jump', 'Leg Press', 'Lunge',
+  'Press', 'Pull Down', 'Pull Up', 'Row', 'Squat',
 ]);
 
 const nameToDef = new Map(EXERCISES.map(d => [normalizeName(d.name), d]));
@@ -102,6 +106,7 @@ export function profileFor(id: string, fallbackName?: string): ExerciseProfile {
     mechanics: workoutType && COMPOUND_PATTERNS.has(workoutType) ? 'compound' : 'isolation',
     difficulty: difficultyFor(id),
     prerequisites: prerequisitesFor(id),
+    unit: unitFor(id),
   };
 }
 
@@ -166,6 +171,8 @@ interface RankContext {
   weeklyRate: Map<MuscleGroup, number>;
   /** equipment seen in the user's logged history or current day */
   observedEquipment: Set<Equipment>;
+  /** weekly set band the volume-balance factors judge against (goal-derived) */
+  band: VolumeTarget;
 }
 
 export function suggestReplacements(
@@ -174,13 +181,14 @@ export function suggestReplacements(
   snapshot: TrainingSnapshot | null,
   limit = 3,
   now = Date.now(),
+  goal: Goal | null = null,
 ): ReplacementSuggestion[] {
   const targetProfile = profileFor(target.id, target.name);
   // Without a primary muscle there is no training intent to preserve — the UI
   // points the user at the metadata editor instead.
   if (!targetProfile.primaryMuscle) return [];
 
-  const ctx = buildContext(targetProfile, day, snapshot, now);
+  const ctx = buildContext(targetProfile, day, snapshot, now, goal);
   const dayIds = new Set(day.exercises.map(e => e.id));
 
   const suggestions: ReplacementSuggestion[] = [];
@@ -225,6 +233,7 @@ function buildContext(
   day: WorkoutDay,
   snapshot: TrainingSnapshot | null,
   now: number,
+  goal: Goal | null,
 ): RankContext {
   const patternsInDay = new Set<WorkoutType>();
   const observedEquipment = new Set<Equipment>();
@@ -244,9 +253,9 @@ function buildContext(
     for (const logs of snapshot.setsBySession.values()) {
       for (const l of logs) loggedIds.add(l.exerciseId);
     }
-    // Shared multi-signal trend (progress.ts) — balanced weighting, since a
-    // swap suggestion isn't tied to one goal's priorities.
-    const directions = progressDirections(assessSnapshot(snapshot, 'general'));
+    // Shared multi-signal trend (progress.ts), weighted for the active goal
+    // when the caller knows it; balanced weighting otherwise.
+    const directions = progressDirections(assessSnapshot(snapshot, goal ?? 'general'));
     trendUp = directions.up;
     trendDown = directions.down;
 
@@ -276,6 +285,7 @@ function buildContext(
     trendDown,
     weeklyRate,
     observedEquipment,
+    band: volumeTargetFor(goal),
   };
 }
 
@@ -364,9 +374,9 @@ function scoreCandidate(cand: ExerciseProfile, ctx: RankContext): Factor[] {
     for (const m of candMuscles) {
       if (ctx.targetMuscles.has(m)) continue;
       const rate = ctx.weeklyRate.get(m) ?? 0;
-      if (rate >= SETS_TARGET_HIGH) {
+      if (rate >= ctx.band.high) {
         factors.push({ points: -6, caution: `Adds volume to ${m}, already at the weekly ceiling` });
-      } else if (rate < SETS_TARGET_LOW) {
+      } else if (rate < ctx.band.low) {
         factors.push({ points: 3, reason: `Bonus work for ${m}, which is under its weekly target` });
       }
     }
