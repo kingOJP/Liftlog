@@ -35,6 +35,9 @@ export interface DosageSlot {
 // loads too light for the rep count to matter much.
 const HIGH_REP_PATTERNS = new Set<WorkoutType>([
   'Lateral Raise', 'Calf Raise', 'Face Pull', 'Reverse Fly', 'Crunch',
+  // Stability and cuff work: light by nature, and the stimulus is control
+  // rather than load, so a low-rep prescription would miss the point.
+  'Abduction', 'Anti-Rotation', 'Rotation',
 ]);
 
 // Heavy axial patterns — the barbell hinge and squat families. These load the

@@ -26,9 +26,13 @@ import { assessSnapshot, progressDirections } from './progress';
 import type { ExerciseProfile } from './substitution';
 import { candidateProfiles, profileFor } from './substitution';
 import { DIFFICULTY_RANK } from './exercises';
-import type { Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel } from './plan';
-import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD } from './plan';
+import type {
+  Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel, SportContext,
+} from './plan';
+import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, parsePlanDate, mondayOf } from './plan';
 import { dosage } from './dosage';
+import type { Slot, DayTemplate } from './sports';
+import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
 
 // ── Input / output ────────────────────────────────────────────────────────────
 
@@ -50,6 +54,8 @@ export interface PlannerInput {
   priorityMuscles?: MuscleGroup[];
   /** injuries/limitations — parsed alongside notes into hard constraints */
   injuries?: string;
+  /** required for goal 'sport-support' — the sport is a hard constraint */
+  sport?: SportContext;
 }
 
 export interface PlannerConfidence {
@@ -180,18 +186,6 @@ function applyEquipmentAccess(g: Guidance, access: EquipmentAccess | undefined):
 // the selector fills it with the best exercise the user's history supports.
 // Templates are pre-calibrated so the weekly per-muscle volume lands inside
 // the 10–20 hard-set band at default set counts.
-
-interface Slot {
-  muscle: MuscleGroup;
-  patterns?: WorkoutType[];     // preference order; hard-filtered, with fallback
-  mechanics?: 'compound' | 'isolation';
-  main?: boolean;               // the day's heavy anchor — more sets, lower reps
-}
-
-interface DayTemplate {
-  title: string;                // rendered as the day's muscleGroups line
-  slots: Slot[];
-}
 
 function splitFor(
   daysPerWeek: number,
@@ -364,16 +358,52 @@ function splitFor(
 // Dosage (sets × rep range) is resolved by data/dosage.ts — the single source
 // of truth shared with the day editor, the mid-workout add panel and quick
 // workouts, so an exercise gets the same goal-aware prescription however it
-// enters the program.
+// enters the program. A sport template's slot may carry its own explicit
+// prescription, which wins: "3 sets of 4–6, short of failure" is the point of
+// that slot, not a default for the goal table to override.
+function doseFor(
+  goal: Goal,
+  slot: Slot,
+  profile: ExerciseProfile,
+  experience: ExperienceLevel,
+): Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> {
+  return slot.dose ? { ...slot.dose } : dosage(goal, slot, profile, experience);
+}
+
+// ── Phase layout ──────────────────────────────────────────────────────────────
 
 export function defaultBlockWeeks(): number {
   return 6;
 }
 
+/**
+ * Whole weeks between the block's start Monday and the race, or null when
+ * there's no race on the calendar. Week 1 containing the race counts as 1.
+ */
+export function weeksToRace(startDate: string, raceDate: string | undefined): number | null {
+  if (!raceDate) return null;
+  const race = parsePlanDate(raceDate);
+  const start = parsePlanDate(startDate);
+  if (!race || !start) return null;
+  const weeks = Math.floor((mondayOf(race).getTime() - mondayOf(start).getTime()) / (7 * 86_400_000)) + 1;
+  return weeks >= 1 ? weeks : null;
+}
+
 export function buildPhases(
-  input: Pick<PlannerInput, 'goal' | 'weeks' | 'includeDeload' | 'openWithRecovery'>,
+  input: Pick<PlannerInput, 'goal' | 'weeks' | 'includeDeload' | 'openWithRecovery' | 'startDate' | 'sport'>,
   previousRetro?: BlockRetrospective | null,
 ): { phases: PhaseKind[]; notes: string[]; warnings: string[] } {
+  // Sport-support periodization runs off the race date, not a build-to-peak
+  // arc: build → maintain → taper → race week, with no lifting peak anywhere
+  // near an A race.
+  if (input.goal === 'sport-support' && input.sport) {
+    return buildSportPhases(
+      input.weeks,
+      weeksToRace(input.startDate, input.sport.raceDate),
+      input.sport.sport,
+    );
+  }
+
   const notes: string[] = [];
   const warnings: string[] = [];
   const weeks = Math.min(12, Math.max(3, Math.round(input.weeks)));
@@ -462,6 +492,14 @@ function allowedByGuidance(p: ExerciseProfile, g: Guidance): boolean {
 
 function scoreCandidate(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): number {
   let score = 0;
+  // A sport template names the movements it actually wants. The bonus is large
+  // enough to win a normal slot contest but still loses to the hard filters
+  // (equipment, injuries, skill gate), so an unavailable preference degrades to
+  // the generically-best exercise rather than to nothing.
+  if (slot.preferIds) {
+    const idx = slot.preferIds.indexOf(p.id);
+    if (idx >= 0) score += 40 - idx * 4;
+  }
   if (slot.patterns && p.workoutType) {
     const idx = slot.patterns.indexOf(p.workoutType);
     if (idx >= 0) score += 12 - idx * 2;
@@ -491,6 +529,9 @@ function scoreCandidate(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): number 
 }
 
 function reasonFor(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): string {
+  // A sport slot exists for a specific, citable reason — that beats anything
+  // the generic selector could say about the exercise.
+  if (slot.why) return slot.why;
   if (ctx.currentIds.has(p.id)) {
     if (ctx.trendUp.has(p.id)) return 'Kept — your strength on it is climbing, and momentum like that is never rotated away.';
     if (ctx.review.has(p.id)) return 'Kept despite a recent stall — no stronger alternative fit this slot; the deload should unstick it.';
@@ -559,6 +600,7 @@ function confidenceFor(snapshot: TrainingSnapshot | null, experience: Experience
 const MINUTES_PER_SET = 3;       // matches the coach planner's estimate
 const SESSION_OVERHEAD_MIN = 10;
 const LONG_SESSION_MIN = 95;
+const SPORT_SESSION_MIN = 55;   // a support session that outgrows this is defeating itself
 
 export function buildPlanProposal(
   input: PlannerInput,
@@ -570,9 +612,22 @@ export function buildPlanProposal(
   // equipment access is layered on top.
   const guidance = parseGuidance([input.notes, input.injuries ?? ''].join('. '));
   applyEquipmentAccess(guidance, input.equipmentAccess);
-  const split = splitFor(input.daysPerWeek, input.experience);
+
+  // Supporting another sport replaces the split wholesale: the sport registry
+  // decides which sessions exist, how many the athlete's weekly sport load can
+  // absorb, and what each slot is for.
+  const sportPlan = input.goal === 'sport-support' && input.sport
+    ? buildSportPlan(input.sport, input.daysPerWeek, input.experience)
+    : null;
+  const split = sportPlan
+    ? { name: sportPlan.splitName, reason: sportPlan.splitReason, days: sportPlan.days, warning: undefined }
+    : splitFor(input.daysPerWeek, input.experience);
   const { phases, notes: phaseNotes, warnings } = buildPhases(input, previousRetro);
   if (split.warning) warnings.push(split.warning);
+  if (sportPlan) {
+    warnings.push(...sportPlan.warnings);
+    guidance.notes.push(...sportPlan.rationale);
+  }
   const confidence = confidenceFor(snapshot, input.experience);
 
   // History-derived context (all optional — the planner works from zero).
@@ -638,7 +693,7 @@ export function buildPlanProposal(
         continue;
       }
       ctx.used.add(picked.profile.id);
-      const dose = dosage(input.goal, slot, picked.profile, input.experience);
+      const dose = doseFor(input.goal, slot, picked.profile, input.experience);
       exercises.push({ id: picked.profile.id, name: picked.profile.name, ...dose });
       decisions.push({
         exerciseId: picked.profile.id,
@@ -648,7 +703,16 @@ export function buildPlanProposal(
         reason: picked.reason,
       });
     }
-    days.push({ id: dayId, label: `Day ${dayId}`, muscleGroups: template.title, exercises });
+    days.push({
+      id: dayId,
+      label: `Day ${dayId}`,
+      muscleGroups: template.title,
+      exercises,
+      // Phase gating is how the lifting taper is enforced rather than merely
+      // described — the short power session simply stops being programmed once
+      // the block reaches its maintenance weeks.
+      ...(template.phases ? { phases: [...template.phases] } : {}),
+    });
   });
 
   // Pair fresh picks with the stalled current-program lifts they displace, so
@@ -668,7 +732,11 @@ export function buildPlanProposal(
 
   // Volume rebalancing from the last block's findings: one extra set where a
   // muscle under-responded, one fewer where volume ran past the ceiling.
-  if (previousRetro) {
+  // A sport prescription is already at its ceiling by construction, so the
+  // retro's "add a set" and the priority-muscle bump are both skipped: they are
+  // hypertrophy instincts, and here they would spend recovery the athlete's
+  // sport has a prior claim on.
+  if (previousRetro && !sportPlan) {
     for (const muscle of previousRetro.carryover.underMuscles) {
       bumpSets(days, decisions, muscle, +1, `+1 set — ${muscle} finished last block under its weekly volume target.`);
     }
@@ -679,8 +747,10 @@ export function buildPlanProposal(
 
   // Priority muscles (weak points the athlete flagged) get an extra set each,
   // within the same guardrails — a targeted bias toward what they care about.
-  for (const muscle of input.priorityMuscles ?? []) {
-    bumpSets(days, decisions, muscle, +1, `+1 set — you flagged ${muscle} as a priority, so it gets extra volume.`);
+  if (!sportPlan) {
+    for (const muscle of input.priorityMuscles ?? []) {
+      bumpSets(days, decisions, muscle, +1, `+1 set — you flagged ${muscle} as a priority, so it gets extra volume.`);
+    }
   }
 
   // Projected weekly volume per muscle (primary 1, secondary 0.5)
@@ -696,10 +766,14 @@ export function buildPlanProposal(
     .map(([muscle, sets]) => ({ muscle, sets: Math.round(sets * 2) / 2 }))
     .sort((a, b) => b.sets - a.sets);
 
+  // Sport-support sessions have a much tighter budget: 40 minutes is the point,
+  // not a nice-to-have, because the session has to fit around training that
+  // matters more.
+  const sessionCap = sportPlan ? SPORT_SESSION_MIN : LONG_SESSION_MIN;
   for (const day of days) {
     const setCount = day.exercises.reduce((s, e) => s + e.sets, 0);
     const est = SESSION_OVERHEAD_MIN + setCount * MINUTES_PER_SET;
-    if (est > LONG_SESSION_MIN) {
+    if (est > sessionCap) {
       warnings.push(`Day ${day.id} projects ~${est} minutes — trim a set or drop an exercise if that doesn't fit your schedule.`);
     }
   }
@@ -716,7 +790,7 @@ export function buildPlanProposal(
     guidanceNotes: guidance.notes,
     muscleWeeklySets,
     intent: intentFor(input, split.name, phases),
-    progression: progressionFor(input.goal, phases, input.experience),
+    progression: progressionFor(input.goal, phases, input.experience, input.sport),
     warnings,
   };
 }
@@ -747,6 +821,19 @@ function bumpSets(
 
 function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]): string {
   const weeks = phases.length;
+
+  // Supporting another sport: the intent has to say out loud that lifting is
+  // the junior partner, because every week of the block is shaped by that.
+  if (input.goal === 'sport-support' && input.sport) {
+    const sport = sportLabel(input.sport.sport).toLowerCase();
+    const race = phases[phases.length - 1] === 'race-week';
+    const arc = race
+      ? 'build strength early, hold it through your heaviest training weeks, then taper the lifting so you arrive at the start line fresh'
+      : 'build strength while it is cheap to build, then hold it';
+    return `${weeks} weeks of lifting in service of your ${sport}: ${splitName} keeps the sessions short, heavy and well short of failure. `
+      + `The plan is to ${arc}. If a session ever clashes with a quality ${sport} workout, the ${sport} workout wins — that is not a compromise, it is the design.`;
+  }
+
   const deload = phases[phases.length - 1] === 'deload';
   const arc = deload
     ? `build for ${weeks - (phases[0] === 'recovery' ? 2 : 1)} weeks, then deload and reassess`
@@ -765,7 +852,34 @@ function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]):
   }
 }
 
-function progressionFor(goal: Goal, phases: PhaseKind[], experience: ExperienceLevel = 'intermediate'): string {
+function progressionFor(
+  goal: Goal,
+  phases: PhaseKind[],
+  experience: ExperienceLevel = 'intermediate',
+  sport?: SportContext,
+): string {
+  if (goal === 'sport-support' && sport) {
+    const meta = sportMeta(sport.sport);
+    const raceWeek = phases.indexOf('race-week') + 1;
+    const taperWeek = phases.indexOf('deload') + 1;
+    const maintainFrom = phases.indexOf('maintenance') + 1;
+    const lines = [
+      'Load climbs on the main lifts whenever you own the top of the rep range with two or three reps still in the tank. '
+      + 'If a set feels like a grind, it was too heavy — stop the set, not the session.',
+    ];
+    if (maintainFrom > 0) {
+      lines.push(`From week ${maintainFrom} the loads stop climbing and the sets come down. That is deliberate: strength is defended by intensity, and the volume is what your ${meta.label.toLowerCase()} training needs back.`);
+    }
+    if (taperWeek > 0) {
+      lines.push(`Week ${taperWeek} tapers — same kind of weight, a third of the work.`);
+    }
+    if (raceWeek > 0) {
+      lines.push(`Week ${raceWeek} is race week: one easy session early, nothing inside 72 hours of the start.`);
+    }
+    lines.push('The coach will never add sets to this plan. It can trim them, and it will if your logged sessions say you are running out of road.');
+    return lines.join(' ');
+  }
+
   const deloadWeek = phases.indexOf('deload') + 1;
   const deloadLine = deloadWeek > 0
     ? ` Week ${deloadWeek} is a planned deload — roughly 10% lighter across the board — so the rebound lands inside this block, not after it.`

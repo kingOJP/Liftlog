@@ -1,6 +1,7 @@
 import type { Exercise } from './program';
 import type { WeightType } from './taxonomy';
 import type { ExperienceLevel, Goal, PhaseKind } from './plan';
+import { isEasyPhase } from './plan';
 import { epley1RM } from './analytics';
 
 // Next-session prescriptions built on double progression — the standard
@@ -348,19 +349,30 @@ export function calculateRecommendation(
     sets: exercise.sets, repLow: exercise.repLow, repHigh: exercise.repHigh,
   };
 
-  // Planned easy week: back off ~10% regardless of how the last session went.
-  if (phase === 'deload' || phase === 'recovery') {
+  // Planned easy week: back off regardless of how the last session went. A
+  // taper keeps the load respectable (intensity is what preserves strength on
+  // reduced volume); race week is deliberately much lighter than that — the
+  // session exists to move, not to train.
+  if (isEasyPhase(phase ?? null)) {
     const easy = phase === 'deload'
       ? 'Planned deload week — ~10% lighter, crisp reps, let fatigue drain'
-      : 'Recovery week — ~10% lighter while you ramp back into training';
+      : phase === 'race-week'
+        ? 'Race week — ~30% lighter and just a couple of sets. Sharpness, not fitness'
+        : 'Recovery week — ~10% lighter while you ramp back into training';
+    const factor = phase === 'race-week' ? 0.7 : 0.9;
     if (weightType === 'Bodyweight' && weight === 0) {
       return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }
     return {
-      weight: easeBack(weight, 0.9, incrementFor(weight, weightType)),
+      weight: easeBack(weight, factor, incrementFor(weight, weightType)),
       direction: 'down', kind: 'deload', reason: easy,
     };
   }
+
+  // A maintenance week holds load on purpose: volume is already trimmed by the
+  // block's design, and intensity is the half of the dose that defends
+  // strength. Double progression still applies — earn the top of the range and
+  // the load still moves — it just isn't chased.
 
   // Bodyweight at 0 lbs → rep progression. If external load was logged
   // (e.g. weighted pull-ups with a belt), the normal weight engine applies.

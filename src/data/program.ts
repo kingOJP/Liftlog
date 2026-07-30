@@ -1,5 +1,6 @@
 import { EXERCISE_MAP } from './exercises';
 import { getProgramStart } from './settings';
+import type { PhaseKind } from './plan';
 
 /**
  * A programmed exercise — one slot in a workout day. Carries the PRESCRIPTION
@@ -51,6 +52,26 @@ export interface WorkoutDay {
   label: string;
   muscleGroups: string;
   exercises: Exercise[];
+  /**
+   * Weeks this day is programmed for, by block phase. Absent — the case for
+   * every day of a normal lifting block — means "every week".
+   *
+   * This is how a lifting taper is actually enforced rather than merely
+   * described: a sport-support block programs three days during its build
+   * weeks, drops the short power session once maintenance starts, and runs a
+   * single session through the taper and race week. Rides the program document,
+   * so it syncs with everything else for free.
+   */
+  phases?: PhaseKind[];
+}
+
+/** Is this day programmed for the given week's phase? */
+export function dayInPhase(day: WorkoutDay, phase: PhaseKind | null): boolean {
+  if (!day.phases || day.phases.length === 0) return true;
+  // No phase resolved (open-ended block, or between blocks) — show everything
+  // rather than hiding workouts the user can still choose to run.
+  if (phase == null) return true;
+  return day.phases.includes(phase);
 }
 
 // The original owner's 4-day split. No longer anyone's starting program — new
