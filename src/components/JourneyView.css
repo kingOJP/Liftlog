@@ -113,6 +113,8 @@
 .journey-week--intensification .journey-week-phase { color: #E8C44A; }
 .journey-week--peak            .journey-week-phase { color: var(--red); }
 .journey-week--deload          .journey-week-phase { color: #7fa3ff; }
+.journey-week--maintenance     .journey-week-phase { color: #9aa5b1; }
+.journey-week--race-week       .journey-week-phase { color: var(--purple); }
 
 .journey-intent {
   display: flex;

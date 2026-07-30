@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { Exercise } from '../data/program';
 import { prescriptionLabel } from '../data/program';
 import type { WeightRec, ExerciseSession, SetPlan } from '../data/recommendations';
+import { unitFor } from '../data/exercises';
+import { unitLabel } from '../data/taxonomy';
+import type { MeasureUnit } from '../data/taxonomy';
 import './ExerciseCard.css';
 
 interface Props {
@@ -24,7 +27,10 @@ type Draft = { kind: 'work' | 'warmup'; weight: string; reps: string };
 
 // "100×10, 100×9, 95×8" — compressed to "100 lbs × 10, 9, 8" when the weight
 // never changes, which is the common case for straight sets.
-function formatLastSets(sets: ExerciseSession['sets']): string {
+function formatLastSets(sets: ExerciseSession['sets'], unit: MeasureUnit): string {
+  // A timed hold carries no meaningful load, so show the holds alone rather
+  // than "0 lbs × 45".
+  if (unit === 'seconds') return sets.map(s => `${s.reps}s`).join(', ');
   const uniqueWeights = new Set(sets.map(s => s.weight));
   if (uniqueWeights.size === 1) {
     return `${sets[0].weight} lbs × ${sets.map(s => s.reps).join(', ')}`;
@@ -71,7 +77,15 @@ export default function ExerciseCard({
     setWorkingWeight(null);
   }
 
-  const targetLabel = prescriptionLabel(exercise);
+  // Isometric holds and carries are counted in seconds, not reps: the logger,
+  // the target line, the prescribed rows and the history all have to say so, or
+  // a 45-second plank reads as 45 repetitions.
+  const unit = unitFor(exercise.id);
+  const timed = unit === 'seconds';
+  const countLabel = unitLabel(unit);
+  const targetLabel = timed
+    ? `${prescriptionLabel(exercise)}s`
+    : prescriptionLabel(exercise);
   // Working sets are numbered on their own; warm-ups carry a label, not a
   // number, so "Set 1" always means the first real work set.
   const setLabels: string[] = [];
@@ -113,7 +127,7 @@ export default function ExerciseCard({
 
   function handleLogSet() {
     if (!row) return;
-    const w = parseFloat(row.weight);
+    const w = timed ? 0 : parseFloat(row.weight);
     const r = parseInt(row.reps, 10);
     // Weight of 0 is valid (bodyweight exercises); reps must be positive.
     if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
@@ -145,7 +159,7 @@ export default function ExerciseCard({
 
   function confirmEdit() {
     if (editingIndex === null) return;
-    const w = parseFloat(editWeight);
+    const w = timed ? 0 : parseFloat(editWeight);
     const r = parseInt(editReps, 10);
     if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
       onEditSet(editingIndex, w, r, editWarmup);
@@ -166,7 +180,7 @@ export default function ExerciseCard({
     if (e.key === 'Escape') cancelEdit();
   }
 
-  const canLog = !!row && row.weight !== '' && row.reps !== '';
+  const canLog = !!row && (timed || row.weight !== '') && row.reps !== '';
   const planComplete = !!plan && remaining.length === 0;
 
   return (
@@ -200,7 +214,7 @@ export default function ExerciseCard({
       {lastSession && (
         <div className="ex-last">
           <span className="ex-last-label">Last time · {lastSessionLabel(lastSession.completedAt)}</span>
-          <span className="ex-last-sets">{formatLastSets(lastSession.sets)}</span>
+          <span className="ex-last-sets">{formatLastSets(lastSession.sets, unit)}</span>
         </div>
       )}
 
@@ -212,18 +226,20 @@ export default function ExerciseCard({
             editingIndex === i ? (
               <div key={i} className={`set-row editing${s.warmup ? ' set-row--warmup' : ''}`}>
                 <span className="set-num">{setLabels[i]}</span>
-                <div className="inline-field">
-                  <input
-                    className="inline-input"
-                    type="number"
-                    inputMode="decimal"
-                    value={editWeight}
-                    onChange={e => setEditWeight(e.target.value)}
-                    onKeyDown={handleEditKeyDown}
-                    autoFocus
-                  />
-                  <span className="inline-unit">lbs</span>
-                </div>
+                {!timed && (
+                  <div className="inline-field">
+                    <input
+                      className="inline-input"
+                      type="number"
+                      inputMode="decimal"
+                      value={editWeight}
+                      onChange={e => setEditWeight(e.target.value)}
+                      onKeyDown={handleEditKeyDown}
+                      autoFocus
+                    />
+                    <span className="inline-unit">lbs</span>
+                  </div>
+                )}
                 <div className="inline-field">
                   <input
                     className="inline-input"
@@ -232,8 +248,9 @@ export default function ExerciseCard({
                     value={editReps}
                     onChange={e => setEditReps(e.target.value)}
                     onKeyDown={handleEditKeyDown}
+                    autoFocus={timed}
                   />
-                  <span className="inline-unit">rp</span>
+                  <span className="inline-unit">{timed ? 'sec' : 'rp'}</span>
                 </div>
                 <button
                   className={`warmup-chip${editWarmup ? ' warmup-chip--on' : ''}`}
@@ -249,8 +266,8 @@ export default function ExerciseCard({
             ) : (
               <div key={i} className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`} onClick={() => startEdit(i)}>
                 <span className="set-num">{setLabels[i]}</span>
-                <span className="set-weight">{s.weight} lbs</span>
-                <span className="set-reps">{s.reps} reps</span>
+                {!timed && <span className="set-weight">{s.weight} lbs</span>}
+                <span className="set-reps">{s.reps} {countLabel}</span>
                 <button
                   className="delete-set-btn"
                   onClick={e => { e.stopPropagation(); onDeleteSet(i); }}
@@ -271,31 +288,33 @@ export default function ExerciseCard({
             <span className="set-num set-num--active">
               {row.kind === 'warmup' ? 'Warm-up' : `Set ${nextSetNum}`}
             </span>
-            <div className="weight-wrap">
-              <input
-                className="num-input"
-                type="number"
-                inputMode="decimal"
-                placeholder="Weight"
-                aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
-                value={row.weight}
-                onChange={e => updateRow({ weight: e.target.value })}
-                onKeyDown={handleKeyDown}
-              />
-              <span className="input-unit">lbs</span>
-            </div>
-            <div className="reps-wrap">
+            {!timed && (
+              <div className="weight-wrap">
+                <input
+                  className="num-input"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="Weight"
+                  aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                  value={row.weight}
+                  onChange={e => updateRow({ weight: e.target.value })}
+                  onKeyDown={handleKeyDown}
+                />
+                <span className="input-unit">lbs</span>
+              </div>
+            )}
+            <div className={`reps-wrap${timed ? ' reps-wrap--solo' : ''}`}>
               <input
                 className="num-input"
                 type="number"
                 inputMode="numeric"
-                placeholder="Reps"
-                aria-label={`Reps for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                placeholder={timed ? 'Seconds' : 'Reps'}
+                aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
                 value={row.reps}
                 onChange={e => updateRow({ reps: e.target.value })}
                 onKeyDown={handleKeyDown}
               />
-              <span className="input-unit">reps</span>
+              <span className="input-unit">{countLabel}</span>
             </div>
           </div>
           <div className="log-actions">
@@ -317,10 +336,14 @@ export default function ExerciseCard({
           {upcoming.map(p => (
             <div className="set-row set-row--planned" key={p.setNumber}>
               <span className="set-num">Set {p.setNumber}</span>
-              <span className="set-weight">
-                {(workingWeight ?? (p.weight == null ? null : String(p.weight))) ?? '—'} lbs
+              {!timed && (
+                <span className="set-weight">
+                  {(workingWeight ?? (p.weight == null ? null : String(p.weight))) ?? '—'} lbs
+                </span>
+              )}
+              <span className={`set-reps${timed ? ' set-reps--solo' : ''}`}>
+                {p.targetReps == null ? '—' : `${p.targetReps} ${countLabel}`}
               </span>
-              <span className="set-reps">{p.targetReps == null ? '—' : `${p.targetReps} reps`}</span>
             </div>
           ))}
         </div>

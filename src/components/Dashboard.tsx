@@ -6,6 +6,7 @@ import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
 import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
+import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
 import './Dashboard.css';
 
@@ -47,6 +48,13 @@ export default function Dashboard({
   const phase = getActivePhase();
   const pending = getPendingActivation();
   const goal = getTrainingGoal();
+
+  // Days can be gated to specific block phases — a sport-support block programs
+  // three sessions in its build weeks and drops to one through the taper. The
+  // dashboard shows this week's workouts; the rest of the block's days are still
+  // in the program, just not scheduled now.
+  const scheduled = program.filter(day => dayInPhase(day, phase));
+  const gatedOut = program.length - scheduled.length;
 
   // One snapshot read powers both the week progress and the coach card
   useEffect(() => {
@@ -152,8 +160,8 @@ export default function Dashboard({
     <div className="dashboard">
       <div className="week-header">
         <span className="week-label">{getWeekDateRange()}</span>
-        {program.length > 0 && (
-          <span className="week-progress">{completedDayIds.size} of {program.length} done</span>
+        {scheduled.length > 0 && (
+          <span className="week-progress">{completedDayIds.size} of {scheduled.length} done</span>
         )}
       </div>
 
@@ -197,7 +205,7 @@ export default function Dashboard({
       ) : (
         <>
           <div className="day-list">
-            {program.map(day => (
+            {scheduled.map(day => (
               <DayCard
                 key={day.id}
                 day={day}
@@ -207,6 +215,12 @@ export default function Dashboard({
               />
             ))}
           </div>
+          {gatedOut > 0 && phase && (
+            <p className="day-list-note">
+              {gatedOut === 1 ? '1 other session is' : `${gatedOut} other sessions are`} paused for
+              this {PHASE_INFO[phase].label.toLowerCase()} week — {PHASE_INFO[phase].blurb.toLowerCase()}.
+            </p>
+          )}
           <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
             ＋ Log a one-off workout
           </button>

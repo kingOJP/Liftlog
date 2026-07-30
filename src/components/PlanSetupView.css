@@ -278,6 +278,9 @@
 .structure-week--intensification { border-left-color: #E8C44A; }
 .structure-week--peak            { border-left-color: var(--red); }
 .structure-week--deload          { border-left-color: #3D6BE8; }
+/* Sport-support phases: maintenance holds, race week is the destination. */
+.structure-week--maintenance     { border-left-color: #6C7A89; }
+.structure-week--race-week       { border-left-color: var(--purple); }
 
 .structure-week-num {
   font-size: 12px;
@@ -590,3 +593,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 .wizard-skip:active { color: var(--text); }
+
+/* Exact race date, offered under the coarse "when's your race" windows. */
+.setup-exact-date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.setup-exact-date .setup-date-input {
+  flex: 0 1 auto;
+  width: auto;
+}

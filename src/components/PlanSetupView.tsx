@@ -5,12 +5,15 @@ import type { TrainingSnapshot } from '../data/analytics';
 import type { MuscleGroup } from '../data/taxonomy';
 import {
   GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS,
-  nextMonday, parsePlanDate, experienceLabel,
+  ENDURANCE_LOADS, DISCIPLINES, defaultSportContext,
+  nextMonday, parsePlanDate, toPlanDate, experienceLabel,
 } from '../data/plan';
 import type {
   Goal, ExperienceLevel, EquipmentAccess, TrainingProfile,
+  SportId, SportEvent, EnduranceLoad, Discipline, SportContext,
 } from '../data/plan';
-import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
+import { SPORTS, NIGGLES, sportLabel } from '../data/sports';
+import { buildPlanProposal, defaultBlockWeeks, weeksToRace } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
 import {
   activateProposal, getActiveBlockInfo, getLatestRetrospective,
@@ -34,11 +37,43 @@ interface Props {
 // answers a short series of quick taps.
 type QId =
   | 'goal' | 'experience' | 'trainingAge' | 'days'
-  | 'equipment' | 'injuries' | 'priority' | 'schedule' | 'startDate';
+  | 'equipment' | 'injuries' | 'priority' | 'schedule' | 'startDate'
+  // sport-support only
+  | 'sport' | 'sportEvent' | 'raceDate' | 'sportLoad' | 'weakLink' | 'niggles';
 
-const QUESTION_ORDER: QId[] = [
+const BASE_ORDER: QId[] = [
   'goal', 'experience', 'trainingAge', 'days',
   'equipment', 'injuries', 'priority', 'schedule', 'startDate',
+];
+
+// Supporting another sport asks a different set of questions, because the
+// answers do different work: the sport and its weekly hours set the volume
+// ceiling, the race date drives the periodization, and the weak link biases
+// exercise selection. The generic priority-muscle question is dropped — a
+// sport prescription is already at its volume ceiling, so there is nothing
+// honest to do with the answer.
+const SPORT_ORDER: QId[] = [
+  'goal', 'sport', 'sportEvent', 'raceDate', 'sportLoad', 'weakLink',
+  'experience', 'days', 'equipment', 'niggles', 'injuries', 'startDate',
+];
+
+function orderFor(goal: Goal): QId[] {
+  return goal === 'sport-support' ? SPORT_ORDER : BASE_ORDER;
+}
+
+const TRI_EVENTS: { id: SportEvent; label: string; blurb: string }[] = [
+  { id: 'sprint',      label: 'Sprint',       blurb: '750m / 20k / 5k — strength and power transfer strongly' },
+  { id: 'olympic',     label: 'Olympic',      blurb: '1.5k / 40k / 10k — moderate volume, real room for strength work' },
+  { id: 'half',        label: 'Half (70.3)',  blurb: '1.9k / 90k / 21k — lifting shifts toward durability' },
+  { id: 'full',        label: 'Full (140.6)', blurb: '3.8k / 180k / 42k — minimum effective dose only' },
+  { id: 'unspecified', label: 'Not sure yet', blurb: 'A balanced template you can adjust once you pick a race' },
+];
+
+const RACE_WINDOWS: { label: string; weeks: number | null; blurb: string }[] = [
+  { label: 'No date yet',    weeks: null, blurb: 'Base training — the best window for heavier strength work' },
+  { label: 'Within 8 weeks', weeks: 8,    blurb: 'Race-specific: lifting tapers to one session, then race week' },
+  { label: '3–4 months',     weeks: 14,   blurb: 'Straight into build; strength holds while your sport takes priority' },
+  { label: '5–6 months',     weeks: 22,   blurb: 'Full arc available: build, hold, taper, race' },
 ];
 
 type Stage = 'questions' | 'structure' | 'workouts';
@@ -93,6 +128,15 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [includeDeload, setIncludeDeload] = useState(saved.experience !== 'beginner');
   const [startDate, setStartDate] = useState(nextMonday());
 
+  // Sport-support answers
+  const savedSport = saved.sport ?? defaultSportContext();
+  const [sportId, setSportId] = useState<SportId>(savedSport.sport);
+  const [sportEvent, setSportEvent] = useState<SportEvent>(savedSport.event);
+  const [raceDate, setRaceDate] = useState<string | undefined>(savedSport.raceDate);
+  const [sportLoad, setSportLoad] = useState<EnduranceLoad>(savedSport.load);
+  const [weakLink, setWeakLink] = useState<Discipline>(savedSport.weakLink);
+  const [niggles, setNiggles] = useState<string[]>(savedSport.niggles);
+
   // Proposal + review
   const [proposal, setProposal] = useState<PlanProposal | null>(null);
   const [days, setDays] = useState<WorkoutDay[]>([]);
@@ -130,13 +174,15 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   });
 
   const startDateValid = parsePlanDate(startDate) != null;
-  const qId = QUESTION_ORDER[qIndex];
+  const order = orderFor(goal);
+  // Switching goal can shorten the flow underneath us; clamp rather than crash.
+  const qId = order[Math.min(qIndex, order.length - 1)];
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   function goNext() {
     if (advanceTimer.current) { clearTimeout(advanceTimer.current); advanceTimer.current = null; }
     setDir('next');
-    if (qIndex < QUESTION_ORDER.length - 1) {
+    if (qIndex < order.length - 1) {
       setQIndex(i => i + 1);
     } else {
       generateAndReview();
@@ -155,6 +201,17 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     advanceTimer.current = window.setTimeout(goNext, 240);
   }
 
+  function sportContext(): SportContext {
+    return {
+      sport: sportId,
+      event: sportEvent,
+      ...(raceDate ? { raceDate } : {}),
+      load: sportLoad,
+      weakLink,
+      niggles,
+    };
+  }
+
   function buildProfile(): TrainingProfile {
     return {
       injuries: injuries.trim(),
@@ -163,6 +220,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       experience,
       trainingAgeMonths,
       priorityMuscles,
+      // Kept once set, even if the athlete plans a lifting block next: the sport
+      // doesn't stop existing, and a later sport block pre-fills from it.
+      ...(goal === 'sport-support' || saved.sport ? { sport: goal === 'sport-support' ? sportContext() : saved.sport } : {}),
       updatedAt: Date.now(),
     };
   }
@@ -179,6 +239,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       equipmentAccess: equipment,
       priorityMuscles,
       injuries: injuries.trim(),
+      // The sport registry sizes the block itself from the race date, so the
+      // generic week/deload answers aren't asked on this path.
+      ...(goal === 'sport-support' ? { sport: sportContext(), weeks: sportBlockWeeks() } : {}),
     };
     const p = buildPlanProposal(input, program, snapshot, plannerRetro);
     setProposal(p);
@@ -229,11 +292,35 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     onActivated();
   }
 
+  // The sport path never asks "how long should this block run?" — the race date
+  // answers it. Without a race, a 6-week base block is the default.
+  function sportBlockWeeks(): number {
+    const w = raceDate ? weeksToRace(startDate, raceDate) : null;
+    return w == null ? defaultBlockWeeks() : Math.min(12, Math.max(2, w));
+  }
+
+  function pickRaceWindow(weeksOut: number | null) {
+    if (weeksOut == null) {
+      setRaceDate(undefined);
+    } else {
+      const monday = parsePlanDate(startDate) ?? new Date();
+      const race = new Date(monday);
+      race.setDate(race.getDate() + weeksOut * 7 - 1);
+      setRaceDate(toPlanDate(race));
+    }
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = window.setTimeout(goNext, 240);
+  }
+
+  function toggleNiggle(id: string) {
+    setNiggles(prev => (prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]));
+  }
+
   const allIds = useMemo(() => new Set(days.flatMap(d => d.exercises.map(e => e.id))), [days]);
   function suggestionsFor(dayId: number, ex: Exercise): ReplacementSuggestion[] {
     const day = days.find(d => d.id === dayId);
     if (!day) return [];
-    return suggestReplacements(ex, day, snapshot, 5).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
+    return suggestReplacements(ex, day, snapshot, 5, Date.now(), goal).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
   }
 
   function togglePriority(muscles: MuscleGroup[]) {
@@ -245,8 +332,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
 
   // ── Questions stage ───────────────────────────────────────────────────────────
   if (stage === 'questions') {
-    const progress = ((qIndex + 1) / QUESTION_ORDER.length) * 100;
-    const optional = qId === 'trainingAge' || qId === 'injuries' || qId === 'priority';
+    const progress = ((qIndex + 1) / order.length) * 100;
+    const optional = qId === 'trainingAge' || qId === 'injuries' || qId === 'priority'
+      || qId === 'niggles';
 
     return (
       <div className="plan-setup">
@@ -274,7 +362,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                 disabled={!canContinue()}
                 onClick={goNext}
               >
-                {qIndex === QUESTION_ORDER.length - 1
+                {qIndex === order.length - 1
                   ? (snapshotReady ? 'Design my plan' : 'Reading your history…')
                   : 'Continue'}
               </button>
@@ -440,7 +528,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   function needsContinue(id: QId): boolean {
     // Single-select questions auto-advance; these need an explicit Continue.
     return id === 'injuries' || id === 'priority'
-      || id === 'schedule' || id === 'startDate';
+      || id === 'schedule' || id === 'startDate' || id === 'niggles';
   }
   function canContinue(): boolean {
     if (qId === 'startDate') return startDateValid && snapshotReady;
@@ -576,6 +664,96 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                 As a beginner you can skip planned deloads for a while — steady weekly progress is the whole game early on.
               </p>
             )}
+          </Question>
+        );
+
+      case 'sport':
+        return (
+          <Question title="Which sport are you supporting?" subtitle="Your sport sets the ceiling — the plan is built to fit around it, not compete with it.">
+            <div className="opt-list">
+              {SPORTS.filter(sp => sp.id !== 'other').map(sp => (
+                <OptionCard key={sp.id} active={sportId === sp.id} label={sp.label} blurb={sp.blurb}
+                  onClick={() => pick(setSportId, sp.id)} />
+              ))}
+              <OptionCard active={sportId === 'other'} label="Something else"
+                blurb="A general strength-support template you can adjust in review"
+                onClick={() => pick(setSportId, 'other' as SportId)} />
+            </div>
+          </Question>
+        );
+
+      case 'sportEvent':
+        return (
+          <Question title={`Which ${sportLabel(sportId).toLowerCase()} distance?`}
+            subtitle="Distance changes the job: short races reward strength and power, long ones reward durability.">
+            <div className="opt-list">
+              {TRI_EVENTS.map(e => (
+                <OptionCard key={e.id} active={sportEvent === e.id} label={e.label} blurb={e.blurb}
+                  onClick={() => pick(setSportEvent, e.id)} />
+              ))}
+            </div>
+          </Question>
+        );
+
+      case 'raceDate':
+        return (
+          <Question title="When's your A race?" subtitle="This drives the whole shape of the block — how long you build, and when the lifting tapers.">
+            <div className="opt-list">
+              {RACE_WINDOWS.map(w => {
+                const active = w.weeks == null
+                  ? raceDate == null
+                  : raceDate != null && weeksToRace(startDate, raceDate) === w.weeks;
+                return (
+                  <OptionCard key={w.label} active={active} label={w.label} blurb={w.blurb}
+                    onClick={() => pickRaceWindow(w.weeks)} />
+                );
+              })}
+            </div>
+            {raceDate && (
+              <label className="setup-exact-date">
+                <span>Exact date</span>
+                <input className="setup-date-input wizard-date" type="date" value={raceDate}
+                  onChange={e => setRaceDate(e.target.value)} />
+              </label>
+            )}
+          </Question>
+        );
+
+      case 'sportLoad':
+        return (
+          <Question title={`How many hours a week of ${sportLabel(sportId).toLowerCase()} right now?`}
+            subtitle="Be honest — this is what decides how much lifting you can absorb without digging a hole.">
+            <div className="opt-list">
+              {ENDURANCE_LOADS.map(l => (
+                <OptionCard key={l.id} active={sportLoad === l.id} label={l.label} blurb={l.blurb}
+                  onClick={() => pick(setSportLoad, l.id)} />
+              ))}
+            </div>
+          </Question>
+        );
+
+      case 'weakLink':
+        return (
+          <Question title="Which part needs the most help?" subtitle="The plan biases toward it — a little, not a lot.">
+            <div className="opt-list">
+              {DISCIPLINES.map(d => (
+                <OptionCard key={d.id} active={weakLink === d.id} label={d.label} blurb={d.blurb}
+                  onClick={() => pick(setWeakLink, d.id)} />
+              ))}
+            </div>
+          </Question>
+        );
+
+      case 'niggles':
+        return (
+          <Question title="Any recurring niggles?" subtitle="Pick anything that flares up. Each one reroutes the plan rather than just being noted." optional>
+            <div className="opt-list">
+              {NIGGLES.map(n => (
+                <OptionCard key={n.id} active={niggles.includes(n.id)} label={n.label} blurb={n.blurb}
+                  onClick={() => toggleNiggle(n.id)} />
+              ))}
+            </div>
+            <p className="setup-hint">Leave everything unpicked if nothing's bothering you.</p>
           </Question>
         );
 

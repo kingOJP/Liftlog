@@ -4,7 +4,8 @@ import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { computeMetrics } from '../data/metrics';
 import type { Metrics } from '../data/metrics';
-import { computeCoaching, SETS_TARGET_LOW, SETS_TARGET_HIGH } from '../data/insights';
+import { computeCoaching } from '../data/insights';
+import { volumeTargetFor } from '../data/analytics';
 import type { Coaching, Insight } from '../data/insights';
 import { getActivePhase, getTrainingGoal } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
@@ -45,8 +46,10 @@ export default function MetricsView({ program, onBack }: Props) {
   }, [program]);
 
   const selected = metrics?.exercises.find(e => e.exerciseId === selectedExercise);
-  const maxMuscleSets = Math.max(...(metrics?.muscleSets.map(m => m.sets) ?? [0]), SETS_TARGET_HIGH);
   const goal = getTrainingGoal();
+  // The weekly set band the charts judge against belongs to the active goal.
+  const band = volumeTargetFor(goal);
+  const maxMuscleSets = Math.max(...(metrics?.muscleSets.map(m => m.sets) ?? [0]), band.high);
 
   // Progress report: current-program exercises with enough data, attention
   // items (declining, stalled) first so the page leads with what needs action.
@@ -305,7 +308,7 @@ export default function MetricsView({ program, onBack }: Props) {
             <section className="metric-section">
               <h2 className="metric-heading">Sets per Muscle Group</h2>
               <p className="metric-sub">
-                {metrics.muscleWeekLabel} · aim for {SETS_TARGET_LOW}–{SETS_TARGET_HIGH} hard sets per muscle weekly.
+                {metrics.muscleWeekLabel} · aim for {band.low}–{band.high} hard sets per muscle weekly.
               </p>
               {metrics.muscleSets.length > 0 ? (
                 <div className="muscle-list">
@@ -314,7 +317,7 @@ export default function MetricsView({ program, onBack }: Props) {
                       <span className="muscle-name">{m.muscle}</span>
                       <div className="muscle-bar-track">
                         <div
-                          className={`muscle-bar-fill${m.sets >= SETS_TARGET_LOW ? ' in-range' : ''}`}
+                          className={`muscle-bar-fill${m.sets >= band.low ? ' in-range' : ''}`}
                           style={{ width: `${(m.sets / maxMuscleSets) * 100}%` }}
                         />
                       </div>

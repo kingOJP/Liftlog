@@ -79,8 +79,8 @@ const GROUPS: Group[] = [
         def: 'A working set taken near failure. Weekly hard sets per muscle is the main dial for muscle growth.',
       },
       {
-        term: 'Set volume (10–20 target)',
-        def: 'How many hard sets a muscle gets per week. Roughly 10–20 sets per muscle weekly is the commonly cited sweet spot for building muscle — the coach aims your training at that band.',
+        term: 'Set volume (weekly target band)',
+        def: 'How many hard sets a muscle gets per week. Roughly 10–20 sets per muscle weekly is the commonly cited sweet spot for building muscle, and the coach aims your training at that band. If your plan supports another sport, the band drops to 4–10 — there, extra sets cost recovery your sport has first claim on.',
       },
       {
         term: 'Primary vs secondary muscle',

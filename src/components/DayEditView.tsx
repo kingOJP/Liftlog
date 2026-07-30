@@ -7,6 +7,7 @@ import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { suggestReplacements, profileFor } from '../data/substitution';
 import { prescribeFor, slotFor } from '../data/prescribe';
+import { getTrainingGoal } from '../data/planStore';
 import type { ReplacementSuggestion } from '../data/substitution';
 import './DayEditView.css';
 
@@ -45,7 +46,7 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   const swapTarget = exercises.find(e => e.id === swapTargetId) ?? null;
   const suggestions = useMemo<ReplacementSuggestion[]>(() => {
     if (!swapTarget) return [];
-    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot);
+    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot, 3, Date.now(), getTrainingGoal());
   }, [swapTarget, exercises, snapshot, day]);
   const swapTargetHasMeta =
     swapTarget != null && profileFor(swapTarget.id, swapTarget.name).primaryMuscle != null;

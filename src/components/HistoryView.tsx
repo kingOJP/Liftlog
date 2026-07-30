@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getExerciseName } from '../data/programStore';
+import { unitFor } from '../data/exercises';
 import { SHARED_DAY_ID } from '../data/share';
 import { isQuickWorkout } from '../data/quickWorkout';
 import { loadTrainingSnapshot } from '../data/analytics';
@@ -118,8 +119,14 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                         {(grouped[exId] ?? []).map((s, i) => (
                           <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}`}>
                             <span className="history-set-num">Set {s.setNumber}</span>
-                            <span className="history-set-weight">{s.weight} lbs</span>
-                            <span className="history-set-reps">{s.reps} reps</span>
+                            {unitFor(exId) === 'seconds' ? (
+                              <span className="history-set-reps">{s.reps} sec</span>
+                            ) : (
+                              <>
+                                <span className="history-set-weight">{s.weight} lbs</span>
+                                <span className="history-set-reps">{s.reps} reps</span>
+                              </>
+                            )}
                             {s.warmup && <span className="history-set-warmup">warm-up</span>}
                           </div>
                         ))}

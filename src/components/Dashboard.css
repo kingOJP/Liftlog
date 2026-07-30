@@ -287,3 +287,12 @@
   font-size: 20px;
   line-height: 1;
 }
+
+/* Sessions paused by the current block phase (a sport-support taper drops its
+   power day once maintenance weeks start) — explained, not silently missing. */
+.day-list-note {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

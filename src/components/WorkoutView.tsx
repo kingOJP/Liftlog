@@ -211,7 +211,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
     loadTrainingSnapshot().then(snap => {
       if (cancelled) return;
       setSnapshot(snap);
-      const plan = computeProgramPlan(program, snap, Date.now(), phase);
+      const plan = computeProgramPlan(program, snap, Date.now(), phase, getTrainingGoal());
       const adjusted = applyPlanToDay(day, plan);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);

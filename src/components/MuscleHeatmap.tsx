@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { MuscleGroup } from '../data/taxonomy';
 import type { TrainingSnapshot } from '../data/analytics';
+import { volumeTargetFor } from '../data/analytics';
+import { getTrainingGoal } from '../data/planStore';
 import { computeMuscleHeat, heatColor, heatLabel, presetWindow } from '../data/heatmap';
 import type { HeatPreset } from '../data/heatmap';
 import './MuscleHeatmap.css';
@@ -28,6 +30,9 @@ function fromDateInput(value: string, endOfDay = false): number {
 }
 
 export default function MuscleHeatmap({ snapshot }: Props) {
+  // The "on target" band belongs to the active goal — 6 weekly sets is on
+  // target for a triathlete and well under it for a bodybuilder.
+  const band = volumeTargetFor(getTrainingGoal());
   const [preset, setPreset] = useState<HeatPreset>('30d');
   const [customFrom, setCustomFrom] = useState(() => toDateInput(Date.now() - 30 * 86_400_000));
   const [customTo, setCustomTo] = useState(() => toDateInput(Date.now()));
@@ -50,7 +55,7 @@ export default function MuscleHeatmap({ snapshot }: Props) {
 
   const rate = (m: MuscleGroup) => heat.byMuscle.get(m)?.weeklyRate ?? 0;
   const region = (m: MuscleGroup) => ({
-    fill: heatColor(rate(m)),
+    fill: heatColor(rate(m), band),
     className: `hm-region${selected === m ? ' hm-selected' : ''}`,
     onClick: () => setSelected(sel => (sel === m ? null : m)),
   });
@@ -169,12 +174,12 @@ export default function MuscleHeatmap({ snapshot }: Props) {
         {selected ? (
           <>
             <span className="hm-detail-muscle">
-              <span className="hm-detail-dot" style={{ background: heatColor(rate(selected)) }} />
+              <span className="hm-detail-dot" style={{ background: heatColor(rate(selected), band) }} />
               {selected}
             </span>
             <span className="hm-detail-stats">
               {formatSets(selectedHeat?.sets ?? 0)} sets in this window
-              {' · '}{formatSets(rate(selected))}/week — {heatLabel(rate(selected))}
+              {' · '}{formatSets(rate(selected))}/week — {heatLabel(rate(selected), band)}
             </span>
           </>
         ) : (
