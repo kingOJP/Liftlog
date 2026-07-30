@@ -92,6 +92,20 @@ Long-term milestones (roughly):
     e1RM-breakout progression triggers, and equipment-aware load increments.
     Warm-ups became an explicit ＋ Warm-up set row instead of a mode toggle.
 
+21. ✅ Sport-support training (`docs/sport-support.md`) — a `sport-support` goal for
+    athletes whose primary training is elsewhere (triathlon, running, Hyrox). The
+    weekly volume band is now goal-derived (`volumeTargetFor` in analytics.ts:
+    4–10 sets/muscle here vs 10–20) rather than a global constant, which removes
+    the ratchet where the coach added volume, insights called it low, and the
+    retrospective carried "under-target" into the next block. `sports.ts` owns the
+    research layer as data — day templates with per-slot dose and rationale, the
+    interference budget (`liftBudget`: the sport's own weekly hours cap lifting
+    days and weekly sets), race-date periodization (build → maintain → taper →
+    race week, never a lifting peak near an A race), and niggle routing.
+    `WorkoutDay.phases` gates a day by block phase so the lifting taper is
+    enforced, not merely described. Timed exercises (`ExerciseDef.unit`) log
+    seconds.
+
 **Future milestones:**
 - RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
 - Journey v2 — deload-position editing in the wizard (`validatePhases` already
@@ -106,9 +120,11 @@ Long-term milestones (roughly):
 - Reactive rest-day suggestions — instead of asking which weekdays the user trains
   (removed: it was collected but unused), suggest rest days from the profile + logged
   training rhythm ("you've trained 3 days straight — tomorrow looks like a rest day").
-- Cardio awareness — only worth doing with real data: integrate external activity
-  sources (Apple Health / Google Fit / Strava) and trim lifting volume when reported
-  cardio load is high. A self-reported "cardio level" was removed as too coarse to act on.
+- Cardio awareness v2 — the sport-support goal now takes self-reported weekly sport
+  hours and turns them into a real lifting budget, but the number is captured once at
+  planning time and goes stale. Integrate external activity sources (Apple Health /
+  Google Fit / Strava) so the budget responds to an actual training week, and surface
+  the hours as editable on the Journey with a nudge when logged rhythm diverges.
 - Exercise Intelligence v2 — external candidate sources behind the `ExerciseProfile`
   normalization seam (AI-generated suggestions, coach-curated collections), injury-aware
   and equipment-aware (travel/home-gym) substitution modes.
@@ -215,8 +231,11 @@ src/
 
   data/
     taxonomy.ts                — domain vocabularies: MuscleGroup / WorkoutType / Equipment /
-                                  WeightType types + the option arrays the UI renders
-    program.ts                 — Exercise/WorkoutDay interfaces, PROGRAM (4 days),
+                                  WeightType / MeasureUnit types + the option arrays the UI
+                                  renders. unitLabel() formats a set's count ("reps"/"sec")
+    program.ts                 — Exercise/WorkoutDay interfaces (incl. WorkoutDay.phases +
+                                  dayInPhase() — per-day block-phase gating, how the
+                                  sport-support lifting taper is enforced), PROGRAM (4 days),
                                   getWeekNumber()/getWeekNumberForDate(), getWeekDateRange(),
                                   getExerciseName(). Also THE calendar-week math:
                                   startOfWeek()/addWeeks()/weeksBetween()/weekStartLabel()
@@ -237,7 +256,9 @@ src/
     legacyIds.ts               — LEGACY_ID_MAP + canonicalizeId(): single source of truth for the
                                   old -d1/-d2/-d4 → canonical exercise-ID remap (used by set-log
                                   migration in database.ts and program canonicalization here)
-    analytics.ts               — shared analytics core: loadTrainingSnapshot() (ONE dumpIDB read
+    analytics.ts               — shared analytics core + volumeTargetFor(goal) (THE weekly
+                                  set band; 4–10 for sport-support, 10–20 otherwise):
+                                  loadTrainingSnapshot() (ONE dumpIDB read
                                   powering every consumer), buildSnapshot() (pure, for tests),
                                   epley1RM, e1rmSeries(), musclesForExercise()/primaryMuscleFor()
                                   (override → master list → name match), SETS_TARGET_LOW/HIGH,
@@ -272,6 +293,7 @@ src/
     plan.ts                    — training-journey domain: TrainingPlan/TrainingBlock/
                                   BlockRetrospective types, PhaseKind week tags, Monday-anchored
                                   block week math (blockWeekIndex/currentPhase/blockEnded),
+<<<<<<< HEAD
                                   validatePhases() deload guardrails. Also the athlete model:
                                   TrainingProfile + ExperienceLevel/EquipmentAccess/CardioLevel
                                   and their option arrays
@@ -282,6 +304,18 @@ src/
     prescribe.ts               — the store-reading wrapper: prescribeFor(id, opts) and
                                   slotFor(id, name, opts) → a dosed program slot. Every route an
                                   exercise takes into a workout goes through here
+=======
+                                  validatePhases() deload guardrails, isEasyPhase(). Also the
+                                  athlete model: TrainingProfile + ExperienceLevel/
+                                  EquipmentAccess and their option arrays, plus SportContext
+                                  (SportId/SportEvent/EnduranceLoad/Discipline) for sport-support
+    sports.ts                  — sport-support research layer as data: SPORTS registry,
+                                  Slot/DayTemplate vocabulary (shared with planner.ts),
+                                  liftBudget() interference ceiling, buildSportPhases()
+                                  race-date periodization, buildSportPlan() (templates +
+                                  weak-link bias + niggle routing + two capping passes),
+                                  NIGGLES. See docs/sport-support.md
+>>>>>>> b9cd6a6 (Document sport-support training and polish the timed-set UI)
     planner.ts                 — block planner: buildPlanProposal(input, program, snapshot,
                                   prevRetro) → PlanProposal (split, phase layout, generated
                                   workouts, per-exercise decisions with reasons, confidence,
@@ -489,8 +523,10 @@ context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four sign
   as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
 
 The signals combine into a −1…+1 composite with **goal-dependent weights** (`GOAL_WEIGHTS`):
-strength leans on e1RM, hypertrophy/fat-loss on volume, and in a deficit merely *holding*
-strength scores positive. Composite → `status`: `progressing` / `steady` / `stalled` /
+strength leans on e1RM, hypertrophy/fat-loss on volume, and where adding strength isn't the
+point — dieting, or supporting a sport whose own volume is climbing — merely *holding* it
+scores positive (otherwise a race build reads as a block of stalled lifts and fires deloads
+nobody needs). Composite → `status`: `progressing` / `steady` / `stalled` /
 `declining` (with `evidence[]` strings and `recentPRs[]` for the UI). Bodyweight work drops
 the e1RM signal and its weight is redistributed. `progressDirections()` reduces the map to
 up/down/stalled id sets for engines that only need direction. Fully covered by
@@ -929,6 +965,16 @@ program, not before):
   lifts. Compiled-in catalog data (a `DIFFICULTY`/`PREREQUISITES` map + `DIFFICULTY_RANK`),
   **not** user metadata — never synced. Drives beginner-safe selection + skill-gating in the
   planner; also on `ExerciseProfile`.
+- `unitFor(id)` / `isTimedExercise(id)` — whether a set counts reps or seconds
+  (`ExerciseDef.unit`, absent = reps). Intrinsic catalog data like difficulty: app-owned,
+  never synced, never a user override. Timed exercises (planks, carries) show **no weight
+  input** and log at 0 lbs, the same convention bodyweight work uses, so the existing
+  rep-progression engine progresses the hold with no schema change.
+- The catalog carries an **athletic / sport-support layer** on top of the bodybuilding
+  exercises: unilateral lower body (step-up, single-leg RDL), hip abduction, tendon work
+  (single-leg calf raise), plyometrics (pogo hops, box jump), anti-rotation and isometric
+  trunk (Pallof press, dead bug, plank, side plank, Copenhagen), loaded carries, and
+  shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise).
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
@@ -960,6 +1006,7 @@ dosage comes from instead.
   every background pull) re-derives the anchor from the *synced* journey document so every
   device agrees. Changing the anchor only affects the week numbering of *new* sessions —
   historical sessions keep the `weekNumber` they were stored with.
+<<<<<<< HEAD
 - **Analytics bucket by CALENDAR week, never by `session.weekNumber`** — this follows directly
   from the bullet above. `weekNumber` is stamped from whatever anchor was in force at logging
   time, so re-anchoring leaves stored numbers out of chronological order (a July session
@@ -974,6 +1021,14 @@ dosage comes from instead.
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
   collapsing them — a skipped week must look like a skipped week.
+=======
+- **The weekly set band belongs to the goal, not the app** — every engine takes a
+  `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
+  A new goal that needs a different dose changes one function. On `sport-support` the coach
+  planner may **trim but never add** sets (also true in any `maintenance` week): volume
+  creep is the specific failure mode of concurrent training, and the coach cannot see the
+  swim/bike/run sessions its extra set would cost.
+>>>>>>> b9cd6a6 (Document sport-support training and polish the timed-set UI)
 - **Settings are device-local** — `liftlog_settings` and `liftlog_rest_seconds` are not synced.
   (The week anchor stays consistent across devices anyway because ensureWeekAnchor derives it
   from the synced journey; exercise metadata *is* synced — see Cloud sync.)

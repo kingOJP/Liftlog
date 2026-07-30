@@ -266,6 +266,13 @@
   position: relative;
 }
 
+/* Timed exercises (planks, carries) have no weight field, so the count input
+   takes the whole row rather than sitting in a 92px box beside empty space. */
+.reps-wrap--solo {
+  flex: 1;
+  width: auto;
+}
+
 .num-input {
   width: 100%;
   background: var(--bg-input);
@@ -278,6 +285,15 @@
   outline: none;
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* `appearance: none` alone doesn't remove Chromium's stepper — it needs the
+   pseudo-element too, and on a focused field the arrows sit exactly where the
+   unit label ("lbs" / "sec") is drawn. */
+.num-input::-webkit-inner-spin-button,
+.num-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .num-input:focus {
@@ -408,3 +424,10 @@
   opacity: 0.75;
 }
 
+
+/* Prescribed rows for a timed exercise carry no weight cell — the hold spans
+   the space the load would have used. */
+.set-reps--solo {
+  flex: 1;
+  text-align: left;
+}

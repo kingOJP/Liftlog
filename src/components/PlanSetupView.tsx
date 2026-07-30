@@ -20,6 +20,7 @@ import {
   getProfileOrDefault, getActivePlan, saveTrainingProfile,
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
+import { unitFor } from '../data/exercises';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { suggestReplacements } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
@@ -473,7 +474,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                       <div className="review-ex-head">
                         <div className="review-ex-main">
                           <span className="review-ex-name">{ex.name}</span>
-                          <span className="review-ex-dose">{ex.sets} × {ex.repLow}–{ex.repHigh}</span>
+                          <span className="review-ex-dose">
+                            {ex.sets} × {ex.repLow}–{ex.repHigh}{unitFor(ex.id) === 'seconds' ? 's' : ''}
+                          </span>
                         </div>
                         <div className="review-ex-actions">
                           <button className="review-ex-btn" aria-label={`Replace ${ex.name}`}

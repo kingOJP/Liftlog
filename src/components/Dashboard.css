@@ -181,6 +181,9 @@
 .journey-seg--intensification { background: #E8C44A; }
 .journey-seg--peak            { background: var(--red); }
 .journey-seg--deload          { background: #3D6BE8; }
+/* Sport-support phases: maintenance holds steady, race week is the destination. */
+.journey-seg--maintenance     { background: #6C7A89; }
+.journey-seg--race-week       { background: var(--purple); }
 
 /* ── Coach card ── */
 .coach-card {

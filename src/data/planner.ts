@@ -580,7 +580,7 @@ function confidenceFor(snapshot: TrainingSnapshot | null, experience: Experience
   if (sessions === 0) {
     return {
       level: 'low', sessions,
-      detail: `No training history yet, so this plan leans on established exercise science, calibrated for a ${experienceLabel(experience).toLowerCase()} lifter. It gets personal fast — every workout you log sharpens the next block.`,
+      detail: `No training history yet, so this plan leans on established exercise science, calibrated for ${experience === 'intermediate' || experience === 'advanced' ? 'an' : 'a'} ${experienceLabel(experience).toLowerCase()} lifter. It gets personal fast — every workout you log sharpens the next block.`,
     };
   }
   if (sessions < 12) {

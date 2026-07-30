@@ -217,8 +217,8 @@ export default function Dashboard({
           </div>
           {gatedOut > 0 && phase && (
             <p className="day-list-note">
-              {gatedOut === 1 ? '1 other session is' : `${gatedOut} other sessions are`} paused for
-              this {PHASE_INFO[phase].label.toLowerCase()} week — {PHASE_INFO[phase].blurb.toLowerCase()}.
+              Not scheduled this week: {gatedOut === 1 ? '1 other session' : `${gatedOut} other sessions`}.
+              {' '}{PHASE_INFO[phase].blurb}.
             </p>
           )}
           <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
