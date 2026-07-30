@@ -68,6 +68,14 @@ Long-term milestones (roughly):
     priority muscles. Experience is inferred from logged data (`experience.ts`) and
     only ratchets up: plans use the higher of self-reported and inferred, and the
     Journey surfaces a "level up" nudge. Profile rides the LWW plan-document sync.
+23. ✅ Prescription ownership — rep ranges moved off the exercise and onto the
+    prescription. `LibraryExercise` carries identity only; `dosage.ts` resolves
+    sets × reps from (goal, slot, movement, training age) and `prescribe.ts`
+    routes every entry point through it — day editor, mid-workout add, quick
+    workouts, the planner and the worker's exercise promotion. Heavy axial
+    barbell work (hinge/squat) gets its own low, narrow tier. When nothing can
+    be resolved (no plan, no history) the slot carries **no** range and the card
+    shows no targets, instead of a fabricated 3 × 8–12.
 22. ✅ Progressive-overload audit — the prescription engine now reads the athlete and the
     plan, not just the lift (`PrescriptionContext`: goal + effective training age). Jump size
     derives from the load–rep relationship instead of a flat 5 lbs; load climbs are
@@ -267,6 +275,13 @@ src/
                                   validatePhases() deload guardrails. Also the athlete model:
                                   TrainingProfile + ExperienceLevel/EquipmentAccess/CardioLevel
                                   and their option arrays
+    dosage.ts                  — THE prescription resolver (pure): dosage(goal, slot, profile,
+                                  experience) → sets × rep range, isHeavyAxial() (barbell hinge/
+                                  squat → low narrow ranges), rangeFromHistory() (read the range
+                                  off the lifter's own log), resolvePrescription() (the cascade)
+    prescribe.ts               — the store-reading wrapper: prescribeFor(id, opts) and
+                                  slotFor(id, name, opts) → a dosed program slot. Every route an
+                                  exercise takes into a workout goes through here
     planner.ts                 — block planner: buildPlanProposal(input, program, snapshot,
                                   prevRetro) → PlanProposal (split, phase layout, generated
                                   workouts, per-exercise decisions with reasons, confidence,
@@ -349,7 +364,7 @@ src/
 | Key | Owner | Purpose |
 |---|---|---|
 | `liftlog_program` | `programStore.ts` | User's customised workout program |
-| `liftlog_exercises` | `programStore.ts` | Exercise library (name + sets/reps defaults) |
+| `liftlog_exercises` | `programStore.ts` | Exercise library — movement identity only (id + name); **no sets/rep range** |
 | `liftlog_exercise_meta` | `exercises.ts` | Per-exercise metadata overrides (muscle, equipment, etc.) |
 | `liftlog_settings` | `settings.ts` | Device-local settings (program start date) |
 | `liftlog_rest_seconds` | `settings.ts` | Rest-timer default duration (pre-Rev-2 key, kept) |
@@ -627,6 +642,66 @@ the inline set editor's `W` chip.
 
 ---
 
+## Prescription: who decides sets × reps (`dosage.ts` + `prescribe.ts`)
+
+**A rep range is a property of a prescription, not of a movement.** The same deadlift is
+3 × 5–8 in a hypertrophy block and 4 × 3–5 in a strength block. Before this, the library
+`Exercise` carried `sets/repLow/repHigh`, `buildDefaultLibrary()` seeded them from the
+hardcoded `PROGRAM` and fell back to `{3, 8, 12}` for anything it didn't list, and the day
+editor / add panel / quick-workout picker each hardcoded the same constant — so an exercise
+entering the program by any route other than the plan wizard carried a range nobody chose.
+A barbell deadlift got a cable row's dose.
+
+Now:
+
+- **`LibraryExercise`** (`program.ts`) is identity only — `{ id, name, archived? }`. The
+  sets/rep fields survive on the type as `@deprecated` **wire-compatibility only**: the server's
+  `user_exercises`/`global_exercises` tables and older clients still send them, and they are
+  never read. (Stage 2 drops the columns once no client reads them; doing both at once would
+  break sync for anyone on an older build.)
+- **`Exercise`** (a program slot) keeps the prescription — but `repLow`/`repHigh` are now
+  **optional**, and genuinely absent when there is nothing to prescribe from.
+- **`dosage.ts`** is pure: `dosage(goal, slot, profile, experience)`, plus `isHeavyAxial()`,
+  `rangeFromHistory()` and the `resolvePrescription()` cascade. No store reads, so it stays
+  testable and free of import cycles with planStore.
+- **`prescribe.ts`** reads the stores and calls it: `prescribeFor(id, opts)` →
+  `RepPrescription | null`, and `slotFor(id, name, opts)` → a dosed `Exercise`.
+
+**The cascade** (`resolvePrescription`), most informed first:
+
+| Situation | Prescription |
+|---|---|
+| In a program slot | the slot's own (unchanged) |
+| Ad-hoc, active plan | `dosage(goal, non-main, profile, experience)` |
+| Ad-hoc, no plan, has history | `rangeFromHistory()` — median reps ± 2, median set count |
+| Ad-hoc, no plan, never trained | **null** — no targets, weight still prefilled from last time |
+
+`getPlannedGoal()` (planStore) returns `null` when there's no plan, which is what makes step 3
+reachable; `getTrainingGoal()` keeps its `'general'` fallback for analytics that just need *a*
+goal to weight signals. Note that `ensureJourneyMigrated()` gives legacy users a Foundation
+plan with a real goal, so in practice most accounts resolve at step 2.
+
+**Heavy axial work has its own tier.** `isHeavyAxial()` = barbell **and** Hip Hinge or Squat
+pattern — so conventional/Romanian deadlifts and back squats qualify, while cable pull-throughs,
+leg press and hip thrusts (same muscles, no spinal load) do not. Those lifts get 3 × 5–8
+(4 × 3–5 on strength, 4 × 4–6 on athletic) instead of being dosed like any other compound.
+Chasing a 3 × 12 rep total on a deadlift buys a lot of spinal fatigue and a degraded bar path
+for stimulus available more cheaply elsewhere.
+
+**The beginner floor outranks everything**, axial tier included: a novice never gets sub-8 reps
+whatever the goal, because technique is the constraint. Worth knowing that an account which
+never completed onboarding has no stored profile, so `getProfileOrDefault()` returns beginner
+and the goal-specific tiers don't apply until they onboard or the data infers a higher level.
+
+**With no prescription**, `calculateRecommendation` returns a plain hold at the last working
+weight ("No rep target set — log a few sessions and the coach will learn your working range"),
+`buildSetPlan` emits rows with `targetReps: null`, and `prescriptionLabel()`/
+`prescriptionDetail()` (program.ts) render "3 sets" rather than "3 × undefined–undefined".
+Every progression branch needs a range — you cannot judge "beat the range" without one — so the
+engine narrows to `PrescribedSlot` before doing any work.
+
+---
+
 ## Coaching engine (`src/data/insights.ts` + `src/data/coach.ts`)
 
 ### Adaptive planner (`coach.ts`)
@@ -857,7 +932,10 @@ program, not before):
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
-`src/data/programStore.ts` builds the exercise library from `EXERCISES` on first load, running a one-time migration to strip stale duplicate IDs (the old `-d1/-d2/-d4` suffixed IDs).
+`src/data/programStore.ts` builds the exercise library from `EXERCISES` on first load, running a
+one-time migration to strip stale duplicate IDs (the old `-d1/-d2/-d4` suffixed IDs). The library
+holds **movement identity only** — no sets or rep range. See the Prescription section for where
+dosage comes from instead.
 
 ---
 

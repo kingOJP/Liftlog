@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { buildSetPlan, calculateRecommendation } from './recommendations';
 import type { ExerciseSession, PrescriptionContext } from './recommendations';
+import type { Exercise } from './program';
+
+type Slot = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>;
 
 const exercise = { sets: 3, repLow: 8, repHigh: 12 };
 
@@ -25,7 +28,7 @@ function session(
 /** Default context: an intermediate on a general goal, evaluated at NOW. */
 function advise(
   history: ExerciseSession[],
-  ex = exercise,
+  ex: Slot = exercise,
   ctx: PrescriptionContext = {},
 ) {
   return calculateRecommendation(history, ex, { now: NOW, ...ctx });
@@ -33,7 +36,7 @@ function advise(
 
 function plan(
   history: ExerciseSession[],
-  ex = exercise,
+  ex: Slot = exercise,
   ctx: PrescriptionContext = {},
 ) {
   return buildSetPlan(history, ex, { now: NOW, ...ctx });
@@ -408,14 +411,14 @@ describe('buildSetPlan', () => {
 
   it('falls back to a decay model for sets the lifter has never reached', () => {
     const targets = plan([session([[100, 10]])]).sets.map(s => s.targetReps);
-    expect(targets[0]).toBeGreaterThanOrEqual(targets[1]);
-    expect(targets[1]).toBeGreaterThanOrEqual(targets[2]);
+    expect(targets[0]!).toBeGreaterThanOrEqual(targets[1]!);
+    expect(targets[1]!).toBeGreaterThanOrEqual(targets[2]!);
   });
 
   it('never targets outside the programmed rep range', () => {
     for (const s of plan([session([[100, 12], [100, 12], [100, 4]])]).sets) {
-      expect(s.targetReps).toBeGreaterThanOrEqual(exercise.repLow);
-      expect(s.targetReps).toBeLessThanOrEqual(exercise.repHigh);
+      expect(s.targetReps!).toBeGreaterThanOrEqual(exercise.repLow);
+      expect(s.targetReps!).toBeLessThanOrEqual(exercise.repHigh);
     }
   });
 
@@ -436,7 +439,7 @@ describe('buildSetPlan', () => {
     ];
     const p = plan(history);
     expect(p.rec).toMatchObject({ kind: 'deload', weight: 90 });
-    expect(p.sets[0].targetReps).toBeGreaterThan(exercise.repLow);
+    expect(p.sets[0].targetReps!).toBeGreaterThan(exercise.repLow);
   });
 
   it('prescribes rep targets with no weight for a never-trained exercise', () => {
@@ -460,7 +463,7 @@ describe('buildSetPlan', () => {
   it('prescribes bodyweight work at 0 lbs with rep targets', () => {
     const p = plan([session([[0, 10], [0, 9], [0, 8]])], exercise, { weightType: 'Bodyweight' });
     expect(p.sets.every(s => s.weight === 0)).toBe(true);
-    expect(p.sets[0].targetReps).toBeGreaterThanOrEqual(p.sets[2].targetReps);
+    expect(p.sets[0].targetReps!).toBeGreaterThanOrEqual(p.sets[2].targetReps!);
   });
 });
 
@@ -470,7 +473,7 @@ describe('week over week — the whole loop', () => {
    * what the plan asks, one session a week. This is the property that matters:
    * the loop as a whole has to climb.
    */
-  function run(weeks: number, ex = exercise, ctx: PrescriptionContext = {}) {
+  function run(weeks: number, ex: Slot = exercise, ctx: PrescriptionContext = {}) {
     const start = new Date(2026, 0, 5).getTime();
     let history: ExerciseSession[] = [
       { completedAt: start, position: 0, sets: [8, 8, 8].map(reps => ({ weight: 100, reps })) },
@@ -481,7 +484,7 @@ describe('week over week — the whole loop', () => {
       const now = start + w * WEEK;
       const p = buildSetPlan(history, ex, { ...ctx, now });
       const weight = p.sets[0].weight!;
-      const reps = p.sets.map(s => s.targetReps);
+      const reps = p.sets.map(s => s.targetReps!);
       log.push({ weight, kind: p.rec!.kind, reps });
       history = [
         { completedAt: now, position: 0, sets: reps.map(r => ({ weight, reps: r })) },
@@ -552,5 +555,27 @@ describe('week over week — the whole loop', () => {
     ];
     const rec = advise(history);
     expect(rec).toMatchObject({ kind: 'hold', weight: 95 });
+  });
+});
+
+describe('no prescription (ad-hoc work with nothing to dose from)', () => {
+  it('holds at the last weight and sets no rep target', () => {
+    const rec = advise([session([[135, 10], [135, 9]])], { sets: 3 });
+    expect(rec).toMatchObject({ kind: 'hold', weight: 135 });
+    expect(rec!.reason).toMatch(/no rep target/i);
+  });
+
+  it('lays out the sets with the weight carried forward and no targets', () => {
+    const p = plan([session([[135, 10], [135, 9]])], { sets: 3 });
+    expect(p.sets).toHaveLength(3);
+    expect(p.sets.every(s => s.weight === 135)).toBe(true);
+    expect(p.sets.every(s => s.targetReps === null)).toBe(true);
+    expect(p.goal).toMatch(/no rep target/i);
+  });
+
+  it('shows nothing at all for a movement never trained', () => {
+    const p = plan([], { sets: 3 });
+    expect(p.rec).toBeNull();
+    expect(p.sets.every(s => s.weight === null && s.targetReps === null)).toBe(true);
   });
 });

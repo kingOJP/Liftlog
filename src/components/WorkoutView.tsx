@@ -23,6 +23,7 @@ import { effectiveExperience } from '../data/experience';
 import { PHASE_INFO } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { slotFor } from '../data/prescribe';
 import { getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import AddExercisePanel from './AddExercisePanel';
@@ -60,12 +61,12 @@ function dateInputToTimestamp(value: string, originalTs: number): number {
 }
 
 // Build an Exercise for an id logged in the session but not part of the day's
-// design — added mid-workout, or (in edit mode) an exercise the day no longer
-// lists — so it still renders. Library entry first, then a sensible default.
-function exerciseFromId(id: string): Exercise {
-  const lib = getExerciseLibrary().find(e => e.id === id);
-  if (lib) return { id, name: lib.name, sets: lib.sets, repLow: lib.repLow, repHigh: lib.repHigh };
-  return { id, name: getExerciseName(id), sets: 3, repLow: 8, repHigh: 12 };
+// design. The prescription is resolved for the active plan (data/prescribe.ts),
+// so an exercise added mid-workout is dosed like any other — and when there is
+// nothing to dose it from, it carries no rep range rather than a made-up one.
+function exerciseFromId(id: string, snapshot: TrainingSnapshot | null): Exercise {
+  const name = getExerciseLibrary().find(e => e.id === id)?.name ?? getExerciseName(id);
+  return slotFor(id, name, { snapshot });
 }
 
 // Per-set prescription + "last time" context for one exercise, from a snapshot.
@@ -117,7 +118,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   const [addedExercises, setAddedExercises] = useState<Exercise[]>(() => {
     if (isEditMode || !restoredDraft) return [];
     const dayIds = new Set(day.exercises.map(e => e.id));
-    return Object.keys(restoredDraft.sets).filter(id => !dayIds.has(id)).map(exerciseFromId);
+    return Object.keys(restoredDraft.sets).filter(id => !dayIds.has(id)).map(id => exerciseFromId(id, null));
   });
   const [showAddPanel, setShowAddPanel] = useState(false);
   // The loaded snapshot — kept so context for a mid-workout exercise can be
@@ -266,7 +267,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       // render (and stay editable) — surface it as an "added" exercise.
       const dayIds = new Set(day.exercises.map(e => e.id));
       const extras = Object.keys(groupedSets).filter(id => !dayIds.has(id));
-      if (extras.length > 0) setAddedExercises(extras.map(exerciseFromId));
+      if (extras.length > 0) setAddedExercises(extras.map(id => exerciseFromId(id, null)));
       setLoading(false);
     });
   }, [existingSessionId, day]);
@@ -485,6 +486,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
         {showAddPanel ? (
           <AddExercisePanel
             excludeIds={new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id))}
+            snapshot={snapshot}
             onAdd={handleAddExercise}
             onClose={() => setShowAddPanel(false)}
           />

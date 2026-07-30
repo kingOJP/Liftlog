@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Exercise } from '../data/program';
+import { prescriptionLabel } from '../data/program';
 import type { WeightRec, ExerciseSession, SetPlan } from '../data/recommendations';
 import './ExerciseCard.css';
 
@@ -70,7 +71,7 @@ export default function ExerciseCard({
     setWorkingWeight(null);
   }
 
-  const targetLabel = `${exercise.sets} × ${exercise.repLow}–${exercise.repHigh}`;
+  const targetLabel = prescriptionLabel(exercise);
   // Working sets are numbered on their own; warm-ups carry a label, not a
   // number, so "Set 1" always means the first real work set.
   const setLabels: string[] = [];
@@ -97,7 +98,7 @@ export default function ExerciseCard({
       ? {
           kind: 'work',
           weight: prescribedWeight(activePrescription.weight),
-          reps: String(activePrescription.targetReps),
+          reps: activePrescription.targetReps == null ? '' : String(activePrescription.targetReps),
         }
       : plan
         ? null
@@ -319,7 +320,7 @@ export default function ExerciseCard({
               <span className="set-weight">
                 {(workingWeight ?? (p.weight == null ? null : String(p.weight))) ?? '—'} lbs
               </span>
-              <span className="set-reps">{p.targetReps} reps</span>
+              <span className="set-reps">{p.targetReps == null ? '—' : `${p.targetReps} reps`}</span>
             </div>
           ))}
         </div>

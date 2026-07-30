@@ -1,13 +1,49 @@
 import { EXERCISE_MAP } from './exercises';
 import { getProgramStart } from './settings';
 
+/**
+ * A programmed exercise — one slot in a workout day. Carries the PRESCRIPTION
+ * (sets and rep range) as well as the movement's identity, because that is what
+ * a slot is: "conventional deadlift, 3 × 5–8, this Tuesday".
+ */
 export interface Exercise {
   id: string;
   name: string;
   sets: number;
-  repLow: number;
-  repHigh: number;
+  /**
+   * The rep range to work in. Optional, and genuinely absent for ad-hoc work
+   * the coach has nothing to prescribe from — a movement logged in a quick
+   * workout by someone with no plan and no history with it. Showing no target
+   * is honest there; inventing 8–12 is what this whole change removes.
+   */
+  repLow?: number;
+  repHigh?: number;
   archived?: boolean;
+}
+
+/**
+ * A movement in the user's exercise library — identity only.
+ *
+ * Deliberately carries NO sets/rep range. A rep range is a property of a
+ * prescription, not of a movement: the same deadlift is 3 × 5–8 in a
+ * hypertrophy block and 4 × 3–5 in a strength block. Storing a range on the
+ * library entry is what let a barbell deadlift wander around the app carrying a
+ * default 3 × 8–12 that no goal ever chose. Dosage is resolved at the point of
+ * use by `data/dosage.ts`.
+ *
+ * The sets/repLow/repHigh fields are still accepted on the wire (older clients
+ * and the server's exercise tables still send them) but are never read.
+ */
+export interface LibraryExercise {
+  id: string;
+  name: string;
+  archived?: boolean;
+  /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
+  sets?: number;
+  /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
+  repLow?: number;
+  /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
+  repHigh?: number;
 }
 
 export interface WorkoutDay {
@@ -17,10 +53,11 @@ export interface WorkoutDay {
   exercises: Exercise[];
 }
 
-// The original owner's 4-day split. No longer anyone's starting program —
-// new accounts begin with a blank slate and build their first program through
-// the plan wizard. Kept only as the sets/reps seed for the built-in exercise
-// library (programStore.buildDefaultLibrary).
+// The original owner's 4-day split. No longer anyone's starting program — new
+// accounts begin with a blank slate and build their first program through the
+// plan wizard, and the exercise library no longer seeds sets/reps from it
+// (dosage is resolved per prescription; see data/dosage.ts). Kept as a
+// reference layout and for the tests that exercise a realistic program.
 export const PROGRAM: WorkoutDay[] = [
   {
     id: 1,
@@ -79,6 +116,25 @@ export const PROGRAM: WorkoutDay[] = [
 
 export function getExerciseName(id: string): string {
   return EXERCISE_MAP.get(id)?.name ?? id;
+}
+
+/**
+ * "3 × 8–12", or "3 sets" when the slot carries no rep range. Every surface
+ * that shows a slot's dose goes through here, so an unprescribed exercise never
+ * renders as "3 × undefined–undefined" (or, worse, an invented 8–12).
+ */
+export function prescriptionLabel(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
+  return ex.repLow != null && ex.repHigh != null
+    ? `${ex.sets} × ${ex.repLow}–${ex.repHigh}`
+    : `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
+}
+
+/** "3 sets · 8–12 reps", or "3 sets" when unprescribed — the long form. */
+export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
+  const sets = `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
+  return ex.repLow != null && ex.repHigh != null
+    ? `${sets} · ${ex.repLow}–${ex.repHigh} reps`
+    : sets;
 }
 
 // ── Calendar weeks (Monday-anchored) ─────────────────────────────────────────

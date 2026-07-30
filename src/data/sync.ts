@@ -15,7 +15,7 @@ import {
   saveGlobalExerciseMeta, clearExerciseMeta,
 } from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
-import type { WorkoutDay, Exercise } from './program';
+import type { WorkoutDay, LibraryExercise } from './program';
 import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
 import { saveExerciseMerges, applyExerciseMerges } from './merges';
 import type { MergeMap } from './merges';
@@ -63,7 +63,7 @@ interface SyncPayload {
   exerciseLogs:        never[];
   deletedSessionGuids: string[];
   program:             WorkoutDay[];
-  exercises:           Exercise[];
+  exercises:           LibraryExercise[];
   exerciseMuscles:     ExerciseMusclesRow[];
   exerciseDetails:     ExerciseDetailsRow[];
   deletedExerciseIds:  string[];
@@ -208,7 +208,7 @@ export async function pullSync(): Promise<boolean> {
     setLogs:             SetLog[];
     deletedSessionGuids: string[]             | null;
     program:             WorkoutDay[]         | null;
-    exercises:           Exercise[]           | null;
+    exercises:           LibraryExercise[]    | null;
     exerciseMuscles:     ExerciseMusclesRow[] | null;
     exerciseDetails:     ExerciseDetailsRow[] | null;
     deletedExerciseIds:  string[]             | null;

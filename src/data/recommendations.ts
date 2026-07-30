@@ -76,13 +76,21 @@ export interface WeightRec {
   reason: string;
 }
 
+/**
+ * A slot with a resolved rep range. Every progression branch needs one — you
+ * cannot judge "beat the range" without a range — so the engine narrows to this
+ * before doing any work.
+ */
+export type PrescribedSlot = { sets: number; repLow: number; repHigh: number };
+
 /** One prescribed working set — what the lifter should actually put on the bar. */
 export interface PrescribedSet {
   /** 1-based working-set number */
   setNumber: number;
   /** null when there's no history to prescribe from — the lifter picks it */
   weight: number | null;
-  targetReps: number;
+  /** null when nothing has been prescribed — free logging, no target to chase */
+  targetReps: number | null;
 }
 
 /** The full next-session prescription for one exercise. */
@@ -324,13 +332,29 @@ export function calculateRecommendation(
     ? { ...rec, reason: `${rec.reason} (last session ran later in your workout than usual — not held against you)` }
     : rec;
 
+  // No rep range to judge against. This is ad-hoc work by someone with no plan
+  // and no history with the movement — every progression branch below is
+  // meaningless without a target, so the honest answer is "start where you left
+  // off". Inventing a range here is exactly what this engine no longer does.
+  if (exercise.repLow == null || exercise.repHigh == null) {
+    return withContext({
+      weight,
+      direction: 'hold',
+      kind: 'hold',
+      reason: 'No rep target set — log a few sessions and the coach will learn your working range',
+    });
+  }
+  const ex: PrescribedSlot = {
+    sets: exercise.sets, repLow: exercise.repLow, repHigh: exercise.repHigh,
+  };
+
   // Planned easy week: back off ~10% regardless of how the last session went.
   if (phase === 'deload' || phase === 'recovery') {
     const easy = phase === 'deload'
       ? 'Planned deload week — ~10% lighter, crisp reps, let fatigue drain'
       : 'Recovery week — ~10% lighter while you ramp back into training';
     if (weightType === 'Bodyweight' && weight === 0) {
-      return { weight: 0, targetReps: exercise.repLow, direction: 'down', kind: 'deload', reason: easy };
+      return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }
     return {
       weight: easeBack(weight, 0.9, incrementFor(weight, weightType)),
@@ -341,18 +365,18 @@ export function calculateRecommendation(
   // Bodyweight at 0 lbs → rep progression. If external load was logged
   // (e.g. weighted pull-ups with a belt), the normal weight engine applies.
   if (weightType === 'Bodyweight' && weight === 0) {
-    return withContext(repProgression(baseline, last, exercise, goal));
+    return withContext(repProgression(baseline, last, ex, goal));
   }
 
   // Stats over the PROGRAMMED set count — extra sets are bonus volume, not
   // evidence that the load has been beaten.
-  const counted = countedSets(last, exercise.sets);
+  const counted = countedSets(last, ex.sets);
   const setsDone = counted.length;
   const maxReps = Math.max(...counted.map(s => s.reps));
   const repTotal = repSum(counted);
   const avgReps = repTotal / setsDone;
-  const targetTotal = exercise.sets * exercise.repHigh;
-  const fullSetCount = setsDone >= exercise.sets;
+  const targetTotal = ex.sets * ex.repHigh;
+  const fullSetCount = setsDone >= ex.sets;
   const step = incrementFor(weight, weightType);
 
   // 1RM estimates are only trustworthy on sets of roughly 1–10 reps; past
@@ -406,7 +430,7 @@ export function calculateRecommendation(
   if (fullSetCount && repTotal >= targetTotal) {
     const jump = goal === 'fat-loss'
       ? step
-      : sizedIncrement(weight, avgReps, exercise.repLow, step);
+      : sizedIncrement(weight, avgReps, ex.repLow, step);
     return increaseTo(jump, `Hit ${repTotal} reps at ${weight} lbs (target ${targetTotal})`);
   }
 
@@ -414,7 +438,7 @@ export function calculateRecommendation(
   // already brushing the top of the range. Holding out for a perfect rep total
   // would leave real progress on the table — a coach moves up now.
   const recentFresh = baseline.slice(0, STALL_SESSIONS);
-  if (e1rmMeaningful && fullSetCount && recentFresh.length >= 2 && avgReps >= exercise.repHigh - 1) {
+  if (e1rmMeaningful && fullSetCount && recentFresh.length >= 2 && avgReps >= ex.repHigh - 1) {
     const priorAtWeight = recentFresh.slice(1).filter(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
     const oldest = priorAtWeight[priorAtWeight.length - 1];
     if (oldest && bestE1rm(last.sets) >= bestE1rm(oldest.sets) * (1 + E1RM_BREAKOUT_PCT)) {
@@ -438,11 +462,11 @@ export function calculateRecommendation(
   if (window.length >= STALL_SESSIONS) {
     const sameWeight = window.every(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
     const anchor = window[window.length - 1];
-    const anchorTotal = repSum(countedSets(anchor, exercise.sets));
+    const anchorTotal = repSum(countedSets(anchor, ex.sets));
     const anchorE1rm = bestE1rm(anchor.sets);
     const since = window.slice(0, -1);
 
-    const repsImproved = since.some(h => repSum(countedSets(h, exercise.sets)) > anchorTotal);
+    const repsImproved = since.some(h => repSum(countedSets(h, ex.sets)) > anchorTotal);
     const e1rmImproved = e1rmMeaningful &&
       since.some(h => bestE1rm(h.sets) > anchorE1rm * (1 + STALL_TOLERANCE));
 
@@ -473,17 +497,17 @@ export function calculateRecommendation(
   // off one session reacts to noise. It takes a clear miss, or a second session
   // confirming the first. In a deficit only a confirmed miss counts — an
   // under-range day there is the deficit talking.
-  if (avgReps < exercise.repLow) {
+  if (avgReps < ex.repLow) {
     // The confirming session has to be at the SAME load. Judging the first
     // session after a back-off against the miss that caused it would walk the
     // weight down a step at a time, forever.
     const previous = baseline[1];
     const repeated = previous != null &&
       Math.abs(workingWeight(previous.sets) - weight) < 2.5 && (() => {
-        const prev = countedSets(previous, exercise.sets);
-        return prev.length > 0 && repSum(prev) / prev.length < exercise.repLow;
+        const prev = countedSets(previous, ex.sets);
+        return prev.length > 0 && repSum(prev) / prev.length < ex.repLow;
       })();
-    const bigMiss = goal !== 'fat-loss' && avgReps <= exercise.repLow - BIG_MISS_REPS;
+    const bigMiss = goal !== 'fat-loss' && avgReps <= ex.repLow - BIG_MISS_REPS;
 
     if (repeated || bigMiss) {
       return withContext({
@@ -491,22 +515,22 @@ export function calculateRecommendation(
         direction: 'down',
         kind: 'decrease',
         reason: repeated
-          ? `Two sessions under ${exercise.repLow} reps — ease back and rebuild`
-          : `Reps fell well under ${exercise.repLow} — ease back and rebuild`,
+          ? `Two sessions under ${ex.repLow} reps — ease back and rebuild`
+          : `Reps fell well under ${ex.repLow} — ease back and rebuild`,
       });
     }
     return withContext({
       weight,
       direction: 'hold',
       kind: 'hold',
-      reason: `Short of ${exercise.repLow} reps, but one session isn't a trend — repeat ${weight} lbs before dropping it`,
+      reason: `Short of ${ex.repLow} reps, but one session isn't a trend — repeat ${weight} lbs before dropping it`,
     });
   }
 
   // 4. In the range → double progression: keep the weight, chase reps. The
   // reason names the exact gap to close, so "hold" is a target, not a shrug.
   const reason = !fullSetCount
-    ? `Complete all ${exercise.sets} sets at this weight, then chase reps`
+    ? `Complete all ${ex.sets} sets at this weight, then chase reps`
     : `${targetTotal - repTotal} more reps than last time (${targetTotal} total) earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
@@ -519,7 +543,7 @@ export function calculateRecommendation(
 function repProgression(
   history: ExerciseSession[],
   last: ExerciseSession,
-  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+  exercise: PrescribedSlot,
   goal: Goal,
 ): WeightRec {
   const minReps = Math.min(...last.sets.map(s => s.reps));
@@ -641,14 +665,30 @@ export function buildSetPlan(
   const rec = calculateRecommendation(history, exercise, ctx);
   const { phase } = ctx;
 
+  // Nothing prescribed — ad-hoc work with no plan to dose it and no history to
+  // read a range off. Lay out the sets and let the lifter log freely; showing a
+  // fabricated 8–12 target here would be the coach guessing out loud.
+  if (exercise.repLow == null || exercise.repHigh == null) {
+    return {
+      rec,
+      sets: Array.from({ length: count }, (_, i) => ({
+        setNumber: i + 1, weight: rec?.weight ?? null, targetReps: null,
+      })),
+      goal: 'No rep target yet — log this session and the coach will learn the range you work in.',
+    };
+  }
+  const ex: PrescribedSlot = {
+    sets: exercise.sets, repLow: exercise.repLow, repHigh: exercise.repHigh,
+  };
+
   // Never trained: prescribe the rep range and let the lifter find the load.
   if (!rec) {
     return {
       rec: null,
       sets: Array.from({ length: count }, (_, i) => ({
-        setNumber: i + 1, weight: null, targetReps: exercise.repLow,
+        setNumber: i + 1, weight: null, targetReps: ex.repLow,
       })),
-      goal: `First time on this lift — find a weight you can control for ${exercise.repLow}–${exercise.repHigh} reps with 1–2 in reserve.`,
+      goal: `First time on this lift — find a weight you can control for ${ex.repLow}–${ex.repHigh} reps with 1–2 in reserve.`,
     };
   }
 
@@ -660,7 +700,7 @@ export function buildSetPlan(
     return {
       rec,
       sets: Array.from({ length: count }, (_, i) => ({
-        setNumber: i + 1, weight: rec.weight, targetReps: exercise.repLow,
+        setNumber: i + 1, weight: rec.weight, targetReps: ex.repLow,
       })),
       goal: `Leave 3–4 reps in reserve on every set. The easy week is the plan working.`,
     };
@@ -680,22 +720,22 @@ export function buildSetPlan(
   //                   both directions: a rate-capped 2.5% jump barely costs a
   //                   rep, and a 10% deload buys back about three.
   const baseReps = rec.kind === 'hold'
-    ? clamp((lastCounted[0]?.reps ?? exercise.repLow) + 1, exercise.repLow, exercise.repHigh)
+    ? clamp((lastCounted[0]?.reps ?? ex.repLow) + 1, ex.repLow, ex.repHigh)
     : bodyweight
-      ? clamp(rec.targetReps!, exercise.repLow, exercise.repHigh)
+      ? clamp(rec.targetReps!, ex.repLow, ex.repHigh)
       : lastAvg != null && lastWeight != null && lastWeight > 0
-        ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), exercise.repLow, exercise.repHigh)
-        : exercise.repLow;
+        ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), ex.repLow, ex.repHigh)
+        : ex.repLow;
 
   const drops = fatigueDrops(baseline, count, baseReps);
   const sets: PrescribedSet[] = Array.from({ length: count }, (_, i) => ({
     setNumber: i + 1,
     weight: rec.weight,
-    targetReps: clamp(baseReps + drops[i], exercise.repLow, exercise.repHigh),
+    targetReps: clamp(baseReps + drops[i], ex.repLow, ex.repHigh),
   }));
 
-  const planTotal = sets.reduce((sum, s) => sum + s.targetReps, 0);
-  const targetTotal = count * exercise.repHigh;
+  const planTotal = sets.reduce((sum, s) => sum + (s.targetReps ?? 0), 0);
+  const targetTotal = count * ex.repHigh;
   const goal = bodyweight
     ? `Hit every target for ${planTotal} total reps — ${targetTotal} earns a harder variation or added load.`
     : rec.kind === 'increase'

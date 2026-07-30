@@ -1,5 +1,9 @@
-import { useState, useMemo } from 'react';
-import type { Exercise, WorkoutDay } from '../data/program';
+import { useState, useMemo, useEffect } from 'react';
+import type { Exercise, LibraryExercise, WorkoutDay } from '../data/program';
+import { prescriptionDetail } from '../data/program';
+import { loadTrainingSnapshot } from '../data/analytics';
+import type { TrainingSnapshot } from '../data/analytics';
+import { prescribeFor, slotFor } from '../data/prescribe';
 import {
   addToExerciseLibrary, findExerciseByName, generateExerciseId, getExerciseLibrary,
 } from '../data/programStore';
@@ -22,10 +26,18 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
 
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
-  const [library, setLibrary] = useState<Exercise[]>(() => getExerciseLibrary());
+  const [library, setLibrary] = useState<LibraryExercise[]>(() => getExerciseLibrary());
   const [newSets, setNewSets] = useState('3');
-  const [newRepLow, setNewRepLow] = useState('8');
-  const [newRepHigh, setNewRepHigh] = useState('12');
+  const [newRepLow, setNewRepLow] = useState('');
+  const [newRepHigh, setNewRepHigh] = useState('');
+
+  // A quick workout is the one path with no plan behind it, so the history
+  // fallback matters most here: with no goal to dose from, the coach reads the
+  // rep range off what this lifter actually does with the movement.
+  const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
+  useEffect(() => {
+    loadTrainingSnapshot().then(setSnapshot).catch(() => {});
+  }, []);
 
   const chosenIds = useMemo(() => new Set(exercises.map(e => e.id)), [exercises]);
 
@@ -43,15 +55,15 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
   }, [library, search]);
 
   function addExercise(ex: Exercise) {
-    addToExerciseLibrary(ex);
+    addToExerciseLibrary({ id: ex.id, name: ex.name });
     setLibrary(getExerciseLibrary());
     setExercises(prev => [...prev, ex]);
     setSearch('');
     setCreating(false);
   }
 
-  function handleAddFromLibrary(ex: Exercise) {
-    addExercise({ id: ex.id, name: ex.name, sets: ex.sets, repLow: ex.repLow, repHigh: ex.repHigh });
+  function handleAddFromLibrary(ex: LibraryExercise) {
+    addExercise(slotFor(ex.id, ex.name, { snapshot }));
   }
 
   function handleCreateExercise() {
@@ -67,16 +79,19 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
       return;
     }
 
+    const id = generateExerciseId(trimmed);
+    const suggested = prescribeFor(id, { name: trimmed, snapshot });
+    const repLow = Number(newRepLow) || suggested?.repLow;
+    const repHigh = Number(newRepHigh) || suggested?.repHigh;
     addExercise({
-      id: generateExerciseId(trimmed),
+      id,
       name: trimmed,
-      sets: Number(newSets) || 3,
-      repLow: Number(newRepLow) || 8,
-      repHigh: Number(newRepHigh) || 12,
+      sets: Number(newSets) || suggested?.sets || 3,
+      ...(repLow != null && repHigh != null ? { repLow, repHigh } : {}),
     });
     setNewSets('3');
-    setNewRepLow('8');
-    setNewRepHigh('12');
+    setNewRepLow('');
+    setNewRepHigh('');
   }
 
   function handleRemove(id: string) {
@@ -112,7 +127,7 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
                 <div className="exercise-edit-row">
                   <div className="exercise-edit-info">
                     <span className="exercise-edit-name">{ex.name}</span>
-                    <span className="exercise-edit-meta">{ex.sets} sets · {ex.repLow}–{ex.repHigh} reps</span>
+                    <span className="exercise-edit-meta">{prescriptionDetail(ex)}</span>
                   </div>
                   <button
                     className="exercise-remove-btn"
@@ -151,7 +166,7 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
                       >
                         <span className="add-search-name">{ex.name}</span>
                         <span className="add-search-meta">
-                          {[muscle, `${ex.sets} × ${ex.repLow}–${ex.repHigh}`].filter(Boolean).join(' · ')}
+                          {[muscle].filter(Boolean).join(' · ')}
                         </span>
                       </button>
                     );
