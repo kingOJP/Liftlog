@@ -684,3 +684,57 @@ describe('timed exercises progress by seconds', () => {
     expect(intro.reason).toMatch(/Intro week/i);
   });
 });
+
+// ── Time away ────────────────────────────────────────────────────────────────
+// Missed *reps* are covered thoroughly above. Missed *sessions* are a different
+// axis, and less settled. These tests pin down what the engine currently does
+// so the behaviour is a decision rather than an accident.
+describe('a lifter coming back from time off', () => {
+  const ex = { sets: 3, repLow: 8, repHigh: 12 };
+  const at = (daysAgo: number, weight: number, reps: number): ExerciseSession => ({
+    completedAt: NOW - daysAgo * DAY,
+    sets: [reps, reps, reps].map(r => ({ weight, reps: r })),
+  });
+
+  it('lifts the weekly rate cap once nothing falls inside the last 7 days', () => {
+    // The cap is a *rate* limit, and with no session this week there is no rate
+    // to hold anyone to. The consequence is worth knowing: an intermediate who
+    // maxed the range three weeks ago gets the full sized increment (10%),
+    // where training through would have capped them at 5%. Defensible — the
+    // increase was earned by the last session — but it does mean the biggest
+    // jumps land on the least recently trained lifts.
+    const maxed = [at(21, 100, 12)];
+    const layoff = calculateRecommendation(maxed, ex, { now: NOW, experience: 'intermediate' })!;
+    expect(layoff).toMatchObject({ kind: 'increase', weight: 110 });
+
+    const consistent = calculateRecommendation(
+      [at(3, 100, 12), at(7, 100, 12)], ex, { now: NOW, experience: 'intermediate' },
+    )!;
+    expect(consistent.weight).toBeLessThan(layoff.weight);
+  });
+
+  it('does not stall a lifter who was progressing before the break', () => {
+    const climbing = [at(21, 100, 12), at(28, 95, 12), at(35, 90, 12)];
+    expect(calculateRecommendation(climbing, ex, { now: NOW })!.kind).toBe('increase');
+  });
+
+  it('eases a sporadic lifter back rather than parking them at a weight they never beat', () => {
+    // Three sessions across ten weeks at the same load. The engine reads it as a
+    // stall and backs off. The outcome is right for someone returning; the
+    // reason it gives ("no gain in reps or strength") describes detraining
+    // rather than accumulated fatigue.
+    const sporadic = [at(5, 100, 10), at(30, 100, 10), at(70, 100, 10)];
+    const rec = calculateRecommendation(sporadic, ex, { now: NOW })!;
+    expect(rec.kind).toBe('deload');
+    expect(rec.weight).toBeLessThan(100);
+  });
+
+  it('counts stalls in sessions, not in weeks', () => {
+    // Same three sessions, compressed into a fortnight — identical verdict. The
+    // engine has no notion of elapsed time in its stall window.
+    const dense = [at(2, 100, 10), at(6, 100, 10), at(10, 100, 10)];
+    const sparse = [at(5, 100, 10), at(30, 100, 10), at(70, 100, 10)];
+    expect(calculateRecommendation(dense, ex, { now: NOW })!.kind)
+      .toBe(calculateRecommendation(sparse, ex, { now: NOW })!.kind);
+  });
+});
