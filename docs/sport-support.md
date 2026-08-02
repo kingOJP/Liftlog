@@ -31,8 +31,20 @@ for `sport-support`, e1RM and PR events carry the verdict and rising tonnage is
 weighted lightly, because increasing volume is a *cost* on this path rather than
 evidence of progress.
 
-**Where it lives:** per-slot `dose` in `sports.ts`; `dosage()` in `planner.ts`
-honours a slot's prescription instead of consulting the goal's generic table.
+**Where it lives:** two places, deliberately.
+
+- **`dosage.ts`** carries `sport-support` as a row in the same goal-keyed table
+  as every other goal — heavy multi-joint work at 4–6, cheap accessories,
+  low-rep plyometrics. This is what an exercise gets when it enters a program by
+  any route other than the plan wizard: the day editor, the mid-workout add
+  panel, a quick workout. Without it those routes fell through to a hypertrophy
+  default. It deliberately overrides `isHeavyAxial` for this goal (which would
+  give a barbell squat 3 × 5–8), because force production is the entire reason
+  an endurance athlete squats.
+- **`sports.ts`** carries a per-slot `dose` on each template slot, which wins
+  where present (`doseFor` in `planner.ts`). The templates know things the goal
+  table cannot: the race distance's rep range, and which slot is the tendon work
+  versus the anchor. Each dose sits next to the rationale that justifies it.
 
 ### The interference effect scales with the sport's own load
 
@@ -230,11 +242,24 @@ Each one reroutes the template rather than being recorded:
 
 Planks and carries are held for seconds, not repeated. `ExerciseDef.unit`
 (`'reps' | 'seconds'`, absent meaning reps) is intrinsic catalog data alongside
-`difficulty` — app-owned, never synced, never a user override. Timed exercises
-have no weight input at all and log at 0 lbs, the convention bodyweight work
-already used, so the existing rep-progression engine in `recommendations.ts`
-progresses the hold with no schema change. The logger, target line, history rows
-and plan review all read the unit and say "sec".
+`difficulty` — app-owned, never synced, never a user override.
+
+A timed exercise has no weight input and logs at 0 lbs, the convention bodyweight
+work already used, so **the hold is the progression**: `repProgression` drives it
+through the same four branches as a bodyweight rep count — beat the range and the
+target grows a second, stall three sessions and it resets to the floor, fall short
+and it builds back. `buildSetPlan` prescribes a duration per set, and an easy week
+flattens every set to the bottom of the range.
+
+Two details worth knowing:
+
+- **Count progression is gated on `weight === 0 && (bodyweight || timed)`**, not on
+  weight type alone. A hold progresses by time whatever the catalog says it's
+  loaded with, so a user editing a plank's weight-type metadata can't flip it onto
+  the load engine.
+- **The unit rides `PrescriptionContext`**, so every reason and goal string the
+  engine emits is worded correctly. The mechanics are identical either way; only
+  the words change, because "push for 46 reps" is nonsense on a plank.
 
 ---
 

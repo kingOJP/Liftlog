@@ -314,9 +314,11 @@ src/
                                   SportContext (SportId/SportEvent/RaceProximity/EnduranceLoad/
                                   Discipline) for sport-support
     dosage.ts                  — THE prescription resolver (pure): dosage(goal, slot, profile,
-                                  experience) → sets × rep range, isHeavyAxial() (barbell hinge/
-                                  squat → low narrow ranges), rangeFromHistory() (read the range
-                                  off the lifter's own log), resolvePrescription() (the cascade)
+                                  experience) → sets × rep range for every goal INCLUDING
+                                  sport-support (so the day editor/quick workouts dose it right)
+                                  and every timed hold (seconds, not reps), isHeavyAxial()
+                                  (barbell hinge/squat → low narrow ranges), rangeFromHistory()
+                                  (read the range off the lifter's own log), resolvePrescription()
     prescribe.ts               — the store-reading wrapper: prescribeFor(id, opts) and
                                   slotFor(id, name, opts) → a dosed program slot. Every route an
                                   exercise takes into a workout goes through here
@@ -1035,6 +1037,12 @@ dosage comes from instead.
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
   collapsing them — a skipped week must look like a skipped week.
+- **Timed work is progressed by time** — a set of an exercise with
+  `unit: 'seconds'` logs at 0 lbs with no weight input, and `repProgression`
+  drives the hold through the same four branches as a bodyweight rep count.
+  Count progression is gated on `weight === 0 && (bodyweight || timed)`, so
+  editing a plank's weight-type metadata can't flip it onto the load engine.
+  The unit travels on `PrescriptionContext` so every reason string reads right.
 - **The weekly set band belongs to the goal, not the app** — every engine takes a
   `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
   A new goal that needs a different dose changes one function. On `sport-support` the coach
