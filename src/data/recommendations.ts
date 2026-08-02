@@ -132,6 +132,17 @@ export interface PrescriptionContext {
 // How many recent sessions at the same weight without progress on either lever
 // count as a stall worth deloading for.
 const STALL_SESSIONS = 3;
+/**
+ * How far apart the stall window may stretch before it stops meaning anything.
+ *
+ * A deload exists to shed accumulated fatigue. Three sessions spread across
+ * three months carry no accumulated fatigue — that lifter trains this movement
+ * rarely, or has been away, and cutting their load treats absence as if it were
+ * over-reaching. Five weeks comfortably covers once-a-week training with a
+ * missed session or two; past that the window is measuring the calendar rather
+ * than the athlete.
+ */
+const STALL_WINDOW_DAYS = 35;
 // Improvement below this fraction across the stall window doesn't count.
 const STALL_TOLERANCE = 0.01;
 // Trained this many slots later than the exercise's usual position = not fresh.
@@ -159,7 +170,8 @@ const WEEKLY_LOAD_CAP: Record<ExperienceLevel, number> = {
   advanced: 0.025,
 };
 const DEFAULT_EXPERIENCE: ExperienceLevel = 'intermediate';
-const WEEK_MS = 7 * 86_400_000;
+const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
 // Sessions of history the fatigue drop-off model is fitted from.
 const FATIGUE_SAMPLE_SESSIONS = 3;
 // Fallback rep loss per set when there's no drop-off history to fit.
@@ -299,8 +311,15 @@ function weeklyCeiling(
 ): number | null {
   const cutoff = now - WEEK_MS;
   const inWeek = baseline.filter(h => h.completedAt >= cutoff);
-  if (inWeek.length === 0) return null;
-  const weekAgo = workingWeight(inWeek[inWeek.length - 1].sets); // newest-first
+  // Nothing inside the last week is a layoff, not a clean slate. Anchor to the
+  // most recent session and allow exactly one week's growth: time away doesn't
+  // bank load increases, and the increase is still granted — just at the same
+  // rate the lifter who trained through would have got. Lifting the cap here
+  // handed the biggest jumps to the least recently trained lifts, which is the
+  // wrong direction when the athlete is, if anything, slightly detrained.
+  const anchor = inWeek.length > 0 ? inWeek[inWeek.length - 1] : baseline[0];
+  if (!anchor) return null;
+  const weekAgo = workingWeight(anchor.sets);
   if (weekAgo <= 0) return null;
   return weekAgo * (1 + WEEKLY_LOAD_CAP[experience]);
 }
@@ -504,7 +523,9 @@ export function calculateRecommendation(
   // sessions ago. A stall means nothing in the window beat where it started, on
   // either lever.
   const window = baseline.slice(0, STALL_SESSIONS);
-  if (window.length >= STALL_SESSIONS) {
+  const sparseWindow = window.length >= STALL_SESSIONS &&
+    window[0].completedAt - window[window.length - 1].completedAt > STALL_WINDOW_DAYS * DAY_MS;
+  if (window.length >= STALL_SESSIONS && !sparseWindow) {
     const sameWeight = window.every(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
     const anchor = window[window.length - 1];
     const anchorTotal = repSum(countedSets(anchor, ex.sets));
@@ -576,7 +597,11 @@ export function calculateRecommendation(
   // reason names the exact gap to close, so "hold" is a target, not a shrug.
   const reason = !fullSetCount
     ? `Complete all ${ex.sets} sets at this weight, then chase reps`
-    : `${targetTotal - repTotal} more reps than last time (${targetTotal} total) earns the next increase`;
+    : sparseWindow
+      // The stall check was skipped on purpose — say so, rather than leaving the
+      // lifter wondering why a flat run of sessions produced no verdict.
+      ? `You've been away from this one — settle back in at ${weight} lbs before pushing, then ${targetTotal} total reps earns the next increase`
+      : `${targetTotal - repTotal} more reps than last time (${targetTotal} total) earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
 
@@ -616,9 +641,13 @@ function repProgression(
     };
   }
 
-  // 2. Total reps stalled for several sessions → back off and rebuild
+  // 2. Total reps stalled for several sessions → back off and rebuild.
+  // Same calendar guard as the loaded engine: sessions spread across months are
+  // infrequent training, not a plateau to shed fatigue from.
   const window = history.filter(h => h.sets.length > 0).slice(0, STALL_SESSIONS);
-  if (window.length >= STALL_SESSIONS) {
+  const sparseWindow = window.length >= STALL_SESSIONS &&
+    window[0].completedAt - window[window.length - 1].completedAt > STALL_WINDOW_DAYS * DAY_MS;
+  if (window.length >= STALL_SESSIONS && !sparseWindow) {
     const oldest = window[window.length - 1];
     if (repSum(last.sets) <= repSum(oldest.sets)) {
       // Same reasoning as the loaded engine: in a deficit a rep plateau is the
@@ -662,7 +691,9 @@ function repProgression(
   const reason =
     last.sets.length < exercise.sets
       ? `Complete all ${exercise.sets} sets, then chase ${timed ? 'time' : 'reps'}`
-      : `In range — aim for ${n(target)}+ per set, toward ${exercise.sets}×${exercise.repHigh}${timed ? 's' : ''}`;
+      : sparseWindow
+        ? `You've been away from this one — settle back in, then aim for ${n(target)}+ per set`
+        : `In range — aim for ${n(target)}+ per set, toward ${exercise.sets}×${exercise.repHigh}${timed ? 's' : ''}`;
   return { weight: 0, targetReps: target, direction: 'hold', kind: 'hold', reason };
 }
 

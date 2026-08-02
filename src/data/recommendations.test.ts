@@ -164,10 +164,13 @@ describe('weekly progression rate', () => {
     expect(advise(history, exercise, { experience: 'beginner' })).toMatchObject({ weight: 440 });
   });
 
-  it('does not restrain a lift that has not been trained in over a week', () => {
-    // Nothing in the trailing 7 days — no rate to hold it to.
+  it('holds a returning lifter to the same weekly rate as one who trained through', () => {
+    // Nothing in the trailing 7 days. The increase is still earned by that last
+    // session, but the cap anchors to it and allows one week's growth — time
+    // away doesn't bank increases, and handing the biggest jump to the least
+    // recently trained lift is the wrong direction.
     const rec = advise([session([[100, 12], [100, 12], [100, 12]], 3)]);
-    expect(rec).toMatchObject({ kind: 'increase', weight: 110 });
+    expect(rec).toMatchObject({ kind: 'increase', weight: 105 });
   });
 });
 
@@ -686,9 +689,9 @@ describe('timed exercises progress by seconds', () => {
 });
 
 // ── Time away ────────────────────────────────────────────────────────────────
-// Missed *reps* are covered thoroughly above. Missed *sessions* are a different
-// axis, and less settled. These tests pin down what the engine currently does
-// so the behaviour is a decision rather than an accident.
+// Missed *reps* are covered thoroughly above. Missed *sessions* are a separate
+// axis: the engine reads the last N sessions of an exercise regardless of when
+// they happened, so the calendar has to be handled deliberately.
 describe('a lifter coming back from time off', () => {
   const ex = { sets: 3, repLow: 8, repHigh: 12 };
   const at = (daysAgo: number, weight: number, reps: number): ExerciseSession => ({
@@ -696,21 +699,30 @@ describe('a lifter coming back from time off', () => {
     sets: [reps, reps, reps].map(r => ({ weight, reps: r })),
   });
 
-  it('lifts the weekly rate cap once nothing falls inside the last 7 days', () => {
-    // The cap is a *rate* limit, and with no session this week there is no rate
-    // to hold anyone to. The consequence is worth knowing: an intermediate who
-    // maxed the range three weeks ago gets the full sized increment (10%),
-    // where training through would have capped them at 5%. Defensible — the
-    // increase was earned by the last session — but it does mean the biggest
-    // jumps land on the least recently trained lifts.
-    const maxed = [at(21, 100, 12)];
-    const layoff = calculateRecommendation(maxed, ex, { now: NOW, experience: 'intermediate' })!;
-    expect(layoff).toMatchObject({ kind: 'increase', weight: 110 });
+  it('applies the weekly rate cap across a layoff', () => {
+    // At 400 lbs the per-week allowances are wider than the minimum increment,
+    // so the training-age rates are actually visible. These are the same
+    // numbers the lifter who trained through gets — the layoff neither earns a
+    // bigger jump nor forfeits the increase.
+    const maxed = [at(21, 400, 12)];
+    for (const [experience, expected] of [['advanced', 410], ['intermediate', 420]] as const) {
+      expect(calculateRecommendation(maxed, ex, { now: NOW, experience }), experience)
+        .toMatchObject({ kind: 'increase', weight: expected });
+    }
+  });
 
-    const consistent = calculateRecommendation(
-      [at(3, 100, 12), at(7, 100, 12)], ex, { now: NOW, experience: 'intermediate' },
-    )!;
-    expect(consistent.weight).toBeLessThan(layoff.weight);
+  it('never blocks the smallest increment the gym stocks, layoff or not', () => {
+    // 2.5% of 100 lbs is under any plate. A lift must still be able to move.
+    expect(calculateRecommendation([at(21, 100, 12)], ex, { now: NOW, experience: 'advanced' }))
+      .toMatchObject({ kind: 'increase', weight: 105 });
+  });
+
+  it('is no more generous to the absent lifter than to the consistent one', () => {
+    const consistent = [at(3, 100, 12), at(7, 100, 12)];
+    const layoff = [at(21, 100, 12), at(25, 100, 12)];
+    const a = calculateRecommendation(consistent, ex, { now: NOW, experience: 'intermediate' })!;
+    const b = calculateRecommendation(layoff, ex, { now: NOW, experience: 'intermediate' })!;
+    expect(b.weight).toBeLessThanOrEqual(a.weight);
   });
 
   it('does not stall a lifter who was progressing before the break', () => {
@@ -718,23 +730,32 @@ describe('a lifter coming back from time off', () => {
     expect(calculateRecommendation(climbing, ex, { now: NOW })!.kind).toBe('increase');
   });
 
-  it('eases a sporadic lifter back rather than parking them at a weight they never beat', () => {
-    // Three sessions across ten weeks at the same load. The engine reads it as a
-    // stall and backs off. The outcome is right for someone returning; the
-    // reason it gives ("no gain in reps or strength") describes detraining
-    // rather than accumulated fatigue.
+  it('does not read infrequent training as a plateau', () => {
+    // Three sessions across ten weeks at the same load. There is no accumulated
+    // fatigue to shed here — cutting the load would treat absence as if it were
+    // over-reaching.
     const sporadic = [at(5, 100, 10), at(30, 100, 10), at(70, 100, 10)];
     const rec = calculateRecommendation(sporadic, ex, { now: NOW })!;
-    expect(rec.kind).toBe('deload');
-    expect(rec.weight).toBeLessThan(100);
+    expect(rec.kind).toBe('hold');
+    expect(rec.weight).toBe(100);
+    expect(rec.reason).toMatch(/been away/i);
   });
 
-  it('counts stalls in sessions, not in weeks', () => {
-    // Same three sessions, compressed into a fortnight — identical verdict. The
-    // engine has no notion of elapsed time in its stall window.
+  it('still calls a real plateau when the sessions are close together', () => {
+    // Identical performances, compressed into a fortnight — that IS a stall.
     const dense = [at(2, 100, 10), at(6, 100, 10), at(10, 100, 10)];
-    const sparse = [at(5, 100, 10), at(30, 100, 10), at(70, 100, 10)];
-    expect(calculateRecommendation(dense, ex, { now: NOW })!.kind)
-      .toBe(calculateRecommendation(sparse, ex, { now: NOW })!.kind);
+    expect(calculateRecommendation(dense, ex, { now: NOW })!.kind).toBe('deload');
+  });
+
+  it('applies the same calendar guard to bodyweight and timed work', () => {
+    const bw = (daysAgo: number, reps: number): ExerciseSession => ({
+      completedAt: NOW - daysAgo * DAY,
+      sets: [reps, reps, reps].map(r => ({ weight: 0, reps: r })),
+    });
+    const ctx = { now: NOW, weightType: 'Bodyweight' } as const;
+    expect(calculateRecommendation([bw(2, 10), bw(6, 10), bw(10, 10)], ex, ctx)!.kind).toBe('deload');
+    const sparse = calculateRecommendation([bw(5, 10), bw(30, 10), bw(70, 10)], ex, ctx)!;
+    expect(sparse.kind).toBe('hold');
+    expect(sparse.reason).toMatch(/been away/i);
   });
 });

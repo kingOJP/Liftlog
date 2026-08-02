@@ -1037,6 +1037,16 @@ dosage comes from instead.
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
   collapsing them — a skipped week must look like a skipped week.
+- **Time away is handled explicitly, not by accident** — the engine reads the last
+  N sessions of an exercise regardless of when they happened, so the calendar needs
+  its own guards. Two: the weekly rate cap (`weeklyCeiling`) anchors to the most
+  recent session when nothing falls inside the trailing 7 days, so a lifter back
+  from a layoff gets the same weekly allowance as one who trained through rather
+  than the largest jump the sizing model can produce; and the stall window
+  (`STALL_WINDOW_DAYS`, 5 weeks) only calls a plateau when the three sessions are
+  close enough together to have accumulated fatigue — three sessions across three
+  months is infrequent training, and the reason string says so instead of
+  deloading them.
 - **Blocks are simulated end to end** (`blockSimulation.test.ts`) — twelve profiles
   across experience levels, goals, equipment, injuries and sports each design a
   10-week block and then *train* it week by week, logging exactly what the plan
