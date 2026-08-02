@@ -1,5 +1,5 @@
 import type { Exercise } from './program';
-import type { WeightType } from './taxonomy';
+import type { WeightType, MeasureUnit } from './taxonomy';
 import type { ExperienceLevel, Goal, PhaseKind } from './plan';
 import { isEasyPhase } from './plan';
 import { epley1RM } from './analytics';
@@ -117,6 +117,14 @@ export interface PrescriptionContext {
   goal?: Goal;
   /** Effective training age (experience.ts) — drives the weekly rate cap */
   experience?: ExperienceLevel;
+  /**
+   * How a set of this exercise is counted (exercises.ts `unit`). Timed work —
+   * planks, carries — is prescribed and progressed in SECONDS. The engine is
+   * otherwise unchanged: a hold logs at 0 lbs like other bodyweight work, so
+   * the rep-progression path already drives it. This only fixes what the
+   * prescription *says*, so a 45-second plank never reads as 45 repetitions.
+   */
+  unit?: MeasureUnit;
   /** For the weekly rate cap; defaults to now */
   now?: number;
 }
@@ -329,6 +337,10 @@ export function calculateRecommendation(
   const last = baseline[0];
   const weight = workingWeight(last.sets);
 
+  // Progression by count (reps or seconds) rather than by load.
+  const countProgressed =
+    weight === 0 && (weightType === 'Bodyweight' || ctx.unit === 'seconds');
+
   const withContext = (rec: WeightRec): WeightRec => skippedShifted
     ? { ...rec, reason: `${rec.reason} (last session ran later in your workout than usual — not held against you)` }
     : rec;
@@ -365,7 +377,7 @@ export function calculateRecommendation(
     // movement the athlete has done before, a bigger cut than a deload is right,
     // because the point is a comfortably submaximal first exposure.
     const factor = phase === 'race-week' ? 0.7 : phase === 'intro' ? 0.8 : 0.9;
-    if (weightType === 'Bodyweight' && weight === 0) {
+    if (countProgressed) {
       return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }
     return {
@@ -379,10 +391,14 @@ export function calculateRecommendation(
   // strength. Double progression still applies — earn the top of the range and
   // the load still moves — it just isn't chased.
 
-  // Bodyweight at 0 lbs → rep progression. If external load was logged
-  // (e.g. weighted pull-ups with a belt), the normal weight engine applies.
-  if (weightType === 'Bodyweight' && weight === 0) {
-    return withContext(repProgression(baseline, last, ex, goal));
+  // Count progression rather than load progression: bodyweight work logged at
+  // 0 lbs, and every timed hold. The unit check is not redundant — it holds
+  // even if a user edits the exercise's weight-type metadata, because a plank
+  // is progressed by time whatever the catalog says it's loaded with. If
+  // external load *was* logged (weighted pull-ups on a belt), the normal weight
+  // engine applies.
+  if (countProgressed) {
+    return withContext(repProgression(baseline, last, ex, goal, ctx.unit ?? 'reps'));
   }
 
   // Stats over the PROGRAMMED set count — extra sets are bonus volume, not
@@ -557,14 +573,23 @@ export function calculateRecommendation(
 // reps stand in for e1RM as the progress metric, and the recommendation carries
 // a `targetReps` goal instead of a new load.
 
+/**
+ * Progression by count rather than by load — bodyweight work at 0 lbs, and
+ * timed holds, which are the same thing measured in seconds. The four branches
+ * are identical either way; only the wording changes, because "push for 46
+ * reps" is nonsense on a plank.
+ */
 function repProgression(
   history: ExerciseSession[],
   last: ExerciseSession,
   exercise: PrescribedSlot,
   goal: Goal,
+  unit: MeasureUnit = 'reps',
 ): WeightRec {
   const minReps = Math.min(...last.sets.map(s => s.reps));
   const avgReps = repSum(last.sets) / last.sets.length;
+  const timed = unit === 'seconds';
+  const n = (v: number) => (timed ? `${v}s` : `${v} reps`);
 
   // 1. Rep range beaten across a full set count → raise the rep goal
   if (last.sets.length >= exercise.sets && minReps >= exercise.repHigh) {
@@ -573,7 +598,9 @@ function repProgression(
       targetReps: minReps + 1,
       direction: 'up',
       kind: 'increase',
-      reason: `All ${last.sets.length} sets hit ${exercise.repHigh}+ — push for ${minReps + 1} reps, or add weight`,
+      reason: timed
+        ? `All ${last.sets.length} holds hit ${exercise.repHigh}s+ — push for ${n(minReps + 1)}`
+        : `All ${last.sets.length} sets hit ${exercise.repHigh}+ — push for ${minReps + 1} reps, or add weight`,
     };
   }
 
@@ -590,7 +617,7 @@ function repProgression(
           targetReps: minReps,
           direction: 'hold',
           kind: 'hold',
-          reason: `Holding ${minReps} reps through a deficit is the win — defend this standard`,
+          reason: `Holding ${n(minReps)} through a deficit is the win — defend this standard`,
         };
       }
       return {
@@ -598,7 +625,9 @@ function repProgression(
         targetReps: exercise.repLow,
         direction: 'down',
         kind: 'deload',
-        reason: `Stalled ${window.length} sessions — reset to ${exercise.repLow} crisp reps and build back up`,
+        reason: timed
+          ? `Stalled ${window.length} sessions — reset to ${n(exercise.repLow)} of clean bracing and build back up`
+          : `Stalled ${window.length} sessions — reset to ${exercise.repLow} crisp reps and build back up`,
       };
     }
   }
@@ -610,7 +639,9 @@ function repProgression(
       targetReps: exercise.repLow,
       direction: 'down',
       kind: 'decrease',
-      reason: `Reps fell under ${exercise.repLow} — build back into the range`,
+      reason: timed
+        ? `Holds fell under ${n(exercise.repLow)} — build back into the range`
+        : `Reps fell under ${exercise.repLow} — build back into the range`,
     };
   }
 
@@ -618,8 +649,8 @@ function repProgression(
   const target = Math.min(minReps + 1, exercise.repHigh);
   const reason =
     last.sets.length < exercise.sets
-      ? `Complete all ${exercise.sets} sets, then chase reps`
-      : `In range — aim for ${target}+ reps per set, toward ${exercise.sets}×${exercise.repHigh}`;
+      ? `Complete all ${exercise.sets} sets, then chase ${timed ? 'time' : 'reps'}`
+      : `In range — aim for ${n(target)}+ per set, toward ${exercise.sets}×${exercise.repHigh}${timed ? 's' : ''}`;
   return { weight: 0, targetReps: target, direction: 'hold', kind: 'hold', reason };
 }
 
@@ -681,6 +712,8 @@ export function buildSetPlan(
   const count = Math.max(1, exercise.sets);
   const rec = calculateRecommendation(history, exercise, ctx);
   const { phase } = ctx;
+  const timed = ctx.unit === 'seconds';
+  const unitWord = timed ? 'seconds' : 'reps';
 
   // Nothing prescribed — ad-hoc work with no plan to dose it and no history to
   // read a range off. Lay out the sets and let the lifter log freely; showing a
@@ -691,7 +724,7 @@ export function buildSetPlan(
       sets: Array.from({ length: count }, (_, i) => ({
         setNumber: i + 1, weight: rec?.weight ?? null, targetReps: null,
       })),
-      goal: 'No rep target yet — log this session and the coach will learn the range you work in.',
+      goal: `No ${unitWord.slice(0, -1)} target yet — log this session and the coach will learn the range you work in.`,
     };
   }
   const ex: PrescribedSlot = {
@@ -705,7 +738,11 @@ export function buildSetPlan(
       sets: Array.from({ length: count }, (_, i) => ({
         setNumber: i + 1, weight: null, targetReps: ex.repLow,
       })),
-      goal: `First time on this lift — find a weight you can control for ${ex.repLow}–${ex.repHigh} reps with 1–2 in reserve.`,
+      goal: timed
+        ? `First time on this one — hold ${ex.repLow}–${ex.repHigh} seconds with clean form, and stop before the form goes.`
+        : ctx.weightType === 'Bodyweight'
+          ? `First time on this one — ${ex.repLow}–${ex.repHigh} controlled reps, stopping while they still look good.`
+          : `First time on this lift — find a weight you can control for ${ex.repLow}–${ex.repHigh} reps with 1–2 in reserve.`,
     };
   }
 
@@ -713,13 +750,15 @@ export function buildSetPlan(
 
   // A planned easy week is about crisp, submaximal reps — flat targets at the
   // bottom of the range, no fatigue-chasing. Every other week gets the model.
-  if (rec.kind === 'deload' && (phase === 'deload' || phase === 'recovery')) {
+  if (rec.kind === 'deload' && isEasyPhase(phase ?? null)) {
     return {
       rec,
       sets: Array.from({ length: count }, (_, i) => ({
         setNumber: i + 1, weight: rec.weight, targetReps: ex.repLow,
       })),
-      goal: `Leave 3–4 reps in reserve on every set. The easy week is the plan working.`,
+      goal: timed
+        ? 'Hold each set to the target and stop — the easy week is the plan working.'
+        : 'Leave 3–4 reps in reserve on every set. The easy week is the plan working.',
     };
   }
 
@@ -753,7 +792,9 @@ export function buildSetPlan(
 
   const planTotal = sets.reduce((sum, s) => sum + (s.targetReps ?? 0), 0);
   const targetTotal = count * ex.repHigh;
-  const goal = bodyweight
+  const goal = timed
+    ? `Hit every hold for ${planTotal} total seconds — ${targetTotal} earns a longer target next time.`
+    : bodyweight
     ? `Hit every target for ${planTotal} total reps — ${targetTotal} earns a harder variation or added load.`
     : rec.kind === 'increase'
       ? `New load: ${rec.weight} lbs — around ${planTotal} reps today, then climb to ${targetTotal} to earn the next jump.`

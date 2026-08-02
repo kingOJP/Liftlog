@@ -135,3 +135,84 @@ describe('resolvePrescription — the cascade', () => {
     })).toBeNull();
   });
 });
+
+// ── Sport-support ────────────────────────────────────────────────────────────
+// The sport templates carry their own per-slot dose, but every OTHER route an
+// exercise takes into a sport-support program — the day editor, the mid-workout
+// add panel, a quick workout — comes through here. Without a branch it fell
+// through to the generic default and handed a triathlete a hypertrophy
+// prescription with no regard for the weekly set ceiling.
+const backSquat = profileFor('barbell-back-squat');
+const cableRow = profileFor('seated-cable-row');
+const boxJump = profileFor('box-jump');
+const plank = profileFor('plank');
+const sidePlank = profileFor('side-plank');
+
+describe('sport-support dosage', () => {
+  it('doses a main compound as heavy, low-volume strength work', () => {
+    expect(dosage('sport-support', main, backSquat, 'intermediate'))
+      .toEqual({ sets: 4, repLow: 4, repHigh: 6 });
+  });
+
+  it('overrides the heavy-axial range: maximal strength is the point here', () => {
+    // isHeavyAxial would give 3 × 5–8. For an endurance athlete the whole
+    // reason to squat is force production, so the sport branch wins.
+    expect(isHeavyAxial(backSquat)).toBe(true);
+    const sport = dosage('sport-support', main, backSquat, 'intermediate');
+    const hyp = dosage('hypertrophy', main, backSquat, 'intermediate');
+    expect(sport.repHigh!).toBeLessThan(hyp.repHigh!);
+  });
+
+  it('keeps accessory compounds cheap', () => {
+    const d = dosage('sport-support', accessory, cableRow, 'intermediate');
+    expect(d.sets).toBeLessThanOrEqual(3);
+    expect(d.repHigh!).toBeLessThanOrEqual(8);
+  });
+
+  it('prescribes less isolation volume than a hypertrophy plan would', () => {
+    expect(dosage('sport-support', accessory, curl, 'intermediate').sets)
+      .toBeLessThan(dosage('hypertrophy', accessory, curl, 'intermediate').sets);
+  });
+
+  it('gives plyometrics low reps, not a hypertrophy range', () => {
+    expect(dosage('sport-support', accessory, boxJump, 'intermediate').repHigh!)
+      .toBeLessThanOrEqual(6);
+  });
+
+  it('still protects a beginner — no near-maximal work while learning', () => {
+    expect(dosage('sport-support', main, backSquat, 'beginner').repLow!)
+      .toBeGreaterThanOrEqual(8);
+  });
+
+  it('reaches the day editor and quick workouts through the cascade', () => {
+    const d = resolvePrescription({
+      profile: backSquat, slot: main, goal: 'sport-support', experience: 'intermediate',
+    });
+    expect(d).toEqual({ sets: 4, repLow: 4, repHigh: 6 });
+  });
+});
+
+describe('timed exercises are prescribed in seconds', () => {
+  it('prescribes a hold duration rather than a rep count', () => {
+    const d = dosage('hypertrophy', accessory, plank, 'intermediate');
+    expect(d.repLow!).toBeGreaterThanOrEqual(20);
+    expect(d.repHigh!).toBeGreaterThanOrEqual(d.repLow!);
+  });
+
+  it('holds are shorter for a beginner', () => {
+    expect(dosage('general', accessory, plank, 'beginner').repHigh!)
+      .toBeLessThan(dosage('general', accessory, plank, 'intermediate').repHigh!);
+  });
+
+  it('spends fewer sets on a hold when lifting supports a sport', () => {
+    expect(dosage('sport-support', accessory, sidePlank, 'intermediate').sets)
+      .toBeLessThan(dosage('hypertrophy', accessory, sidePlank, 'intermediate').sets);
+  });
+
+  it('is not confused by the plank being an Anti-Rotation-adjacent pattern', () => {
+    // Plank is a Plank pattern, so it must not fall into the high-rep table and
+    // come out as "3 × 12–20" reps.
+    const d = dosage('general', accessory, plank, 'intermediate');
+    expect(d.repHigh!).toBeGreaterThan(20);
+  });
+});

@@ -75,6 +75,34 @@ export function dosage(
   }
   const compound = profile.mechanics === 'compound';
 
+  // Timed work — planks, carries, dead hangs — is prescribed in SECONDS, and
+  // the numbers below are durations, not repetitions. It sits ahead of the
+  // beginner branch because a hold is a hold whoever is doing it; only the
+  // duration moves. See exercises.ts `unit`.
+  if (profile.unit === 'seconds') {
+    if (experience === 'beginner') return { sets: 2, repLow: 20, repHigh: 30 };
+    return goal === 'sport-support'
+      ? { sets: 2, repLow: 30, repHigh: 45 }
+      : { sets: 3, repLow: 30, repHigh: 45 };
+  }
+
+  // Lifting in service of another sport. The dose is maximal-strength work at
+  // low volume: heavy multi-joint lifts in the 4–6 region, accessories kept
+  // deliberately cheap, and nothing taken near failure. It sits ahead of the
+  // beginner branch's peers but after it, because a novice endurance athlete
+  // still needs to learn the movement before loading it.
+  //
+  // This is the same prescription the sport templates carry per slot
+  // (sports.ts) — having it here too is what makes an exercise added in the day
+  // editor, mid-workout or in a quick workout come out dosed for the sport
+  // instead of falling through to a hypertrophy default.
+  if (goal === 'sport-support' && experience !== 'beginner') {
+    if (profile.workoutType === 'Jump') return { sets: 3, repLow: 4, repHigh: 6 };
+    if (slot.main && compound) return { sets: 4, repLow: 4, repHigh: 6 };
+    if (compound) return { sets: 3, repLow: 6, repHigh: 8 };
+    return { sets: 2, repLow: 8, repHigh: 12 };
+  }
+
   // Beginners: submaximal loads, moderate reps, and fewer sets. Rep ranges
   // never drop below 8 — a novice building technique should not be grinding
   // near-maximal singles/triples, whatever their stated goal, and that holds on

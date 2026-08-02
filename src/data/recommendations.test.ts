@@ -579,3 +579,76 @@ describe('no prescription (ad-hoc work with nothing to dose from)', () => {
     expect(p.sets.every(s => s.weight === null && s.targetReps === null)).toBe(true);
   });
 });
+
+// ── Timed holds ───────────────────────────────────────────────────────────────
+// A plank logs at 0 lbs like other bodyweight work, so it already rides the
+// rep-progression path. What the unit changes is what the coach SAYS, and that
+// the progression is understood as time.
+describe('timed exercises progress by seconds', () => {
+  const plank = { sets: 3, repLow: 30, repHigh: 45 };
+  const held = (...secs: number[][]): ExerciseSession[] =>
+    secs.map((s, i) => ({
+      completedAt: NOW - i * 3 * DAY,
+      sets: s.map(v => ({ weight: 0, reps: v })),
+    }));
+
+  it('lengthens the hold once the range is beaten', () => {
+    const rec = calculateRecommendation(held([46, 46, 46]), plank, { unit: 'seconds' });
+    expect(rec!.kind).toBe('increase');
+    expect(rec!.targetReps).toBe(47);
+    expect(rec!.weight).toBe(0);
+    expect(rec!.reason).toMatch(/holds hit/i);
+    expect(rec!.reason).not.toMatch(/\breps\b/);
+  });
+
+  it('resets the hold after a stall instead of adding load', () => {
+    const rec = calculateRecommendation(held([35, 35, 35], [35, 35, 35], [36, 35, 35]), plank, { unit: 'seconds' });
+    expect(rec!.kind).toBe('deload');
+    expect(rec!.targetReps).toBe(plank.repLow);
+    expect(rec!.reason).toMatch(/bracing/i);
+  });
+
+  it('builds back into the range when the holds fall short', () => {
+    const rec = calculateRecommendation(held([18, 16, 15]), plank, { unit: 'seconds' });
+    expect(rec!.kind).toBe('decrease');
+    expect(rec!.reason).toMatch(/Holds fell under 30s/);
+  });
+
+  it('chases one more second per set while in range', () => {
+    const rec = calculateRecommendation(held([34, 33, 33]), plank, { unit: 'seconds' });
+    expect(rec!.kind).toBe('hold');
+    expect(rec!.reason).toMatch(/34s\+/);
+  });
+
+  it('says the same things in reps when the exercise is not timed', () => {
+    const rec = calculateRecommendation(held([46, 46, 46]), plank);
+    expect(rec!.reason).toMatch(/\breps\b/);
+  });
+
+  it('prescribes a per-set hold, and talks in seconds', () => {
+    const plan = buildSetPlan(held([34, 33, 33]), plank, { unit: 'seconds' });
+    expect(plan.sets).toHaveLength(3);
+    for (const s of plan.sets) {
+      expect(s.weight).toBe(0);
+      expect(s.targetReps).toBeGreaterThanOrEqual(plank.repLow);
+    }
+    expect(plan.goal).toMatch(/total seconds/);
+  });
+
+  it('backs the hold off in an easy week', () => {
+    const plan = buildSetPlan(held([40, 40, 40]), plank, { unit: 'seconds', phase: 'deload' });
+    expect(plan.sets.every(s => s.targetReps === plank.repLow)).toBe(true);
+    expect(plan.goal).toMatch(/Hold each set/);
+  });
+
+  it('backs off harder in an intro week than in a deload', () => {
+    const loaded = { sets: 3, repLow: 8, repHigh: 12 };
+    const history: ExerciseSession[] = [
+      { completedAt: NOW, sets: [{ weight: 100, reps: 10 }, { weight: 100, reps: 10 }, { weight: 100, reps: 10 }] },
+    ];
+    const intro = calculateRecommendation(history, loaded, { phase: 'intro' })!;
+    const deload = calculateRecommendation(history, loaded, { phase: 'deload' })!;
+    expect(intro.weight).toBeLessThan(deload.weight);
+    expect(intro.reason).toMatch(/Intro week/i);
+  });
+});

@@ -17,7 +17,7 @@ import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { buildSetPlan } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
-import { getExerciseMeta } from '../data/exercises';
+import { getExerciseMeta, unitFor } from '../data/exercises';
 import { getActivePhase, getProfileOrDefault, getTrainingGoal } from '../data/planStore';
 import { effectiveExperience } from '../data/experience';
 import { PHASE_INFO } from '../data/plan';
@@ -93,7 +93,12 @@ function contextForExercise(
     }
     if (history.length >= 4) break;
   }
-  const plan = buildSetPlan(history, ex, { ...ctx, weightType: getExerciseMeta(ex.id).weightType });
+  const plan = buildSetPlan(history, ex, {
+    ...ctx,
+    weightType: getExerciseMeta(ex.id).weightType,
+    // Timed holds are prescribed and progressed in seconds, not reps.
+    unit: unitFor(ex.id),
+  });
   return { plan, last: history[0], rec: plan.rec ?? undefined };
 }
 
