@@ -28,6 +28,7 @@ import { candidateProfiles, profileFor } from './substitution';
 import { DIFFICULTY_RANK } from './exercises';
 import type { Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel } from './plan';
 import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD } from './plan';
+import { dosage } from './dosage';
 
 // ── Input / output ────────────────────────────────────────────────────────────
 
@@ -360,47 +361,10 @@ function splitFor(
 
 // ── Dosage (sets × rep range) by goal ─────────────────────────────────────────
 
-const HIGH_REP_PATTERNS = new Set<WorkoutType>([
-  'Lateral Raise', 'Calf Raise', 'Face Pull', 'Reverse Fly', 'Crunch',
-]);
-
-function dosage(
-  goal: Goal,
-  slot: Slot,
-  profile: ExerciseProfile,
-  experience: ExperienceLevel,
-): Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> {
-  if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
-    return experience === 'beginner' ? { sets: 2, repLow: 12, repHigh: 20 } : { sets: 3, repLow: 12, repHigh: 20 };
-  }
-  const compound = profile.mechanics === 'compound';
-
-  // Beginners: submaximal loads, moderate reps, and fewer sets. Rep ranges
-  // never drop below 8 — a novice building technique should not be grinding
-  // near-maximal singles/triples, whatever their stated goal. Lower set counts
-  // keep total volume in the range a new lifter actually recovers from.
-  if (experience === 'beginner') {
-    if (slot.main && compound) return { sets: 3, repLow: 8, repHigh: 12 };
-    if (compound) return { sets: 2, repLow: 8, repHigh: 12 };
-    return { sets: 2, repLow: 10, repHigh: 15 };
-  }
-
-  if (slot.main && compound) {
-    if (goal === 'strength') return { sets: 4, repLow: 4, repHigh: 6 };
-    if (goal === 'athletic') return { sets: 4, repLow: 5, repHigh: 8 };
-    if (goal === 'hypertrophy') return { sets: 3, repLow: 6, repHigh: 10 };
-    return { sets: 3, repLow: 8, repHigh: 12 };
-  }
-  if (compound) {
-    return goal === 'strength' ? { sets: 3, repLow: 6, repHigh: 10 } : { sets: 3, repLow: 8, repHigh: 12 };
-  }
-  // isolation
-  if (goal === 'strength') return { sets: 3, repLow: 8, repHigh: 12 };
-  if (goal === 'hypertrophy') return { sets: 3, repLow: 10, repHigh: 15 };
-  return { sets: 3, repLow: 12, repHigh: 15 };
-}
-
-// ── Phase layout ──────────────────────────────────────────────────────────────
+// Dosage (sets × rep range) is resolved by data/dosage.ts — the single source
+// of truth shared with the day editor, the mid-workout add panel and quick
+// workouts, so an exercise gets the same goal-aware prescription however it
+// enters the program.
 
 export function defaultBlockWeeks(): number {
   return 6;

@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { WorkoutDay, Exercise } from '../data/program';
+import type { WorkoutDay, Exercise, LibraryExercise } from '../data/program';
+import { prescriptionDetail } from '../data/program';
 import { addToExerciseLibrary, findExerciseByName, generateExerciseId, getExerciseLibrary } from '../data/programStore';
 import { getExerciseMeta } from '../data/exercises';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { suggestReplacements, profileFor } from '../data/substitution';
+import { prescribeFor, slotFor } from '../data/prescribe';
 import type { ReplacementSuggestion } from '../data/substitution';
 import './DayEditView.css';
 
@@ -23,10 +25,13 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
-  const [library, setLibrary] = useState<Exercise[]>([]);
+  const [library, setLibrary] = useState<LibraryExercise[]>([]);
+  // The create-exercise form is pre-filled with the dose the coach would
+  // prescribe for this goal and athlete, not a hardcoded 3 × 8–12. The user can
+  // still override it — an explicit choice is a prescription; a constant isn't.
   const [newSets, setNewSets] = useState('3');
-  const [newRepLow, setNewRepLow] = useState('8');
-  const [newRepHigh, setNewRepHigh] = useState('12');
+  const [newRepLow, setNewRepLow] = useState('');
+  const [newRepHigh, setNewRepHigh] = useState('');
 
   // Replacement suggestions personalize on training history (familiarity,
   // strength trends, weekly volume balance) — loaded once, used lazily.
@@ -108,21 +113,16 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
     setSearch('');
     setCreating(false);
     setNewSets('3');
-    setNewRepLow('8');
-    setNewRepHigh('12');
+    setNewRepLow('');
+    setNewRepHigh('');
   }
 
   // Pick an existing library exercise: reuse its id (so history resolves) and
-  // its stored sets/rep range. addToExerciseLibrary lifts any deletion tombstone.
-  function handleAddFromLibrary(ex: Exercise) {
+  // dose it for the active plan. The library carries no rep range of its own —
+  // the prescription is resolved here, at the point of use.
+  function handleAddFromLibrary(ex: LibraryExercise) {
     addToExerciseLibrary(ex);
-    setExercises(prev => [...prev, {
-      id: ex.id,
-      name: ex.name,
-      sets: ex.sets,
-      repLow: ex.repLow,
-      repHigh: ex.repHigh,
-    }]);
+    setExercises(prev => [...prev, slotFor(ex.id, ex.name, { snapshot })]);
     closeAdd();
   }
 
@@ -140,16 +140,19 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
       return;
     }
 
-    const exercise: Exercise = {
-      id: generateExerciseId(trimmed),
-      name: trimmed,
-      sets: Number(newSets) || 3,
-      repLow: Number(newRepLow) || 8,
-      repHigh: Number(newRepHigh) || 12,
-    };
+    const id = generateExerciseId(trimmed);
+    // The library stores identity only; the day slot carries the prescription.
+    addToExerciseLibrary({ id, name: trimmed });
 
-    addToExerciseLibrary(exercise);
-    setExercises(prev => [...prev, exercise]);
+    const suggested = prescribeFor(id, { name: trimmed, snapshot });
+    const repLow = Number(newRepLow) || suggested?.repLow;
+    const repHigh = Number(newRepHigh) || suggested?.repHigh;
+    setExercises(prev => [...prev, {
+      id,
+      name: trimmed,
+      sets: Number(newSets) || suggested?.sets || 3,
+      ...(repLow != null && repHigh != null ? { repLow, repHigh } : {}),
+    }]);
     closeAdd();
   }
 
@@ -189,7 +192,7 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                   <div className="exercise-edit-row">
                     <div className="exercise-edit-info">
                       <span className="exercise-edit-name">{ex.name}</span>
-                      <span className="exercise-edit-meta">{ex.sets} sets · {ex.repLow}–{ex.repHigh} reps</span>
+                      <span className="exercise-edit-meta">{prescriptionDetail(ex)}</span>
                     </div>
                     <button
                       className={`exercise-swap-btn${swapTargetId === ex.id ? ' active' : ''}`}
@@ -252,7 +255,7 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                           {s.cautions.map(c => <li key={c} className="swap-caution">{c}</li>)}
                         </ul>
                         <span className="swap-card-keep">
-                          Keeps your {ex.sets} sets × {ex.repLow}–{ex.repHigh} reps
+                          Keeps your {prescriptionDetail(ex)}
                         </span>
                       </div>
                     ))}
@@ -296,7 +299,7 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                         >
                           <span className="add-search-name">{ex.name}</span>
                           <span className="add-search-meta">
-                            {[muscle, `${ex.sets} × ${ex.repLow}–${ex.repHigh}`]
+                            {[muscle]
                               .filter(Boolean)
                               .join(' · ')}
                           </span>

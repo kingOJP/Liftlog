@@ -1,3 +1,4 @@
+import { prescriptionDetail } from '../data/program';
 import { useMemo } from 'react';
 import type { SharedWorkout } from '../data/share';
 import { resolveSharedExercises } from '../data/share';
@@ -41,7 +42,7 @@ export default function SharedWorkoutView({ shared, onStart, onAddToProgram, onD
               <div className="shared-exercise-info">
                 <span className="shared-exercise-name">{exercise.name}</span>
                 <span className="shared-exercise-meta">
-                  {exercise.sets} sets · {exercise.repLow}–{exercise.repHigh} reps
+                  {prescriptionDetail(exercise)}
                 </span>
               </div>
               <span className={`shared-badge${existing ? '' : ' shared-badge--new'}`}>

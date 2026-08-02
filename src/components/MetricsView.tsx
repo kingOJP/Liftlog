@@ -6,7 +6,6 @@ import { computeMetrics } from '../data/metrics';
 import type { Metrics } from '../data/metrics';
 import { computeCoaching, SETS_TARGET_LOW, SETS_TARGET_HIGH } from '../data/insights';
 import type { Coaching, Insight } from '../data/insights';
-import { getWeekNumber } from '../data/program';
 import { getActivePhase, getTrainingGoal } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
@@ -40,7 +39,7 @@ export default function MetricsView({ program, onBack }: Props) {
       setMetrics(m);
       setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snap, getWeekNumber(), Date.now(), getActivePhase(), getTrainingGoal()));
+      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal()));
     });
     return () => { cancelled = true; };
   }, [program]);
@@ -256,9 +255,15 @@ export default function MetricsView({ program, onBack }: Props) {
             {/* ── Weekly volume ── */}
             <section className="metric-section">
               <h2 className="metric-heading">Weekly Volume</h2>
-              <p className="metric-sub">Total weight × reps lifted each week — your progressive-overload signal.</p>
+              <p className="metric-sub">
+                Total weight × reps lifted each week (Mon–Sun), oldest to newest — your
+                progressive-overload signal. This week is highlighted.
+              </p>
               {metrics.weeklyVolume.length > 0
-                ? <BarChart data={metrics.weeklyVolume} />
+                ? <BarChart
+                    data={metrics.weeklyVolume}
+                    highlightIndex={metrics.weeklyVolume.findIndex(w => w.isCurrent)}
+                  />
                 : <p className="metrics-empty">Not enough data yet.</p>}
             </section>
 

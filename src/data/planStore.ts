@@ -356,12 +356,23 @@ export async function startPendingActivation(
   return true;
 }
 
-/** The goal the user is currently training toward (weights the progress engine). */
-export function getTrainingGoal(): Goal {
+/**
+ * The goal the user is currently training toward, or null when they have no
+ * plan at all. Prescription needs to tell "no plan" apart from "general goal" —
+ * dosing an ad-hoc lift as if a plan existed is how invented rep ranges creep
+ * back in. Analytics that only need *a* goal to weight signals use
+ * getTrainingGoal() below.
+ */
+export function getPlannedGoal(): Goal | null {
   const state = getPlanState();
   return state.plans.find(p => p.status === 'active')?.goal
     ?? state.pendingActivation?.goal
-    ?? 'general';
+    ?? null;
+}
+
+/** The goal the user is currently training toward (weights the progress engine). */
+export function getTrainingGoal(): Goal {
+  return getPlannedGoal() ?? 'general';
 }
 
 /** The block the currently-active block replaced (most recently completed). */

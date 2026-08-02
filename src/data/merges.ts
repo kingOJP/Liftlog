@@ -1,5 +1,5 @@
 import { deleteExerciseMeta } from './exercises';
-import type { Exercise, WorkoutDay } from './program';
+import type { Exercise, LibraryExercise, WorkoutDay } from './program';
 import {
   getExerciseLibrary, saveExerciseLibrary,
   getStoredProgram, saveStoredProgram, getExerciseName,
@@ -90,13 +90,13 @@ export function mergeProgramIds(
  * Pure.
  */
 export function mergeLibraryIds(
-  library: Exercise[],
+  library: LibraryExercise[],
   flat: MergeMap,
   nameFor: (id: string) => string,
-): { library: Exercise[]; changed: boolean } {
+): { library: LibraryExercise[]; changed: boolean } {
   let changed = false;
   const byId = new Map(library.map(e => [e.id, e]));
-  const out: Exercise[] = [];
+  const out: LibraryExercise[] = [];
   const emitted = new Set<string>();
   for (const e of library) {
     const id = flat[e.id] ?? e.id;

@@ -21,6 +21,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay } from './program';
+import { startOfWeek } from './program';
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
@@ -207,12 +208,9 @@ export function toPlanDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Monday 00:00 of the week containing `date` — one definition, in program.ts. */
 export function mondayOf(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d;
+  return new Date(startOfWeek(date));
 }
 
 /** The Monday starting the block's first week. */

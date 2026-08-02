@@ -196,7 +196,10 @@ async function reviewPending(request: Request, env: Env, adminId: string, id: st
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name, sets = excluded.sets,
          rep_low = excluded.rep_low, rep_high = excluded.rep_high, archived = 0`,
-    ).bind(id, body.name ?? pending.name, body.sets ?? 3, body.repLow ?? 8, body.repHigh ?? 12));
+      // Sets/reps are prescription, not identity: the client resolves them per
+      // plan (data/dosage.ts), so the global row stores NULL rather than an
+      // invented 3 × 8–12 that would follow the exercise into every program.
+    ).bind(id, body.name ?? pending.name, body.sets ?? null, body.repLow ?? null, body.repHigh ?? null));
 
     const submitted = pending.metadata_json ? JSON.parse(pending.metadata_json) as MetadataBody : {};
     const meta = { ...submitted, ...body.metadata };
@@ -245,8 +248,8 @@ async function editGlobal(request: Request, env: Env, adminId: string, id: strin
        rep_low  = COALESCE(excluded.rep_low, global_exercises.rep_low),
        rep_high = COALESCE(excluded.rep_high, global_exercises.rep_high),
        archived = COALESCE(excluded.archived, global_exercises.archived)`,
-  ).bind(id, body.name ?? (before?.name ?? id), body.sets ?? (before?.sets ?? 3),
-         body.repLow ?? (before?.rep_low ?? 8), body.repHigh ?? (before?.rep_high ?? 12),
+  ).bind(id, body.name ?? (before?.name ?? id), body.sets ?? (before?.sets ?? null),
+         body.repLow ?? (before?.rep_low ?? null), body.repHigh ?? (before?.rep_high ?? null),
          body.archived === undefined ? (before?.archived ?? 0) : (body.archived ? 1 : 0)));
 
   if (body.metadata) {

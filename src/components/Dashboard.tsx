@@ -60,7 +60,7 @@ export default function Dashboard({
       setCompletedDayIds(new Set(
         snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
       ));
-      setCoaching(computeCoaching(program, snapshot, weekNumber, Date.now(), phase, goal));
+      setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal));
     });
     return () => { cancelled = true; };
   }, [program, weekNumber, phase, goal]);

@@ -1,6 +1,6 @@
 import { EXERCISES, EXERCISE_MAP, catalogDefFor, deleteExerciseMeta } from './exercises';
 import { LEGACY_ID_MAP, canonicalizeId } from './legacyIds';
-import { PROGRAM, type Exercise, type WorkoutDay } from './program';
+import { type Exercise, type LibraryExercise, type WorkoutDay } from './program';
 
 const PROGRAM_KEY  = 'liftlog_program';
 const LIBRARY_KEY  = 'liftlog_exercises';
@@ -98,21 +98,12 @@ export function addDeletedExerciseIds(ids: string[]): void {
 
 // ── Exercise library ─────────────────────────────────────────────────────────
 
-function buildDefaultLibrary(): Exercise[] {
-  // Derive default sets/reps from PROGRAM where possible, else fall back to generic defaults
-  const programDefaults = new Map<string, Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>>();
-  for (const day of PROGRAM) {
-    for (const ex of day.exercises) {
-      if (!programDefaults.has(ex.id)) {
-        programDefaults.set(ex.id, { sets: ex.sets, repLow: ex.repLow, repHigh: ex.repHigh });
-      }
-    }
-  }
-
-  return EXERCISES.map(def => {
-    const defaults = programDefaults.get(def.id) ?? { sets: 3, repLow: 8, repHigh: 12 };
-    return { id: def.id, name: def.name, ...defaults };
-  });
+// The library is movement identity only. It used to seed sets/reps from the
+// hardcoded PROGRAM, falling back to 3 × 8–12 for anything PROGRAM didn't list —
+// which is how a conventional deadlift ended up prescribed like a cable row.
+// Dosage now comes from data/dosage.ts at the point of use.
+function buildDefaultLibrary(): LibraryExercise[] {
+  return EXERCISES.map(def => ({ id: def.id, name: def.name }));
 }
 
 // One-time migration: remove stale/duplicate IDs and rebuild from master list,
@@ -135,21 +126,21 @@ function migrateLibraryIfNeeded(): void {
   localStorage.setItem(MIGRATION_V3, '1');
 }
 
-export function getExerciseLibrary(): Exercise[] {
+export function getExerciseLibrary(): LibraryExercise[] {
   migrateLibraryIfNeeded();
   const deleted = getDeletedExerciseIds();
   try {
     const raw = localStorage.getItem(LIBRARY_KEY);
-    if (raw) return (JSON.parse(raw) as Exercise[]).filter(e => !deleted.has(e.id));
+    if (raw) return (JSON.parse(raw) as LibraryExercise[]).filter(e => !deleted.has(e.id));
   } catch { /* fall through */ }
   return buildDefaultLibrary().filter(e => !deleted.has(e.id));
 }
 
-export function saveExerciseLibrary(exercises: Exercise[]): void {
+export function saveExerciseLibrary(exercises: LibraryExercise[]): void {
   localStorage.setItem(LIBRARY_KEY, JSON.stringify(exercises));
 }
 
-export function addToExerciseLibrary(exercise: Exercise): void {
+export function addToExerciseLibrary(exercise: LibraryExercise): void {
   // Explicitly re-adding an exercise lifts its tombstone
   const deleted = getDeletedExerciseIds();
   if (deleted.delete(exercise.id)) saveDeletedExerciseIds(deleted);
@@ -165,7 +156,7 @@ export function addToExerciseLibrary(exercise: Exercise): void {
 // this device and simply haven't pushed yet (or a stale device pushed a library
 // from before they existed). A pull must never delete a local exercise; only
 // tombstones delete. Returns the merged library it saved.
-export function mergeExerciseLibrary(incoming: Exercise[]): Exercise[] {
+export function mergeExerciseLibrary(incoming: LibraryExercise[]): LibraryExercise[] {
   const deleted = getDeletedExerciseIds();
   const incomingIds = new Set(incoming.map(e => e.id));
   const localOnly = getExerciseLibrary().filter(e => !incomingIds.has(e.id));
@@ -182,12 +173,12 @@ export function ensureProgramExercisesInLibrary(program: WorkoutDay[]): void {
   const deleted = getDeletedExerciseIds();
   const lib = getExerciseLibrary();
   const known = new Set(lib.map(e => e.id));
-  const missing: Exercise[] = [];
+  const missing: LibraryExercise[] = [];
   for (const day of program) {
     for (const ex of day.exercises) {
       if (known.has(ex.id) || deleted.has(ex.id)) continue;
       known.add(ex.id);
-      missing.push({ id: ex.id, name: ex.name, sets: ex.sets, repLow: ex.repLow, repHigh: ex.repHigh });
+      missing.push({ id: ex.id, name: ex.name });
     }
   }
   if (missing.length > 0) saveExerciseLibrary([...lib, ...missing]);
@@ -229,15 +220,13 @@ export function generateExerciseId(name: string): string {
 // by slug ("Bench  Press!" ≡ "bench press"), library first (the id the user's
 // history is logged under wins), then the built-in catalog — a catalog match
 // also revives a tombstoned entry once it's explicitly re-added.
-export function findExerciseByName(name: string): Exercise | null {
+export function findExerciseByName(name: string): LibraryExercise | null {
   const slug = slugify(name);
   if (!slug) return null;
   const lib = getExerciseLibrary().find(e => slugify(e.name) === slug);
   if (lib) return lib;
   const def = EXERCISES.find(e => e.id === slug || slugify(e.name) === slug);
-  if (def) {
-    return { id: def.id, name: def.name, sets: 3, repLow: 8, repHigh: 12 };
-  }
+  if (def) return { id: def.id, name: def.name };
   return null;
 }
 

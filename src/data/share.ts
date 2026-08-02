@@ -24,8 +24,9 @@ const PENDING_KEY = 'liftlog_pending_share';
 export interface SharedExercise {
   name: string;
   sets: number;
-  repLow: number;
-  repHigh: number;
+  /** Absent when the sharer's slot carries no prescription (encoded as 0) */
+  repLow?: number;
+  repHigh?: number;
 }
 
 export interface SharedWorkout {
@@ -40,7 +41,9 @@ interface WirePayload {
   v: 1;
   l: string;
   g: string;
-  x: Array<[string, number, number, number]>; // [name, sets, repLow, repHigh]
+  // [name, sets, repLow, repHigh] — a rep bound of 0 means "not prescribed",
+  // which keeps the tuple shape (and old decoders) intact.
+  x: Array<[string, number, number, number]>;
 }
 
 // Standard base64 helpers can't hold arbitrary unicode; go through UTF-8 and
@@ -64,7 +67,7 @@ export function encodeWorkoutShare(day: WorkoutDay): string {
     v: 1,
     l: day.label,
     g: day.muscleGroups,
-    x: day.exercises.map(e => [e.name, e.sets, e.repLow, e.repHigh]),
+    x: day.exercises.map(e => [e.name, e.sets, e.repLow ?? 0, e.repHigh ?? 0]),
   };
   return toBase64Url(JSON.stringify(payload));
 }
@@ -83,11 +86,16 @@ export function decodeWorkoutShare(encoded: string): SharedWorkout | null {
           typeof row[3] !== 'number') {
         return null;
       }
+      // 0/0 is the "not prescribed" sentinel this encoder writes. Anything
+      // else is treated as a real (if hostile) range and clamped, so a corrupt
+      // payload can't smuggle in nonsense OR quietly drop a prescription.
+      const prescribed = !(row[2] === 0 && row[3] === 0);
       exercises.push({
         name: row[0].trim().slice(0, 80),
         sets: clampInt(row[1], 1, 10),
-        repLow: clampInt(row[2], 1, 100),
-        repHigh: clampInt(row[3], 1, 100),
+        ...(prescribed
+          ? { repLow: clampInt(row[2], 1, 100), repHigh: clampInt(row[3], 1, 100) }
+          : {}),
       });
     }
     return { label: p.l.slice(0, 60), muscleGroups: p.g.slice(0, 80), exercises };

@@ -14,26 +14,35 @@ function formatValue(v: number): string {
 
 interface BarChartProps {
   data: ChartPoint[];
-  /** highlight the bar with the largest value */
+  /** highlight the bar with the largest value (ignored when highlightIndex is set) */
   highlightMax?: boolean;
+  /**
+   * Highlight a specific bar instead of the tallest one — e.g. the week the
+   * user is training in right now, which is the bar they came to look at.
+   */
+  highlightIndex?: number;
 }
 
-export function BarChart({ data, highlightMax = true }: BarChartProps) {
+export function BarChart({ data, highlightMax = true, highlightIndex }: BarChartProps) {
   const max = Math.max(...data.map(d => d.value), 1);
-  const maxIndex = highlightMax ? data.reduce((m, d, i, a) => (d.value > a[m].value ? i : m), 0) : -1;
+  const accentIndex = highlightIndex != null
+    ? highlightIndex
+    : highlightMax && data.length > 0
+      ? data.reduce((m, d, i, a) => (d.value > a[m].value ? i : m), 0)
+      : -1;
 
   return (
     <div className="bar-chart">
       {data.map((d, i) => (
         <div className="bar-col" key={i}>
-          <span className="bar-value">{formatValue(d.value)}</span>
+          <span className={`bar-value${i === accentIndex ? ' is-max' : ''}`}>{formatValue(d.value)}</span>
           <div className="bar-track">
             <div
-              className={`bar-fill${i === maxIndex ? ' is-max' : ''}`}
-              style={{ height: `${(d.value / max) * 100}%` }}
+              className={`bar-fill${i === accentIndex ? ' is-max' : ''}${d.value === 0 ? ' is-empty' : ''}`}
+              style={{ height: `${Math.max((d.value / max) * 100, d.value === 0 ? 0 : 2)}%` }}
             />
           </div>
-          <span className="bar-label">{d.label}</span>
+          <span className={`bar-label${i === accentIndex ? ' is-max' : ''}`}>{d.label}</span>
         </div>
       ))}
     </div>
