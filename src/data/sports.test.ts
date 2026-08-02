@@ -122,6 +122,41 @@ describe('race proximity shapes the block', () => {
     }
   });
 
+  it('closes a near-race block on two easy weeks', () => {
+    const { phases, notes } = buildSportPhases(10, 'soon', 'triathlon');
+    expect(phases.slice(-2)).toEqual(['deload', 'deload']);
+    expect(phases.filter(p => p === 'deload')).toHaveLength(2);
+    expect(notes.join(' ')).toMatch(/fresh legs/i);
+  });
+
+  it('keeps the taper at one week when the race is further out', () => {
+    expect(buildSportPhases(10, 'mid', 'triathlon').phases.filter(p => p === 'deload')).toHaveLength(1);
+    expect(buildSportPhases(10, 'far', 'triathlon').phases.filter(p => p === 'deload')).toHaveLength(0);
+    expect(buildSportPhases(10, 'none', 'triathlon').phases.filter(p => p === 'deload')).toHaveLength(0);
+  });
+
+  it('shrinks the taper rather than eating the productive weeks', () => {
+    // 5 weeks: two easy would leave only 3 hard weeks — exactly the minimum, so
+    // the full taper survives. 4 weeks cannot afford both.
+    expect(buildSportPhases(5, 'soon', 'running').phases.filter(p => p === 'deload')).toHaveLength(2);
+    expect(buildSportPhases(4, 'soon', 'running').phases.filter(p => p === 'deload')).toHaveLength(1);
+    expect(buildSportPhases(3, 'soon', 'running').phases.filter(p => p === 'deload')).toHaveLength(0);
+  });
+
+  it('still fits the requested length with a two-week taper', () => {
+    for (const weeks of [5, 6, 8, 10, 12]) {
+      expect(buildSportPhases(weeks, 'soon', 'running').phases, `${weeks}`).toHaveLength(weeks);
+    }
+  });
+
+  it('runs a single short session through both taper weeks', () => {
+    // Day gating does the volume cut: only the strength day survives a deload.
+    const plan = buildSportPlan(sport({ proximity: 'soon' }), 3);
+    const running = plan.days.filter(d => !d.phases || d.phases.includes('deload'));
+    expect(running).toHaveLength(1);
+    expect(running[0].title).toMatch(/Max Strength/);
+  });
+
   it('opens with the intro weeks it was given', () => {
     const { phases } = buildSportPhases(8, 'mid', 'running', 2);
     expect(phases.slice(0, 2)).toEqual(['intro', 'intro']);

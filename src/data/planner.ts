@@ -21,7 +21,8 @@
 
 import type { MuscleGroup, WorkoutType, Equipment, WeightType } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
-import type { TrainingSnapshot } from './analytics';
+import type { TrainingSnapshot, VolumeTarget } from './analytics';
+import { volumeTargetFor } from './analytics';
 import { assessSnapshot, progressDirections } from './progress';
 import type { ExerciseProfile } from './substitution';
 import { candidateProfiles, profileFor } from './substitution';
@@ -683,6 +684,7 @@ const MINUTES_PER_SET = 3;       // matches the coach planner's estimate
 const SESSION_OVERHEAD_MIN = 10;
 const LONG_SESSION_MIN = 95;
 const SPORT_SESSION_MIN = 55;   // a support session that outgrows this is defeating itself
+const MAX_VOLUME_TRIMS = 40;    // loop guard for the ceiling pass
 
 export function buildPlanProposal(
   input: PlannerInput,
@@ -845,15 +847,20 @@ export function buildPlanProposal(
   const { phases, notes: phaseNotes, warnings: phaseWarnings } = buildPhases(input, previousRetro, change);
   warnings.push(...phaseWarnings);
 
-  // Projected weekly volume per muscle (primary 1, secondary 0.5)
-  const weekly = new Map<MuscleGroup, number>();
-  for (const day of days) {
-    for (const ex of day.exercises) {
-      const p = profileFor(ex.id, ex.name);
-      if (p.primaryMuscle) weekly.set(p.primaryMuscle, (weekly.get(p.primaryMuscle) ?? 0) + ex.sets);
-      for (const m of p.secondaryMuscles) weekly.set(m, (weekly.get(m) ?? 0) + ex.sets * 0.5);
-    }
+  // Ceiling pass — last, so it sees every bump the retro and priority passes
+  // made. A plan that starts over the ceiling is a plan the in-block coach will
+  // spend the block undoing.
+  const band = volumeTargetFor(input.goal);
+  capWeeklyVolume(days, decisions, band);
+
+  const weekly = projectWeeklySets(days);
+  const stillOver = [...weekly].filter(([, sets]) => sets > band.high).map(([m]) => m);
+  if (stillOver.length > 0) {
+    warnings.push(
+      `${stillOver.join(', ')} still projects past the ${band.high}-set weekly ceiling and can't be trimmed further without dropping an exercise — remove one below if that worries you.`,
+    );
   }
+
   const muscleWeeklySets = [...weekly]
     .map(([muscle, sets]) => ({ muscle, sets: Math.round(sets * 2) / 2 }))
     .sort((a, b) => b.sets - a.sets);
@@ -895,7 +902,7 @@ function bumpSets(
   muscle: MuscleGroup,
   delta: 1 | -1,
   note: string,
-): void {
+): boolean {
   let best: Exercise | null = null;
   for (const day of days) {
     for (const ex of day.exercises) {
@@ -905,10 +912,58 @@ function bumpSets(
       if (!best || (delta > 0 ? ex.sets < best.sets : ex.sets > best.sets)) best = ex;
     }
   }
-  if (!best) return;
+  if (!best) return false;
   best.sets += delta;
   const d = decisions.find(dec => dec.exerciseId === best!.id);
   if (d) d.reason = `${d.reason} ${note}`;
+  return true;
+}
+
+/** Weekly hard sets per muscle for a program (primary 1, secondary 0.5). */
+function projectWeeklySets(days: WorkoutDay[]): Map<MuscleGroup, number> {
+  const weekly = new Map<MuscleGroup, number>();
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const p = profileFor(ex.id, ex.name);
+      if (p.primaryMuscle) weekly.set(p.primaryMuscle, (weekly.get(p.primaryMuscle) ?? 0) + ex.sets);
+      for (const m of p.secondaryMuscles) weekly.set(m, (weekly.get(m) ?? 0) + ex.sets * 0.5);
+    }
+  }
+  return weekly;
+}
+
+/**
+ * Trim any muscle projected past the goal's weekly ceiling.
+ *
+ * The split templates are calibrated on DIRECT sets, but a muscle also collects
+ * half a set from every compound that recruits it — and on a high-frequency
+ * split that spillover is not a rounding error. Six days of push/pull/legs put
+ * delts past 25 weekly sets without a single extra shoulder slot, purely from
+ * pressing and rowing. Prescribing that and then having the in-block coach trim
+ * it back is a worse experience than not prescribing it.
+ *
+ * Trims come off the exercise doing the most direct work for the muscle, never
+ * below 2 sets, and every one carries its reason into the review step.
+ */
+function capWeeklyVolume(
+  days: WorkoutDay[],
+  decisions: ExerciseDecision[],
+  band: VolumeTarget,
+): void {
+  for (let guard = 0; guard < MAX_VOLUME_TRIMS; guard++) {
+    const over = [...projectWeeklySets(days)]
+      .filter(([, sets]) => sets > band.high)
+      .sort((a, b) => b[1] - a[1])[0];
+    if (!over) return;
+    const [muscle, sets] = over;
+    const trimmed = bumpSets(
+      days, decisions, muscle, -1,
+      `−1 set — ${muscle} projected ${Math.round(sets * 2) / 2} weekly sets once the secondary work from your compounds is counted, past the ${band.high}-set ceiling.`,
+    );
+    // Nothing left to take without gutting a movement — the warning in the
+    // proposal is the honest outcome.
+    if (!trimmed) return;
+  }
 }
 
 function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]): string {
@@ -949,8 +1004,8 @@ function introSentence(count: number): string {
   return count === 1
     ? 'Week 1 is an introduction: run the prescribed sets and reps at a weight you could clearly do 4–5 more reps with. '
       + 'Nothing is being tested — you are teaching your body the movements so the following weeks can be hard.'
-    : `Weeks 1–${count} are an introduction: the prescribed sets and reps at a weight you could clearly do 4–5 more reps with, `
-      + 'adding a little in the second week. Nothing is being tested yet.';
+    : `Weeks 1–${count} are an introduction: the prescribed sets and reps at a weight you could clearly do 4–5 more reps with. `
+      + 'Both weeks sit at the same easy load — nothing is being tested yet, and the first exposure is the one that makes you sore.';
 }
 
 function progressionFor(

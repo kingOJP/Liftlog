@@ -99,11 +99,24 @@ that length is spent building strength versus holding it:
 |---|---|---|
 | No date / 5–6 months | Build the whole way | Nothing is close enough for lifting to cost anything, and this is the cheapest window to raise maximal strength |
 | 3–4 months | Build roughly 60%, then hold | Enough runway to build, close enough that the sport starts taking priority |
-| Within 8 weeks | Build ~25%, mostly hold, close with an easy week | Strength is already banked; the job is keeping it without spending recovery the race needs |
+| Within 8 weeks | Build ~25%, mostly hold, close with **two** easy weeks | Strength is already banked; the job is keeping it without spending recovery the race needs |
 
-The closing easy week doubles as the start of a taper when a race is near. It cuts
-sets and not load, because strength is maintained on a fraction of the volume that
-built it provided intensity is held.
+**A near-race block ends on two deload weeks, not one.** Measurable strength loss
+from reduced volume takes longer than a fortnight — maximal strength holds for
+weeks on a fraction of the volume that built it — so the second quiet week costs
+essentially nothing and buys fresh legs for the start line. The asymmetry is the
+argument: arriving slightly under-trained is a rounding error, arriving
+under-recovered is a ruined race.
+
+The taper is enforced three ways at once, which is why it bites: day gating drops
+the block to a **single session** a week (`THROUGH_MAINTENANCE` excludes `deload`),
+the recommendation engine takes ~10% off, and set targets flatten to the bottom of
+the range. Because each deload week measures against the session before it, the
+second week lands lighter than the first — the taper deepens on its own.
+
+Further out the taper stays at one week: there is no start line close enough to
+protect, and the block should keep training. `MAX_TAPER_WEEKS` caps it at two, and
+`validatePhases` requires the easy weeks to be contiguous and to close the block.
 
 **There is deliberately no "race week" phase emitted.** Without an exact race-date
 input the planner cannot know which week the start line falls in, and labelling the

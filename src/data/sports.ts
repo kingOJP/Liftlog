@@ -39,7 +39,7 @@ import type {
 } from './plan';
 import {
   enduranceHours, validatePhases,
-  MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_BLOCK_WEEKS, MAX_OPENER_WEEKS,
+  MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_BLOCK_WEEKS, MAX_OPENER_WEEKS, MAX_TAPER_WEEKS,
 } from './plan';
 import type { VolumeTarget } from './analytics';
 import { volumeTargetFor } from './analytics';
@@ -337,10 +337,24 @@ export function buildSportPhases(
   const total = Math.min(MAX_BLOCK_WEEKS, Math.max(2, Math.round(weeks)));
 
   const intro = Math.min(introWeeks, MAX_OPENER_WEEKS, Math.max(0, total - 2));
-  // A closing easy week is earned the same way it is anywhere else. Close to a
-  // race it doubles as the start of the taper.
-  const wantsTaper = proximity === 'soon' || proximity === 'mid';
-  const deload = total - intro - 1 >= MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD && wantsTaper ? 1 : 0;
+
+  // The closing taper. With a race inside eight weeks the block ends on TWO easy
+  // weeks, not one: measurable strength loss from reduced volume takes longer
+  // than a fortnight — Rønnestad and colleagues found maximal strength held for
+  // weeks on a fraction of the volume that built it — so two quiet weeks cost
+  // essentially nothing and buy fresh legs for the race. The asymmetry is the
+  // whole argument: being slightly under-trained on race day is a rounding
+  // error, being under-recovered is a ruined race.
+  //
+  // Further out the taper stays at one week, because there is no start line
+  // close enough to protect and the block should keep training.
+  const wantedTaper = proximity === 'soon' ? MAX_TAPER_WEEKS
+    : proximity === 'mid' ? 1
+      : 0;
+  // A taper is still earned: it never eats into the productive weeks that make
+  // it worth taking. Shrink it (2 → 1 → 0) until enough hard weeks remain.
+  let deload = wantedTaper;
+  while (deload > 0 && total - intro - deload < MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD) deload--;
   const productive = total - intro - deload;
 
   // Share of the productive weeks spent building rather than holding.
@@ -354,7 +368,7 @@ export function buildSportPhases(
   for (let i = 0; i < intro; i++) phases.push('intro');
   for (let i = 0; i < build; i++) phases.push(i === 0 ? 'accumulation' : 'intensification');
   for (let i = 0; i < maintain; i++) phases.push('maintenance');
-  if (deload) phases.push('deload');
+  for (let i = 0; i < deload; i++) phases.push('deload');
 
   if (intro > 0) {
     notes.push(
@@ -375,14 +389,19 @@ export function buildSportPhases(
       + `Your ${label} training is the priority from here; lifting exists to stop you losing what you built.`,
     );
   }
-  if (deload) {
+  if (deload === 1) {
     notes.push(
       `Week ${total} backs off — the load stays respectable but the volume is gutted, because intensity is the half of the dose that defends strength on reduced volume.`,
+    );
+  } else if (deload > 1) {
+    notes.push(
+      `Weeks ${total - deload + 1}–${total} are a taper: one short session a week, roughly 10% lighter, at the bottom of every rep range. `
+      + 'You will not lose strength in a fortnight, and arriving at the start line with fresh legs is worth far more than the training those weeks would have bought.',
     );
   }
   if (proximity === 'soon') {
     notes.push(
-      'Your race is close, so this block is mostly holding rather than building. In race week itself, lift once early if at all, and nothing inside 72 hours of the start.',
+      'In race week itself, lift once early if at all, and nothing inside 72 hours of the start.',
     );
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildSnapshot } from './analytics';
+import { buildSnapshot, volumeTargetFor } from './analytics';
 import type { TrainingSnapshot } from './analytics';
 import type { Session, SetLog } from '../db/database';
 import type { WorkoutDay } from './program';
@@ -348,5 +348,56 @@ describe('introductory weeks', () => {
     );
     expect(p.phases[0]).toBe('intro');
     expect(p.progression).toMatch(/4–5 more reps/);
+  });
+});
+
+// ── Weekly volume ceiling ────────────────────────────────────────────────────
+// Split templates are calibrated on direct sets, but every compound also feeds
+// half a set into its secondary muscles. On a high-frequency split that adds up
+// to real over-prescription — six days of pressing and rowing put delts past 25
+// weekly sets with no extra shoulder work at all.
+describe('the proposal respects the weekly volume ceiling', () => {
+  const project = (p: ReturnType<typeof buildPlanProposal>) =>
+    new Map(p.muscleWeeklySets.map(m => [m.muscle, m.sets]));
+
+  it('keeps every muscle inside the band on a six-day split', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 6, experience: 'advanced' }), [], null, null);
+    const band = volumeTargetFor('hypertrophy');
+    for (const [muscle, sets] of project(p)) {
+      expect(sets, `${muscle}`).toBeLessThanOrEqual(band.high);
+    }
+  });
+
+  it('holds across every day count and experience level', () => {
+    for (const daysPerWeek of [2, 3, 4, 5, 6]) {
+      for (const experience of ['beginner', 'intermediate', 'advanced'] as const) {
+        const p = buildPlanProposal(input({ daysPerWeek, experience }), [], null, null);
+        const band = volumeTargetFor(p.input.goal);
+        for (const [muscle, sets] of project(p)) {
+          expect(sets, `${daysPerWeek}d ${experience}: ${muscle}`).toBeLessThanOrEqual(band.high);
+        }
+      }
+    }
+  });
+
+  it('explains the trim on the exercise it came from', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 6, experience: 'advanced' }), [], null, null);
+    const trimmed = p.decisions.filter(d => /weekly sets once the secondary work/.test(d.reason));
+    expect(trimmed.length).toBeGreaterThan(0);
+    expect(trimmed[0].reason).toMatch(/ceiling/);
+  });
+
+  it('does not trim a plan that already fits', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 3 }), [], null, null);
+    expect(p.decisions.some(d => /past the .*-set ceiling/.test(d.reason))).toBe(false);
+  });
+
+  it('never trims an exercise below two sets', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 6, experience: 'advanced' }), [], null, null);
+    for (const day of p.days) {
+      for (const ex of day.exercises) {
+        expect(ex.sets, ex.name).toBeGreaterThanOrEqual(2);
+      }
+    }
   });
 });

@@ -377,11 +377,23 @@ export function calculateRecommendation(
     // movement the athlete has done before, a bigger cut than a deload is right,
     // because the point is a comfortably submaximal first exposure.
     const factor = phase === 'race-week' ? 0.7 : phase === 'intro' ? 0.8 : 0.9;
+
+    // Intro weeks come in pairs for a novice, and they sit at the FRONT of a
+    // block — so backing off from the last session compounds: week 2 would take
+    // 80% of week 1's already-easy 80%, landing at 64% and getting easier as
+    // the introduction goes on. Backwards. An intro week is measured against
+    // the heaviest recent working weight instead, which is stable across
+    // consecutive intro weeks and is what "well short of your working weight"
+    // actually means. A deload is different and correctly relative to the last
+    // session: it exists to shed fatigue from where you currently are.
+    const introBase = phase === 'intro'
+      ? Math.max(...baseline.map(h => workingWeight(h.sets)), weight)
+      : weight;
     if (countProgressed) {
       return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }
     return {
-      weight: easeBack(weight, factor, incrementFor(weight, weightType)),
+      weight: easeBack(introBase, factor, incrementFor(introBase, weightType)),
       direction: 'down', kind: 'deload', reason: easy,
     };
   }

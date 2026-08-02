@@ -1037,6 +1037,22 @@ dosage comes from instead.
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
   collapsing them — a skipped week must look like a skipped week.
+- **Blocks are simulated end to end** (`blockSimulation.test.ts`) — twelve profiles
+  across experience levels, goals, equipment, injuries and sports each design a
+  10-week block and then *train* it week by week, logging exactly what the plan
+  prescribes and feeding the history back. It asserts the properties no unit test
+  can see: every week schedules a workout, easy weeks do less work than hard ones,
+  loads climb for goals that build and hold for goals that defend, and weekly
+  volume stays inside the goal's band. It has already caught a real
+  over-prescription (six-day splits blowing past the delt ceiling) and a real
+  compounding bug (consecutive intro weeks getting progressively easier).
+- **The planner enforces the volume ceiling** (`capWeeklyVolume`) — split templates
+  are calibrated on *direct* sets, but every compound also feeds half a set into
+  its secondaries, and on a 6-day split that spillover put Delts at 25.5 weekly
+  sets against a 20 ceiling. The last pass in `buildPlanProposal` trims non-main
+  slots (floor 2 sets) until the projection fits, each trim carrying its reason
+  into the review step. Prescribing over the ceiling and letting the in-block
+  coach undo it all block is a worse experience than not prescribing it.
 - **Timed work is progressed by time** — a set of an exercise with
   `unit: 'seconds'` logs at 0 lbs with no weight input, and `repProgression`
   drives the hold through the same four branches as a bodyweight rep count.

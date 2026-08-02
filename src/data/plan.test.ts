@@ -76,12 +76,29 @@ describe('validatePhases', () => {
     expect(validatePhases([acc, 'recovery', acc])).toMatch(/recovery week/i);
   });
 
-  it('rejects more than one deload', () => {
-    expect(validatePhases([acc, acc, acc, 'deload', 'deload'])).toMatch(/one deload/i);
+  // A block may close on up to MAX_TAPER_WEEKS easy weeks. One is the classic
+  // deload; two is a race taper, which costs no measurable strength and buys
+  // fresh legs for a start line.
+  it('accepts a two-week closing taper', () => {
+    expect(validatePhases([acc, acc, acc, 'deload', 'deload'])).toBeNull();
   });
 
-  it('rejects a deload that is not the closing week', () => {
-    expect(validatePhases([acc, acc, acc, 'deload', acc])).toMatch(/closes the block/i);
+  it('rejects a third consecutive easy week — that is detraining', () => {
+    expect(validatePhases([acc, acc, acc, 'deload', 'deload', 'deload'])).toMatch(/detraining/i);
+  });
+
+  it('rejects deload weeks that do not close the block', () => {
+    expect(validatePhases([acc, acc, acc, 'deload', acc])).toMatch(/close the block/i);
+  });
+
+  it('rejects a hard week sandwiched inside the taper', () => {
+    expect(validatePhases([acc, acc, acc, 'deload', acc, 'deload'])).toMatch(/close the block/i);
+  });
+
+  it('counts the whole taper against the productive-weeks requirement', () => {
+    // Three productive weeks earn one easy week, not two.
+    expect(validatePhases([acc, acc, acc, 'deload', 'deload'])).toBeNull();
+    expect(validatePhases([acc, acc, 'deload', 'deload'])).toMatch(/productive weeks/i);
   });
 
   it('requires three productive weeks before a deload', () => {

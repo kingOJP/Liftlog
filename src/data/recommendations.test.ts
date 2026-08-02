@@ -641,6 +641,38 @@ describe('timed exercises progress by seconds', () => {
     expect(plan.goal).toMatch(/Hold each set/);
   });
 
+  it('does not compound across consecutive intro weeks', () => {
+    // A novice gets two intro weeks, and they sit at the front of a block. If
+    // week 2 backed off from week 1 it would land at 64% and the introduction
+    // would get *easier* as it went — the opposite of easing in.
+    const loaded = { sets: 3, repLow: 8, repHigh: 12 };
+    const before: ExerciseSession[] = [
+      { completedAt: NOW - 3 * DAY, sets: [100, 100, 100].map(w => ({ weight: w, reps: 10 })) },
+    ];
+    const week1 = calculateRecommendation(before, loaded, { phase: 'intro' })!;
+    expect(week1.weight).toBeGreaterThan(70);
+    expect(week1.weight).toBeLessThan(90);
+
+    const afterWeek1: ExerciseSession[] = [
+      { completedAt: NOW, sets: [week1.weight, week1.weight, week1.weight].map(w => ({ weight: w, reps: 8 })) },
+      ...before,
+    ];
+    const week2 = calculateRecommendation(afterWeek1, loaded, { phase: 'intro' })!;
+    expect(week2.weight).toBe(week1.weight);
+  });
+
+  it('still backs a deload off from where the lifter currently is', () => {
+    // The intro rule must not leak: a deload after hard weeks is relative to
+    // the last session, not to the heaviest thing in the window.
+    const loaded = { sets: 3, repLow: 8, repHigh: 12 };
+    const history: ExerciseSession[] = [
+      { completedAt: NOW, sets: [100, 100, 100].map(w => ({ weight: w, reps: 10 })) },
+      { completedAt: NOW - 3 * DAY, sets: [130, 130, 130].map(w => ({ weight: w, reps: 10 })) },
+    ];
+    const rec = calculateRecommendation(history, loaded, { phase: 'deload' })!;
+    expect(rec.weight).toBeLessThan(100);
+  });
+
   it('backs off harder in an intro week than in a deload', () => {
     const loaded = { sets: 3, repLow: 8, repHigh: 12 };
     const history: ExerciseSession[] = [

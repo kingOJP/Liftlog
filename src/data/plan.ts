@@ -382,6 +382,13 @@ export function currentPhase(block: TrainingBlock, now = Date.now()): PhaseKind 
 export const MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD = 3;
 export const MAX_BLOCK_WEEKS = 12;
 export const MAX_OPENER_WEEKS = 2;
+/**
+ * Easy weeks a block may close on. One is the classic deload. Two is a race
+ * taper: strength survives a fortnight of reduced volume comfortably, so the
+ * second quiet week costs almost nothing and buys fresh legs for the start
+ * line. Three would be detraining.
+ */
+export const MAX_TAPER_WEEKS = 2;
 
 export function productiveWeeks(phases: PhaseKind[]): number {
   return phases.filter(p => !isEasyPhase(p)).length;
@@ -415,15 +422,19 @@ export function validatePhases(phases: PhaseKind[]): string | null {
   }
 
   const deloads = phases.filter(p => p === 'deload').length;
-  if (deloads > 1) return 'One deload per block — more than that is just detraining.';
-  if (deloads === 1) {
+  if (deloads > MAX_TAPER_WEEKS) {
+    return `More than ${MAX_TAPER_WEEKS} easy weeks in a row stops being a taper and starts being detraining.`;
+  }
+  if (deloads > 0) {
     const at = phases.indexOf('deload');
-    // The deload closes the block, or sits immediately before race week: a
-    // taper and the race itself are the one legitimate pair of easy weeks.
-    const closesBlock = at === phases.length - 1;
-    const tapersIntoRace = raceWeeks === 1 && at === phases.length - 2;
-    if (!closesBlock && !tapersIntoRace) {
-      return 'The deload closes the block — training on tired legs after an easy week wastes both.';
+    // Deload weeks are contiguous and close the block — a hard week sandwiched
+    // between two easy ones wastes all three. The one exception is a race week
+    // after them, which is easier still.
+    const tail = phases.slice(at);
+    const raceTail = raceWeeks === 1 && tail[tail.length - 1] === 'race-week';
+    const shouldBeDeload = raceTail ? tail.slice(0, -1) : tail;
+    if (!shouldBeDeload.every(p => p === 'deload')) {
+      return 'Deload weeks close the block — training on tired legs after an easy week wastes both.';
     }
     if (productiveWeeks(phases.slice(0, at)) < MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD) {
       return `A deload needs at least ${MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD} productive weeks before it — there's no fatigue to shed yet.`;
