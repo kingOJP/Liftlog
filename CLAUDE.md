@@ -122,13 +122,14 @@ Long-term milestones (roughly):
     plans still resolve).
 
 **Future milestones:**
-- RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
+- Effort inference from set-to-set rep drop-off (NOT self-reported RPE — see roadmap item 2,
+  where that idea is rejected and the reasons are recorded).
 - Journey v2 — deload-position editing in the wizard (`validatePhases` already
   enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
   seam: any generator that emits one plugs into the same review-and-activate
   flow), block-over-block comparison charts, rehab/peaking block presets.
 - Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
-- Planner v2 — RPE-aware volume decisions, automatic exercise substitution (the planner
+- Planner v2 — effort-aware volume decisions, automatic exercise substitution (the planner
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
   suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
   addition to set counts.
@@ -1185,18 +1186,28 @@ risk is *merge semantics*: immutable session GUIDs (not `startedAt`, which `upda
 mutates), per-document last-write-wins by `updatedAt`, and deletion tombstones. See the Cloud
 sync section. `pendingSessions` was removed.
 
-### 2. RPE / RIR logging
-The deload trigger now reads a goal-weighted blend of volume, est. 1RM and PR events
-(`progression.ts`) — but every one of those signals is blind to effort. 3×10 at RPE 6 and 3×10
-at RPE 9 are identical volume and completely different stimuli, so the engine still can't
-distinguish "I was grinding" from "these were easy reps." One optional `rpe` field per set
-(scale 1–10, blank = untracked) lets it confirm fatigue before recommending a deload and detect
-under-effort when reps stay in range but RPE is low. **This is the missing input that would
-make the volume metric genuinely sharp** rather than merely honest.
+### 2. Effort, inferred rather than self-reported — **RPE logging is rejected, don't propose it**
+The deload trigger reads a goal-weighted blend of volume, est. 1RM and PR events
+(`progression.ts`), and every one of those signals is blind to effort: 3×10 left with two reps
+in the tank and 3×10 to failure are identical volume and completely different stimuli. That gap
+is real. **An `rpe` field is not how this app closes it.** Self-reported RIR is least accurate
+in exactly the population and the situations that matter — novices, multi-joint lifts, sets
+stopped short of failure — and an optional subjective field that the user knows they'd fill in
+carelessly is worse than no field, because the engine would weight bad data as a measurement.
+This app already tried the cheap version and removed it (the Easy/Medium/Hard difficulty
+rating; the `exerciseLogs` store is its fossil).
 
-Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a small tap-to-set
-chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
-No UI change is needed if the field is left blank — fully backwards-compatible.
+The signal to use instead is already in the log: **set-to-set rep drop-off**, measured against
+the lifter's own norm. 12/12/11 at a load is a lifter stopping well short; 12/9/7 at the same
+load is a lifter near failure. `fatigueDrops()` in recommendations.ts already fits that curve —
+it just spends it on rep targets and never reads it as effort. An unusually flat session means
+reps were left in reserve (the load can move sooner); an unusually steep one means the sets
+were genuinely hard (a stall there is fatigue, not lack of effort). Rest duration is the
+obvious confounder and is already known — the rest timer records it.
+
+Implementation sketch: derive a per-session effort estimate in `progression.ts` from observed
+drop-off vs the exercise's fitted norm, normalized by rest; feed it as a fourth signal into
+`compositeScore` with its own goal weight. No schema change, no new UI, nothing to self-report.
 
 ### 3. ~~In-workout session persistence (draft sessions)~~ — DONE
 Implemented in localStorage rather than IDB: a draft is one small single-writer object, and
