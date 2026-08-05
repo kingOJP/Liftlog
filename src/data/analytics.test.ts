@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildSnapshot } from './analytics';
+import { buildSnapshot, headSetTotals } from './analytics';
 import { computeMetrics } from './metrics';
 import type { Session, SetLog } from '../db/database';
 
@@ -42,5 +42,34 @@ describe('buildSnapshot warm-up handling', () => {
     expect(snap.allSetsBySession.get(1)).toHaveLength(1);
     const m = computeMetrics(snap, 1);
     expect(m.summary.totalVolume).toBe(0);
+  });
+});
+
+describe('headSetTotals — Tier 3 muscle-head accumulation', () => {
+  const headSessions: Session[] = [
+    { id: 1, dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 2_000 },
+  ];
+
+  it('credits a set to every catalogued head of its exercise', () => {
+    const setLogs: SetLog[] = [
+      // seated-calf-raises → Calves, Soleus only
+      { id: 1, sessionId: 1, exerciseId: 'seated-calf-raises', setNumber: 1, weight: 90, reps: 12 },
+      { id: 2, sessionId: 1, exerciseId: 'seated-calf-raises', setNumber: 2, weight: 90, reps: 12 },
+      // standing-calf-raises → Calves, Gastrocnemius
+      { id: 3, sessionId: 1, exerciseId: 'standing-calf-raises', setNumber: 1, weight: 135, reps: 10 },
+    ];
+    const totals = headSetTotals(buildSnapshot(headSessions, setLogs));
+    expect(totals.byHead.get('Calves::Soleus')).toBe(2);
+    expect(totals.byHead.get('Calves::Gastrocnemius')).toBe(1);
+    expect(totals.unspecified.size).toBe(0);
+  });
+
+  it('buckets exercises with no catalogued head emphasis as unspecified', () => {
+    const setLogs: SetLog[] = [
+      { id: 1, sessionId: 1, exerciseId: 'barbell-back-squat', setNumber: 1, weight: 225, reps: 5 },
+    ];
+    const totals = headSetTotals(buildSnapshot(headSessions, setLogs));
+    expect(totals.byHead.size).toBe(0);
+    expect(totals.unspecified.get('Quads')).toBe(1);
   });
 });

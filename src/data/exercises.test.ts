@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getExerciseMeta } from './exercises';
+import { getExerciseMeta, headsFor, MUSCLE_HEADS } from './exercises';
 
 beforeEach(() => localStorage.clear());
 
@@ -76,5 +76,53 @@ describe('catalogDefFor — timestamped custom ids that are really catalog exerc
     const meta = getExerciseMeta('hip-thrusts-1782325062957');
     expect(meta.primaryMuscle).toBe('Glutes');
     expect(meta.workoutType).toBe('Hip Thrust');
+  });
+});
+
+describe('rotational/lateral core exercises classify as Obliques', () => {
+  it('pallof press and side plank are Obliques-primary', () => {
+    expect(getExerciseMeta('pallof-press').primaryMuscle).toBe('Obliques');
+    expect(getExerciseMeta('side-plank').primaryMuscle).toBe('Obliques');
+    expect(getExerciseMeta('dead-bug').primaryMuscle).toBe('Obliques');
+  });
+
+  it('a front plank stays Abs — it resists extension, not rotation', () => {
+    expect(getExerciseMeta('plank').primaryMuscle).toBe('Abs');
+  });
+
+  it('Copenhagen plank\'s secondary shifted from Abs to Obliques', () => {
+    expect(getExerciseMeta('copenhagen-plank').secondaryMuscle1).toBe('Obliques');
+  });
+});
+
+describe('headsFor — Tier 3 muscle-head assignment', () => {
+  it('assigns a head only from its primary muscle\'s catalogued vocabulary', () => {
+    for (const [id, expected] of [
+      ['incline-barbell-press', ['Upper Chest']],
+      ['dumbbell-bench-press', ['Lower Chest']],
+      ['cable-lateral-raises', ['Side Delt']],
+      ['face-pulls', ['Rear Delt']],
+      ['seated-calf-raises', ['Soleus']],
+      ['standing-calf-raises', ['Gastrocnemius']],
+    ] as const) {
+      const heads = headsFor(id);
+      expect(heads).toEqual(expected);
+      const primary = getExerciseMeta(id).primaryMuscle!;
+      for (const head of heads) expect(MUSCLE_HEADS[primary]).toContain(head);
+    }
+  });
+
+  it('returns empty for exercises with no established head emphasis', () => {
+    expect(headsFor('barbell-back-squat')).toEqual([]);
+    expect(headsFor('lat-pull-down')).toEqual([]);
+  });
+
+  it('returns empty for muscles with no catalogued heads at all', () => {
+    expect(MUSCLE_HEADS['Lats']).toBeUndefined();
+    expect(headsFor('weighted-pull-ups')).toEqual([]);
+  });
+
+  it('resolves through a timestamped custom id, like difficultyFor', () => {
+    expect(headsFor('standing-calf-raises-1782324989917')).toEqual(['Gastrocnemius']);
   });
 });

@@ -1,4 +1,4 @@
-import type { MuscleGroup, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
+import type { MuscleGroup, MuscleHead, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
 
 export interface ExerciseDef {
   id: string;
@@ -158,11 +158,15 @@ export const EXERCISES: ExerciseDef[] = [
   { id: 'box-jump',                 name: 'Box Jump',                         primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Calves', null],       workoutType: 'Jump',             equipment: 'None',              weightType: 'Bodyweight' },
 
   // Trunk — anti-rotation and isometric bracing rather than spinal flexion
-  { id: 'pallof-press',             name: 'Pallof Press',                     primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Anti-Rotation',    equipment: 'Cable Machine',     weightType: 'Machine'    },
-  { id: 'dead-bug',                 name: 'Dead Bug',                         primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Anti-Rotation',    equipment: 'None',              weightType: 'Bodyweight' },
+  // Pallof press and dead bug both resist rotation (the app already tags
+  // both 'Anti-Rotation'); side plank and Copenhagen plank both resist
+  // lateral flexion. Obliques are the prime mover for both — a front plank
+  // stays on Abs since it resists extension, not rotation.
+  { id: 'pallof-press',             name: 'Pallof Press',                     primaryMuscle: 'Obliques',    secondaryMuscles: [null, null, null],               workoutType: 'Anti-Rotation',    equipment: 'Cable Machine',     weightType: 'Machine'    },
+  { id: 'dead-bug',                 name: 'Dead Bug',                         primaryMuscle: 'Obliques',    secondaryMuscles: ['Abs', null, null],              workoutType: 'Anti-Rotation',    equipment: 'None',              weightType: 'Bodyweight' },
   { id: 'plank',                    name: 'Plank',                            primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Plank',            equipment: 'None',              weightType: 'Bodyweight', unit: 'seconds' },
-  { id: 'side-plank',               name: 'Side Plank',                       primaryMuscle: 'Abs',         secondaryMuscles: ['Abductors', null, null],        workoutType: 'Plank',            equipment: 'None',              weightType: 'Bodyweight', unit: 'seconds' },
-  { id: 'copenhagen-plank',         name: 'Copenhagen Plank',                 primaryMuscle: 'Adductors',   secondaryMuscles: ['Abs', null, null],              workoutType: 'Plank',            equipment: 'Bench',             weightType: 'Bodyweight', unit: 'seconds' },
+  { id: 'side-plank',               name: 'Side Plank',                       primaryMuscle: 'Obliques',    secondaryMuscles: ['Abductors', null, null],        workoutType: 'Plank',            equipment: 'None',              weightType: 'Bodyweight', unit: 'seconds' },
+  { id: 'copenhagen-plank',         name: 'Copenhagen Plank',                 primaryMuscle: 'Adductors',   secondaryMuscles: ['Obliques', null, null],         workoutType: 'Plank',            equipment: 'Bench',             weightType: 'Bodyweight', unit: 'seconds' },
   { id: 'farmer-carry',             name: 'Farmer Carry',                     primaryMuscle: 'Traps',       secondaryMuscles: ['Forearms', 'Abs', null],        workoutType: 'Carry',            equipment: 'None',              weightType: 'Dumbbell',   unit: 'seconds' },
 
   // Shoulder rotation / posterior cuff — the swim's insurance policy
@@ -278,6 +282,109 @@ export function isTimedExercise(id: string): boolean {
 export function prerequisitesFor(id: string): string[] {
   const def = catalogDefFor(id);
   return (def && PREREQUISITES[def.id]) ?? [];
+}
+
+// ── Muscle heads (Tier 3) ──────────────────────────────────────────────────────
+// Compiled catalog data, same footing as DIFFICULTY/PREREQUISITES above: not
+// user-editable, not synced, absent on custom exercises. See the tiering
+// comment in taxonomy.ts for why this exists and why it stops here rather
+// than reaching every MuscleGroup.
+//
+// Only muscles with anatomically distinct heads that exercise *selection*
+// actually differentiates get a vocabulary — a lat doesn't have a program-
+// relevant "upper" vs "lower", but a deltoid's three heads are trained by
+// visibly different movements (an overhead press is not a lateral raise).
+export const MUSCLE_HEADS: Partial<Record<MuscleGroup, MuscleHead[]>> = {
+  Chest: ['Upper Chest', 'Lower Chest'],
+  Delts: ['Front Delt', 'Side Delt', 'Rear Delt'],
+  Traps: ['Upper Traps', 'Mid-Lower Traps'],
+  Biceps: ['Long Head', 'Short Head', 'Brachialis'],
+  Triceps: ['Long Head', 'Lateral Head', 'Medial Head'],
+  Quads: ['Rectus Femoris', 'Vastus Lateralis', 'Vastus Medialis'],
+  Hamstrings: ['Biceps Femoris', 'Medial Hamstrings'],
+  Glutes: ['Gluteus Maximus', 'Gluteus Medius/Minimus'],
+  Calves: ['Gastrocnemius', 'Soleus'],
+};
+
+// Which head(s) of its primary muscle an exercise emphasizes, keyed by id.
+// Sparse and best-effort: populated only where the emphasis is well-
+// established (joint angle at the shoulder/hip changes which head stretches
+// or shortens), left unset where a movement trains the whole muscle evenly
+// or the emphasis is genuinely contested — an absent entry means "trains the
+// muscle as a whole," not "unknown."
+const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
+  // Chest — incline shifts load toward the clavicular (upper) fibers, flat
+  // and forward-lean dip/push work toward the sternocostal (lower) fibers.
+  'incline-barbell-press': ['Upper Chest'], 'incline-dumbbell-press': ['Upper Chest'],
+  'dumbbell-bench-press': ['Lower Chest'], 'flat-barbell-bench-press': ['Lower Chest'],
+  'dumbbell-fly': ['Lower Chest'], 'weighted-dips': ['Lower Chest'], 'push-ups': ['Lower Chest'],
+
+  // Delts — presses bias the anterior (front) head, raises isolate the
+  // lateral (side) head, pulls/reverse-flys bias the posterior (rear) head.
+  'seated-db-overhead-press': ['Front Delt'], 'barbell-overhead-press': ['Front Delt'],
+  'machine-shoulder-press': ['Front Delt'],
+  'cable-lateral-raises': ['Side Delt'], 'dumbbell-lateral-raises': ['Side Delt'],
+  'machine-lateral-raise': ['Side Delt'],
+  'face-pulls': ['Rear Delt'], 'reverse-pec-deck': ['Rear Delt'],
+  'dumbbell-rear-delt-fly': ['Rear Delt'], 'db-y-raise': ['Rear Delt'],
+  'db-external-rotation': ['Rear Delt'],
+
+  // Traps — shrugs are pure elevation (upper traps); carries hold that same
+  // elevated, packed position isometrically.
+  'barbell-shrugs': ['Upper Traps'], 'dumbbell-shrugs': ['Upper Traps'],
+  'farmer-carry': ['Upper Traps'],
+
+  // Biceps — a shoulder extended behind the torso (incline curl, low-pulley
+  // cable curl) stretches the long head; a shoulder flexed in front of it
+  // (preacher, EZ bar) shortens the long head and biases the short head;
+  // a neutral grip (hammer) recruits brachialis over either bicep head.
+  'incline-db-curls': ['Long Head'], 'cable-curls': ['Long Head'],
+  'preacher-curls': ['Short Head'], 'ez-bar-curls': ['Short Head'],
+  'hammer-curls': ['Brachialis'],
+
+  // Triceps — an overhead arm position stretches the long head across the
+  // shoulder; an arm pinned at the side (pushdowns) removes the long head's
+  // shoulder-flexion role and biases the lateral/medial heads instead.
+  'overhead-tricep-ext': ['Long Head'], 'skull-crushers': ['Long Head'],
+  'cable-kick-backs': ['Long Head'],
+  'tricep-cable-pushdown': ['Lateral Head'], 'cable-pushdown': ['Lateral Head'],
+  'close-grip-bench-press': ['Lateral Head', 'Medial Head'],
+
+  // Quads — leg extension keeps the hip flexed, which slackens rectus
+  // femoris (a hip flexor as well as knee extensor) and shifts the work onto
+  // the vastus group.
+  'leg-extension': ['Vastus Lateralis', 'Vastus Medialis'],
+
+  // Hamstrings — leg curls isolate knee flexion (biceps femoris' own job,
+  // with less contribution from the hip-extensor medial hamstrings); hip
+  // hinges are hip extension, the medial hamstrings' primary role.
+  'seated-leg-curl': ['Biceps Femoris'], 'lying-leg-curl': ['Biceps Femoris'],
+  'romanian-deadlifts': ['Medial Hamstrings'], 'dumbbell-rdl': ['Medial Hamstrings'],
+  'single-leg-rdl': ['Medial Hamstrings'], 'good-mornings': ['Medial Hamstrings'],
+
+  // Glutes — every listed exercise is a hip-extension-dominant compound, the
+  // gluteus maximus' role (medius/minimus have no dedicated Glutes-primary
+  // movement in this catalog; hip abduction trains them under 'Abductors').
+  'hip-thrusts': ['Gluteus Maximus'], 'conventional-deadlift': ['Gluteus Maximus'],
+  'cable-pull-through': ['Gluteus Maximus'],
+
+  // Calves — a bent knee (seated) removes gastrocnemius' mechanical
+  // advantage and isolates soleus; a straight knee (standing) trains both,
+  // with gastrocnemius dominant.
+  'seated-calf-raises': ['Soleus'],
+  'standing-calf-raises': ['Gastrocnemius'], 'leg-press-calf-raise': ['Gastrocnemius'],
+  'single-leg-calf-raise': ['Gastrocnemius'], 'pogo-hops': ['Gastrocnemius'],
+};
+
+/**
+ * Which head(s) of its primary muscle an exercise emphasizes — empty when the
+ * muscle has no catalogued heads (MUSCLE_HEADS) or the emphasis isn't
+ * established. Not surfaced in the main UI; kept for future fine-grained
+ * volume analysis (see analytics.ts headSetTotals).
+ */
+export function headsFor(id: string): MuscleHead[] {
+  const def = catalogDefFor(id);
+  return (def && PRIMARY_HEADS[def.id]) ?? [];
 }
 
 // ── Per-exercise metadata overrides (user edits stored in localStorage) ───────
