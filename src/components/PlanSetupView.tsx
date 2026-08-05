@@ -98,7 +98,7 @@ const PRIORITY_OPTIONS: { label: string; muscles: MuscleGroup[] }[] = [
   { label: 'Hamstrings', muscles: ['Hamstrings'] },
   { label: 'Glutes', muscles: ['Glutes'] },
   { label: 'Calves', muscles: ['Calves'] },
-  { label: 'Abs', muscles: ['Abs'] },
+  { label: 'Core', muscles: ['Abs', 'Obliques'] },
 ];
 
 export default function PlanSetupView({ program, onBack, onActivated }: Props) {

@@ -991,7 +991,9 @@ program, not before):
   exercises: unilateral lower body (step-up, single-leg RDL), hip abduction, tendon work
   (single-leg calf raise), plyometrics (pogo hops, box jump), anti-rotation and isometric
   trunk (Pallof press, dead bug, plank, side plank, Copenhagen), loaded carries, and
-  shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise).
+  shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise). Pallof
+  press, dead bug, side plank and Copenhagen plank are **Obliques**-primary (rotation/lateral
+  flexion); a plain plank stays **Abs** (extension resistance, not rotation).
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
@@ -999,6 +1001,31 @@ program, not before):
 one-time migration to strip stale duplicate IDs (the old `-d1/-d2/-d4` suffixed IDs). The library
 holds **movement identity only** — no sets or rep range. See the Prescription section for where
 dosage comes from instead.
+
+### Muscle taxonomy tiers
+
+Three tiers, coarsest to finest (`docs` reference: see `src/data/taxonomy.ts` comment block).
+`MuscleGroup` is unchanged as *the* level every engine reasons about — this is additive, not a
+rename:
+
+- **Tier 1 — Region** (`MuscleRegion`, `MUSCLE_REGIONS`, `regionFor()` in `taxonomy.ts`) — Chest /
+  Back / Shoulders / Arms / Core / Legs. Purely organizational grouping of `MuscleGroup`s for
+  pickers (the plan wizard's priority-muscle options are grouped this way, e.g. "Core" =
+  Abs + Obliques). No volume target of its own.
+- **Tier 2 — MuscleGroup** — unchanged role: volume targets (`volumeTargetFor`), the heatmap,
+  splits, substitution matching, priority muscles, synced metadata. One addition: **Obliques**
+  split out of Abs — rotational/anti-rotation work is a distinct programming decision from
+  spinal flexion (see the sport-support layer note above).
+- **Tier 3 — MuscleHead** (`MuscleHead` type in `taxonomy.ts`; `MUSCLE_HEADS` vocabulary +
+  `headsFor(id)` in `exercises.ts`) — anatomically distinct heads *within* a muscle, for the nine
+  muscles where exercise selection actually differentiates them (Chest, Delts, Traps, Biceps,
+  Triceps, Quads, Hamstrings, Glutes, Calves — e.g. incline press → Upper Chest, lateral raise →
+  Side Delt, seated calf raise → Soleus). Compiled catalog data on the same footing as
+  `difficultyFor`/`prerequisitesFor`: not user-editable, not synced, absent on custom exercises,
+  not surfaced in the main UI yet. `headSetTotals()` (`analytics.ts`) is the queryable
+  counterpart — per-(muscle, head) set totals plus an `unspecified` bucket for exercises with no
+  catalogued head emphasis — kept for future holistic volume analysis (e.g. flagging a
+  chronically undertrained rear delt even when total delt volume looks fine).
 
 ---
 

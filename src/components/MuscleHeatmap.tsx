@@ -116,6 +116,9 @@ export default function MuscleHeatmap({ snapshot }: Props) {
             <ellipse cx="42" cy="155" rx="8" ry="22" {...region('Forearms')} />
             {/* abs */}
             <rect x="84" y="112" width="32" height="54" rx="10" {...region('Abs')} />
+            {/* obliques */}
+            <rect x="69" y="114" width="13" height="50" rx="6" {...region('Obliques')} />
+            <rect x="118" y="114" width="13" height="50" rx="6" {...region('Obliques')} />
             {/* quads */}
             <ellipse cx="82" cy="242" rx="16" ry="44" {...region('Quads')} />
             <ellipse cx="118" cy="242" rx="16" ry="44" {...region('Quads')} />
