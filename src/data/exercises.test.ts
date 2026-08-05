@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getExerciseMeta, headsFor, MUSCLE_HEADS } from './exercises';
+import {
+  getExerciseMeta, headsFor, MUSCLE_HEADS, EXERCISES, EXERCISE_MAP,
+  difficultyFor, prerequisitesFor,
+} from './exercises';
 
 beforeEach(() => localStorage.clear());
 
@@ -136,5 +139,61 @@ describe('headsFor — Tier 3 muscle-head assignment', () => {
 
   it('resolves through a timestamped custom id, like difficultyFor', () => {
     expect(headsFor('standing-calf-raises-1782324989917')).toEqual(['Gastrocnemius']);
+  });
+});
+
+describe('catalog metadata audit fixes', () => {
+  it('seated calf raises requires a machine, not no equipment', () => {
+    expect(EXERCISE_MAP.get('seated-calf-raises')?.equipment).toBe('Machine');
+  });
+
+  it('straight-arm pulldown is Pull Over — the same joint action as a pullover, not a bent-elbow pulldown', () => {
+    const def = EXERCISE_MAP.get('straight-arm-pulldowns')!;
+    expect(def.workoutType).toBe('Pull Over');
+    // No elbow flexion in the movement, so no biceps assist either.
+    expect(def.secondaryMuscles).not.toContain('Biceps');
+  });
+});
+
+describe('kettlebell catalog additions', () => {
+  const KB_IDS = [
+    'kettlebell-swing', 'kettlebell-goblet-squat', 'kettlebell-single-arm-press',
+    'kettlebell-single-arm-row', 'kettlebell-suitcase-carry',
+    'kettlebell-front-rack-lunge', 'kettlebell-turkish-get-up',
+  ];
+
+  it('every kettlebell exercise is fully classified', () => {
+    for (const id of KB_IDS) {
+      const def = EXERCISE_MAP.get(id);
+      expect(def, id).toBeDefined();
+      expect(def!.weightType).toBe('Kettlebell');
+      expect(def!.equipment).toBe('None');
+      expect(def!.primaryMuscle).not.toBeNull();
+      expect(def!.workoutType).not.toBeNull();
+    }
+  });
+
+  it('the suitcase carry is timed like the other loaded carry', () => {
+    expect(EXERCISE_MAP.get('kettlebell-suitcase-carry')?.unit).toBe('seconds');
+  });
+
+  it('the suitcase carry trains Obliques — a loaded alternative to the isometric holds', () => {
+    expect(EXERCISE_MAP.get('kettlebell-suitcase-carry')?.primaryMuscle).toBe('Obliques');
+  });
+
+  it('gates the swing and get-up behind a controlled-movement prerequisite', () => {
+    expect(difficultyFor('kettlebell-swing')).toBe('advanced');
+    expect(prerequisitesFor('kettlebell-swing').length).toBeGreaterThan(0);
+    expect(difficultyFor('kettlebell-turkish-get-up')).toBe('advanced');
+    expect(prerequisitesFor('kettlebell-turkish-get-up').length).toBeGreaterThan(0);
+  });
+
+  it('the goblet squat is beginner-friendly, matching its dumbbell counterpart', () => {
+    expect(difficultyFor('kettlebell-goblet-squat')).toBe('beginner');
+  });
+
+  it('every kettlebell id resolves a unique name with no catalog collisions', () => {
+    const names = EXERCISES.map(e => e.name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
   });
 });

@@ -42,7 +42,7 @@ Long-term milestones (roughly):
     in-workout draft persistence (localStorage; auto-restore on reopening the day)
 17. ✅ Exercise Intelligence / substitution engine (`substitution.ts`) — per-exercise
     "Find replacement" in the day editor: top-3 ranked, explained suggestions that
-    preserve the slot's programming; curated catalog expansion (~68 exercises)
+    preserve the slot's programming; curated catalog expansion (~89 exercises)
 18. ✅ Training journey — the long-term planning layer above individual workouts:
     TrainingPlan/TrainingBlock domain model (`plan.ts`), block planner
     (`planner.ts`: goal + history → explained split/phases/workouts proposal),
@@ -258,7 +258,7 @@ src/
     settings.ts                — device-local settings (localStorage): the week-numbering
                                   anchor (managed automatically — first-use stamp, then the
                                   journey via planStore.ensureWeekAnchor) + rest-timer default
-    exercises.ts               — Single source of truth for the ~68 built-in exercises
+    exercises.ts               — Single source of truth for the ~89 built-in exercises
                                   (ExerciseDef), EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
                                   saveExerciseMeta() — metadata overrides in localStorage.
                                   Includes the curated catalog expansion that feeds the
@@ -963,7 +963,7 @@ serves first-run onboarding and every replan; it saves the profile on activate.
 
 ## Exercise data architecture
 
-`src/data/exercises.ts` is the single source of truth for the ~68 built-in exercises
+`src/data/exercises.ts` is the single source of truth for the ~89 built-in exercises
 (the original 28 plus a curated catalog expansion that feeds the substitution engine's
 candidate pool — catalog-only exercises join the user's library when swapped into the
 program, not before):
@@ -994,6 +994,15 @@ program, not before):
   shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise). Pallof
   press, dead bug, side plank and Copenhagen plank are **Obliques**-primary (rotation/lateral
   flexion); a plain plank stays **Abs** (extension resistance, not rotation).
+- A **kettlebell staples** layer (7 exercises) covers movements the dumbbell/barbell catalog
+  doesn't reach rather than duplicating them under a new `weightType`: ballistic hip hinge
+  (swing), offset/unilateral pressing and rowing, a front-rack lunge, and the suitcase carry —
+  a loaded, anti-lateral-flexion **Obliques** stimulus distinct from the muscle's only other
+  coverage (isometric holds). The Turkish get-up has no single prime mover; it's classified by
+  its limiting factor (resisting rotation as the base changes through the sequence) alongside
+  Pallof press and dead bug. The swing and get-up are `advanced` with prerequisites (a
+  controlled hip hinge; core anti-rotation work) for the same reason good mornings is — an
+  unforgiving technique floor.
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 

@@ -34,7 +34,11 @@ export const EXERCISES: ExerciseDef[] = [
 
   // Lats
   { id: 'lat-pull-down',            name: 'Lat Pull Down',                    primaryMuscle: 'Lats',        secondaryMuscles: ['Upper Back', 'Biceps', null],   workoutType: 'Pull Down',        equipment: 'Cable Machine',     weightType: 'Machine'    },
-  { id: 'straight-arm-pulldowns',   name: 'Straight Arm Pull Downs',          primaryMuscle: 'Lats',        secondaryMuscles: ['Upper Back', null, null],       workoutType: 'Pull Down',        equipment: 'Cable Machine',     weightType: 'Machine'    },
+  // 'Pull Over', not 'Pull Down' — the joint action (straight-elbow shoulder
+  // extension) matches Dumbbell Pullover exactly; the cable vs. dumbbell
+  // difference is equipment, not movement. No elbow flexion means no biceps
+  // assist, unlike a true (bent-elbow) pulldown.
+  { id: 'straight-arm-pulldowns',   name: 'Straight Arm Pull Downs',          primaryMuscle: 'Lats',        secondaryMuscles: ['Upper Back', null, null],       workoutType: 'Pull Over',        equipment: 'Cable Machine',     weightType: 'Machine'    },
   { id: 'weighted-pull-ups',        name: 'Weighted Pull Ups',                primaryMuscle: 'Lats',        secondaryMuscles: ['Upper Back', 'Biceps', null],   workoutType: 'Pull Up',          equipment: 'Pull Up Bar',       weightType: 'Bodyweight' },
 
   // Lower Back
@@ -64,7 +68,7 @@ export const EXERCISES: ExerciseDef[] = [
   { id: 'hip-thrusts',              name: 'Hip Thrusts',                      primaryMuscle: 'Glutes',      secondaryMuscles: ['Hamstrings', null, null],       workoutType: 'Hip Thrust',       equipment: 'Bench',             weightType: 'Barbell'    },
 
   // Calves
-  { id: 'seated-calf-raises',       name: 'Seated Calf Raises',               primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'None',              weightType: 'Machine'    },
+  { id: 'seated-calf-raises',       name: 'Seated Calf Raises',               primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'standing-calf-raises',     name: 'Standing Calf Raises',             primaryMuscle: 'Calves',      secondaryMuscles: [null, null, null],               workoutType: 'Calf Raise',       equipment: 'None',              weightType: 'Barbell'    },
 
   // ── Catalog expansion ────────────────────────────────────────────────────────
@@ -174,6 +178,27 @@ export const EXERCISES: ExerciseDef[] = [
   // Shoulder rotation / posterior cuff — the swim's insurance policy
   { id: 'db-external-rotation',     name: 'Dumbbell External Rotation',       primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Rotation',         equipment: 'None',              weightType: 'Dumbbell'   },
   { id: 'db-y-raise',               name: 'Prone Dumbbell Y Raise',           primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Bench',             weightType: 'Dumbbell'   },
+
+  // ── Kettlebell staples ───────────────────────────────────────────────────────
+  // Genuinely kettlebell-distinct movements — ballistic hip-hinge, offset
+  // loading, unilateral pressing/rowing/carrying — rather than duplicating
+  // moves the dumbbell/barbell catalog already covers just to say "Kettlebell."
+  // Every entry needs no equipment beyond the bell itself.
+  { id: 'kettlebell-swing',                  name: 'Kettlebell Swing',                    primaryMuscle: 'Glutes', secondaryMuscles: ['Hamstrings', 'Lower Back', null], workoutType: 'Hip Hinge',      equipment: 'None', weightType: 'Kettlebell' },
+  { id: 'kettlebell-goblet-squat',           name: 'Kettlebell Goblet Squat',              primaryMuscle: 'Quads',  secondaryMuscles: ['Glutes', null, null],             workoutType: 'Squat',          equipment: 'None', weightType: 'Kettlebell' },
+  { id: 'kettlebell-single-arm-press',       name: 'Kettlebell Single-Arm Overhead Press', primaryMuscle: 'Delts',  secondaryMuscles: ['Triceps', null, null],            workoutType: 'Vertical Press', equipment: 'None', weightType: 'Kettlebell' },
+  { id: 'kettlebell-single-arm-row',         name: 'Kettlebell Single-Arm Row',             primaryMuscle: 'Upper Back', secondaryMuscles: ['Lats', 'Biceps', null],       workoutType: 'Row',            equipment: 'None', weightType: 'Kettlebell' },
+  // Anti-lateral-flexion loading, carried on one side only — a genuinely
+  // different Obliques stimulus from the isometric holds (Pallof press, side
+  // plank) that are otherwise the muscle's only coverage.
+  { id: 'kettlebell-suitcase-carry',         name: 'Kettlebell Suitcase Carry',            primaryMuscle: 'Obliques', secondaryMuscles: ['Traps', 'Forearms', null],  workoutType: 'Carry',          equipment: 'None', weightType: 'Kettlebell', unit: 'seconds' },
+  { id: 'kettlebell-front-rack-lunge',       name: 'Kettlebell Front-Rack Reverse Lunge',  primaryMuscle: 'Quads',  secondaryMuscles: ['Glutes', 'Hamstrings', null],     workoutType: 'Lunge',          equipment: 'None', weightType: 'Kettlebell' },
+  // Floor-to-standing sequence pressing the bell overhead throughout — no
+  // single prime mover, but the limiting factor start to finish is resisting
+  // rotation/lateral flexion as the base changes, the same demand as Pallof
+  // press and dead bug, so it's classified there rather than by any one
+  // transitional position (the overhead lockout, the lunge, the bridge).
+  { id: 'kettlebell-turkish-get-up',         name: 'Kettlebell Turkish Get-Up',            primaryMuscle: 'Obliques', secondaryMuscles: ['Delts', 'Glutes', null],    workoutType: 'Anti-Rotation',  equipment: 'None', weightType: 'Kettlebell' },
 ];
 
 export const EXERCISE_MAP = new Map<string, ExerciseDef>(EXERCISES.map(e => [e.id, e]));
@@ -238,6 +263,8 @@ const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   'dead-bug': 'beginner', 'plank': 'beginner', 'side-plank': 'beginner',
   'db-external-rotation': 'beginner', 'db-y-raise': 'beginner',
   'single-leg-calf-raise': 'beginner', 'dumbbell-step-up': 'beginner',
+  // A goblet grip is exactly as forgiving with a kettlebell as a dumbbell.
+  'kettlebell-goblet-squat': 'beginner',
 
   // Advanced — high skill / high axial load / gated behind prerequisites
   'conventional-deadlift': 'advanced', 'barbell-back-squat': 'advanced',
@@ -246,6 +273,13 @@ const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   // Copenhagen planks put a long lever through the adductors — a hard sell
   // before a regular side plank is comfortable.
   'copenhagen-plank': 'advanced',
+  // The ballistic hip-hinge timing is unforgiving on the lower back if it's
+  // muscled with the arms instead of driven by the hips — same risk profile
+  // as good mornings, same fix (earn a controlled hinge first).
+  'kettlebell-swing': 'advanced',
+  // A whole-body, multi-position sequence with no room to muscle through a
+  // missed step — the highest skill floor in the catalog.
+  'kettlebell-turkish-get-up': 'advanced',
   // everything else (barbell/dumbbell pressing, rows, RDLs, hip thrusts,
   // dips, chin-ups, lunges, plyometrics, carries) defaults to intermediate
 };
@@ -256,6 +290,8 @@ const PREREQUISITES: Record<string, string[]> = {
   'conventional-deadlift': ['romanian-deadlifts', 'dumbbell-rdl'],
   'barbell-back-squat':    ['goblet-squat', 'leg-press', 'hack-squat'],
   'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],
+  'kettlebell-swing':      ['romanian-deadlifts', 'dumbbell-rdl'],
+  'kettlebell-turkish-get-up': ['side-plank', 'pallof-press'],
   'good-mornings':         ['romanian-deadlifts', 'dumbbell-rdl'],
   'hanging-leg-raise':     ['machine-crunch', 'cable-crunch'],
   'copenhagen-plank':      ['side-plank', 'plank'],
@@ -324,7 +360,7 @@ const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
   // Delts — presses bias the anterior (front) head, raises isolate the
   // lateral (side) head, pulls/reverse-flys bias the posterior (rear) head.
   'seated-db-overhead-press': ['Front Delt'], 'barbell-overhead-press': ['Front Delt'],
-  'machine-shoulder-press': ['Front Delt'],
+  'machine-shoulder-press': ['Front Delt'], 'kettlebell-single-arm-press': ['Front Delt'],
   'cable-lateral-raises': ['Side Delt'], 'dumbbell-lateral-raises': ['Side Delt'],
   'machine-lateral-raise': ['Side Delt'],
   'face-pulls': ['Rear Delt'], 'reverse-pec-deck': ['Rear Delt'],
@@ -368,7 +404,7 @@ const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
   // gluteus maximus' role (medius/minimus have no dedicated Glutes-primary
   // movement in this catalog; hip abduction trains them under 'Abductors').
   'hip-thrusts': ['Gluteus Maximus'], 'conventional-deadlift': ['Gluteus Maximus'],
-  'cable-pull-through': ['Gluteus Maximus'],
+  'cable-pull-through': ['Gluteus Maximus'], 'kettlebell-swing': ['Gluteus Maximus'],
 
   // Calves — a bent knee (seated) removes gastrocnemius' mechanical
   // advantage and isolates soleus; a straight knee (standing) trains both,
