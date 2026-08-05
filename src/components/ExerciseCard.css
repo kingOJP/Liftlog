@@ -63,6 +63,8 @@
 .ex-rec--up    { border-left-color: var(--green); }
 .ex-rec--down  { border-left-color: var(--red); }
 .ex-rec--hold  { border-left-color: var(--purple); }
+/* A load re-matched to a new rep range — neither a reward nor a back-off. */
+.ex-rec--reanchor { border-left-color: var(--purple); }
 
 .ex-rec-weight {
   font-size: 14px;
@@ -73,6 +75,7 @@
 
 .ex-rec--up   .ex-rec-weight { color: var(--green); }
 .ex-rec--down .ex-rec-weight { color: var(--red); }
+.ex-rec--reanchor .ex-rec-weight { color: var(--purple); }
 
 .ex-rec-reason {
   font-size: 12px;

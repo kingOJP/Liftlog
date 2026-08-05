@@ -365,6 +365,132 @@ describe('planned phase overrides', () => {
   });
 });
 
+describe('re-anchoring a load to a changed rep range', () => {
+  // The reported case: a general-hypertrophy block (3 × 10–12) became a
+  // triathlon-support block (4 × 4–6). Nothing about the LIFTER changed, but
+  // every load in the program was chosen for a rep range nobody is training in
+  // any more.
+  const sportSquat: Slot = { sets: 4, repLow: 4, repHigh: 6 };
+  const squatHistory = [
+    session([[185, 9], [185, 9], [185, 8], [205, 7]], 1),
+    session([[185, 8], [185, 8], [185, 7], [195, 7]], 2),
+  ];
+
+  it('re-anchors a hypertrophy load to a low-rep block from the est. 1RM', () => {
+    const rec = advise(squatHistory, sportSquat);
+    // Best valid est. 1RM is 205×7 → 253 lbs; a 6-rep load is 253 / 1.2 ≈ 211,
+    // shaded 5% because four sets of six is not a 6RM attempt.
+    expect(rec).toMatchObject({ weight: 200, direction: 'up', kind: 'reanchor' });
+    expect(rec!.reason).toMatch(/est\. 1RM/i);
+  });
+
+  it('is not throttled by the weekly rate cap', () => {
+    // 5%/week off 185 lbs is 194 — a cap meant to pace PROGRESS, which this is
+    // not. Re-expressing the same strength in a new rep range is arithmetic,
+    // and rationing it hands the lifter a month of sessions that are too easy.
+    for (const experience of ['beginner', 'intermediate', 'advanced'] as const) {
+      expect(advise(squatHistory, sportSquat, { experience })).toMatchObject({ weight: 200 });
+    }
+  });
+
+  it('prescribes the reps the new load actually costs', () => {
+    const p = plan(squatHistory, sportSquat);
+    expect(p.sets.map(s => s.weight)).toEqual([200, 200, 200, 200]);
+    expect(p.sets.map(s => s.targetReps)).toEqual([6, 6, 5, 5]);
+    expect(p.goal).toMatch(/estimate from your log/i);
+  });
+
+  it('leaves ordinary double progression alone', () => {
+    // One rep past the top of the range is the increase rule working, not a
+    // mismatched prescription — this must still route through sized increments.
+    const rec = advise([session([[100, 13], [100, 13], [100, 13]], 1)]);
+    expect(rec!.kind).toBe('increase');
+  });
+
+  it('needs a second session before reading a blow-out as a mismatch', () => {
+    const flukeThenNormal = [
+      session([[100, 15], [100, 15], [100, 14]], 1),
+      session([[100, 11], [100, 11], [100, 10]], 2),
+    ];
+    expect(advise(flukeThenNormal)!.kind).toBe('increase');
+  });
+
+  it('falls back to the load–rep model when est. 1RM is out of its valid range', () => {
+    // Every set past ~12 reps: Epley's error swamps the signal there, so the
+    // 3%-per-rep relationship sets the load instead of a fictional 1RM.
+    const highRep = [
+      session([[100, 15], [100, 15], [100, 14]], 1),
+      session([[100, 15], [100, 14], [100, 14]], 2),
+    ];
+    const rec = advise(highRep);
+    expect(rec).toMatchObject({ kind: 'reanchor', direction: 'up', weight: 105 });
+    expect(rec!.reason).not.toMatch(/est\. 1RM/i);
+  });
+
+  it('re-anchors downward when a block moves to higher reps', () => {
+    const strengthToHypertrophy = [
+      session([[225, 5], [225, 5], [225, 4]], 1),
+      session([[225, 5], [225, 4], [225, 4]], 2),
+    ];
+    const rec = advise(strengthToHypertrophy, { sets: 3, repLow: 10, repHigh: 12 });
+    expect(rec).toMatchObject({ kind: 'reanchor', direction: 'down' });
+    // Capped at one 20% step rather than betting the whole correction on one
+    // prediction — the next session re-anchors again from fresh evidence.
+    expect(rec!.weight).toBe(180);
+  });
+
+  it('never cuts load off a single under-range session', () => {
+    // The mirror of the rule above: reps falling short is exactly what an off
+    // day looks like, so a downward re-anchor needs a session confirming it.
+    const rec = advise([session([[225, 5], [225, 5], [225, 4]], 1)], { sets: 3, repLow: 10, repHigh: 12 });
+    expect(rec!.kind).not.toBe('reanchor');
+  });
+
+  it('backs an easy week off the re-anchored load, not the stale one', () => {
+    // A new block often opens with an intro week. Backing off 20% from a load
+    // that was already 15 lbs light for the range is two mistakes compounding.
+    const rec = advise(squatHistory, sportSquat, { phase: 'intro' });
+    expect(rec).toMatchObject({ weight: 160, kind: 'deload' });
+  });
+});
+
+describe('extra and heavier sets', () => {
+  it('counts a heavier top set toward the programmed set count', () => {
+    // 3 sets at the working weight plus a heavier top set IS four sets of work.
+    // Judging it as three left the lifter permanently short of the set count
+    // the increase rule requires, so the load could never move.
+    const rec = advise([session([[100, 12], [100, 12], [100, 12], [110, 10]], 1)], {
+      sets: 4, repLow: 8, repHigh: 12,
+    });
+    expect(rec).toMatchObject({ kind: 'increase' });
+  });
+
+  it('does not let a failed extra set drag the session under the range', () => {
+    // Three programmed sets in range, then a fourth taken to failure. The extra
+    // work is a bonus; it must not read as "reps fell under the range".
+    const rec = advise([session([[100, 9], [100, 9], [100, 8], [100, 2]], 1)]);
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+  });
+
+  it('still does not let bonus sets earn an increase', () => {
+    // The cap at the programmed set count is what keeps the credit honest.
+    const rec = advise([session([[100, 8], [100, 8], [100, 8], [100, 8], [100, 8]], 1)]);
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+  });
+
+  it('lets a heavier top set call off a deload', () => {
+    // Reps flat at the working weight for three sessions, but the lifter has
+    // been adding a heavier top set — that is progress, and progress is what a
+    // stall verdict is supposed to rule out.
+    const history = [
+      session([[100, 9], [100, 9], [100, 8], [115, 6]], 1),
+      session([[100, 9], [100, 9], [100, 8], [110, 6]], 2),
+      session([[100, 9], [100, 9], [100, 8]], 3),
+    ];
+    expect(advise(history, { sets: 4, repLow: 8, repHigh: 12 })!.kind).not.toBe('deload');
+  });
+});
+
 describe('exercise-order freshness', () => {
   const at = (pos: number, sets: Array<[number, number]>, weeksAgo: number): ExerciseSession => ({
     completedAt: NOW - weeksAgo * WEEK,

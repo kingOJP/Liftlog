@@ -562,6 +562,8 @@ the engine reads the athlete and the plan, not just the lift. WorkoutView suppli
 
 Branches, evaluated in order:
 
+0. **Re-anchor (rep range changed)** — the reps logged sit ≥2 outside the prescribed range →
+   recompute the load from the **estimated 1RM** instead of nudging it (see below).
 1. **Increase (rep total)** — at least `exercise.sets` working sets and a **rep total** of
    `sets × repHigh` over the *programmed* set count → add load. Counting the total rather than
    demanding *every* set hit `repHigh` is what stops the engine parroting last week's weight:
@@ -576,8 +578,41 @@ Branches, evaluated in order:
 5. **Hold** (double progression) — reps in range → keep the weight, chase reps. The reason
    names the exact gap ("2 more reps than last time (36 total) earns the next increase").
 
-Four things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
+Six things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
 earlier version was wrong:
+
+**A load that belongs to a different rep range is re-anchored, not nudged** (`rangeReanchor`).
+Double progression only knows how to move a lifter *within* a range. When the range itself
+changes underneath them — a hypertrophy block's 3×10–12 becoming a sport-support block's
+4×4–6 — every increment rule starts from the wrong number, and the weekly rate cap turns the
+walk to the right load into a month of sessions too easy to be worth doing (185 lbs for a
+lifter who just did 185×9, 185×9, 185×8, 205×7). Set logs don't record the prescription that
+was in force, so the mismatch is inferred from the reps, and the new load comes from the
+**estimated 1RM** — the only thing that carries strength *between* rep ranges: best valid
+e1RM → `loadForReps(e1rm, repHigh)` → shaded `REANCHOR_SAFETY` (5%, because several sets at
+a rep count is not a rep max) → snapped down to the equipment's increment. Guard rails: the
+mismatch must be ≥`RANGE_MISMATCH_REPS` (2) outside the range so ordinary double progression
+is untouched; one step may move the load at most `REANCHOR_MAX_STEP` (20%), with the next
+session re-anchoring again from fresh evidence; past `E1RM_VALID_REPS` the load–rep model is
+used instead of a fictional 1RM; and the **weekly rate cap does not apply** — this is not
+progress being paced, it is the same strength re-expressed in new units. The two directions
+carry different burdens of proof, mirroring the rest of the engine: **too light** re-anchors
+on the latest session (vetoed by a previous one that contradicts it) because reps *above* a
+range can't be explained by a bad night's sleep; **too heavy** needs a previous session that
+missed the same way, because falling short is exactly what an off day looks like. An easy
+week (deload/intro/race) backs off *from the re-anchored load* — a new block often opens with
+an intro week, and 20% off a load that was already wrong is two mistakes compounding.
+
+**Extra and heavier sets can only help** (`credit()` vs `countedSets()`). Every session is read
+two ways. The **credited** view — the best `sets` of everything at or above the working weight,
+each valued at what it would have been worth *at* that weight (`equivalentReps`, the same
+~3%-per-rep relationship) — is what can EARN something: increases, and the rep improvement that
+calls off a deload. The **strict** view — programmed sets at the working weight, in order — is
+the only thing that can COST load. So a lifter who works up to a top set gets credit for it
+(185×9, 185×9, 185×8, 205×7 is four sets of work against a programmed four, not three, and
+205×7 outscores 185×7), a fifth set taken to failure is ignored rather than averaged in, and
+the under-range branch reads whichever view looks better. The cap at the programmed set count
+is what keeps it honest in the other direction — five sets of eight still isn't a 3×12.
 
 **Jump size comes from the load–rep relationship, not a flat 5 lbs.** Standard %1RM tables
 (1RM 100%, 5RM ~87%, 10RM ~75%) put one rep at roughly 2.5–3% of load; `PCT_LOAD_PER_REP = 3`
@@ -647,7 +682,10 @@ one more rep). If external load *was* logged
 (e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
 "↑ N reps" instead of a weight when `targetReps` is set.
 
-Returns `{ weight, targetReps?, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
+Returns `{ weight, targetReps?, direction, kind, reason }`
+(`kind`: `increase`/`hold`/`decrease`/`deload`/`reanchor`). ExerciseCard colours the chip by
+`direction`, except `reanchor` which is neutral (purple) — re-matching a load to a new rep
+range is a correction, not a verdict on the last session.
 
 ### Per-set prescription (`buildSetPlan`)
 
