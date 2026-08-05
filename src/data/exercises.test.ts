@@ -14,8 +14,20 @@ describe('exercise metadata — legacy value normalization', () => {
     }));
     const meta = getExerciseMeta('my-press');
     expect(meta.primaryMuscle).toBe('Delts');
-    expect(meta.workoutType).toBe('Press');
+    expect(meta.workoutType).toBe('Vertical Press');
     expect(meta.equipment).toBe('Machine');
+  });
+
+  it('defaults a bare legacy Press (ambiguous plane) to Horizontal Press', () => {
+    localStorage.setItem('liftlog_exercise_meta', JSON.stringify({
+      'my-bench': {
+        primaryMuscle: 'Chest', secondaryMuscle1: null,
+        secondaryMuscle2: null, secondaryMuscle3: null,
+        workoutType: 'Press', equipment: 'Bench', weightType: 'Barbell',
+      },
+    }));
+    const meta = getExerciseMeta('my-bench');
+    expect(meta.workoutType).toBe('Horizontal Press');
   });
 
   it('dedupes muscles that collapse into the same group', () => {
@@ -33,7 +45,7 @@ describe('exercise metadata — legacy value normalization', () => {
     expect(meta.secondaryMuscle1).toBeNull();
     expect(meta.secondaryMuscle2).toBe('Triceps');
     expect(meta.secondaryMuscle3).toBeNull();
-    expect(meta.workoutType).toBe('Press');
+    expect(meta.workoutType).toBe('Horizontal Press');
   });
 
   it('leaves current taxonomy values untouched', () => {

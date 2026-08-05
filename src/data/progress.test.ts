@@ -3,6 +3,7 @@ import { buildSnapshot } from './analytics';
 import type { Session, SetLog } from '../db/database';
 import {
   assessSnapshot,
+  categoryProgress,
   exercisePointSeries,
   sessionExercisePositions,
 } from './progress';
@@ -166,5 +167,31 @@ describe('assessSnapshot — goal-weighted multi-signal', () => {
     const a = assessSnapshot(snap, 'strength').get('bench')!;
     expect(a.status).toBe('declining');
     expect(a.e1rmChangePct!).toBeLessThan(0);
+  });
+});
+
+describe('categoryProgress — movement-pattern rollup', () => {
+  it('buckets real catalog exercises by movement category, not muscle', () => {
+    const snap = build([
+      { day: 1, sets: [...s('barbell-back-squat', 200, 8), ...s('incline-barbell-press', 135, 8)] },
+      { day: 1, sets: [...s('barbell-back-squat', 205, 8), ...s('incline-barbell-press', 140, 8)] },
+      { day: 1, sets: [...s('barbell-back-squat', 210, 8), ...s('incline-barbell-press', 145, 8)] },
+    ]);
+    const categories = categoryProgress(snap, 'strength');
+    const squat = categories.find(c => c.category === 'Squat');
+    const push = categories.find(c => c.category === 'Push');
+    expect(squat?.exerciseCount).toBe(1);
+    expect(push?.exerciseCount).toBe(1);
+    expect((squat?.progressing ?? 0) + (squat?.steady ?? 0)).toBe(1);
+  });
+
+  it('excludes exercises with no resolvable movement pattern', () => {
+    const snap = build([
+      { day: 1, sets: s('some-unclassified-custom-lift', 50, 10) },
+      { day: 1, sets: s('some-unclassified-custom-lift', 55, 10) },
+    ]);
+    const categories = categoryProgress(snap, 'general');
+    const total = categories.reduce((sum, c) => sum + c.exerciseCount, 0);
+    expect(total).toBe(0);
   });
 });

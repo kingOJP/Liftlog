@@ -32,7 +32,7 @@
 //     as intensity is held, which is what makes a lifting taper cheap: keep
 //     the load, gut the sets.
 
-import type { MuscleGroup, WorkoutType } from './taxonomy';
+import type { MuscleGroup, MovementPattern } from './taxonomy';
 import type {
   PhaseKind, SportContext, SportId, SportEvent, Discipline, ExperienceLevel,
   EnduranceLoad, RaceProximity,
@@ -58,7 +58,7 @@ export interface SlotDose {
 
 export interface Slot {
   muscle: MuscleGroup;
-  patterns?: WorkoutType[];
+  patterns?: MovementPattern[];
   mechanics?: 'compound' | 'isolation';
   /** the day's heavy anchor — more sets, lower reps */
   main?: boolean;

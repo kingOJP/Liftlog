@@ -1027,6 +1027,38 @@ rename:
   catalogued head emphasis — kept for future holistic volume analysis (e.g. flagging a
   chronically undertrained rear delt even when total delt volume looks fine).
 
+### Movement pattern tiers
+
+Two tiers (`taxonomy.ts` comment block). Renamed from the old flat `WorkoutType` — "workout
+type" never described what the field actually captured. The `ExerciseDef`/metadata *field*
+stays `workoutType` for wire/schema compatibility (JSON keys and the D1 column are unchanged);
+only the type name and vocabulary change.
+
+- **Tier 2 — MovementPattern** (`MOVEMENT_PATTERNS` in `taxonomy.ts`) — unchanged role: the
+  family-level match the substitution engine and planner/sports.ts slot templates operate at
+  (Row vs. Pull Down vs. Pull Up are genuinely different movements). One correction: **Press**
+  — the one real inconsistency in an otherwise-consistent list — used to span both bench-style
+  horizontal pressing and overhead-style vertical pressing. Split into **Horizontal Press** /
+  **Vertical Press**. A stale stored override of the old bare `'Press'` value can't be
+  disambiguated from the string alone, so it defaults to Horizontal on read
+  (`LEGACY_WORKOUT_TYPES` in `exercises.ts`) and self-heals next time that exercise's metadata
+  is edited; the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
+  earlier merge into `'Press'`) remap unambiguously since they name their plane directly.
+- **Tier 1 — MovementCategory** (`MOVEMENT_CATEGORIES`, `patternCategoryFor()` in
+  `taxonomy.ts`) — a coarser layer above MovementPattern, for the same reason Region sits above
+  MuscleGroup: most of MovementPattern's ~28 values have only 1–3 exercises, too few to show a
+  *trend* — "is my Face Pull number going up" just restates that exercise's own progress. Eight
+  categories (Squat, Hinge, Push, Pull, Core, Carry, Power, Isolation) aggregate enough
+  exercises to say something new — the same mental model lifters already use for
+  squat/bench/deadlift/press trends. `Isolation` is a deliberate catch-all: every pattern needs
+  a category, but a bicep curl and a calf raise trending on one line isn't a meaningful signal,
+  so isolation work is bucketed together without being treated as trend-worthy itself. Compiled
+  catalog data, not user-editable, not synced — same footing as MuscleHead.
+  `movementPatternFor(id)` (`analytics.ts`) resolves an exercise's pattern with the same
+  precedence as `musclesForExercise` (user override → catalog → name match), and
+  `categoryProgress(snapshot, goal)` (`progress.ts`) rolls per-exercise progress status up by
+  category — not surfaced in the UI yet, kept for future pattern-vs-growth insights.
+
 ---
 
 ## Decisions & things to keep in mind

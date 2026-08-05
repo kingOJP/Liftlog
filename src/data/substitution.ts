@@ -22,7 +22,7 @@
 //     recommendation engine are pure functions of (program, history), so once
 //     a swap is saved to the program nothing needs to be "notified".
 
-import type { MuscleGroup, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
+import type { MuscleGroup, MovementPattern, Equipment, WeightType, MeasureUnit } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
 import type { TrainingSnapshot, VolumeTarget } from './analytics';
 import {
@@ -49,7 +49,7 @@ export interface ExerciseProfile {
   name: string;
   primaryMuscle: MuscleGroup | null;
   secondaryMuscles: MuscleGroup[];
-  workoutType: WorkoutType | null;
+  workoutType: MovementPattern | null;
   equipment: Equipment | null;
   weightType: WeightType | null;
   mechanics: Mechanics;
@@ -65,9 +65,9 @@ export interface ExerciseProfile {
 // than hand-maintaining a flag on every catalog row. Jumps and loaded carries
 // are whole-body efforts; isometric holds and single-joint rotation/abduction
 // work fall through to isolation.
-const COMPOUND_PATTERNS = new Set<WorkoutType>([
-  'Carry', 'Dip', 'Hip Hinge', 'Hip Thrust', 'Jump', 'Leg Press', 'Lunge',
-  'Press', 'Pull Down', 'Pull Up', 'Row', 'Squat',
+const COMPOUND_PATTERNS = new Set<MovementPattern>([
+  'Carry', 'Dip', 'Hip Hinge', 'Hip Thrust', 'Horizontal Press', 'Jump',
+  'Leg Press', 'Lunge', 'Pull Down', 'Pull Up', 'Row', 'Squat', 'Vertical Press',
 ]);
 
 const nameToDef = new Map(EXERCISES.map(d => [normalizeName(d.name), d]));
@@ -163,7 +163,7 @@ interface RankContext {
   target: ExerciseProfile;
   targetMuscles: Set<MuscleGroup>;
   /** movement patterns the rest of the day already covers */
-  patternsInDay: Set<WorkoutType>;
+  patternsInDay: Set<MovementPattern>;
   loggedIds: Set<string>;
   trendUp: Set<string>;
   trendDown: Set<string>;
@@ -235,7 +235,7 @@ function buildContext(
   now: number,
   goal: Goal | null,
 ): RankContext {
-  const patternsInDay = new Set<WorkoutType>();
+  const patternsInDay = new Set<MovementPattern>();
   const observedEquipment = new Set<Equipment>();
   for (const ex of day.exercises) {
     const p = profileFor(ex.id, ex.name);

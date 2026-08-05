@@ -6,7 +6,7 @@
 
 import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
-import type { MuscleGroup } from './taxonomy';
+import type { MuscleGroup, MovementPattern } from './taxonomy';
 import { startOfWeek } from './program';
 import type { Goal } from './plan';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
@@ -223,6 +223,23 @@ export function musclesForExercise(id: string): MuscleInvolvement[] {
 
 export function primaryMuscleFor(id: string): MuscleGroup | null {
   return musclesForExercise(id).find(m => m.weight === 1)?.muscle ?? null;
+}
+
+// The exercise's movement pattern, same precedence as musclesForExercise:
+// user override (getExerciseMeta) → master catalog → name match for custom
+// library entries with no override. THE resolver for pattern-vs-growth
+// analysis (progress.ts categoryProgress) and anything else that needs a
+// single agreed-upon pattern for an exercise id.
+export function movementPatternFor(id: string): MovementPattern | null {
+  const meta = getExerciseMeta(id);
+  let pattern = meta.workoutType;
+
+  if (!pattern && !EXERCISE_MAP.has(id)) {
+    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
+    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
+    if (def) pattern = def.workoutType;
+  }
+  return pattern;
 }
 
 // ── Muscle set accumulation ───────────────────────────────────────────────────

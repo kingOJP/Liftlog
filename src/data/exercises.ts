@@ -1,11 +1,13 @@
-import type { MuscleGroup, MuscleHead, WorkoutType, Equipment, WeightType, MeasureUnit } from './taxonomy';
+import type { MuscleGroup, MuscleHead, MovementPattern, Equipment, WeightType, MeasureUnit } from './taxonomy';
 
 export interface ExerciseDef {
   id: string;
   name: string;
   primaryMuscle: MuscleGroup | null;
   secondaryMuscles: [MuscleGroup | null, MuscleGroup | null, MuscleGroup | null];
-  workoutType: WorkoutType | null;
+  /** movement family (see taxonomy.ts MovementPattern) — field name kept as
+   *  `workoutType` for wire/schema compatibility. */
+  workoutType: MovementPattern | null;
   equipment: Equipment | null;
   weightType: WeightType | null;
   /** how a set is counted — omitted means 'reps' (the case for all barbell,
@@ -15,13 +17,13 @@ export interface ExerciseDef {
 
 export const EXERCISES: ExerciseDef[] = [
   // Chest
-  { id: 'incline-barbell-press',    name: 'Incline Barbell Press',            primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
-  { id: 'dumbbell-bench-press',     name: 'Dumbbell Bench Press',             primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'incline-barbell-press',    name: 'Incline Barbell Press',            primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'dumbbell-bench-press',     name: 'Dumbbell Bench Press',             primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
   { id: 'cable-fly',                name: 'Cable Fly',                        primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Cable Machine',     weightType: 'Machine'    },
 
   // Delts
-  { id: 'seated-db-overhead-press', name: 'Seated Dumbbell Overhead Press',   primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
-  { id: 'barbell-overhead-press',   name: 'Barbell Overhead Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'seated-db-overhead-press', name: 'Seated Dumbbell Overhead Press',   primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Vertical Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'barbell-overhead-press',   name: 'Barbell Overhead Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Vertical Press',            equipment: 'Squat Rack',        weightType: 'Barbell'    },
   { id: 'cable-lateral-raises',     name: 'Cable Lateral Raises',             primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'Cable Machine',     weightType: 'Machine'    },
   { id: 'dumbbell-lateral-raises',  name: 'Dumbbell Lateral Raises',          primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'None',              weightType: 'Dumbbell'   },
   { id: 'face-pulls',               name: 'Face Pulls',                       primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Face Pull',        equipment: 'Cable Machine',     weightType: 'Machine'    },
@@ -74,16 +76,16 @@ export const EXERCISES: ExerciseDef[] = [
   // actually swapped into the program (addToExerciseLibrary).
 
   // Chest
-  { id: 'flat-barbell-bench-press', name: 'Flat Barbell Bench Press',         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
-  { id: 'incline-dumbbell-press',   name: 'Incline Dumbbell Press',           primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
-  { id: 'machine-chest-press',      name: 'Machine Chest Press',              primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'flat-barbell-bench-press', name: 'Flat Barbell Bench Press',         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'incline-dumbbell-press',   name: 'Incline Dumbbell Press',           primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'Bench',             weightType: 'Dumbbell'   },
+  { id: 'machine-chest-press',      name: 'Machine Chest Press',              primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'pec-deck-fly',             name: 'Pec Deck Fly',                     primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'dumbbell-fly',             name: 'Dumbbell Fly',                     primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', null, null],            workoutType: 'Fly',              equipment: 'Bench',             weightType: 'Dumbbell'   },
   { id: 'weighted-dips',            name: 'Weighted Dips',                    primaryMuscle: 'Chest',       secondaryMuscles: ['Triceps', 'Delts', null],       workoutType: 'Dip',              equipment: 'Dip Station',       weightType: 'Bodyweight' },
-  { id: 'push-ups',                 name: 'Push Ups',                         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Press',            equipment: 'None',              weightType: 'Bodyweight' },
+  { id: 'push-ups',                 name: 'Push Ups',                         primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press',            equipment: 'None',              weightType: 'Bodyweight' },
 
   // Delts
-  { id: 'machine-shoulder-press',   name: 'Machine Shoulder Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Press',            equipment: 'Machine',           weightType: 'Machine'    },
+  { id: 'machine-shoulder-press',   name: 'Machine Shoulder Press',           primaryMuscle: 'Delts',       secondaryMuscles: ['Triceps', null, null],          workoutType: 'Vertical Press',            equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'machine-lateral-raise',    name: 'Machine Lateral Raise',            primaryMuscle: 'Delts',       secondaryMuscles: [null, null, null],               workoutType: 'Lateral Raise',    equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'reverse-pec-deck',         name: 'Reverse Pec Deck',                 primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Machine',           weightType: 'Machine'    },
   { id: 'dumbbell-rear-delt-fly',   name: 'Dumbbell Rear Delt Fly',           primaryMuscle: 'Delts',       secondaryMuscles: ['Upper Back', 'Traps', null],    workoutType: 'Reverse Fly',      equipment: 'Bench',             weightType: 'Dumbbell'   },
@@ -127,7 +129,7 @@ export const EXERCISES: ExerciseDef[] = [
 
   // Triceps
   { id: 'skull-crushers',           name: 'Skull Crushers',                   primaryMuscle: 'Triceps',     secondaryMuscles: [null, null, null],               workoutType: 'Tricep Extension', equipment: 'Bench',             weightType: 'EZ Bar'     },
-  { id: 'close-grip-bench-press',   name: 'Close Grip Bench Press',           primaryMuscle: 'Triceps',     secondaryMuscles: ['Chest', 'Delts', null],         workoutType: 'Press',            equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'close-grip-bench-press',   name: 'Close Grip Bench Press',           primaryMuscle: 'Triceps',     secondaryMuscles: ['Chest', 'Delts', null],         workoutType: 'Horizontal Press',            equipment: 'Bench',             weightType: 'Barbell'    },
 
   // Abs
   { id: 'cable-crunch',             name: 'Cable Crunch',                     primaryMuscle: 'Abs',         secondaryMuscles: [null, null, null],               workoutType: 'Crunch',           equipment: 'Cable Machine',     weightType: 'Machine'    },
@@ -396,7 +398,7 @@ export interface ExerciseMetaOverride {
   secondaryMuscle1: MuscleGroup | null;
   secondaryMuscle2: MuscleGroup | null;
   secondaryMuscle3: MuscleGroup | null;
-  workoutType: WorkoutType | null;
+  workoutType: MovementPattern | null;
   equipment: Equipment | null;
   weightType: WeightType | null;
 }
@@ -406,8 +408,16 @@ export interface ExerciseMetaOverride {
 const LEGACY_MUSCLES: Record<string, MuscleGroup> = {
   'Front Delts': 'Delts', 'Side Delts': 'Delts', 'Rear Delts': 'Delts',
 };
-const LEGACY_WORKOUT_TYPES: Record<string, WorkoutType> = {
-  'Chest Press': 'Press', 'Overhead Press': 'Press', 'Push Up': 'Press',
+// 'Overhead Press' and 'Push Up' predate an even older merge into 'Press' —
+// they unambiguously say which side of the later Horizontal/Vertical split
+// they meant, so they remap straight there. A bare 'Press' (the more recent,
+// now-legacy merged value) can't be disambiguated from the string alone;
+// it defaults to the more common case and self-heals next time the user
+// edits that exercise's metadata.
+const LEGACY_WORKOUT_TYPES: Record<string, MovementPattern> = {
+  'Chest Press': 'Horizontal Press', 'Push Up': 'Horizontal Press',
+  'Overhead Press': 'Vertical Press',
+  Press: 'Horizontal Press',
 };
 
 function normalizeOverride(o: ExerciseMetaOverride): void {
