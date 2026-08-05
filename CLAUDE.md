@@ -122,8 +122,12 @@ Long-term milestones (roughly):
     plans still resolve).
 
 **Future milestones:**
-- Effort inference from set-to-set rep drop-off (NOT self-reported RPE — see roadmap item 2,
-  where that idea is rejected and the reasons are recorded).
+- Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
+  rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
+  capacity filter with real uncertainty replacing the dead band / stall window / e1RM cliff
+  (Stage 1), fatigue as a second state (Stage 2), a constrained controller (Stage 3). The
+  rules become the constraint set, not the competition. Both self-reported RPE and
+  drop-off-inferred effort are **rejected** there, with reasons.
 - Journey v2 — deload-position editing in the wizard (`validatePhases` already
   enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
   seam: any generator that emits one plugs into the same review-and-activate
@@ -1186,7 +1190,7 @@ risk is *merge semantics*: immutable session GUIDs (not `startedAt`, which `upda
 mutates), per-document last-write-wins by `updatedAt`, and deletion tombstones. See the Cloud
 sync section. `pendingSessions` was removed.
 
-### 2. Effort, inferred rather than self-reported — **RPE logging is rejected, don't propose it**
+### 2. Effort — **not measurable today; both RPE and drop-off inference are rejected**
 The deload trigger reads a goal-weighted blend of volume, est. 1RM and PR events
 (`progression.ts`), and every one of those signals is blind to effort: 3×10 left with two reps
 in the tank and 3×10 to failure are identical volume and completely different stimuli. That gap
@@ -1197,17 +1201,18 @@ carelessly is worse than no field, because the engine would weight bad data as a
 This app already tried the cheap version and removed it (the Easy/Medium/Hard difficulty
 rating; the `exerciseLogs` store is its fossil).
 
-The signal to use instead is already in the log: **set-to-set rep drop-off**, measured against
-the lifter's own norm. 12/12/11 at a load is a lifter stopping well short; 12/9/7 at the same
-load is a lifter near failure. `fatigueDrops()` in recommendations.ts already fits that curve —
-it just spends it on rep targets and never reads it as effort. An unusually flat session means
-reps were left in reserve (the load can move sooner); an unusually steep one means the sets
-were genuinely hard (a stall there is fatigue, not lack of effort). Rest duration is the
-obvious confounder and is already known — the rest timer records it.
+**Set-to-set rep drop-off was proposed as the objective replacement, and is also rejected.**
+Sets get cut short for *scheduling* reasons, not just fatigue ones — stopping a squat two reps
+early because the workout continues afterward produces the same curve as reaching failure, and
+the bias is systematic per athlete and per exercise position rather than random. Worth knowing
+that this already affects live code: `fatigueDrops()` fits rep targets to observed drop-off, so
+an athlete who habitually leaves reps on the later sets has that *preference* learned as their
+*capacity* and prescribed back to them indefinitely.
 
-Implementation sketch: derive a per-session effort estimate in `progression.ts` from observed
-drop-off vs the exercise's fitted norm, normalized by rest; feed it as a fourth signal into
-`compositeScore` with its own goal weight. No schema change, no new UI, nothing to self-report.
+What effort measurement would actually require is in `docs/adaptive-engine-roadmap.md`: per-set
+timestamps (Stage 0) make set duration and rest intervals available, which is the only
+objective proximity-to-failure proxy a phone can capture. Until then the honest position is
+that the engine cannot see effort, and should not pretend to.
 
 ### 3. ~~In-workout session persistence (draft sessions)~~ — DONE
 Implemented in localStorage rather than IDB: a draft is one small single-writer object, and
