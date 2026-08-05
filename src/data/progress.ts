@@ -24,17 +24,18 @@ import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp } from './analytics';
 import { getExerciseName } from './programStore';
 import type { Goal } from './plan';
+import {
+  compositeScore, pctChange, PROGRESS_SCORE, DECLINE_SCORE, STALL_SCORE,
+} from './progression';
 
 // ── Tunables ──────────────────────────────────────────────────────────────────
 
 export const TREND_WINDOW_SESSIONS = 4;  // sessions the trend is judged over
 export const MIN_TREND_SESSIONS = 3;     // fewer than this → "building a baseline"
 const POSITION_SHIFT_SLOTS = 2;          // this many slots later than usual = not fresh
-const FULL_MARKS_E1RM_PCT = 5;           // +5% e1RM across the window = full score
-const FULL_MARKS_VOLUME_PCT = 10;        // +10% tonnage across the window = full score
-const FULL_MARKS_PR_EVENTS = 2;          // 2 PR events in the window = full score
-const PROGRESS_SCORE = 0.22;             // composite score bands
-const DECLINE_SCORE = -0.22;
+// Signal weights, full-marks bars and score bands live in progression.ts —
+// the recommendation engine decides what goes on the bar from the same numbers,
+// so the two can never drift into disagreeing about the same lift.
 
 export type ProgressStatus = 'progressing' | 'steady' | 'stalled' | 'declining';
 
@@ -43,22 +44,6 @@ export const STATUS_INFO: Record<ProgressStatus, { label: string }> = {
   steady:      { label: 'Steady' },
   stalled:     { label: 'Stalled' },
   declining:   { label: 'Declining' },
-};
-
-// Signal weights per goal — the coach's judgement of what matters most.
-// strength: moving more weight IS the goal. hypertrophy: volume and rep PRs
-// drive growth. fat-loss: defending volume/strength in a deficit is winning
-// (holding e1RM scores positive, see below). athletic/general: balanced.
-const GOAL_WEIGHTS: Record<Goal, { e1rm: number; volume: number; prs: number }> = {
-  strength:    { e1rm: 0.55, volume: 0.20, prs: 0.25 },
-  hypertrophy: { e1rm: 0.30, volume: 0.40, prs: 0.30 },
-  'fat-loss':  { e1rm: 0.30, volume: 0.50, prs: 0.20 },
-  athletic:    { e1rm: 0.45, volume: 0.30, prs: 0.25 },
-  general:     { e1rm: 0.34, volume: 0.33, prs: 0.33 },
-  // Supporting another sport: strength per unit of fatigue is the whole point,
-  // so e1RM and PRs carry the verdict. Rising tonnage is explicitly *not* the
-  // goal here — extra volume is a cost paid out of the sport's recovery.
-  'sport-support': { e1rm: 0.50, volume: 0.15, prs: 0.35 },
 };
 
 // ── Per-session, per-exercise datapoints ──────────────────────────────────────
@@ -211,12 +196,7 @@ function median(values: number[]): number | null {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-function pct(from: number, to: number): number | null {
-  if (from <= 0) return null;
-  return ((to - from) / from) * 100;
-}
-
-const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+const pct = pctChange;
 
 export function assessExercise(
   exerciseId: string,
@@ -254,25 +234,14 @@ export function assessExercise(
     .sort((a, b) => b.ts - a.ts);
 
   // ── Composite score ──
-  const weights = GOAL_WEIGHTS[goal];
-
-  let e1rmComponent = e1rmChangePct == null ? null : clamp(e1rmChangePct / FULL_MARKS_E1RM_PCT, -1, 1);
-  // When the training isn't aimed at adding strength — dieting, or lifting to
-  // support a sport whose own volume is climbing — *holding* it is the win, so
-  // a flat e1RM scores mildly positive instead of reading as a stall.
-  const holdingCounts = goal === 'fat-loss' || goal === 'sport-support';
-  if (holdingCounts && e1rmChangePct != null && Math.abs(e1rmChangePct) <= 2) {
-    e1rmComponent = Math.max(e1rmComponent ?? 0, 0.35);
-  }
-  const volumeComponent = volumeChangePct == null ? null : clamp(volumeChangePct / FULL_MARKS_VOLUME_PCT, -1, 1);
-  const prComponent = clamp((weightPRs + repPRs) / FULL_MARKS_PR_EVENTS, 0, 1);
-
-  // Redistribute the weight of missing signals (e.g. no e1RM for bodyweight)
-  let score = 0, weightSum = 0;
-  if (e1rmComponent != null) { score += e1rmComponent * weights.e1rm; weightSum += weights.e1rm; }
-  if (volumeComponent != null) { score += volumeComponent * weights.volume; weightSum += weights.volume; }
-  score += prComponent * weights.prs; weightSum += weights.prs;
-  score = weightSum > 0 ? score / weightSum : 0;
+  // The same function the prescription engine scores a plateau with. This
+  // review reads a TREND for display, so it judges against the standard
+  // intermediate bars rather than scaling them by training age — the athlete's
+  // level belongs to the decision, not to the description.
+  const score = compositeScore(
+    { e1rmChangePct, volumeChangePct, prEvents: weightPRs + repPRs },
+    goal,
+  );
 
   // ── Status ──
   let status: ProgressStatus;
@@ -282,7 +251,7 @@ export function assessExercise(
     status = 'progressing';
   } else if (score <= DECLINE_SCORE) {
     status = 'declining';
-  } else if (weightPRs + repPRs > 0 || score > 0.1) {
+  } else if (weightPRs + repPRs > 0 || score > STALL_SCORE) {
     status = 'steady';
   } else {
     status = 'stalled';

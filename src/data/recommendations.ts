@@ -3,6 +3,10 @@ import type { WeightType, MeasureUnit } from './taxonomy';
 import type { ExperienceLevel, Goal, PhaseKind } from './plan';
 import { isEasyPhase } from './plan';
 import { epley1RM } from './analytics';
+import {
+  compositeScore, deadband, pctChange, stallWindowFor, holdsInsteadOfDeload,
+  STALL_SCORE, PROGRESS_SCORE,
+} from './progression';
 
 // Next-session prescriptions built on double progression — the standard
 // evidence-based loading scheme for hypertrophy and strength:
@@ -10,12 +14,15 @@ import { epley1RM } from './analytics';
 //   2. Add reps session to session until the session's rep target is met.
 //   3. Then add load (which drops reps back into the range) and repeat.
 //
-// Five things separate this from "same weight as last time":
+// Several things separate this from "same weight as last time":
 //
-//   • The trigger is the session's REP TOTAL over the programmed set count, not
-//     "every single set hit the top". A coach counts total work: 13/12/11 is the
-//     same 36 reps as 12/12/12 and has equally earned the increase, but the
-//     strict per-set rule holds that lifter at one weight indefinitely.
+//   • The trigger is VOLUME AT A FIXED LOAD, gated on the top of the range: one
+//     set at repHigh, and a session that matches the most work you have ever
+//     done at this weight. Demanding a rep total of `sets × repHigh` instead —
+//     every set at the ceiling — asks for something reps-fall-off-with-fatigue
+//     makes impossible, and the per-set plan itself never prescribes it. The
+//     fixed load is what makes volume usable: tonnage across load changes falls
+//     every time a lifter successfully adds weight (see progression.ts).
 //
 //   • The SIZE of the jump comes from the load–rep relationship rather than a
 //     flat 5 lbs. Standard %1RM tables (1RM 100%, 5RM ~87%, 10RM ~75%) put one
@@ -310,6 +317,8 @@ interface Credit {
   total: number;
   /** Work-equivalent reps per set */
   average: number;
+  /** Work-equivalent reps of the single best set — did any set reach the top of the range? */
+  best: number;
   /** The sets themselves, for anything that needs the real numbers */
   sets: LoggedSet[];
 }
@@ -345,6 +354,7 @@ function credit(session: ExerciseSession, sets: number): Credit {
     count: chosen.length,
     total,
     average: chosen.length > 0 ? total / chosen.length : 0,
+    best: chosen.reduce((max, s) => Math.max(max, equivalentReps(s, w)), 0),
     sets: chosen,
   };
 }
@@ -353,6 +363,40 @@ function credit(session: ExerciseSession, sets: number): Credit {
 function creditedAverage(session: ExerciseSession, sets: number): number | null {
   const c = credit(session, sets);
   return c.count > 0 ? c.average : null;
+}
+
+/**
+ * The most work the lifter has ever done at this load — the high-water mark the
+ * next session has to match to earn a load increase.
+ *
+ * Comparing volume at a FIXED load is what makes volume a usable trigger. Raw
+ * tonnage across load changes falls every time a lifter successfully adds
+ * weight; held at one load, the weight cancels out, the comparison is
+ * like-for-like, and "more work than last time" means exactly what it says.
+ *
+ * Sessions from a different REP ERA are excluded. Three sets of eight at 100
+ * lbs is 24 reps of work; the same 100 lbs prescribed as 4×4–6 is 22 at its
+ * ceiling. Left in, the old prescription's volume becomes a bar the new one
+ * cannot clear by design, and the lifter is held at a weight they have already
+ * mastered — then deloaded for the flat sessions that follow. The threshold is
+ * the same one the re-anchor uses to decide a load belongs to another range.
+ *
+ * @returns null when this load is new — nothing to beat, so nothing to block.
+ */
+function bestWorkAt(
+  sessions: ExerciseSession[],
+  weight: number,
+  ex: PrescribedSlot,
+): number | null {
+  let best: number | null = null;
+  for (const h of sessions) {
+    if (h.sets.length === 0) continue;
+    if (Math.abs(workingWeight(h.sets) - weight) >= 2.5) continue;
+    const c = credit(h, ex.sets);
+    if (c.count === 0 || c.average >= ex.repHigh + RANGE_MISMATCH_REPS) continue;
+    if (best == null || c.total > best) best = c.total;
+  }
+  return best;
 }
 
 /**
@@ -682,7 +726,6 @@ export function calculateRecommendation(
   const repTotal = credited.total;
   const avgReps = credited.average;
   const strictAvg = repSum(strict) / strict.length;
-  const targetTotal = ex.sets * ex.repHigh;
   const fullSetCount = setsDone >= ex.sets;
 
   // 1RM estimates are only trustworthy on sets of roughly 1–10 reps; past
@@ -729,15 +772,35 @@ export function calculateRecommendation(
     });
   };
 
-  // 1a. Rep target met across the programmed set count → add load. The jump is
-  // sized so the lifter lands back inside the rep range, not on a flat 5 lbs.
+  // 1a. The load has been mastered → add weight. Two conditions, and the second
+  // one is why this reads volume rather than a fixed rep total:
+  //
+  //   • the top of the rep range was reached on a set, and
+  //   • the session is the most work the lifter has ever done AT THIS LOAD.
+  //
+  // The old rule demanded a rep total of `sets × repHigh` — every set at the
+  // ceiling. No lifter does that: reps fall off set to set, which is why the
+  // per-set plan prescribes a descending fit in the first place. So the plan
+  // asked for 6/6/5/5 while the trigger required 6/6/6/6, the lifter did
+  // exactly what was asked every week, and three flat sessions later the stall
+  // branch deloaded them for it. Volume at a fixed load is the honest measure
+  // of "more than last time", and pairing it with the range ceiling keeps
+  // double progression intact: no amount of extra volume adds load until the
+  // lifter is working at the top of the range.
+  //
+  // The jump is sized so they land back inside the range, not on a flat 5 lbs.
   // In a deficit the minimum step is used instead: recovery capacity is reduced
   // and the objective is retaining muscle, not chasing loading PRs.
-  if (fullSetCount && repTotal >= targetTotal) {
+  const priorBest = bestWorkAt(baseline.slice(1), weight, ex);
+  const rangeTopped = credited.best >= ex.repHigh;
+  if (fullSetCount && rangeTopped && (priorBest == null || repTotal >= priorBest)) {
     const jump = goal === 'fat-loss'
       ? step
       : sizedIncrement(weight, avgReps, ex.repLow, step);
-    return increaseTo(jump, `Hit ${Math.round(repTotal)} reps at ${weight} lbs (target ${targetTotal})`);
+    const evidence = priorBest == null
+      ? `Hit ${ex.repHigh} reps at ${weight} lbs`
+      : `${Math.round(repTotal)} reps at ${weight} lbs — your best work at this load, with a set at ${ex.repHigh}`;
+    return increaseTo(jump, evidence);
   }
 
   // 1b. Strength breakout: est. 1RM climbing at an unchanged load with reps
@@ -755,19 +818,27 @@ export function calculateRecommendation(
 
   // 2. Genuinely stalled at this weight → deload and rebuild.
   //
-  // Two things a naive stall check gets wrong, and both of them punish good
-  // training. First, reading est. 1RM alone flags a lifter going
-  // 10/9/8 → 10/10/9 → 10/10/10 as stalled, because their top set never moved —
-  // yet that lifter added three reps at the same load, which is precisely what
-  // double progression asks for. Second, comparing only the LATEST session to
-  // the oldest turns one bad night's sleep into a deload: 24 → 27 → 30 → 24
-  // reads as "no progress" even though the lifter set a high-water mark two
-  // sessions ago. A stall means nothing in the window beat where it started, on
-  // either lever.
-  const window = baseline.slice(0, STALL_SESSIONS);
-  const sparseWindow = window.length >= STALL_SESSIONS &&
+  // The verdict comes from the same goal-weighted composite the Metrics screen
+  // reports (progression.ts), so the app cannot tell you a lift is steady and
+  // then deload it in the next workout. Three properties matter:
+  //
+  //   • BOTH LEVERS, weighted by the goal. Reading est. 1RM alone flags a
+  //     lifter going 10/9/8 → 10/10/9 → 10/10/10 as stalled because their top
+  //     set never moved — yet that is textbook double progression. Reading
+  //     volume alone misses a lifter whose reps are flat while the bar keeps
+  //     getting heavier. What each is worth depends on what they train for:
+  //     est. 1RM carries a strength block, volume carries a hypertrophy one.
+  //   • THE BEST OF THE WINDOW, not the latest session, is compared to the
+  //     anchor — otherwise one bad night's sleep is a deload (24 → 27 → 30 → 24
+  //     reads as "no progress" despite a high-water mark two sessions back).
+  //   • A DEAD BAND. Session-to-session performance moves a few percent on
+  //     sleep and food alone, so changes inside NOISE_FLOOR_PCT are read as no
+  //     change rather than as a trend in either direction.
+  const stallWindow = stallWindowFor(experience);
+  const window = baseline.slice(0, stallWindow);
+  const sparseWindow = window.length >= stallWindow &&
     window[0].completedAt - window[window.length - 1].completedAt > STALL_WINDOW_DAYS * DAY_MS;
-  if (window.length >= STALL_SESSIONS && !sparseWindow) {
+  if (window.length >= stallWindow && !sparseWindow) {
     const sameWeight = window.every(h => Math.abs(workingWeight(h.sets) - weight) < 2.5);
     const anchor = window[window.length - 1];
     const anchorTotal = credit(anchor, ex.sets).total;
@@ -777,28 +848,47 @@ export function calculateRecommendation(
     // Credited totals on both sides: a session where the lifter added a set or
     // worked up to a heavier top set is evidence of progress, and evidence of
     // progress is what calls off a deload.
-    const repsImproved = since.some(h => credit(h, ex.sets).total > anchorTotal);
-    const e1rmImproved = e1rmMeaningful &&
-      since.some(h => bestE1rm(h.sets) > anchorE1rm * (1 + STALL_TOLERANCE));
+    const bestTotal = Math.max(...since.map(h => credit(h, ex.sets).total));
+    const bestSinceE1rm = Math.max(...since.map(h => bestE1rm(h.sets)));
+    const volumeChangePct = deadband(pctChange(anchorTotal, bestTotal));
+    const e1rmChangePct = e1rmMeaningful ? deadband(pctChange(anchorE1rm, bestSinceE1rm)) : null;
+    // Local stand-in for the PR events the review engine counts: sessions that
+    // set a new high inside the window, on either lever.
+    const prEvents = since.filter(h =>
+      credit(h, ex.sets).total > anchorTotal ||
+      (e1rmMeaningful && bestE1rm(h.sets) > anchorE1rm * (1 + STALL_TOLERANCE))).length;
 
-    if (sameWeight && !repsImproved && !e1rmImproved) {
-      // In an energy deficit a plateau is expected — it reflects energy
-      // availability, not accumulated fatigue, and the goal is holding onto
-      // muscle. Cutting the load would give away the very stimulus that
-      // defends it.
-      if (goal === 'fat-loss') {
-        return withContext({
-          weight,
-          direction: 'hold',
-          kind: 'hold',
-          reason: `Holding ${weight} lbs through a deficit is the win — defend this load, PRs come back when you eat`,
-        });
+    const score = compositeScore({ e1rmChangePct, volumeChangePct, prEvents }, goal, experience);
+
+    // Two bars, because the two decisions carry different costs. CUTTING a
+    // lifter's load needs a real stall (STALL_SCORE). Merely telling someone
+    // they're flat — and that holding here is the win, which is the whole point
+    // of the fat-loss and sport-support framing — only needs the absence of
+    // clear progress. Scoring them on one bar hid the explanation exactly where
+    // it was most useful: "holding counts" lifts the score just past a stall,
+    // so the lifter got a generic chase-reps line instead of being told that
+    // defending the load through a deficit is the objective.
+    const flat = sameWeight && prEvents === 0 && score < PROGRESS_SCORE;
+    const stalled = sameWeight && prEvents === 0 && score < STALL_SCORE;
+
+    if (holdsInsteadOfDeload(goal, experience) ? flat : stalled) {
+      // Not everyone gets their load cut. In a deficit the plateau reflects
+      // energy availability rather than accumulated fatigue; supporting a sport
+      // it reflects the swim, bike and run; and a novice who stopped adding
+      // reps needs another rep at this weight, not a lighter one.
+      if (holdsInsteadOfDeload(goal, experience)) {
+        const why = goal === 'fat-loss'
+          ? `Holding ${weight} lbs through a deficit is the win — defend this load, PRs come back when you eat`
+          : goal === 'sport-support'
+            ? `Flat at ${weight} lbs, but your legs are paying for the miles — holding this load through the block is the win`
+            : `Flat for ${window.length} sessions — repeat ${weight} lbs and chase one more rep before changing anything`;
+        return withContext({ weight, direction: 'hold', kind: 'hold', reason: why });
       }
       return withContext({
         weight: easeBack(weight, 0.9, step),
         direction: 'down',
         kind: 'deload',
-        reason: `${window.length} sessions at ${weight} lbs with no gain in reps or strength — deload, then build back up`,
+        reason: `${window.length} sessions at ${weight} lbs with no gain in volume or strength — deload, then build back up`,
       });
     }
   }
@@ -845,14 +935,17 @@ export function calculateRecommendation(
   }
 
   // 4. In the range → double progression: keep the weight, chase reps. The
-  // reason names the exact gap to close, so "hold" is a target, not a shrug.
+  // reason names whichever of the two conditions is still outstanding, so
+  // "hold" is a target rather than a shrug.
   const reason = !fullSetCount
     ? `Complete all ${ex.sets} sets at this weight, then chase reps`
     : sparseWindow
       // The stall check was skipped on purpose — say so, rather than leaving the
       // lifter wondering why a flat run of sessions produced no verdict.
-      ? `You've been away from this one — settle back in at ${weight} lbs before pushing, then ${targetTotal} total reps earns the next increase`
-      : `${Math.round(targetTotal - repTotal)} more reps than last time (${targetTotal} total) earns the next increase`;
+      ? `You've been away from this one — settle back in at ${weight} lbs before pushing, then a set at ${ex.repHigh} reps earns the next increase`
+      : !rangeTopped
+        ? `Get one set to ${ex.repHigh} reps at ${weight} lbs — that's what earns the next increase`
+        : `${Math.round((priorBest ?? 0) - repTotal + 1)} more reps than your best at ${weight} lbs (${Math.round(priorBest ?? 0)}) earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
 
@@ -1086,6 +1179,16 @@ export function buildSetPlan(
 
   const planTotal = sets.reduce((sum, s) => sum + (s.targetReps ?? 0), 0);
   const targetTotal = count * ex.repHigh;
+
+  // What actually earns the next jump at this load: reach the top of the range
+  // on a set, and beat your own best work here. Stating the real number matters
+  // — the old line quoted `sets × repHigh`, a total the targets above it never
+  // added up to, so the plan and the goal disagreed on every single card.
+  const toBeat = rec.weight > 0 ? bestWorkAt(freshBaseline(history), rec.weight, ex) : null;
+  const holdGoal = toBeat == null
+    ? `Hit every target (${planTotal} reps) — a set at ${ex.repHigh} reps earns the next increase.`
+    : `Hit every target (${planTotal} reps) — a set at ${ex.repHigh}, and ${Math.round(toBeat)}+ total at ${rec.weight} lbs, earns the next increase.`;
+
   const goal = timed
     ? `Hit every hold for ${planTotal} total seconds — ${targetTotal} earns a longer target next time.`
     : bodyweight
@@ -1093,9 +1196,9 @@ export function buildSetPlan(
     : rec.kind === 'reanchor'
       ? `First session at ${rec.weight} lbs — this is an estimate from your log, not a test. Around ${planTotal} reps with 1–2 in reserve, and the coach corrects from what you actually hit.`
       : rec.kind === 'increase'
-        ? `New load: ${rec.weight} lbs — around ${planTotal} reps today, then climb to ${targetTotal} to earn the next jump.`
+        ? `New load: ${rec.weight} lbs — around ${planTotal} reps today. A set at ${ex.repHigh} earns the next jump.`
         : rec.kind === 'hold'
-          ? `Hit every target (${planTotal} reps) — ${targetTotal} at ${rec.weight} lbs earns the next increase.`
+          ? holdGoal
           : `Rebuild at ${rec.weight} lbs: ${planTotal} clean reps, then start climbing again.`;
 
   return { rec, sets, goal };

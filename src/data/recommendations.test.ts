@@ -56,7 +56,8 @@ describe('calculateRecommendation', () => {
   it('holds when reps are inside the range (double progression)', () => {
     const rec = advise([session([[100, 10], [100, 9], [100, 8]])]);
     expect(rec).toMatchObject({ weight: 100, direction: 'hold', kind: 'hold' });
-    expect(rec!.reason).toContain('36 total');
+    // Top of the range is what earns load, so that's the gap the reason names.
+    expect(rec!.reason).toContain('12 reps at 100 lbs');
   });
 
   it('does not increase when the rep target was hit on an incomplete set count', () => {
@@ -365,6 +366,100 @@ describe('planned phase overrides', () => {
   });
 });
 
+describe('the increase trigger — volume at a fixed load', () => {
+  it('adds load when the range is topped and the work matches your best here', () => {
+    const history = [
+      session([[100, 6], [100, 6], [100, 5], [100, 5]], 1),
+      session([[100, 6], [100, 6], [100, 5], [100, 5]], 2),
+    ];
+    expect(advise(history, { sets: 4, repLow: 4, repHigh: 6 })).toMatchObject({ kind: 'increase' });
+  });
+
+  it('holds while the top of the range is still out of reach, however good the volume', () => {
+    // Volume climbed 26 → 29, but nothing reached 12. Double progression says
+    // finish the range before touching the weight.
+    const history = [
+      session([[100, 10], [100, 10], [100, 9]], 1),
+      session([[100, 9], [100, 9], [100, 8]], 2),
+    ];
+    const rec = advise(history);
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+    expect(rec!.reason).toMatch(/one set to 12 reps/i);
+  });
+
+  it('holds when the range is topped but the session did less work than before', () => {
+    // 12 on the first set, then it fell apart: 28 total against a best of 33 at
+    // this load. Topping the range on one set is not mastering the load.
+    const history = [
+      session([[100, 12], [100, 8], [100, 8]], 1),
+      session([[100, 12], [100, 11], [100, 10]], 2),
+    ];
+    const rec = advise(history);
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+    expect(rec!.reason).toMatch(/your best at 100 lbs/i);
+  });
+
+  it('has nothing to beat the first time at a new load', () => {
+    const rec = advise([session([[100, 12], [100, 11], [100, 10]], 1)]);
+    expect(rec).toMatchObject({ kind: 'increase' });
+  });
+
+  it('states the volume to beat on the plan, not an unreachable rep total', () => {
+    const history = [
+      session([[100, 12], [100, 8], [100, 8]], 1),
+      session([[100, 12], [100, 11], [100, 10]], 2),
+    ];
+    expect(plan(history).goal).toMatch(/33\+ total at 100 lbs/);
+  });
+});
+
+describe('the stall verdict — goal- and experience-weighted', () => {
+  // Three sessions at one load with nothing improving on either lever.
+  const flat = [
+    session([[100, 9], [100, 9], [100, 8]], 1),
+    session([[100, 9], [100, 8], [100, 8]], 2),
+    session([[100, 9], [100, 9], [100, 8]], 3),
+  ];
+
+  it('deloads a lifter whose composite says stalled', () => {
+    expect(advise(flat, exercise, { goal: 'hypertrophy' })).toMatchObject({ kind: 'deload' });
+  });
+
+  it('gives an advanced lifter a longer window before calling it', () => {
+    // Advanced lifters progress across a block, not session to session — three
+    // flat sessions is a normal fortnight, not a plateau.
+    expect(advise(flat, exercise, { experience: 'advanced' })!.kind).not.toBe('deload');
+    const fourth = [...flat, session([[100, 9], [100, 9], [100, 8]], 4)];
+    expect(advise(fourth, exercise, { experience: 'advanced' })).toMatchObject({ kind: 'deload' });
+  });
+
+  it('repeats the weight for a beginner instead of cutting it', () => {
+    // The beginner path in this app is linear progression: a novice who stopped
+    // adding reps needs another rep at this weight, not a lighter one.
+    const rec = advise(flat, exercise, { experience: 'beginner' });
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+    expect(rec!.reason).toMatch(/repeat 100 lbs/i);
+  });
+
+  it('holds through a sport-support block rather than deloading', () => {
+    const rec = advise(flat, exercise, { goal: 'sport-support' });
+    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
+    expect(rec!.reason).toMatch(/miles/i);
+  });
+
+  it('ignores a wobble inside the noise band', () => {
+    // +1 rep across three sessions on a 26-rep base is under 4% and inside the
+    // dead band — but it is a genuine new high, so it still calls off the
+    // deload via the PR term. What must not happen is a deload.
+    const wobble = [
+      session([[100, 9], [100, 9], [100, 9]], 1),
+      session([[100, 9], [100, 9], [100, 8]], 2),
+      session([[100, 9], [100, 9], [100, 8]], 3),
+    ];
+    expect(advise(wobble)!.kind).not.toBe('deload');
+  });
+});
+
 describe('re-anchoring a load to a changed rep range', () => {
   // The reported case: a general-hypertrophy block (3 × 10–12) became a
   // triathlon-support block (4 × 4–6). Nothing about the LIFTER changed, but
@@ -631,6 +726,17 @@ describe('week over week — the whole loop', () => {
       expect(log[i].weight).toBeGreaterThanOrEqual(log[i - 1].weight);
     }
     expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+  });
+
+  it('climbs on a narrow rep range too, where the old rep total was unreachable', () => {
+    // The regression this trigger exists for. A 4×4–6 slot's targets are fitted
+    // to the lifter's drop-off (6/6/5/5 = 22), but the old rule demanded
+    // `sets × repHigh` (24) — so a lifter who did exactly what the plan asked
+    // never earned an increase, and three flat sessions later got deloaded for
+    // it. Volume at a fixed load has no such gap.
+    const log = run(12, { sets: 4, repLow: 4, repHigh: 6 });
+    expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+    expect(log[log.length - 1].weight).toBeGreaterThan(100);
   });
 
   it('never exceeds the weekly rate for any training age', () => {

@@ -280,14 +280,22 @@ src/
                                   sessionDurationMs()/avgDurationByDay() (workout durations),
                                   sessionWeekStart() — the grouping key for every week-bucketed
                                   analytic (see the weekly-bucketing note below)
+    progression.ts             — THE shared thresholds: GOAL_SIGNAL_WEIGHTS, compositeScore()
+                                  (−1…+1 goal-weighted blend of e1RM/volume/PRs), fullMarksFor()
+                                  (training-age-scaled bars), deadband() (3% noise floor),
+                                  stallWindowFor(), holdsInsteadOfDeload(), score bands. Pure
+                                  arithmetic, no stores — imported by BOTH progress.ts (what the
+                                  review says) and recommendations.ts (what goes on the bar), so
+                                  the two can never disagree about the same lift
     progress.ts                — THE progress/stall assessment: assessSnapshot(snapshot, goal) →
                                   per-exercise ExerciseProgress (status progressing/steady/
                                   stalled/declining) blending e1RM trend + volume-load trend +
                                   weight/rep PRs with goal-dependent weights, discounting sessions
                                   trained later in the workout than usual (exercise-order
                                   freshness). Single source of truth for "is this progressing?"
-                                  across insights, recommendations, retrospective, planner,
-                                  substitution (see progress engine section below)
+                                  across insights, retrospective, planner, substitution; shares
+                                  its thresholds with recommendations.ts via progression.ts
+                                  (see progress engine section below)
     recommendations.ts         — calculateRecommendation(history, exercise, ctx) → WeightRec |
                                   null and buildSetPlan(...) → SetPlan (one PrescribedSet per
                                   programmed set + a goal line). ctx = PrescriptionContext
@@ -526,9 +534,9 @@ on pull and cached in `liftlog_role` as a UI hint only.
 
 ## Progress & stall engine (`src/data/progress.ts`)
 
-The single definition of "is this exercise making progress?" — used by insights, the
-recommendation deload trigger, retrospectives, the planner and substitution, so the whole app
-agrees. e1RM alone is a raw-strength proxy (blind to volume gains, rep PRs, and workout
+The single definition of "is this exercise making progress?" — used by insights, retrospectives,
+the planner and substitution, and (through the shared thresholds in `progression.ts`) by the
+prescription engine's own stall verdict, so the whole app agrees. e1RM alone is a raw-strength proxy (blind to volume gains, rep PRs, and workout
 context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four signals:
 
 - **e1RM trend** — best Epley estimate, first vs last session in the trailing window.
@@ -539,7 +547,8 @@ context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four sign
   latest session ran ≥2 slots later than the exercise's usual position (median), it's excluded
   as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
 
-The signals combine into a −1…+1 composite with **goal-dependent weights** (`GOAL_WEIGHTS`):
+The signals combine into a −1…+1 composite with **goal-dependent weights**
+(`GOAL_SIGNAL_WEIGHTS` in `progression.ts`, shared with the prescription engine):
 strength leans on e1RM, hypertrophy/fat-loss on volume, and where adding strength isn't the
 point — dieting, or supporting a sport whose own volume is climbing — merely *holding* it
 scores positive (otherwise a race build reads as a block of stalled lifts and fires deloads
@@ -564,22 +573,44 @@ Branches, evaluated in order:
 
 0. **Re-anchor (rep range changed)** — the reps logged sit ≥2 outside the prescribed range →
    recompute the load from the **estimated 1RM** instead of nudging it (see below).
-1. **Increase (rep total)** — at least `exercise.sets` working sets and a **rep total** of
-   `sets × repHigh` over the *programmed* set count → add load. Counting the total rather than
-   demanding *every* set hit `repHigh` is what stops the engine parroting last week's weight:
-   13/12/11 is the same 36 reps as 12/12/12 and has equally earned the jump. Capping the count
-   at `exercise.sets` stops bonus sets (5×8 = 40 reps) from earning it.
+1. **Increase (volume at a fixed load)** — a full set count, **one set at `repHigh`**, and a
+   session matching the **most work ever done at this load** → add load. See the volume note
+   below; this replaced a rep total of `sets × repHigh` that the per-set plan never prescribed.
 2. **Increase (e1RM breakout)** — 2+ recent sessions at the same load, reps already at
    `repHigh − 1`+, and best e1RM up ≥3% across them → move up now rather than waiting for a
    perfect rep total. Skipped on high-rep work (see the e1RM validity note below).
-3. **Deload** — 3 sessions at the same weight where **nothing in the window beat where it
-   started**, on *either* lever → drop ~10% and build back up.
+3. **Deload** — a window of sessions at the same weight whose **goal-weighted composite**
+   (`progression.ts`) shows no progress → drop ~10% and build back up. Window length and who
+   gets a cut at all depend on training age and goal (see below).
 4. **Decrease** — reps under `repLow`, **confirmed** (see below) → ease back ~5%.
 5. **Hold** (double progression) — reps in range → keep the weight, chase reps. The reason
    names the exact gap ("2 more reps than last time (36 total) earns the next increase").
 
-Six things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
+Seven things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
 earlier version was wrong:
+
+**Progress is measured as volume at a fixed load, and judged by one shared composite**
+(`progression.ts`). Two changes, one idea. The **increase** trigger is `credit()` volume
+compared against `bestWorkAt()` — the most work ever done *at this weight* — gated on reaching
+`repHigh` on a set. The old absolute target (`sets × repHigh`, i.e. every set at the ceiling)
+demanded something fatigue makes impossible and `buildSetPlan` never prescribed: on a 4×4–6
+slot the plan asked for 6/6/5/5 = 22 while the trigger required 24, so a lifter who did exactly
+what they were told never earned an increase and was **deloaded every third session for
+complying**. Fixing the load is what makes volume usable at all — raw tonnage falls ~17% every
+time a lifter successfully adds weight (3×12 @ 100 → 3×9 @ 110), under-credits heavy work
+(100×12 = 1200 "beats" 110×10 = 1100) and is inflated by junk volume, so it is never compared
+across loads. Sessions from a different **rep era** (credited average ≥ `repHigh + 2`, the
+re-anchor threshold) are excluded from the high-water mark, or a 3×8 log at a weight would set
+a bar a 4×4–6 prescription cannot clear by design. The **stall** verdict is
+`compositeScore()` — the same goal-weighted blend of e1RM trend, volume trend and PR events
+the Metrics screen reports, so the app can no longer call a lift steady and deload it in the
+next workout. `deadband()` (3%) keeps ordinary session-to-session noise out of the decision,
+`stallWindowFor()` gives advanced lifters 4 sessions instead of 3 (they progress across a
+block, not session to session), and `holdsInsteadOfDeload()` decides who repeats the weight
+rather than cutting it: `fat-loss`, `sport-support`, and **beginners** (whose path is linear
+progression — a novice who stopped adding reps needs another rep, not a lighter bar).
+Full marks scale with training age (`fullMarksFor`, same 2×/1×/0.5× ratios as the weekly load
+cap), so a 5% gain reads as a plateau for a novice and a good block for an advanced lifter.
 
 **A load that belongs to a different rep range is re-anchored, not nudged** (`rangeReanchor`).
 Double progression only knows how to move a lifter *within* a range. When the range itself
@@ -1155,10 +1186,13 @@ mutates), per-document last-write-wins by `updatedAt`, and deletion tombstones. 
 sync section. `pendingSessions` was removed.
 
 ### 2. RPE / RIR logging
-The deload trigger today fires purely on e1RM stagnation across 3 sessions, which can't
-distinguish "I was grinding at RPE 10" from "these were easy reps." One optional `rpe` field per
-set (scale 1–10, blank = untracked) lets the engine confirm fatigue before recommending a deload
-and detect under-effort when reps stay in range but RPE is low.
+The deload trigger now reads a goal-weighted blend of volume, est. 1RM and PR events
+(`progression.ts`) — but every one of those signals is blind to effort. 3×10 at RPE 6 and 3×10
+at RPE 9 are identical volume and completely different stimuli, so the engine still can't
+distinguish "I was grinding" from "these were easy reps." One optional `rpe` field per set
+(scale 1–10, blank = untracked) lets it confirm fatigue before recommending a deload and detect
+under-effort when reps stay in range but RPE is low. **This is the missing input that would
+make the volume metric genuinely sharp** rather than merely honest.
 
 Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a small tap-to-set
 chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
