@@ -122,13 +122,18 @@ Long-term milestones (roughly):
     plans still resolve).
 
 **Future milestones:**
-- RPE/RIR logging — one optional field per set would let the engine distinguish "grinding at RPE 10" from "easy reps," making deload detection much sharper.
+- Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
+  rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
+  capacity filter with real uncertainty replacing the dead band / stall window / e1RM cliff
+  (Stage 1), fatigue as a second state (Stage 2), a constrained controller (Stage 3). The
+  rules become the constraint set, not the competition. Both self-reported RPE and
+  drop-off-inferred effort are **rejected** there, with reasons.
 - Journey v2 — deload-position editing in the wizard (`validatePhases` already
   enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
   seam: any generator that emits one plugs into the same review-and-activate
   flow), block-over-block comparison charts, rehab/peaking block presets.
 - Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
-- Planner v2 — RPE-aware volume decisions, automatic exercise substitution (the planner
+- Planner v2 — effort-aware volume decisions, automatic exercise substitution (the planner
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
   suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
   addition to set counts.
@@ -280,14 +285,22 @@ src/
                                   sessionDurationMs()/avgDurationByDay() (workout durations),
                                   sessionWeekStart() — the grouping key for every week-bucketed
                                   analytic (see the weekly-bucketing note below)
+    progression.ts             — THE shared thresholds: GOAL_SIGNAL_WEIGHTS, compositeScore()
+                                  (−1…+1 goal-weighted blend of e1RM/volume/PRs), fullMarksFor()
+                                  (training-age-scaled bars), deadband() (3% noise floor),
+                                  stallWindowFor(), holdsInsteadOfDeload(), score bands. Pure
+                                  arithmetic, no stores — imported by BOTH progress.ts (what the
+                                  review says) and recommendations.ts (what goes on the bar), so
+                                  the two can never disagree about the same lift
     progress.ts                — THE progress/stall assessment: assessSnapshot(snapshot, goal) →
                                   per-exercise ExerciseProgress (status progressing/steady/
                                   stalled/declining) blending e1RM trend + volume-load trend +
                                   weight/rep PRs with goal-dependent weights, discounting sessions
                                   trained later in the workout than usual (exercise-order
                                   freshness). Single source of truth for "is this progressing?"
-                                  across insights, recommendations, retrospective, planner,
-                                  substitution (see progress engine section below)
+                                  across insights, retrospective, planner, substitution; shares
+                                  its thresholds with recommendations.ts via progression.ts
+                                  (see progress engine section below)
     recommendations.ts         — calculateRecommendation(history, exercise, ctx) → WeightRec |
                                   null and buildSetPlan(...) → SetPlan (one PrescribedSet per
                                   programmed set + a goal line). ctx = PrescriptionContext
@@ -526,9 +539,9 @@ on pull and cached in `liftlog_role` as a UI hint only.
 
 ## Progress & stall engine (`src/data/progress.ts`)
 
-The single definition of "is this exercise making progress?" — used by insights, the
-recommendation deload trigger, retrospectives, the planner and substitution, so the whole app
-agrees. e1RM alone is a raw-strength proxy (blind to volume gains, rep PRs, and workout
+The single definition of "is this exercise making progress?" — used by insights, retrospectives,
+the planner and substitution, and (through the shared thresholds in `progression.ts`) by the
+prescription engine's own stall verdict, so the whole app agrees. e1RM alone is a raw-strength proxy (blind to volume gains, rep PRs, and workout
 context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four signals:
 
 - **e1RM trend** — best Epley estimate, first vs last session in the trailing window.
@@ -539,7 +552,8 @@ context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four sign
   latest session ran ≥2 slots later than the exercise's usual position (median), it's excluded
   as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
 
-The signals combine into a −1…+1 composite with **goal-dependent weights** (`GOAL_WEIGHTS`):
+The signals combine into a −1…+1 composite with **goal-dependent weights**
+(`GOAL_SIGNAL_WEIGHTS` in `progression.ts`, shared with the prescription engine):
 strength leans on e1RM, hypertrophy/fat-loss on volume, and where adding strength isn't the
 point — dieting, or supporting a sport whose own volume is climbing — merely *holding* it
 scores positive (otherwise a race build reads as a block of stalled lifts and fires deloads
@@ -562,22 +576,79 @@ the engine reads the athlete and the plan, not just the lift. WorkoutView suppli
 
 Branches, evaluated in order:
 
-1. **Increase (rep total)** — at least `exercise.sets` working sets and a **rep total** of
-   `sets × repHigh` over the *programmed* set count → add load. Counting the total rather than
-   demanding *every* set hit `repHigh` is what stops the engine parroting last week's weight:
-   13/12/11 is the same 36 reps as 12/12/12 and has equally earned the jump. Capping the count
-   at `exercise.sets` stops bonus sets (5×8 = 40 reps) from earning it.
+0. **Re-anchor (rep range changed)** — the reps logged sit ≥2 outside the prescribed range →
+   recompute the load from the **estimated 1RM** instead of nudging it (see below).
+1. **Increase (volume at a fixed load)** — a full set count, **one set at `repHigh`**, and a
+   session matching the **most work ever done at this load** → add load. See the volume note
+   below; this replaced a rep total of `sets × repHigh` that the per-set plan never prescribed.
 2. **Increase (e1RM breakout)** — 2+ recent sessions at the same load, reps already at
    `repHigh − 1`+, and best e1RM up ≥3% across them → move up now rather than waiting for a
    perfect rep total. Skipped on high-rep work (see the e1RM validity note below).
-3. **Deload** — 3 sessions at the same weight where **nothing in the window beat where it
-   started**, on *either* lever → drop ~10% and build back up.
+3. **Deload** — a window of sessions at the same weight whose **goal-weighted composite**
+   (`progression.ts`) shows no progress → drop ~10% and build back up. Window length and who
+   gets a cut at all depend on training age and goal (see below).
 4. **Decrease** — reps under `repLow`, **confirmed** (see below) → ease back ~5%.
 5. **Hold** (double progression) — reps in range → keep the weight, chase reps. The reason
    names the exact gap ("2 more reps than last time (36 total) earns the next increase").
 
-Four things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
+Seven things make this a coach's answer rather than a rule-of-thumb, each fixing a way the
 earlier version was wrong:
+
+**Progress is measured as volume at a fixed load, and judged by one shared composite**
+(`progression.ts`). Two changes, one idea. The **increase** trigger is `credit()` volume
+compared against `bestWorkAt()` — the most work ever done *at this weight* — gated on reaching
+`repHigh` on a set. The old absolute target (`sets × repHigh`, i.e. every set at the ceiling)
+demanded something fatigue makes impossible and `buildSetPlan` never prescribed: on a 4×4–6
+slot the plan asked for 6/6/5/5 = 22 while the trigger required 24, so a lifter who did exactly
+what they were told never earned an increase and was **deloaded every third session for
+complying**. Fixing the load is what makes volume usable at all — raw tonnage falls ~17% every
+time a lifter successfully adds weight (3×12 @ 100 → 3×9 @ 110), under-credits heavy work
+(100×12 = 1200 "beats" 110×10 = 1100) and is inflated by junk volume, so it is never compared
+across loads. Sessions from a different **rep era** (credited average ≥ `repHigh + 2`, the
+re-anchor threshold) are excluded from the high-water mark, or a 3×8 log at a weight would set
+a bar a 4×4–6 prescription cannot clear by design. The **stall** verdict is
+`compositeScore()` — the same goal-weighted blend of e1RM trend, volume trend and PR events
+the Metrics screen reports, so the app can no longer call a lift steady and deload it in the
+next workout. `deadband()` (3%) keeps ordinary session-to-session noise out of the decision,
+`stallWindowFor()` gives advanced lifters 4 sessions instead of 3 (they progress across a
+block, not session to session), and `holdsInsteadOfDeload()` decides who repeats the weight
+rather than cutting it: `fat-loss`, `sport-support`, and **beginners** (whose path is linear
+progression — a novice who stopped adding reps needs another rep, not a lighter bar).
+Full marks scale with training age (`fullMarksFor`, same 2×/1×/0.5× ratios as the weekly load
+cap), so a 5% gain reads as a plateau for a novice and a good block for an advanced lifter.
+
+**A load that belongs to a different rep range is re-anchored, not nudged** (`rangeReanchor`).
+Double progression only knows how to move a lifter *within* a range. When the range itself
+changes underneath them — a hypertrophy block's 3×10–12 becoming a sport-support block's
+4×4–6 — every increment rule starts from the wrong number, and the weekly rate cap turns the
+walk to the right load into a month of sessions too easy to be worth doing (185 lbs for a
+lifter who just did 185×9, 185×9, 185×8, 205×7). Set logs don't record the prescription that
+was in force, so the mismatch is inferred from the reps, and the new load comes from the
+**estimated 1RM** — the only thing that carries strength *between* rep ranges: best valid
+e1RM → `loadForReps(e1rm, repHigh)` → shaded `REANCHOR_SAFETY` (5%, because several sets at
+a rep count is not a rep max) → snapped down to the equipment's increment. Guard rails: the
+mismatch must be ≥`RANGE_MISMATCH_REPS` (2) outside the range so ordinary double progression
+is untouched; one step may move the load at most `REANCHOR_MAX_STEP` (20%), with the next
+session re-anchoring again from fresh evidence; past `E1RM_VALID_REPS` the load–rep model is
+used instead of a fictional 1RM; and the **weekly rate cap does not apply** — this is not
+progress being paced, it is the same strength re-expressed in new units. The two directions
+carry different burdens of proof, mirroring the rest of the engine: **too light** re-anchors
+on the latest session (vetoed by a previous one that contradicts it) because reps *above* a
+range can't be explained by a bad night's sleep; **too heavy** needs a previous session that
+missed the same way, because falling short is exactly what an off day looks like. An easy
+week (deload/intro/race) backs off *from the re-anchored load* — a new block often opens with
+an intro week, and 20% off a load that was already wrong is two mistakes compounding.
+
+**Extra and heavier sets can only help** (`credit()` vs `countedSets()`). Every session is read
+two ways. The **credited** view — the best `sets` of everything at or above the working weight,
+each valued at what it would have been worth *at* that weight (`equivalentReps`, the same
+~3%-per-rep relationship) — is what can EARN something: increases, and the rep improvement that
+calls off a deload. The **strict** view — programmed sets at the working weight, in order — is
+the only thing that can COST load. So a lifter who works up to a top set gets credit for it
+(185×9, 185×9, 185×8, 205×7 is four sets of work against a programmed four, not three, and
+205×7 outscores 185×7), a fifth set taken to failure is ignored rather than averaged in, and
+the under-range branch reads whichever view looks better. The cap at the programmed set count
+is what keeps it honest in the other direction — five sets of eight still isn't a 3×12.
 
 **Jump size comes from the load–rep relationship, not a flat 5 lbs.** Standard %1RM tables
 (1RM 100%, 5RM ~87%, 10RM ~75%) put one rep at roughly 2.5–3% of load; `PCT_LOAD_PER_REP = 3`
@@ -647,7 +718,10 @@ one more rep). If external load *was* logged
 (e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
 "↑ N reps" instead of a weight when `targetReps` is set.
 
-Returns `{ weight, targetReps?, direction, kind, reason }` (`kind`: `increase`/`hold`/`decrease`/`deload`).
+Returns `{ weight, targetReps?, direction, kind, reason }`
+(`kind`: `increase`/`hold`/`decrease`/`deload`/`reanchor`). ExerciseCard colours the chip by
+`direction`, except `reanchor` which is neutral (purple) — re-matching a load to a new rep
+range is a correction, not a verdict on the last session.
 
 ### Per-set prescription (`buildSetPlan`)
 
@@ -1184,15 +1258,29 @@ risk is *merge semantics*: immutable session GUIDs (not `startedAt`, which `upda
 mutates), per-document last-write-wins by `updatedAt`, and deletion tombstones. See the Cloud
 sync section. `pendingSessions` was removed.
 
-### 2. RPE / RIR logging
-The deload trigger today fires purely on e1RM stagnation across 3 sessions, which can't
-distinguish "I was grinding at RPE 10" from "these were easy reps." One optional `rpe` field per
-set (scale 1–10, blank = untracked) lets the engine confirm fatigue before recommending a deload
-and detect under-effort when reps stay in range but RPE is low.
+### 2. Effort — **not measurable today; both RPE and drop-off inference are rejected**
+The deload trigger reads a goal-weighted blend of volume, est. 1RM and PR events
+(`progression.ts`), and every one of those signals is blind to effort: 3×10 left with two reps
+in the tank and 3×10 to failure are identical volume and completely different stimuli. That gap
+is real. **An `rpe` field is not how this app closes it.** Self-reported RIR is least accurate
+in exactly the population and the situations that matter — novices, multi-joint lifts, sets
+stopped short of failure — and an optional subjective field that the user knows they'd fill in
+carelessly is worse than no field, because the engine would weight bad data as a measurement.
+This app already tried the cheap version and removed it (the Easy/Medium/Hard difficulty
+rating; the `exerciseLogs` store is its fossil).
 
-Implementation: add `rpe INTEGER` to `setLogs` IDB store (schema v4), show a small tap-to-set
-chip next to each logged set row, update `calculateRecommendation` to factor in average RPE.
-No UI change is needed if the field is left blank — fully backwards-compatible.
+**Set-to-set rep drop-off was proposed as the objective replacement, and is also rejected.**
+Sets get cut short for *scheduling* reasons, not just fatigue ones — stopping a squat two reps
+early because the workout continues afterward produces the same curve as reaching failure, and
+the bias is systematic per athlete and per exercise position rather than random. Worth knowing
+that this already affects live code: `fatigueDrops()` fits rep targets to observed drop-off, so
+an athlete who habitually leaves reps on the later sets has that *preference* learned as their
+*capacity* and prescribed back to them indefinitely.
+
+What effort measurement would actually require is in `docs/adaptive-engine-roadmap.md`: per-set
+timestamps (Stage 0) make set duration and rest intervals available, which is the only
+objective proximity-to-failure proxy a phone can capture. Until then the honest position is
+that the engine cannot see effort, and should not pretend to.
 
 ### 3. ~~In-workout session persistence (draft sessions)~~ — DONE
 Implemented in localStorage rather than IDB: a draft is one small single-writer object, and

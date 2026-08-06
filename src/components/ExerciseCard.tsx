@@ -199,8 +199,14 @@ export default function ExerciseCard({
         )}
       </div>
 
+      {/* Re-anchoring a load to a new rep range is a correction, not a verdict
+          on the last session — colour it neutrally so a block that moves to
+          higher reps doesn't read as a punishment. The arrow still says which
+          way the weight moved. */}
       {recommendation && (
-        <div className={`ex-rec ex-rec--${recommendation.direction}`}>
+        <div className={`ex-rec ex-rec--${
+          recommendation.kind === 'reanchor' ? 'reanchor' : recommendation.direction
+        }`}>
           <span className="ex-rec-weight">
             {DIRECTION_ICON[recommendation.direction]}{' '}
             {recommendation.targetReps != null
