@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    // Both sides of the wire. Workers types come first so the worker's D1 row
+    // inference survives — letting Node's declarations shadow them collapses
+    // every `.all()` result into `any` — then Node for the sqlite-backed
+    // harness. DOM is in `lib` for the client's IndexedDB and cookie access.
+    "types": ["@cloudflare/workers-types", "node", "vitest/globals"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true
+  },
+  // Cross-boundary tests only; imported files are pulled in automatically.
+  // These belong to neither project — importing the worker from src/ would
+  // typecheck worker code against the browser's lib, and importing src/ from
+  // worker/ would do the reverse. This is the seam, so it gets its own project
+  // that can see both. Deliberately NOT composite: it overlaps the app and
+  // worker projects by design, so it is typechecked as its own `tsc -p` step
+  // (see the `typecheck` script) rather than through the build's references.
+  "include": ["./**/*.ts"]
+}

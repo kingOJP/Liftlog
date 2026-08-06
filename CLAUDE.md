@@ -154,8 +154,11 @@ Long-term milestones (roughly):
 ## Stack
 
 - **React + Vite + TypeScript** — `npm run dev` to start, `npm run build` to build
-- **Vitest + jsdom** — `npm test` (or `npm run test:watch`). Unit tests live next to the
-  modules they cover (`src/data/*.test.ts`) and target the pure data layer.
+- **Vitest** — `npm test` (or `npm run test:watch`); `npm run typecheck` for types alone.
+  Tests live next to the modules they cover (`src/data/*.test.ts`, `src/db/*.test.ts`,
+  `worker/*.test.ts`), plus `test/` for tests that span the client/worker boundary.
+  See the Testing section below for the environment, the D1/IDB harnesses and the
+  tsconfig layout.
 - **IndexedDB** — via a custom `idbReq<T>` promise wrapper in `src/db/database.ts` (no third-party library). Read and write in **separate transactions** to avoid IDB auto-commit bugs; multi-record writes queue all requests synchronously on one transaction and await `txDone(tx)`.
 - **localStorage** — for program config, exercise library, exercise metadata, settings, and migration flags. Managed in `src/data/programStore.ts`, `src/data/exercises.ts` and `src/data/settings.ts`.
 - **Plain CSS** — no CSS framework, dark theme via CSS custom properties
@@ -1144,6 +1147,64 @@ only the type name and vocabulary change.
 
 ---
 
+## Testing
+
+`npm test` runs everything (~740 tests, ~4.5s). `npm run typecheck` runs types alone;
+`npm run build` runs typecheck then Vite.
+
+**Where tests live.** Beside what they cover — `src/data/*.test.ts`, `src/db/*.test.ts`,
+`worker/*.test.ts` — with one exception: `test/` holds tests that span the client/worker
+boundary, because they belong to neither side's tsconfig (see below).
+
+**The suite runs on `environment: 'node'`, not jsdom.** The data layer's only browser
+dependency is `localStorage`, and `src/test/setup.ts` provides it in about twenty lines.
+Booting jsdom to get it cost 28s of environment setup against ~1s of actual assertions —
+the whole suite was 3x slower than the work it was doing. A file that genuinely needs a
+DOM opts back in with a `// @vitest-environment jsdom` docblock (only `share.test.ts`
+does, for `window.location`). **Do not add jsdom back globally**; shim the one API instead.
+
+**The worker is tested against a real database, not a real runtime.** `worker/testkit.ts`
+executes the production `schema.sql` on `node:sqlite` (built into Node 22, no dependency)
+and adapts it to the D1 surface the worker uses — `prepare/bind/all/first/run` plus an
+atomic `batch`. That means NOT NULL and PRIMARY KEY violations surface exactly as they do
+in production, and `undefined` bindings throw the way D1 throws rather than silently
+becoming NULL. `vitest-pool-workers` was the documented plan and was rejected: what these
+handlers need verified is SQL and validation, not workerd semantics, and workerd costs
+more per file than the entire suite.
+
+**IndexedDB is tested with `fake-indexeddb`.** `database.ts` caches its connection in a
+module-level `_db`, so tests reset state by calling `clearIDB()` rather than swapping the
+`IDBFactory` — replacing the factory leaves the module pointing at an orphaned database.
+
+**`test/syncContract.test.ts` wires the real client to the real worker.** `fetch` is
+stubbed to call `handleSync` directly over an in-memory D1, so a push really is validated,
+stored, and pulled back. This exists because the client/server payload contract is the one
+thing neither side's tests could see, and it is exactly where sync broke: the client
+stopped sending `sets`/`repLow`/`repHigh` on library exercises, the worker still required
+them, and every push 400'd. Any change to `SyncPayload` or `validatePush` should be made
+with this file open.
+
+**tsconfig layout.** Four projects, because the two halves compile against different
+globals and mixing them silently degrades inference:
+- `tsconfig.app.json` — the client (DOM lib).
+- `worker/tsconfig.json` — production worker code, Workers types **only**, tests excluded.
+  An accidental `fs`/`process` import fails here rather than at the edge.
+- `worker/tsconfig.test.json` — worker tests: Workers types **first**, then Node. The order
+  matters: letting Node's declarations win collapses D1's typed row results into `any`,
+  which quietly disables inference across `worker/sync.ts`.
+- `test/tsconfig.json` — the cross-boundary tests. Deliberately not composite (it overlaps
+  the others by design), so it is a separate `tsc -p` step in `npm run typecheck`.
+
+**Conventions.** Test names state the behaviour and the reason ("never drops a workout
+logged locally but not yet pushed"), not the function name. Where a test pins down
+current-but-questionable behaviour, say so in a comment rather than asserting it silently —
+`admin.test.ts` does this for promotions that require no reason. `blockSimulation.test.ts`
+is the integration tier: it designs a block per athlete profile and *trains* it week by
+week, catching composition bugs no unit test can see. Its `simulate()` calls run at
+collection time, so hoist them to the `describe` body rather than repeating them per `it`.
+
+---
+
 ## Decisions & things to keep in mind
 
 - **DB writes only at "Finish Workout"** — sets are pure React state until save. This makes
@@ -1305,6 +1366,8 @@ These are independent of each other and can land in any order:
 - **Exercise substitution suggestions** — when the Coach flags a muscle as under-trained, surface
   1–2 exercises from `EXERCISES` that target it and match the user's available equipment
   (`taxonomy.ts` already has the data).
-- **Worker-side tests** — the `worker/` directory has no test coverage. Add
-  `vitest-pool-workers` (Cloudflare's Vitest integration) and cover `validatePush()`, the
-  OAuth redirect helper, and the D1 upsert logic.
+- ~~**Worker-side tests**~~ — DONE, but **not** with `vitest-pool-workers`: booting workerd
+  per file costs more than the whole suite, and the parts worth testing (validation, the
+  D1 upserts, the role gate, the OAuth handshake) need a real *database*, not a real
+  *runtime*. `worker/testkit.ts` runs the real `schema.sql` on `node:sqlite` instead. See
+  the Testing section.

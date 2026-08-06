@@ -183,12 +183,17 @@ CREATE TABLE IF NOT EXISTS user_deleted_exercises (
 
 -- Layer 1: admin-curated global exercises + metadata, served to every user on
 -- pull. Only admins write; every write is audited.
+-- sets/rep_low/rep_high are nullable: a dose belongs to the prescription
+-- (src/data/dosage.ts), not to the movement. Promotion writes NULL rather than
+-- inventing a range that would follow the exercise into every program. The
+-- columns remain only so older clients still find the fields on pull.
+-- See migrations/0007_nullable_prescription_columns.sql.
 CREATE TABLE IF NOT EXISTS global_exercises (
   id       TEXT PRIMARY KEY,
   name     TEXT    NOT NULL,
-  sets     INTEGER NOT NULL,
-  rep_low  INTEGER NOT NULL,
-  rep_high INTEGER NOT NULL,
+  sets     INTEGER,
+  rep_low  INTEGER,
+  rep_high INTEGER,
   archived INTEGER NOT NULL DEFAULT 0
 );
 

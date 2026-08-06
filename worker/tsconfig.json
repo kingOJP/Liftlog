@@ -7,7 +7,13 @@
     "lib": ["ES2022"],
     "strict": true,
     "noEmit": true,
+    "composite": true,
     "isolatedModules": true
   },
-  "include": ["./**/*.ts"]
+  // Production worker code only. It is typechecked against the Workers runtime
+  // and nothing else — no Node globals — so an accidental `fs`/`process` import
+  // fails here rather than at the edge. Tests run under Node and need a
+  // different lib/types set, so they get their own project (tsconfig.test.json).
+  "include": ["./**/*.ts"],
+  "exclude": ["./**/*.test.ts", "./testkit.ts"]
 }
