@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    // Workers types FIRST: the worker source under test is written against
+    // them, and letting Node's declarations win instead collapses D1's typed
+    // row results into `any`, which quietly disables inference across the file.
+    // Node comes second for the harness's sqlite/fs/path imports.
+    "types": ["@cloudflare/workers-types", "node", "vitest/globals"],
+    "lib": ["ES2023"],
+    "strict": true,
+    "noEmit": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
+  },
+  // Everything, so the tests can import the handlers they exercise. The
+  // production project (tsconfig.json) is what pins worker code to the Workers
+  // runtime alone; this one exists to typecheck the tests.
+  "include": ["./**/*.ts"]
+}

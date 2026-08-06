@@ -364,13 +364,15 @@ describe('the near-race taper', () => {
 });
 
 describe('intro weeks', () => {
+  // One simulation, shared: a 10-week block is the most expensive fixture in
+  // the suite, and both assertions are about the same block.
+  const sim = simulate(base({ experience: 'beginner', goal: 'hypertrophy' }));
+
   it('give a beginner two easy weeks on a long block', () => {
-    const sim = simulate(base({ experience: 'beginner', goal: 'hypertrophy' }));
     expect(sim.phases.slice(0, 2)).toEqual(['intro', 'intro']);
   });
 
   it('train lighter than the first hard week that follows them', () => {
-    const sim = simulate(base({ experience: 'beginner', goal: 'hypertrophy' }));
     const introWeeks = sim.weeks.filter(w => w.phase === 'intro');
     const firstHard = sim.weeks.find(w => w.phase !== 'intro')!;
     const lightest = Math.min(...introWeeks.map(w => w.tonnage));

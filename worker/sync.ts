@@ -253,7 +253,9 @@ async function pull(userId: string, env: Env): Promise<Response> {
 }
 
 interface PushExercise {
-  id: string; name: string; sets: number; repLow: number; repHigh: number; archived?: boolean;
+  id: string; name: string; archived?: boolean;
+  /** @deprecated wire-compatibility only — older clients still send these */
+  sets?: number; repLow?: number; repHigh?: number;
 }
 
 interface PushPayload {
@@ -317,9 +319,14 @@ function validatePush(data: PushPayload): string | null {
     if (!Array.isArray(data.exercises)) return 'exercises must be an array';
     if (data.exercises.length > MAX_EXERCISES) return 'too many exercises';
     for (const e of data.exercises) {
+      // Identity only. sets/repLow/repHigh moved onto the prescription
+      // (data/dosage.ts) and current clients no longer send them; requiring
+      // them here rejected every push those clients made. They stay accepted
+      // and stored for older clients that still read the columns.
       if (typeof e.id !== 'string' || typeof e.name !== 'string' ||
-          typeof e.sets !== 'number' || typeof e.repLow !== 'number' ||
-          typeof e.repHigh !== 'number') {
+          (e.sets    !== undefined && typeof e.sets    !== 'number') ||
+          (e.repLow  !== undefined && typeof e.repLow  !== 'number') ||
+          (e.repHigh !== undefined && typeof e.repHigh !== 'number')) {
         return 'malformed exercise';
       }
     }
@@ -445,7 +452,10 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
            rep_low  = excluded.rep_low,
            rep_high = excluded.rep_high,
            archived = excluded.archived`,
-      ).bind(userId, e.id, e.name, e.sets, e.repLow, e.repHigh, e.archived ? 1 : 0));
+      // The rep columns are NOT NULL and only an older client reads them, so
+      // an identity-only entry stores the same 3 × 8–12 the pre-dosage library
+      // used as its fallback. Nothing on a current client reads these back.
+      ).bind(userId, e.id, e.name, e.sets ?? 3, e.repLow ?? 8, e.repHigh ?? 12, e.archived ? 1 : 0));
     }
     // Tombstoned rows may still exist from before this push carried the
     // tombstone — scrub them (reads already filter, this is hygiene).

@@ -5,8 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   test: {
-    environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    // `node`, not `jsdom`: the data layer only needs localStorage, which
+    // src/test/setup.ts provides. Files that need a real DOM opt in with a
+    // `@vitest-environment jsdom` docblock. See src/test/setup.ts.
+    environment: 'node',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.ts', 'worker/**/*.test.ts', 'test/**/*.test.ts'],
   },
   plugins: [
     react(),

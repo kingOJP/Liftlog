@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// share.ts reads and rewrites window.location, so this file needs a real DOM.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   encodeWorkoutShare, decodeWorkoutShare, buildShareUrl,

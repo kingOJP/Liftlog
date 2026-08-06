@@ -68,7 +68,8 @@ describe('calculateRecommendation', () => {
 
   it('does not let bonus sets earn a load increase', () => {
     // 5 × 8 at 100 is 40 reps, past the 36-rep target — but the programmed work
-    // is 3 sets, and 8/8/8 is the bottom of the range, not the top of it.
+    // is 3 sets, and 8/8/8 is the bottom of the range, not the top of it. The
+    // cap at the programmed set count is what keeps `credit()` honest.
     const rec = advise([session([[100, 8], [100, 8], [100, 8], [100, 8], [100, 8]])]);
     expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
   });
@@ -564,12 +565,6 @@ describe('extra and heavier sets', () => {
     // Three programmed sets in range, then a fourth taken to failure. The extra
     // work is a bonus; it must not read as "reps fell under the range".
     const rec = advise([session([[100, 9], [100, 9], [100, 8], [100, 2]], 1)]);
-    expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
-  });
-
-  it('still does not let bonus sets earn an increase', () => {
-    // The cap at the programmed set count is what keeps the credit honest.
-    const rec = advise([session([[100, 8], [100, 8], [100, 8], [100, 8], [100, 8]], 1)]);
     expect(rec).toMatchObject({ kind: 'hold', weight: 100 });
   });
 
