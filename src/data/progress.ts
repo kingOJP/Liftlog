@@ -24,6 +24,8 @@ import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp, movementPatternFor } from './analytics';
 import { getExerciseName } from './programStore';
 import type { Goal } from './plan';
+import type { MovementCategory } from './taxonomy';
+import { patternCategoryFor } from './taxonomy';
 import {
   compositeScore, pctChange, PROGRESS_SCORE, DECLINE_SCORE, STALL_SCORE,
 } from './progression';
