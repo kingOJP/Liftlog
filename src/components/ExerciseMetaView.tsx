@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  MUSCLE_GROUPS, WORKOUT_TYPES, EQUIPMENT_OPTIONS, WEIGHT_TYPES,
-  type MuscleGroup, type WorkoutType, type Equipment, type WeightType,
+  MUSCLE_GROUPS, MOVEMENT_PATTERNS, EQUIPMENT_OPTIONS, WEIGHT_TYPES,
+  type MuscleGroup, type MovementPattern, type Equipment, type WeightType,
 } from '../data/taxonomy';
 import { getExerciseMeta, saveExerciseMeta } from '../data/exercises';
 import { archiveExercise, deleteExerciseFromLibrary, getExerciseLibrary } from '../data/programStore';
@@ -27,7 +27,7 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
   const [secondary1, setSecondary1] = useState<MuscleGroup | ''>(initial.secondaryMuscle1 ?? '');
   const [secondary2, setSecondary2] = useState<MuscleGroup | ''>(initial.secondaryMuscle2 ?? '');
   const [secondary3, setSecondary3] = useState<MuscleGroup | ''>(initial.secondaryMuscle3 ?? '');
-  const [workoutType, setWorkoutType] = useState<WorkoutType | ''>(initial.workoutType ?? '');
+  const [workoutType, setWorkoutType] = useState<MovementPattern | ''>(initial.workoutType ?? '');
   const [equipment, setEquipment] = useState<Equipment | ''>(initial.equipment ?? '');
   const [weightType, setWeightType] = useState<WeightType | ''>(initial.weightType ?? '');
   const [saving, setSaving] = useState(false);
@@ -124,14 +124,14 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
 
       <div className="exercise-meta-body">
         <section className="meta-section">
-          <span className="meta-label">Workout Type</span>
+          <span className="meta-label">Movement Pattern</span>
           <select
             className="meta-select"
             value={workoutType}
-            onChange={e => setWorkoutType(e.target.value as WorkoutType | '')}
+            onChange={e => setWorkoutType(e.target.value as MovementPattern | '')}
           >
             <option value="">— Not set —</option>
-            {WORKOUT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {MOVEMENT_PATTERNS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </section>
 

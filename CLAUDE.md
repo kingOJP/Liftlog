@@ -42,7 +42,7 @@ Long-term milestones (roughly):
     in-workout draft persistence (localStorage; auto-restore on reopening the day)
 17. ✅ Exercise Intelligence / substitution engine (`substitution.ts`) — per-exercise
     "Find replacement" in the day editor: top-3 ranked, explained suggestions that
-    preserve the slot's programming; curated catalog expansion (~68 exercises)
+    preserve the slot's programming; curated catalog expansion (~89 exercises)
 18. ✅ Training journey — the long-term planning layer above individual workouts:
     TrainingPlan/TrainingBlock domain model (`plan.ts`), block planner
     (`planner.ts`: goal + history → explained split/phases/workouts proposal),
@@ -263,7 +263,7 @@ src/
     settings.ts                — device-local settings (localStorage): the week-numbering
                                   anchor (managed automatically — first-use stamp, then the
                                   journey via planStore.ensureWeekAnchor) + rest-timer default
-    exercises.ts               — Single source of truth for the ~68 built-in exercises
+    exercises.ts               — Single source of truth for the ~89 built-in exercises
                                   (ExerciseDef), EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
                                   saveExerciseMeta() — metadata overrides in localStorage.
                                   Includes the curated catalog expansion that feeds the
@@ -1037,7 +1037,7 @@ serves first-run onboarding and every replan; it saves the profile on activate.
 
 ## Exercise data architecture
 
-`src/data/exercises.ts` is the single source of truth for the ~68 built-in exercises
+`src/data/exercises.ts` is the single source of truth for the ~89 built-in exercises
 (the original 28 plus a curated catalog expansion that feeds the substitution engine's
 candidate pool — catalog-only exercises join the user's library when swapped into the
 program, not before):
@@ -1065,7 +1065,18 @@ program, not before):
   exercises: unilateral lower body (step-up, single-leg RDL), hip abduction, tendon work
   (single-leg calf raise), plyometrics (pogo hops, box jump), anti-rotation and isometric
   trunk (Pallof press, dead bug, plank, side plank, Copenhagen), loaded carries, and
-  shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise).
+  shoulder rotation / posterior cuff (dumbbell external rotation, prone Y raise). Pallof
+  press, dead bug, side plank and Copenhagen plank are **Obliques**-primary (rotation/lateral
+  flexion); a plain plank stays **Abs** (extension resistance, not rotation).
+- A **kettlebell staples** layer (7 exercises) covers movements the dumbbell/barbell catalog
+  doesn't reach rather than duplicating them under a new `weightType`: ballistic hip hinge
+  (swing), offset/unilateral pressing and rowing, a front-rack lunge, and the suitcase carry —
+  a loaded, anti-lateral-flexion **Obliques** stimulus distinct from the muscle's only other
+  coverage (isometric holds). The Turkish get-up has no single prime mover; it's classified by
+  its limiting factor (resisting rotation as the base changes through the sequence) alongside
+  Pallof press and dead bug. The swing and get-up are `advanced` with prerequisites (a
+  controlled hip hinge; core anti-rotation work) for the same reason good mornings is — an
+  unforgiving technique floor.
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
@@ -1073,6 +1084,63 @@ program, not before):
 one-time migration to strip stale duplicate IDs (the old `-d1/-d2/-d4` suffixed IDs). The library
 holds **movement identity only** — no sets or rep range. See the Prescription section for where
 dosage comes from instead.
+
+### Muscle taxonomy tiers
+
+Three tiers, coarsest to finest (`docs` reference: see `src/data/taxonomy.ts` comment block).
+`MuscleGroup` is unchanged as *the* level every engine reasons about — this is additive, not a
+rename:
+
+- **Tier 1 — Region** (`MuscleRegion`, `MUSCLE_REGIONS`, `regionFor()` in `taxonomy.ts`) — Chest /
+  Back / Shoulders / Arms / Core / Legs. Purely organizational grouping of `MuscleGroup`s for
+  pickers (the plan wizard's priority-muscle options are grouped this way, e.g. "Core" =
+  Abs + Obliques). No volume target of its own.
+- **Tier 2 — MuscleGroup** — unchanged role: volume targets (`volumeTargetFor`), the heatmap,
+  splits, substitution matching, priority muscles, synced metadata. One addition: **Obliques**
+  split out of Abs — rotational/anti-rotation work is a distinct programming decision from
+  spinal flexion (see the sport-support layer note above).
+- **Tier 3 — MuscleHead** (`MuscleHead` type in `taxonomy.ts`; `MUSCLE_HEADS` vocabulary +
+  `headsFor(id)` in `exercises.ts`) — anatomically distinct heads *within* a muscle, for the nine
+  muscles where exercise selection actually differentiates them (Chest, Delts, Traps, Biceps,
+  Triceps, Quads, Hamstrings, Glutes, Calves — e.g. incline press → Upper Chest, lateral raise →
+  Side Delt, seated calf raise → Soleus). Compiled catalog data on the same footing as
+  `difficultyFor`/`prerequisitesFor`: not user-editable, not synced, absent on custom exercises,
+  not surfaced in the main UI yet. `headSetTotals()` (`analytics.ts`) is the queryable
+  counterpart — per-(muscle, head) set totals plus an `unspecified` bucket for exercises with no
+  catalogued head emphasis — kept for future holistic volume analysis (e.g. flagging a
+  chronically undertrained rear delt even when total delt volume looks fine).
+
+### Movement pattern tiers
+
+Two tiers (`taxonomy.ts` comment block). Renamed from the old flat `WorkoutType` — "workout
+type" never described what the field actually captured. The `ExerciseDef`/metadata *field*
+stays `workoutType` for wire/schema compatibility (JSON keys and the D1 column are unchanged);
+only the type name and vocabulary change.
+
+- **Tier 2 — MovementPattern** (`MOVEMENT_PATTERNS` in `taxonomy.ts`) — unchanged role: the
+  family-level match the substitution engine and planner/sports.ts slot templates operate at
+  (Row vs. Pull Down vs. Pull Up are genuinely different movements). One correction: **Press**
+  — the one real inconsistency in an otherwise-consistent list — used to span both bench-style
+  horizontal pressing and overhead-style vertical pressing. Split into **Horizontal Press** /
+  **Vertical Press**. A stale stored override of the old bare `'Press'` value can't be
+  disambiguated from the string alone, so it defaults to Horizontal on read
+  (`LEGACY_WORKOUT_TYPES` in `exercises.ts`) and self-heals next time that exercise's metadata
+  is edited; the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
+  earlier merge into `'Press'`) remap unambiguously since they name their plane directly.
+- **Tier 1 — MovementCategory** (`MOVEMENT_CATEGORIES`, `patternCategoryFor()` in
+  `taxonomy.ts`) — a coarser layer above MovementPattern, for the same reason Region sits above
+  MuscleGroup: most of MovementPattern's ~28 values have only 1–3 exercises, too few to show a
+  *trend* — "is my Face Pull number going up" just restates that exercise's own progress. Eight
+  categories (Squat, Hinge, Push, Pull, Core, Carry, Power, Isolation) aggregate enough
+  exercises to say something new — the same mental model lifters already use for
+  squat/bench/deadlift/press trends. `Isolation` is a deliberate catch-all: every pattern needs
+  a category, but a bicep curl and a calf raise trending on one line isn't a meaningful signal,
+  so isolation work is bucketed together without being treated as trend-worthy itself. Compiled
+  catalog data, not user-editable, not synced — same footing as MuscleHead.
+  `movementPatternFor(id)` (`analytics.ts`) resolves an exercise's pattern with the same
+  precedence as `musclesForExercise` (user override → catalog → name match), and
+  `categoryProgress(snapshot, goal)` (`progress.ts`) rolls per-exercise progress status up by
+  category — not surfaced in the UI yet, kept for future pattern-vs-growth insights.
 
 ---
 

@@ -6,10 +6,10 @@
 
 import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
-import type { MuscleGroup } from './taxonomy';
+import type { MuscleGroup, MovementPattern } from './taxonomy';
 import { startOfWeek } from './program';
 import type { Goal } from './plan';
-import { EXERCISES, EXERCISE_MAP, getExerciseMeta } from './exercises';
+import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
 import { getExerciseLibrary } from './programStore';
 
 // Secondary muscles count as a fraction of a direct ("hard") set
@@ -225,6 +225,23 @@ export function primaryMuscleFor(id: string): MuscleGroup | null {
   return musclesForExercise(id).find(m => m.weight === 1)?.muscle ?? null;
 }
 
+// The exercise's movement pattern, same precedence as musclesForExercise:
+// user override (getExerciseMeta) → master catalog → name match for custom
+// library entries with no override. THE resolver for pattern-vs-growth
+// analysis (progress.ts categoryProgress) and anything else that needs a
+// single agreed-upon pattern for an exercise id.
+export function movementPatternFor(id: string): MovementPattern | null {
+  const meta = getExerciseMeta(id);
+  let pattern = meta.workoutType;
+
+  if (!pattern && !EXERCISE_MAP.has(id)) {
+    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
+    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
+    if (def) pattern = def.workoutType;
+  }
+  return pattern;
+}
+
 // ── Muscle set accumulation ───────────────────────────────────────────────────
 // THE set-counting model, shared by metrics, insights, the coach planner and
 // the heatmap so every surface reports the same number: each logged set counts
@@ -269,4 +286,47 @@ export function muscleSetTotals(
     }
   }
   return { totals, unmappedSets, unmappedExerciseIds };
+}
+
+// ── Muscle-head set accumulation (Tier 3) ────────────────────────────────────
+// Not wired into any UI yet — see the tiering comment in taxonomy.ts and
+// headsFor() in exercises.ts. Kept here as the queryable counterpart to that
+// compiled data: knowing a lifter logged 40 hamstring sets doesn't say
+// whether both heads got hit. A set counts at full weight toward every head
+// its exercise is catalogued against (heads name *which part* of the muscle
+// a set reaches, they don't subdivide the set itself); exercises with no
+// catalogued head emphasis contribute to `unspecified` instead of being
+// silently dropped, mirroring how muscleSetTotals handles unmapped exercises.
+
+export interface MuscleHeadTotals {
+  /** fractional hard sets per (muscle, head), keyed `${muscle}::${head}` */
+  byHead: Map<string, number>;
+  /** primary-muscle sets whose exercise has no catalogued head emphasis */
+  unspecified: Map<MuscleGroup, number>;
+}
+
+export function headSetTotals(
+  snapshot: TrainingSnapshot,
+  include: (session: Session) => boolean = () => true,
+): MuscleHeadTotals {
+  const byHead = new Map<string, number>();
+  const unspecified = new Map<MuscleGroup, number>();
+
+  for (const session of snapshot.sessions) {
+    if (!include(session)) continue;
+    for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
+      const primary = primaryMuscleFor(log.exerciseId);
+      if (!primary) continue;
+      const heads = headsFor(log.exerciseId);
+      if (heads.length === 0) {
+        unspecified.set(primary, (unspecified.get(primary) ?? 0) + 1);
+        continue;
+      }
+      for (const head of heads) {
+        const key = `${primary}::${head}`;
+        byHead.set(key, (byHead.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  return { byHead, unspecified };
 }

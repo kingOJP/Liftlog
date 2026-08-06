@@ -19,7 +19,7 @@
 
 import type { Exercise } from './program';
 import type { Goal, ExperienceLevel } from './plan';
-import type { WorkoutType } from './taxonomy';
+import type { MovementPattern } from './taxonomy';
 import type { ExerciseProfile } from './substitution';
 
 /** sets × rep range — the prescription, without the exercise it belongs to. */
@@ -33,7 +33,7 @@ export interface DosageSlot {
 
 // Movements whose stimulus lives at high reps: small muscles, long ranges, and
 // loads too light for the rep count to matter much.
-const HIGH_REP_PATTERNS = new Set<WorkoutType>([
+const HIGH_REP_PATTERNS = new Set<MovementPattern>([
   'Lateral Raise', 'Calf Raise', 'Face Pull', 'Reverse Fly', 'Crunch',
   // Stability and cuff work: light by nature, and the stimulus is control
   // rather than load, so a low-rep prescription would miss the point.
@@ -44,7 +44,7 @@ const HIGH_REP_PATTERNS = new Set<WorkoutType>([
 // spine directly and cost far more systemic fatigue per rep than any other
 // compound, and technique is the first thing to go as a set drags on. A set of
 // 12 deadlifts is not "a set of 12" in the way a set of 12 rows is.
-const HEAVY_AXIAL_PATTERNS = new Set<WorkoutType>(['Hip Hinge', 'Squat']);
+const HEAVY_AXIAL_PATTERNS = new Set<MovementPattern>(['Hip Hinge', 'Squat']);
 
 /**
  * A barbell hinge or squat. The barbell condition matters: a cable pull-through

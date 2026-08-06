@@ -32,7 +32,7 @@
 //     as intensity is held, which is what makes a lifting taper cheap: keep
 //     the load, gut the sets.
 
-import type { MuscleGroup, WorkoutType } from './taxonomy';
+import type { MuscleGroup, MovementPattern } from './taxonomy';
 import type {
   PhaseKind, SportContext, SportId, SportEvent, Discipline, ExperienceLevel,
   EnduranceLoad, RaceProximity,
@@ -58,7 +58,7 @@ export interface SlotDose {
 
 export interface Slot {
   muscle: MuscleGroup;
-  patterns?: WorkoutType[];
+  patterns?: MovementPattern[];
   mechanics?: 'compound' | 'isolation';
   /** the day's heavy anchor — more sets, lower reps */
   main?: boolean;
@@ -447,7 +447,7 @@ const TRI_STRENGTH_DAY = (): DayTemplate => ({
       why: 'Bent-knee calf work loads the soleus — the largest force contributor in running gait, and the tissue most often under-prepared for it. Three seconds down on every rep.',
     },
     {
-      muscle: 'Abs',
+      muscle: 'Obliques',
       patterns: ['Anti-Rotation'],
       preferIds: ['pallof-press', 'dead-bug'],
       dose: { sets: 2, repLow: 8, repHigh: 12 },
@@ -525,9 +525,9 @@ const TRI_POWER_DAY = (): DayTemplate => ({
       why: 'Glute-med strength controls the pelvis on every single-leg stance phase — the cheapest insurance there is against ITB and kneecap pain.',
     },
     {
-      muscle: 'Abs',
+      muscle: 'Obliques',
       patterns: ['Plank'],
-      preferIds: ['side-plank', 'plank'],
+      preferIds: ['side-plank'],
       dose: { sets: 2, repLow: 30, repHigh: 45 },
       why: 'Lateral trunk stability under single-leg load. Logged in seconds — build the hold, not the reps.',
     },
@@ -565,7 +565,7 @@ const RUN_STRENGTH_DAY = (): DayTemplate => ({
       why: 'Bent-knee calf raises load the soleus, which absorbs more force per stride than any other muscle in the chain and is the tissue most often under-prepared for it. Three seconds down on every rep.',
     },
     {
-      muscle: 'Abs',
+      muscle: 'Obliques',
       patterns: ['Anti-Rotation'],
       preferIds: ['pallof-press', 'dead-bug'],
       dose: { sets: 2, repLow: 8, repHigh: 12 },
@@ -636,9 +636,9 @@ const RUN_POWER_DAY = (): DayTemplate => ({
       why: 'Rate of force development — the quality behind a finishing kick. Full recovery between sets; this is a power slot, not conditioning.',
     },
     {
-      muscle: 'Abs',
+      muscle: 'Obliques',
       patterns: ['Plank'],
-      preferIds: ['side-plank', 'plank'],
+      preferIds: ['side-plank'],
       dose: { sets: 2, repLow: 30, repHigh: 45 },
       why: 'Lateral trunk stability under single-leg load. Logged in seconds — build the hold, not the reps.',
     },

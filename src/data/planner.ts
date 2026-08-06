@@ -19,7 +19,7 @@
 //     proposal declares its own confidence: history-backed picks say so,
 //     defaults admit they're defaults
 
-import type { MuscleGroup, WorkoutType, Equipment, WeightType } from './taxonomy';
+import type { MuscleGroup, MovementPattern, Equipment, WeightType } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
 import type { TrainingSnapshot, VolumeTarget } from './analytics';
 import { volumeTargetFor } from './analytics';
@@ -104,7 +104,7 @@ export interface PlanProposal {
 interface Guidance {
   bannedWeightTypes: Set<WeightType>;
   bannedEquipment: Set<Equipment>;
-  avoidPatterns: Set<WorkoutType>;
+  avoidPatterns: Set<MovementPattern>;
   avoidNameParts: string[];
   notes: string[];
 }
@@ -147,7 +147,10 @@ export function parseGuidance(raw: string): Guidance {
   }
   if (new RegExp(`shoulder${near}${hurt}|${hurt}${near}shoulder`).test(text)) {
     g.avoidPatterns.add('Dip');
-    g.avoidNameParts.push('overhead');
+    // Pattern-based, not name-based — catches every vertical press
+    // regardless of naming (e.g. "Machine Shoulder Press" has no "overhead"
+    // in its name, so a name-substring filter alone would miss it).
+    g.avoidPatterns.add('Vertical Press');
     g.notes.push('Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay.');
   }
   if (new RegExp(`(lower\\s+)?back${near}${hurt}|${hurt}${near}(lower\\s+)?back\\b`).test(text)) {
@@ -197,9 +200,9 @@ function splitFor(
   const upperA: DayTemplate = {
     title: 'Upper — Chest, Back, Arms',
     slots: [
-      { muscle: 'Chest',      patterns: ['Press'], mechanics: 'compound', main: true },
+      { muscle: 'Chest',      patterns: ['Horizontal Press'], mechanics: 'compound', main: true },
       { muscle: 'Upper Back', patterns: ['Row'], mechanics: 'compound', main: true },
-      { muscle: 'Delts',      patterns: ['Press', 'Lateral Raise'] },
+      { muscle: 'Delts',      patterns: ['Vertical Press', 'Lateral Raise'] },
       { muscle: 'Lats',       patterns: ['Pull Down', 'Pull Up'] },
       { muscle: 'Triceps',    patterns: ['Tricep Extension', 'Dip'] },
       { muscle: 'Biceps',     patterns: ['Curl'] },
@@ -219,7 +222,7 @@ function splitFor(
     title: 'Upper — Shoulders, Back, Chest',
     slots: [
       { muscle: 'Lats',       patterns: ['Pull Up', 'Pull Down'], mechanics: 'compound', main: true },
-      { muscle: 'Chest',      patterns: ['Press', 'Fly'], main: true },
+      { muscle: 'Chest',      patterns: ['Horizontal Press', 'Fly'], main: true },
       { muscle: 'Delts',      patterns: ['Lateral Raise'] },
       { muscle: 'Upper Back', patterns: ['Row'] },
       { muscle: 'Delts',      patterns: ['Face Pull', 'Reverse Fly'] },
@@ -240,9 +243,9 @@ function splitFor(
   const push: DayTemplate = {
     title: 'Push — Chest, Delts, Triceps',
     slots: [
-      { muscle: 'Chest',   patterns: ['Press'], mechanics: 'compound', main: true },
-      { muscle: 'Chest',   patterns: ['Fly', 'Dip', 'Press'] },
-      { muscle: 'Delts',   patterns: ['Press', 'Lateral Raise'] },
+      { muscle: 'Chest',   patterns: ['Horizontal Press'], mechanics: 'compound', main: true },
+      { muscle: 'Chest',   patterns: ['Fly', 'Dip', 'Horizontal Press'] },
+      { muscle: 'Delts',   patterns: ['Vertical Press', 'Lateral Raise'] },
       { muscle: 'Delts',   patterns: ['Lateral Raise'] },
       { muscle: 'Triceps', patterns: ['Tricep Extension', 'Dip'] },
       { muscle: 'Triceps', patterns: ['Tricep Extension'] },
@@ -273,7 +276,7 @@ function splitFor(
     title: 'Full Body A',
     slots: [
       { muscle: 'Quads',      patterns: ['Squat', 'Leg Press'], mechanics: 'compound', main: true },
-      { muscle: 'Chest',      patterns: ['Press'], mechanics: 'compound', main: true },
+      { muscle: 'Chest',      patterns: ['Horizontal Press'], mechanics: 'compound', main: true },
       { muscle: 'Upper Back', patterns: ['Row'] },
       { muscle: 'Delts',      patterns: ['Lateral Raise'] },
       { muscle: 'Calves',     patterns: ['Calf Raise'] },
@@ -284,7 +287,7 @@ function splitFor(
     slots: [
       { muscle: 'Hamstrings', patterns: ['Hip Hinge', 'Leg Curl'], main: true },
       { muscle: 'Lats',       patterns: ['Pull Down', 'Pull Up'], mechanics: 'compound', main: true },
-      { muscle: 'Delts',      patterns: ['Press', 'Lateral Raise'] },
+      { muscle: 'Delts',      patterns: ['Vertical Press', 'Lateral Raise'] },
       { muscle: 'Biceps',     patterns: ['Curl'] },
       { muscle: 'Abs',        patterns: ['Crunch'] },
     ],
@@ -293,7 +296,7 @@ function splitFor(
     title: 'Full Body C',
     slots: [
       { muscle: 'Quads',      patterns: ['Leg Press', 'Lunge', 'Squat'], main: true },
-      { muscle: 'Chest',      patterns: ['Fly', 'Press'] },
+      { muscle: 'Chest',      patterns: ['Fly', 'Horizontal Press'] },
       { muscle: 'Upper Back', patterns: ['Row'] },
       { muscle: 'Glutes',     patterns: ['Hip Thrust'] },
       { muscle: 'Triceps',    patterns: ['Tricep Extension', 'Dip'] },

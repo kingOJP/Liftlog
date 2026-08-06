@@ -21,9 +21,11 @@
 
 import type { Session, SetLog } from '../db/database';
 import type { TrainingSnapshot } from './analytics';
-import { epley1RM, sessionTimestamp } from './analytics';
+import { epley1RM, sessionTimestamp, movementPatternFor } from './analytics';
 import { getExerciseName } from './programStore';
 import type { Goal } from './plan';
+import type { MovementCategory } from './taxonomy';
+import { patternCategoryFor } from './taxonomy';
 import {
   compositeScore, pctChange, PROGRESS_SCORE, DECLINE_SCORE, STALL_SCORE,
 } from './progression';
@@ -325,4 +327,39 @@ export function progressDirections(assessments: Map<string, ExerciseProgress>): 
     else if (a.status === 'stalled') stalled.add(id);
   }
   return { up, down, stalled };
+}
+
+export interface CategoryProgress {
+  category: MovementCategory;
+  exerciseCount: number;
+  progressing: number;
+  steady: number;
+  stalled: number;
+  declining: number;
+}
+
+/**
+ * Per-exercise progress (assessSnapshot), rolled up by movement category
+ * (taxonomy.ts MovementCategory) rather than by muscle. A single exercise's
+ * trend restates itself; "is my Push pattern trending up while Pull stalls"
+ * is a signal only a handful of coarse buckets can show — the reason
+ * MovementCategory exists as a layer above the fine-grained movement
+ * pattern. Not surfaced in the UI yet; kept for future pattern-vs-growth
+ * insights, the same scope as analytics.ts headSetTotals.
+ */
+export function categoryProgress(snapshot: TrainingSnapshot, goal: Goal): CategoryProgress[] {
+  const byCategory = new Map<MovementCategory, CategoryProgress>();
+  for (const [exerciseId, progress] of assessSnapshot(snapshot, goal)) {
+    const pattern = movementPatternFor(exerciseId);
+    if (!pattern) continue;
+    const category = patternCategoryFor(pattern);
+    let bucket = byCategory.get(category);
+    if (!bucket) {
+      bucket = { category, exerciseCount: 0, progressing: 0, steady: 0, stalled: 0, declining: 0 };
+      byCategory.set(category, bucket);
+    }
+    bucket.exerciseCount++;
+    bucket[progress.status]++;
+  }
+  return [...byCategory.values()];
 }
