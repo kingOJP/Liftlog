@@ -43,29 +43,34 @@ because they touch disjoint files. Everything else is sequential by dependency.
 
 ---
 
-## 2. Phase 0 — Guardrails
+## 2. Phase 0 — Guardrails — ✅ landed on `claude/action-plan-2026-10`
 
-**0.1 Lint clean.** Fix the two `react-hooks/purity` errors (`DayEditView.tsx:49`,
+**0.1 Lint clean.** ✅ Fix the two `react-hooks/purity` errors (`DayEditView.tsx:49`,
 `PlanSetupView.tsx:312`): hoist `now` into state captured at mount. Closes **M3** (lint half).
 Also removes the double substitution ranking per render the audit measured.
 
-**0.2 CI.** `.github/workflows/ci.yml` running `npm ci && npm run typecheck && npm run lint &&
+**0.2 CI.** ✅ `.github/workflows/ci.yml` running `npm ci && npm run typecheck && npm run lint &&
 npm test` on pull requests and on pushes to `main`. Deploy gating per **[D6]**: the PR adds a
 `check` script (`npm run lint && npm test && npm run build`) and documents that the Cloudflare
 Pages build command must be switched to `npm run check` — **that switch is a manual step for
 you in the Pages dashboard**, as is (optionally) requiring the Actions check under branch
 protection for `main`. Bump the 10 dev-dependency vulnerabilities while touching the lockfile.
-Closes **M3** (CI half) and the "dev-dependency vulnerabilities" LOW.
+Closes **M3** (CI half) and the "dev-dependency vulnerabilities" LOW. (Landed: the lockfile
+was regenerated from scratch — `npm audit fix` crashes on this lockfile under npm 10 — which
+took vitest to v5; the suite, typecheck and lint were verified on it. 0 vulnerabilities.)
 
-**0.3 Regression harnesses.** The session scratchpads that held the audit tooling are gone, so
+**0.3 Regression harnesses.** ✅ The session scratchpads that held the audit tooling are gone, so
 rebuild three things as permanent tests:
 - `src/data/profileSimulation.test.ts` — the functional audit's five-profile, 13-week harness
   (synthetic athlete with capacity growth, noise, fatigue, skips) that onboards through the real
   planner, trains against the real `buildSetPlan`/`computeProgramPlan`, wraps blocks and replans.
-  Initially it asserts only what passes today; Phases 2–4 and 7 tighten its assertions as they
-  land (loads trail capacity by < X%, no replacement storm, no "declining" after an easy week).
-- A bodyweight/timed twin of the 12-week "whole loop" test in `recommendations.test.ts` (fails
-  today — it is the reproduction for C1; mark `it.fails` until Phase 2.2 lands).
+  It asserts what passes today as plain `it`, and pins the audit's findings as `it.fails`
+  reproductions (F1, F2, F5, F6, F9) each naming the phase that flips it: vitest fails an
+  `it.fails` test that starts passing, so the fix and the flip land in the same PR.
+- A bodyweight/timed twin of the 12-week "whole loop" test in `recommendations.test.ts`
+  (`it.fails` — the reproduction for C1; flips in Phase 2.2). Worth knowing: it only
+  reproduces when the opening session has a real set-to-set drop-off (10/9/8); a flat 8/8/8
+  start fits flat targets and hides the bug.
 - `src/data/catalog.test.ts` — the catalog invariants the audit checked by script (ids unique,
   names unique, muscles valid, prerequisites resolve, head tags valid, option arrays sorted).
 

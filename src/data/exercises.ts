@@ -235,7 +235,7 @@ export const DIFFICULTY_RANK: Record<ExerciseDifficulty, number> = {
 // Only exceptions to the default (intermediate) are listed. Beginner = machine
 // or supported movements a first-timer can load safely on day one; advanced =
 // free-weight lifts that reward a technique base and punish a missing one.
-const DIFFICULTY: Record<string, ExerciseDifficulty> = {
+export const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   // Beginner — machines, cables, supported & low-skill free weights
   'cable-fly': 'beginner', 'machine-chest-press': 'beginner', 'pec-deck-fly': 'beginner',
   'dumbbell-fly': 'beginner', 'push-ups': 'beginner',
@@ -286,7 +286,7 @@ const DIFFICULTY: Record<string, ExerciseDifficulty> = {
 
 // Advanced lifts a novice should earn: at least one prerequisite trained (or
 // an intermediate+ profile) before the planner will program them.
-const PREREQUISITES: Record<string, string[]> = {
+export const PREREQUISITES: Record<string, string[]> = {
   'conventional-deadlift': ['romanian-deadlifts', 'dumbbell-rdl'],
   'barbell-back-squat':    ['goblet-squat', 'leg-press', 'hack-squat'],
   'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],
@@ -350,7 +350,7 @@ export const MUSCLE_HEADS: Partial<Record<MuscleGroup, MuscleHead[]>> = {
 // or shortens), left unset where a movement trains the whole muscle evenly
 // or the emphasis is genuinely contested — an absent entry means "trains the
 // muscle as a whole," not "unknown."
-const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
+export const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
   // Chest — incline shifts load toward the clavicular (upper) fibers, flat
   // and forward-lean dip/push work toward the sternocostal (lower) fibers.
   'incline-barbell-press': ['Upper Chest'], 'incline-dumbbell-press': ['Upper Chest'],

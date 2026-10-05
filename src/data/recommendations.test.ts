@@ -986,3 +986,53 @@ describe('a lifter coming back from time off', () => {
     expect(sparse.reason).toMatch(/been away/i);
   });
 });
+
+describe('week over week — the whole loop, bodyweight and timed', () => {
+  /**
+   * The rep-progression twin of the loop above. The loaded engine was fixed
+   * to judge progress as volume at a fixed load; the bodyweight engine kept
+   * the old rule (every set at repHigh) that buildSetPlan's descending
+   * targets can never satisfy, so a compliant lifter is deloaded forever
+   * (audit C1). These two cases reproduce it. They are marked `it.fails`
+   * until Phase 2.2 of docs/action-plan-2026-10.md lands — vitest then
+   * reports them as unexpectedly passing, which is the cue to flip them.
+   */
+  function run(weeks: number, ex: Slot, ctx: PrescriptionContext, startReps: number[]) {
+    const start = new Date(2026, 0, 5).getTime();
+    // The opening session carries a real set-to-set drop-off: buildSetPlan
+    // fits its targets to it, which is what makes "every set at repHigh"
+    // unreachable. A flat 8/8/8 start would hide the bug.
+    let history: ExerciseSession[] = [
+      { completedAt: start, position: 0, sets: startReps.map(reps => ({ weight: 0, reps })) },
+    ];
+    const log: { kind: string; reps: number[]; total: number }[] = [];
+    for (let w = 1; w <= weeks; w++) {
+      const now = start + w * WEEK;
+      const p = buildSetPlan(history, ex, { ...ctx, now });
+      const reps = p.sets.map(s => s.targetReps!);
+      log.push({ kind: p.rec!.kind, reps, total: reps.reduce((a, b) => a + b, 0) });
+      history = [
+        { completedAt: now, position: 0, sets: reps.map(r => ({ weight: 0, reps: r })) },
+        ...history,
+      ].slice(0, 4);
+    }
+    return log;
+  }
+
+  it.fails('climbs the rep total for a bodyweight lifter who hits every target', () => {
+    const log = run(10, exercise, { weightType: 'Bodyweight' }, [10, 9, 8]);
+    expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+    expect(log[log.length - 1].total).toBeGreaterThan(log[0].total);
+    for (let i = 1; i < log.length; i++) {
+      expect(log[i].total, `week ${i + 1}`).toBeGreaterThanOrEqual(log[i - 1].total);
+    }
+  });
+
+  it.fails('climbs the hold for a timed exercise the same way', () => {
+    // 16 weeks: the hold climbs a second a week until the clamp at 45 s, then
+    // the same flat-session deload fires. A wider range would merely delay it.
+    const log = run(16, { sets: 3, repLow: 30, repHigh: 45 }, { weightType: 'Bodyweight', unit: 'seconds' }, [36, 33, 30]);
+    expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+    expect(log[log.length - 1].total).toBeGreaterThan(log[0].total);
+  });
+});

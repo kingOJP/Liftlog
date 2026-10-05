@@ -38,6 +38,9 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   // strength trends, weekly volume balance) — loaded once, used lazily.
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  // "Now" is captured once at mount: reading the clock during render makes
+  // the memoized suggestions drift across renders (react-hooks/purity).
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     loadTrainingSnapshot().then(setSnapshot).catch(() => {});
@@ -46,8 +49,8 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   const swapTarget = exercises.find(e => e.id === swapTargetId) ?? null;
   const suggestions = useMemo<ReplacementSuggestion[]>(() => {
     if (!swapTarget) return [];
-    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot, 3, Date.now(), getTrainingGoal());
-  }, [swapTarget, exercises, snapshot, day]);
+    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot, 3, now, getTrainingGoal());
+  }, [swapTarget, exercises, snapshot, day, now]);
   const swapTargetHasMeta =
     swapTarget != null && profileFor(swapTarget.id, swapTarget.name).primaryMuscle != null;
 

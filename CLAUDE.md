@@ -154,7 +154,10 @@ Long-term milestones (roughly):
 ## Stack
 
 - **React + Vite + TypeScript** — `npm run dev` to start, `npm run build` to build
-- **Vitest** — `npm test` (or `npm run test:watch`); `npm run typecheck` for types alone.
+- **Vitest** — `npm test` (or `npm run test:watch`); `npm run typecheck` for types alone;
+  `npm run lint` for ESLint; `npm run check` runs lint + tests + build and is what the
+  Cloudflare Pages build command should run so a red commit never deploys.
+  `.github/workflows/ci.yml` runs typecheck + lint + tests on every PR and push to `main`.
   Tests live next to the modules they cover (`src/data/*.test.ts`, `src/db/*.test.ts`,
   `worker/*.test.ts`), plus `test/` for tests that span the client/worker boundary.
   See the Testing section below for the environment, the D1/IDB harnesses and the
@@ -1149,8 +1152,9 @@ only the type name and vocabulary change.
 
 ## Testing
 
-`npm test` runs everything (~740 tests, ~4.5s). `npm run typecheck` runs types alone;
-`npm run build` runs typecheck then Vite.
+`npm test` runs everything (~795 tests, ~4.5s). `npm run typecheck` runs types alone;
+`npm run build` runs typecheck then Vite; `npm run check` is lint + test + build (the deploy
+gate). CI (`.github/workflows/ci.yml`) runs typecheck, lint and tests on PRs and `main`.
 
 **Where tests live.** Beside what they cover — `src/data/*.test.ts`, `src/db/*.test.ts`,
 `worker/*.test.ts` — with one exception: `test/` holds tests that span the client/worker
@@ -1202,6 +1206,18 @@ current-but-questionable behaviour, say so in a comment rather than asserting it
 is the integration tier: it designs a block per athlete profile and *trains* it week by
 week, catching composition bugs no unit test can see. Its `simulate()` calls run at
 collection time, so hoist them to the `describe` body rather than repeating them per `it`.
+
+**Known defects are pinned with `it.fails`, not skipped.** `profileSimulation.test.ts`
+(five user profiles trained for a quarter by a synthetic *human* athlete — noisy, fatiguing,
+skipping sessions — through the real planner, planStore, prescription, coach, retrospective
+and replan loop), the bodyweight/timed loop in `recommendations.test.ts`, and any future
+reproduction of an audit finding are written as `it.fails(...)` with a comment naming the
+phase of `docs/action-plan-2026-10.md` that fixes them. vitest reports an `it.fails` test
+that starts passing as a failure, so fixing the bug *forces* the test to flip to a plain
+`it` in the same PR — the reproduction becomes the regression test with no step forgotten.
+`catalog.test.ts` pins the catalog invariants (unique ids/names, vocabulary membership,
+prerequisites that resolve to easier lifts, heads from the right muscle, legacy-id and
+PROGRAM references) that are otherwise only checked by hand.
 
 ---
 

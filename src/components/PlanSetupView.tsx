@@ -150,6 +150,8 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [decisions, setDecisions] = useState<Map<string, ExerciseDecision>>(new Map());
   const [swapTarget, setSwapTarget] = useState<{ dayId: number; exerciseId: string } | null>(null);
+  // Captured once at mount — the clock must not be read during render.
+  const [now] = useState(() => Date.now());
   const [activating, setActivating] = useState(false);
 
   const advanceTimer = useRef<number | null>(null);
@@ -305,12 +307,16 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     setNiggles(prev => (prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]));
   }
 
-  const allIds = useMemo(() => new Set(days.flatMap(d => d.exercises.map(e => e.id))), [days]);
-  function suggestionsFor(dayId: number, ex: Exercise): ReplacementSuggestion[] {
-    const day = days.find(d => d.id === dayId);
-    if (!day) return [];
-    return suggestReplacements(ex, day, snapshot, 5, Date.now(), goal).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
-  }
+  // Only one slot can be open for swapping at a time, so rank once for it
+  // instead of running the full substitution ranking per exercise per render.
+  const swapSuggestions = useMemo<ReplacementSuggestion[]>(() => {
+    if (!swapTarget) return [];
+    const day = days.find(d => d.id === swapTarget.dayId);
+    const ex = day?.exercises.find(e => e.id === swapTarget.exerciseId);
+    if (!day || !ex) return [];
+    const allIds = new Set(days.flatMap(d => d.exercises.map(e => e.id)));
+    return suggestReplacements(ex, day, snapshot, 5, now, goal).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
+  }, [swapTarget, days, snapshot, now, goal]);
 
   function togglePriority(muscles: MuscleGroup[]) {
     setPriorityMuscles(prev => {
@@ -483,13 +489,13 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                       )}
                       {isSwapping && (
                         <div className="review-swaps">
-                          {suggestionsFor(day.id, ex).map(s => (
+                          {swapSuggestions.map(s => (
                             <button className="review-swap" key={s.exercise.id} onClick={() => replaceExercise(day.id, ex, s)}>
                               <span className="review-swap-name">{s.exercise.name}</span>
                               {s.reasons[0] && <span className="review-swap-reason">{s.reasons[0]}</span>}
                             </button>
                           ))}
-                          {suggestionsFor(day.id, ex).length === 0 && (
+                          {swapSuggestions.length === 0 && (
                             <p className="setup-hint">No good alternative found for this slot.</p>
                           )}
                         </div>
