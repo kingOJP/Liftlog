@@ -610,3 +610,17 @@
   flex: 0 1 auto;
   width: auto;
 }
+
+/* What each picked injury chip does to the plan */
+.setup-constraints {
+  margin: 10px 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.setup-constraints strong {
+  color: var(--text);
+  font-weight: 600;
+}

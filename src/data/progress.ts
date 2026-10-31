@@ -331,7 +331,9 @@ export function assessExercise(
     status = 'steady'; // still building a baseline — no verdict yet
   } else if (score >= PROGRESS_SCORE) {
     status = 'progressing';
-  } else if (score <= DECLINE_SCORE) {
+  } else if (score <= DECLINE_SCORE && weightPRs + repPRs === 0) {
+    // A PR inside the window is something that got better; "declining" next to
+    // a fresh rep record reads as a broken coach. Symmetric with the stall rule.
     status = 'declining';
   } else if (weightPRs + repPRs > 0 || score > STALL_SCORE) {
     status = 'steady';

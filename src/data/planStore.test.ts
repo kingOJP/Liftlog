@@ -218,10 +218,12 @@ describe('completeActiveBlock', () => {
 
 describe('mergeServerPlanState', () => {
   it('takes a newer server document and ignores an older one', () => {
-    activateProposal(makeProposal(), null, 1000);
+    // Activation now happens at a clock AFTER the block's start date — a
+    // future-dated block waits as a pending activation (audit M16).
+    activateProposal(makeProposal(), null, JUL6);
     const local = getPlanState();
 
-    const older = { ...local, updatedAt: 500, plans: [] };
+    const older = { ...local, updatedAt: local.updatedAt - 1, plans: [] };
     expect(mergeServerPlanState(older)).toBe(false);
     expect(getPlanState().plans).toHaveLength(1);
 
@@ -323,5 +325,71 @@ describe('reconcileActiveProgram (self-heal a wiped live program)', () => {
   it('is a no-op with no active block', () => {
     expect(reconcileActiveProgram()).toBe(false);
     expect(getStoredProgram()).toHaveLength(0);
+  });
+});
+
+
+// ── Phase 3: block provenance, pending rule, coach decisions (audit H2, M16) ──
+
+import { getCoachDecisions, recordCoachDecision, getLatestCompletedBlock } from './planStore';
+
+describe('finishing the week on the previous workouts — only undoes an activation', () => {
+  it('never reactivates a block the user wrapped up deliberately', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    completeActiveBlock(makeRetro('x'), JUL6 - 10 * 86_400_000);       // user wrap-up
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000);
+    expect(canDeferActiveBlock()).toBe(false);
+    expect(deferActiveBlockToNextWeek(JUL6 + 2 * 86_400_000)).toBe(false);
+    const wrapped = getPlanState().plans.flatMap(p => p.blocks).find(b => b.completedBy === 'user')!;
+    expect(wrapped.status).toBe('completed');
+    expect(wrapped.retrospective).toBeDefined();
+  });
+
+  it('refuses while another block is already queued, instead of overwriting it', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000); // closes B1 by activation
+    activateProposal(makeProposal({ startDate: '2026-08-03' }), null, JUL6 + 3 * 86_400_000); // queued
+    expect(getPlanState().pendingActivation).toBeDefined();
+    expect(canDeferActiveBlock()).toBe(false);
+  });
+
+  it('restores the LIVE program the activation replaced, edits included', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    const edited = [...getStoredProgram(), { id: 99, label: 'My extra day', muscleGroups: 'Arms', exercises: [{ id: 'hammer-curls', name: 'Hammer Curls', sets: 3, repLow: 10, repHigh: 12 }] }];
+    saveStoredProgram(edited);
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000);
+    expect(canDeferActiveBlock()).toBe(true);
+    expect(deferActiveBlockToNextWeek(JUL6 + 2 * 86_400_000)).toBe(true);
+    expect(getStoredProgram().some(d => d.id === 99)).toBe(true);
+    expect(getPlanState().pendingActivation?.block.startDate).toBe('2026-07-13');
+  });
+});
+
+describe('activation is one-directional: a future start always waits', () => {
+  it('queues a future-dated block even when nothing is running', () => {
+    const r = activateProposal(makeProposal({ startDate: '2026-07-13' }), null, JUL6);
+    expect(r.started).toBe(false);
+    expect(getActiveBlockInfo()).toBeNull();
+    expect(getPlanState().pendingActivation?.block.startDate).toBe('2026-07-13');
+    expect(getActivePhase(JUL6)).toBeNull();
+  });
+
+  it('installs immediately when the start date is today or past', () => {
+    const r = activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6);
+    expect(r.started).toBe(true);
+    expect(getActiveBlockInfo()).not.toBeNull();
+  });
+});
+
+describe('coach decisions live on the active block', () => {
+  it('records accept/decline per adjustment, latest answer wins, and resets with the block', () => {
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6);
+    expect(getCoachDecisions()).toEqual([]);
+    recordCoachDecision('1:bench:add-set', false, JUL6 + 1);
+    recordCoachDecision('1:bench:add-set', true, JUL6 + 2);
+    expect(getCoachDecisions()).toEqual([{ key: '1:bench:add-set', accepted: true, at: JUL6 + 2 }]);
+    completeActiveBlock(makeRetro('x'), JUL6 + 10);
+    expect(getCoachDecisions()).toEqual([]);
+    expect(getLatestCompletedBlock()?.coachDecisions).toHaveLength(1);
   });
 });

@@ -16,7 +16,7 @@
 import type { TrainingSnapshot } from './analytics';
 import { sessionTimestamp } from './analytics';
 import { exercisePointSeries } from './progress';
-import { difficultyFor } from './exercises';
+import { difficultyFor, hasCatalogDifficulty } from './exercises';
 import { DIFFICULTY_RANK } from './exercises';
 import type { ExperienceLevel, TrainingProfile } from './plan';
 import { experienceLabel } from './plan';
@@ -45,44 +45,61 @@ export function inferExperience(snapshot: TrainingSnapshot, now = Date.now()): E
   const timestamps = snapshot.sessions.map(sessionTimestamp);
   const weeks = Math.max(1, Math.round((now - Math.min(...timestamps)) / WEEK_MS));
 
-  // Per-exercise session counts → consistency by difficulty tier.
+  // Per-exercise session counts → consistency by difficulty tier. Only ids the
+  // catalog has classified count: a custom exercise defaults to intermediate
+  // for selection, but that default is not evidence about the athlete.
   let masteredAdvanced = 0;
-  let masteredIntermediatePlus = 0;
   for (const [id, points] of exercisePointSeries(snapshot)) {
-    if (points.length < CONSISTENT_SESSIONS) continue;
-    const rank = DIFFICULTY_RANK[difficultyFor(id)];
-    if (rank >= DIFFICULTY_RANK.advanced) masteredAdvanced++;
-    if (rank >= DIFFICULTY_RANK.intermediate) masteredIntermediatePlus++;
+    if (points.length < CONSISTENT_SESSIONS || !hasCatalogDifficulty(id)) continue;
+    if (DIFFICULTY_RANK[difficultyFor(id)] >= DIFFICULTY_RANK.advanced) masteredAdvanced++;
   }
 
-  // Ratchet up through the tiers. Advanced needs real training age AND either a
-  // long history or demonstrated mastery of multiple advanced lifts.
+  // Training AGE is the gate, with session counts as the consistency check.
+  // "Intermediate" means roughly six months of consistent training and
+  // "advanced" a year and a half — anyone who squats and deadlifts for ten
+  // weeks is not advanced, and a true newcomer is not intermediate in week 4
+  // because hip thrusts carry an intermediate tag.
   let level: ExperienceLevel = 'beginner';
   let rationale = 'Still building a base — early days.';
 
-  if ((sessions >= 12 && weeks >= 8) || (masteredIntermediatePlus > 0 && sessions >= 8)) {
+  if (weeks >= INTERMEDIATE_WEEKS && sessions >= INTERMEDIATE_SESSIONS) {
     level = 'intermediate';
-    rationale = masteredIntermediatePlus > 0
-      ? `You've logged ${sessions} sessions and are consistently training compound lifts — that's intermediate territory.`
-      : `You've trained consistently for ${weeks} weeks across ${sessions} sessions.`;
+    rationale = `You've trained consistently for ${Math.round(weeks / 4.33)} months across ${sessions} sessions — that's intermediate territory.`;
   }
 
-  if ((weeks >= 52 && sessions >= 50) || (masteredAdvanced >= 2 && sessions >= 30)) {
+  if (
+    (weeks >= ADVANCED_WEEKS && sessions >= ADVANCED_SESSIONS) ||
+    (masteredAdvanced >= 3 && weeks >= ADVANCED_MASTERY_WEEKS && sessions >= ADVANCED_MASTERY_SESSIONS)
+  ) {
     level = 'advanced';
-    rationale = masteredAdvanced >= 2
-      ? `You're consistently handling ${masteredAdvanced} advanced lifts over ${sessions} sessions — that's an advanced training history.`
-      : `Over a year of training and ${sessions} logged sessions — an advanced base.`;
+    rationale = masteredAdvanced >= 3
+      ? `You've been consistently handling ${masteredAdvanced} advanced lifts across ${Math.round(weeks / 4.33)} months and ${sessions} sessions — an advanced training history.`
+      : `${Math.round(weeks / 52)} year${weeks >= 104 ? 's' : ''} of training and ${sessions} logged sessions — an advanced base.`;
   }
 
   return { level, sessions, weeks, masteredAdvanced, rationale };
 }
 
-/** The level to plan with: never below what the athlete told us about themselves. */
-export function effectiveExperience(profile: TrainingProfile, snapshot: TrainingSnapshot | null): ExperienceLevel {
-  const self = profile.experience;
-  if (!snapshot) return self;
-  const inferred = inferExperience(snapshot).level;
-  return DIFFICULTY_RANK[inferred] > DIFFICULTY_RANK[self] ? inferred : self;
+// Gates for the inference. Months, not sessions, are what the literature keys
+// progression rate to; the session counts stop a sparse year from counting.
+export const INTERMEDIATE_WEEKS = 26;
+export const INTERMEDIATE_SESSIONS = 40;
+export const ADVANCED_WEEKS = 78;
+export const ADVANCED_SESSIONS = 120;
+const ADVANCED_MASTERY_WEEKS = 52;
+const ADVANCED_MASTERY_SESSIONS = 80;
+
+/**
+ * The level the engines plan and prescribe with: what the athlete SAID. The
+ * inference feeds the Journey's "level up" nudge only — it never changes what
+ * the engines use until the user accepts it. Before this it did
+ * (max(self-report, inferred)), and a newcomer lost the beginner protections
+ * in week four on the strength of a hip-thrust tag. The snapshot parameter is
+ * kept so callers don't change; it is unused.
+ */
+export function effectiveExperience(profile: TrainingProfile, _snapshot: TrainingSnapshot | null): ExperienceLevel {
+  void _snapshot;
+  return profile.experience;
 }
 
 export interface ExperienceSuggestion {

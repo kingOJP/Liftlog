@@ -1,6 +1,6 @@
 import type { Exercise } from './program';
 import type { WeightType, MeasureUnit } from './taxonomy';
-import type { ExperienceLevel, Goal, PhaseKind } from './plan';
+import type { ExperienceLevel, Goal, PhaseKind, PhaseResolver } from './plan';
 import { isEasyPhase } from './plan';
 import { epley1RM } from './analytics';
 import {
@@ -146,6 +146,8 @@ export interface PrescriptionContext {
   unit?: MeasureUnit;
   /** For the weekly rate cap; defaults to now */
   now?: number;
+  /** which planned phase governed a past session (planStore.getPhaseResolver) */
+  phaseOf?: PhaseResolver | null;
 }
 
 // How many recent sessions at the same weight without progress on either lever
@@ -718,6 +720,18 @@ export function calculateRecommendation(
   // reduced volume); race week is deliberately much lighter than that — the
   // session exists to move, not to train.
   if (isEasyPhase(phase ?? null)) {
+    // A lift whose only session was logged IN this intro week has no working
+    // weight to back off from: that session was itself the easy first
+    // exposure, and 80% of it on the second visit is a wall of red "↓" chips
+    // for doing exactly what was asked. Repeat it.
+    const firstExposure = phase === 'intro' && !countProgressed
+      && baseline.every(h => isEasyPhase(ctx.phaseOf?.(h.completedAt) ?? null));
+    if (firstExposure) {
+      return withContext({
+        weight, direction: 'hold', kind: 'hold',
+        reason: 'Intro week — repeat the easy weight from your first session; the point is a second clean exposure, not a lighter one',
+      });
+    }
     const easy = phase === 'deload'
       ? 'Planned deload week — ~10% lighter, crisp reps, let fatigue drain'
       : phase === 'race-week'
@@ -742,11 +756,17 @@ export function calculateRecommendation(
     // When the load has been re-anchored to a new rep range, that is the weight
     // the easy week backs off FROM — the old one was answering a question this
     // block is no longer asking.
+    // Intro and recovery weeks are measured against the heaviest RECENT
+    // working weight, not the last session: an intro week follows an intro
+    // week, a recovery week can follow a deload, and backing off from a
+    // session that was itself backed off compounds (90% of 90% is 20% under
+    // in a fortnight). A deload is different and correctly relative to the
+    // last session: it exists to shed fatigue from where you currently are.
     const introBase = reanchor
       ? reanchor.weight
-      : phase === 'intro'
-        ? Math.max(...baseline.map(h => workingWeight(h.sets)), weight)
-        : weight;
+      : phase === 'deload'
+        ? weight
+        : Math.max(...baseline.map(h => workingWeight(h.sets)), weight);
     if (countProgressed) {
       return { weight: 0, targetReps: ex.repLow, direction: 'down', kind: 'deload', reason: easy };
     }
@@ -879,7 +899,12 @@ export function calculateRecommendation(
   // and the objective is retaining muscle, not chasing loading PRs.
   const priorBest = bestWorkAt(baseline.slice(1), weight, ex);
   const rangeTopped = credited.best >= ex.repHigh;
-  if (fullSetCount && rangeTopped && (priorBest == null || repTotal >= priorBest)) {
+  // A beginner's path is linear progression: every set at the ceiling IS the
+  // signal, whatever an earlier session at this load managed. Waiting for a
+  // best-ever total left the Newcomer's prescribed loads 25–44% behind their
+  // capacity after a quarter.
+  const beginnerCeiling = experience === 'beginner' && fullSetCount && credited.sets.every(s => s.reps >= ex.repHigh);
+  if (fullSetCount && rangeTopped && (beginnerCeiling || priorBest == null || repTotal >= priorBest)) {
     const jump = goal === 'fat-loss'
       ? step
       : sizedIncrement(weight, avgReps, ex.repLow, step);

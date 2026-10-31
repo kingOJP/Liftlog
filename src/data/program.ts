@@ -19,6 +19,12 @@ export interface Exercise {
    */
   repLow?: number;
   repHigh?: number;
+  /**
+   * The day's heavy anchor (set by the planner from its slot template). Main
+   * lifts are protected: the volume caps trim them last and never below three
+   * sets, and a strength plan never rotates one for a lighter variant.
+   */
+  main?: boolean;
   archived?: boolean;
 }
 

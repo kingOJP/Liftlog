@@ -6,18 +6,18 @@ import type { MuscleGroup } from '../data/taxonomy';
 import {
   GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS,
   ENDURANCE_LOADS, DISCIPLINES, RACE_PROXIMITY, defaultSportContext,
-  nextMonday, parsePlanDate, experienceLabel,
+  nextMonday, parsePlanDate, experienceLabel, INJURY_AREAS, blockEnded,
 } from '../data/plan';
 import type {
   Goal, ExperienceLevel, EquipmentAccess, TrainingProfile,
-  SportId, SportEvent, EnduranceLoad, Discipline, SportContext, RaceProximity,
+  SportId, SportEvent, EnduranceLoad, Discipline, SportContext, RaceProximity, InjuryArea,
 } from '../data/plan';
 import { SPORTS, sportLabel, eventsFor, defaultEventFor, nigglesFor } from '../data/sports';
 import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
 import {
   activateProposal, getActiveBlockInfo, getLatestRetrospective,
-  getProfileOrDefault, getActivePlan, saveTrainingProfile,
+  getProfileOrDefault, getActivePlan, saveTrainingProfile, getPhaseResolver, getLatestCompletedBlock,
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
@@ -121,9 +121,14 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [daysPerWeek, setDaysPerWeek] = useState(saved.daysPerWeek);
   const [equipment, setEquipment] = useState<EquipmentAccess>(saved.equipment);
   const [injuries, setInjuries] = useState(saved.injuries);
+  const [injuryAreas, setInjuryAreas] = useState<InjuryArea[]>(saved.injuryAreas ?? []);
   const [priorityMuscles, setPriorityMuscles] = useState<MuscleGroup[]>(saved.priorityMuscles);
   const [weeks, setWeeks] = useState(defaultBlockWeeks());
   const [includeDeload, setIncludeDeload] = useState(saved.experience !== 'beginner');
+  // The deload default follows the experience answered in THIS run of the
+  // wizard (an advanced lifter's first block arrived with it unchecked because
+  // the default read the not-yet-saved profile) — until the user touches it.
+  const deloadTouched = useRef(false);
   const [startDate, setStartDate] = useState(nextMonday());
 
   // Sport-support answers
@@ -179,8 +184,18 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   }, [activeInfo, snapshot]);
 
   const [openWithRecovery] = useState(() => {
+    // A recovery opener follows a block that just ENDED. A mid-block replan
+    // (the user re-planning while a block is still running) is a continuation,
+    // not a return from a break.
     const latest = getLatestRetrospective();
-    return latest != null && Date.now() - latest.to < 21 * 86_400_000;
+    const running = getActiveBlockInfo();
+    const midBlock = running != null && !blockEnded(running.block) && !running.block.openEnded;
+    // ...and not when the block just closed ON its deload: a recovery week
+    // right after a deload week is two easy weeks back to back, each backing
+    // off from the last — 20% off by the time training resumes.
+    const previous = running?.block ?? getLatestCompletedBlock();
+    const endedOnDeload = previous?.phases.at(-1) === 'deload';
+    return !midBlock && !endedOnDeload && latest != null && Date.now() - latest.to < 21 * 86_400_000;
   });
 
   const startDateValid = parsePlanDate(startDate) != null;
@@ -226,6 +241,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   function buildProfile(): TrainingProfile {
     return {
       injuries: injuries.trim(),
+      injuryAreas,
       equipment,
       daysPerWeek,
       experience,
@@ -250,11 +266,12 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       equipmentAccess: equipment,
       priorityMuscles,
       injuries: injuries.trim(),
+      injuryAreas,
       // A goal change is one of the things that earns an introductory week.
       previousGoal: activeGoal ?? null,
       ...(goal === 'sport-support' ? { sport: sportContext() } : {}),
     };
-    const p = buildPlanProposal(input, program, snapshot, plannerRetro);
+    const p = buildPlanProposal(input, program, snapshot, plannerRetro, getPhaseResolver());
     setProposal(p);
     setDays(p.days.map(d => ({ ...d, exercises: [...d.exercises] })));
     setDecisions(new Map(p.decisions.map(d => [`${d.dayId}:${d.exerciseId}`, d])));
@@ -529,9 +546,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       || id === 'sportWeeks';
   }
   function canContinue(): boolean {
-    if (qId === 'startDate') return startDateValid && snapshotReady;
-    if (qId === 'schedule') return true;
-    return true;
+    return qId !== 'startDate' || (startDateValid && snapshotReady);
   }
 
   function renderQuestion() {
@@ -554,7 +569,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
             <div className="opt-list">
               {EXPERIENCE_LEVELS.map(x => (
                 <OptionCard key={x.id} active={experience === x.id} label={x.label} blurb={x.blurb}
-                  onClick={() => pick(setExperience, x.id)} />
+                  onClick={() => {
+                    if (!deloadTouched.current) setIncludeDeload(x.id !== 'beginner');
+                    pick(setExperience, x.id);
+                  }} />
               ))}
             </div>
             {inferred && experienceRank(inferred.level) > experienceRank(experience) && (
@@ -610,16 +628,36 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
 
       case 'injuries':
         return (
-          <Question title="Any injuries or movements to avoid?" subtitle="Tell the coach in plain words — it'll route around them." optional>
+          <Question title="Any injuries or movements to avoid?" subtitle="Tap what's bothering you — each one routes the plan around it. Add detail below if it helps." optional>
+            <div className="chip-grid">
+              {INJURY_AREAS.map(a => {
+                const active = injuryAreas.includes(a.id);
+                return (
+                  <button key={a.id}
+                    className={`setup-chip${active ? ' setup-chip--active' : ''}`}
+                    title={a.blurb}
+                    aria-pressed={active}
+                    onClick={() => setInjuryAreas(prev => (active ? prev.filter(x => x !== a.id) : [...prev, a.id]))}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+            {injuryAreas.length > 0 && (
+              <ul className="setup-constraints">
+                {INJURY_AREAS.filter(a => injuryAreas.includes(a.id)).map(a => (
+                  <li key={a.id}><strong>{a.label}:</strong> {a.blurb}</li>
+                ))}
+              </ul>
+            )}
             <textarea
               className="setup-notes wizard-textarea"
-              rows={4}
-              placeholder="e.g. “left knee pain on squats”, “bad lower back”, “sore right shoulder overhead”…"
+              rows={3}
+              placeholder="Anything else, in your own words — e.g. “left knee only on deep squats”…"
               value={injuries}
               onChange={e => setInjuries(e.target.value)}
-              autoFocus
             />
-            <p className="setup-hint">Leave blank if nothing's bothering you.</p>
+            <p className="setup-hint">Leave this empty if nothing's bothering you.</p>
           </Question>
         );
 
@@ -654,7 +692,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
               ))}
             </div>
             <label className="setup-toggle">
-              <input type="checkbox" checked={includeDeload} onChange={e => setIncludeDeload(e.target.checked)} />
+              <input type="checkbox" checked={includeDeload} onChange={e => { deloadTouched.current = true; setIncludeDeload(e.target.checked); }} />
               <span>End with a deload (recovery) week</span>
             </label>
             {experience === 'beginner' && (

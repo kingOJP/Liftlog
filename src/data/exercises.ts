@@ -303,6 +303,18 @@ export function difficultyFor(id: string): ExerciseDifficulty {
 }
 
 /**
+ * Whether the catalog actually says anything about this exercise's skill
+ * tier. `difficultyFor` defaults unknown ids to intermediate for SELECTION
+ * purposes; anything that reads difficulty as EVIDENCE about the athlete
+ * (experience inference) must only count ids the catalog has classified —
+ * eight sessions of a custom band movement are not "compound lifts".
+ */
+export function hasCatalogDifficulty(id: string): boolean {
+  const def = catalogDefFor(id);
+  return def != null && DIFFICULTY[def.id] != null;
+}
+
+/**
  * How a set of this exercise is counted. Intrinsic to the movement (a plank is
  * held, a squat is repeated), so it lives in the app-owned catalog beside
  * difficulty rather than in the user-editable metadata layer. Unknown/custom

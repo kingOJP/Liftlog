@@ -39,10 +39,6 @@ export const GOALS: { id: Goal; label: string; blurb: string }[] = [
   { id: 'general',       label: 'General Fitness',      blurb: 'Balanced full-body training you can sustain for years' },
 ];
 
-export const ALL_GOALS: Goal[] = [
-  'hypertrophy', 'strength', 'fat-loss', 'athletic', 'general', 'sport-support',
-];
-
 export function goalLabel(goal: Goal): string {
   return GOALS.find(g => g.id === goal)?.label ?? goal;
 }
@@ -168,10 +164,27 @@ export interface TrainingProfile {
   trainingAgeMonths?: number;
   /** weak points / muscles to bias volume toward */
   priorityMuscles: MuscleGroup[];
+  /**
+   * Structured injury areas picked in the wizard (knee, shoulder, lower-back,
+   * …) — the hard-constraint path the planner can act on without parsing
+   * prose. The free-text `injuries` is a supplement, parsed conservatively.
+   */
+  injuryAreas?: InjuryArea[];
   /** present once the athlete has planned a 'sport-support' block */
   sport?: SportContext;
   updatedAt: number;
 }
+
+export type InjuryArea = 'knee' | 'shoulder' | 'lower-back' | 'hip' | 'elbow' | 'wrist';
+
+export const INJURY_AREAS: { id: InjuryArea; label: string; blurb: string }[] = [
+  { id: 'knee',       label: 'Knee',       blurb: 'No squats, lunges or leg extensions; pressing and hinging carry the legs' },
+  { id: 'shoulder',   label: 'Shoulder',   blurb: 'No overhead pressing or dips; horizontal pressing and raises stay' },
+  { id: 'lower-back', label: 'Lower back', blurb: 'No barbell hinges or squats; supported machine work covers the posterior chain' },
+  { id: 'hip',        label: 'Hip',        blurb: 'No deep lunging or heavy hinging; machines and hip thrusts carry it' },
+  { id: 'elbow',      label: 'Elbow',      blurb: 'No skull-crushers or dips; cable pressdowns and neutral-grip pulls stay' },
+  { id: 'wrist',      label: 'Wrist',      blurb: 'No barbell pressing or wrist curls; neutral-grip and machine work instead' },
+];
 
 export function defaultTrainingProfile(): TrainingProfile {
   return {
@@ -236,7 +249,33 @@ export interface TrainingBlock {
   status: 'pending' | 'active' | 'completed';
   activatedAt: number;
   completedAt?: number;
+  /**
+   * How the block ended: closed automatically because another block was
+   * activated over it, or wrapped up by the user. Only an 'activation' close
+   * may be undone by "finish the week on the previous workouts".
+   */
+  completedBy?: 'activation' | 'user';
+  /** the block this one replaced when it was activated (for the undo path) */
+  replacedBlockId?: string;
+  /** the LIVE program at activation time — what the undo path restores (it may
+   *  carry edits the replaced block's own snapshot does not) */
+  replacedProgram?: WorkoutDay[];
+  /** the experience level the block was planned at (sets its volume band) */
+  experience?: ExperienceLevel;
   retrospective?: BlockRetrospective;
+  /**
+   * The user's answers to the in-block coach's set adjustments, keyed by
+   * `${dayId}:${exerciseId}:${kind}`. Accepted ones keep applying; declined ones
+   * stop being proposed for the rest of the block. The stored program itself is
+   * never mutated — this is the overlay's memory, synced with the journey.
+   */
+  coachDecisions?: CoachDecision[];
+}
+
+export interface CoachDecision {
+  key: string;
+  accepted: boolean;
+  at: number;
 }
 
 export interface TrainingPlan {

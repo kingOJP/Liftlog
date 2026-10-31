@@ -28,9 +28,9 @@ import type { ExerciseProfile } from './substitution';
 import { candidateProfiles, profileFor } from './substitution';
 import { DIFFICULTY_RANK } from './exercises';
 import type {
-  Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel, SportContext,
+  Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel, SportContext, InjuryArea, PhaseResolver,
 } from './plan';
-import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_OPENER_WEEKS } from './plan';
+import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_OPENER_WEEKS, isEasyPhase } from './plan';
 import { dosage } from './dosage';
 import type { Slot, DayTemplate } from './sports';
 import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
@@ -55,6 +55,8 @@ export interface PlannerInput {
   priorityMuscles?: MuscleGroup[];
   /** injuries/limitations — parsed alongside notes into hard constraints */
   injuries?: string;
+  /** structured injury areas from the wizard's chips — hard constraints, no parsing */
+  injuryAreas?: InjuryArea[];
   /** required for goal 'sport-support' — the sport is a hard constraint */
   sport?: SportContext;
   /** the active plan's goal, when there is one — a change earns an intro week */
@@ -137,32 +139,81 @@ export function parseGuidance(raw: string): Guidance {
     }
   }
 
-  const hurt = '(pain|injur\\w*|hurt\\w*|issue|problem|tweak\\w*|surgery)';
-  const near = '[^.,;!?]{0,30}';
-  if (new RegExp(`knee${near}${hurt}|${hurt}${near}knee`).test(text)) {
-    g.avoidPatterns.add('Squat');
-    g.avoidPatterns.add('Lunge');
-    g.avoidPatterns.add('Leg Extension');
-    g.notes.push('Knee issue noted — squats, lunges and leg extensions are out; pressing and hinging carry the legs. Start lighter than feels necessary.');
+  // Injuries are read CLAUSE by clause (split on punctuation and "but"/"and"),
+  // because a body part and a complaint in the same sentence are not enough:
+  //   "my shoulder hurts when I do back squats" names a shoulder, not a back
+  //   "no knee problems, but my elbow hurts" names a knee that is fine
+  //   "knee surgery 10 years ago, fully recovered" names a knee that healed
+  // Lift names that contain a body part are stripped first, a negated or
+  // recovered clause is skipped, and the complaint vocabulary includes the
+  // words people actually use ("sore right shoulder overhead" is the wizard's
+  // own placeholder, and "sore" was not in the list).
+  const liftNames = /\b(back|front|box|goblet|hack|split|bulgarian split|pistol|zercher|overhead|pause[d]?)\s+squats?\b|\bback\s+extensions?\b|\bhip\s+thrusts?\b|\bshoulder\s+press(es)?\b|\bknee\s+(push|drive|raise)s?\b/g;
+  const hurt = /\b(pain(ful|s)?|injur\w*|hurt\w*|issues?|problems?|tweak\w*|surgery|sore(ness)?|tight(ness)?|ach(e|es|ing|y)|niggl\w*|strain\w*|tendi?n[io]tis|impingement|bad|dodgy|weak|cranky|flare\w*|bother\w*)\b/;
+  const negated = /\b(no|not|never|without|free of|recovered|fully|healed|fine now|ok now|okay now|better now|used to|years? ago|months? ago|ages ago|no longer)\b/;
+  const clauses = text
+    .replace(liftNames, m => (m.includes('squat') ? 'squat' : m.includes('extension') ? 'extension' : m.includes('thrust') ? 'thrust' : m.includes('press') ? 'press' : 'drill'))
+    .split(/[.,;!?\n]|\bbut\b|\band\b|\bhowever\b/);
+
+  const flagged = new Set<'knee' | 'shoulder' | 'back' | 'hip' | 'elbow' | 'wrist'>();
+  for (const clause of clauses) {
+    if (!hurt.test(clause) || negated.test(clause)) continue;
+    if (/\bknees?\b|\bpatell\w*\b|\bitb\b|\bit band\b/.test(clause)) flagged.add('knee');
+    if (/\bshoulders?\b|\brotator\b|\bcuff\b/.test(clause)) flagged.add('shoulder');
+    if (/\b(lower|low)\s+back\b|\blumbar\b|\bback\b|\bsciatic\w*\b|\bdisc\b/.test(clause)) flagged.add('back');
+    if (/\bhips?\b|\bgroin\b|\bsi joint\b/.test(clause)) flagged.add('hip');
+    if (/\belbows?\b|\btennis elbow\b|\bgolfer'?s elbow\b/.test(clause)) flagged.add('elbow');
+    if (/\bwrists?\b|\bcarpal\b/.test(clause)) flagged.add('wrist');
   }
-  if (new RegExp(`shoulder${near}${hurt}|${hurt}${near}shoulder`).test(text)) {
-    g.avoidPatterns.add('Dip');
-    // Pattern-based, not name-based — catches every vertical press
-    // regardless of naming (e.g. "Machine Shoulder Press" has no "overhead"
-    // in its name, so a name-substring filter alone would miss it).
-    g.avoidPatterns.add('Vertical Press');
-    g.notes.push('Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay.');
-  }
-  if (new RegExp(`(lower\\s+)?back${near}${hurt}|${hurt}${near}(lower\\s+)?back\\b`).test(text)) {
-    g.avoidPatterns.add('Hip Hinge');
-    g.avoidPatterns.add('Squat');
-    g.notes.push('Lower-back issue noted — barbell hinges and squats are out; supported machine work covers the posterior chain.');
-  }
+  if (flagged.has('knee')) applyInjuryArea(g, 'knee');
+  if (flagged.has('shoulder')) applyInjuryArea(g, 'shoulder');
+  if (flagged.has('back')) applyInjuryArea(g, 'lower-back');
+  if (flagged.has('hip')) applyInjuryArea(g, 'hip');
+  if (flagged.has('elbow')) applyInjuryArea(g, 'elbow');
+  if (flagged.has('wrist')) applyInjuryArea(g, 'wrist');
 
   if (g.notes.length === 0) {
     g.notes.push('Notes saved with the plan — review the workouts below and swap anything that doesn\'t fit.');
   }
   return g;
+}
+
+/** The constraint each structured injury area imposes — one place, shared by chips and prose. */
+export function applyInjuryArea(g: Guidance, area: InjuryArea): void {
+  const add = (patterns: MovementPattern[], names: string[], note: string) => {
+    for (const p of patterns) g.avoidPatterns.add(p);
+    for (const n of names) if (!g.avoidNameParts.includes(n)) g.avoidNameParts.push(n);
+    if (!g.notes.includes(note)) g.notes.push(note);
+  };
+  switch (area) {
+    case 'knee':
+      add(['Squat', 'Lunge', 'Leg Extension', 'Jump'], [],
+        'Knee issue noted — squats, lunges, jumps and leg extensions are out; pressing and hinging carry the legs. Start lighter than feels necessary.');
+      break;
+    case 'shoulder':
+      // Pattern-based, not name-based — catches every vertical press
+      // regardless of naming (e.g. "Machine Shoulder Press" has no "overhead"
+      // in its name, so a name-substring filter alone would miss it).
+      add(['Dip', 'Vertical Press'], [],
+        'Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay.');
+      break;
+    case 'lower-back':
+      add(['Hip Hinge', 'Squat'], ['good morning'],
+        'Lower-back issue noted — barbell hinges and squats are out; supported machine work covers the posterior chain.');
+      break;
+    case 'hip':
+      add(['Lunge', 'Hip Hinge'], ['bulgarian', 'pistol'],
+        'Hip issue noted — no deep lunging or heavy hinging; machines and hip thrusts carry the lower body.');
+      break;
+    case 'elbow':
+      add(['Dip'], ['skull', 'close-grip', 'close grip', 'preacher'],
+        'Elbow issue noted — no skull-crushers, dips or close-grip pressing; cable pressdowns and neutral-grip pulls stay.');
+      break;
+    case 'wrist':
+      add([], ['wrist curl', 'barbell bench', 'barbell overhead', 'front squat', 'push-up', 'push up'],
+        'Wrist issue noted — no barbell pressing, push-ups or wrist curls; neutral-grip dumbbell and machine work instead.');
+      break;
+  }
 }
 
 // Structured equipment access → the same constraint shape. Applied on top of
@@ -292,12 +343,16 @@ function splitFor(
       { muscle: 'Abs',        patterns: ['Crunch'] },
     ],
   };
+  // Day C repeats A's two big compounds (A/B/A frequency on the movements
+  // that matter most) and varies the accessories. The split's own rationale
+  // says "you practise the big movements often"; with every day disjoint, a
+  // beginner's squat was trained once a week.
   const fullC: DayTemplate = {
     title: 'Full Body C',
     slots: [
-      { muscle: 'Quads',      patterns: ['Leg Press', 'Lunge', 'Squat'], main: true },
-      { muscle: 'Chest',      patterns: ['Fly', 'Horizontal Press'] },
-      { muscle: 'Upper Back', patterns: ['Row'] },
+      { muscle: 'Quads',      patterns: ['Squat', 'Leg Press', 'Lunge'], mechanics: 'compound', main: true, reuse: true },
+      { muscle: 'Chest',      patterns: ['Horizontal Press', 'Fly'], main: true, reuse: true },
+      { muscle: 'Upper Back', patterns: ['Row'], reuse: true },
       { muscle: 'Glutes',     patterns: ['Hip Thrust'] },
       { muscle: 'Triceps',    patterns: ['Tricep Extension', 'Dip'] },
     ],
@@ -489,7 +544,9 @@ export function buildPhases(
   const warnings: string[] = [];
   const weeks = Math.min(12, Math.max(3, Math.round(input.weeks)));
 
-  const introWeeks = Math.min(intro.weeks, MAX_OPENER_WEEKS, Math.max(0, weeks - 3));
+  // A 3-week block still opens with its intro week (one intro + two hard);
+  // the previous `weeks - 3` floor silently dropped it for the shortest blocks.
+  const introWeeks = Math.min(intro.weeks, MAX_OPENER_WEEKS, Math.max(0, weeks - 2));
   const recovery = input.openWithRecovery ? 1 : 0;
   let deload = input.includeDeload ? 1 : 0;
   let productive = weeks - recovery - introWeeks - deload;
@@ -546,6 +603,8 @@ interface SelectCtx {
   experience: ExperienceLevel;
   byMuscle: Map<MuscleGroup, ExerciseProfile[]>;
   used: Set<string>;
+  /** exercises already placed in the day being built (reuse never repeats within a day) */
+  dayUsed: Set<string>;
   currentIds: Set<string>;
   trendUp: Set<string>;
   trendDown: Set<string>;
@@ -592,6 +651,8 @@ function scoreCandidate(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): number 
   }
   if (slot.mechanics) score += p.mechanics === slot.mechanics ? 6 : -6;
   if (ctx.currentIds.has(p.id)) score += ctx.review.has(p.id) ? -10 : 12;
+  // A reuse slot exists to repeat the movement already programmed this block
+  if (slot.reuse && ctx.used.has(p.id)) score += 30;
   if (ctx.keep.has(p.id)) score += 8;
   if (ctx.trendUp.has(p.id)) score += 10;
   if (ctx.trendDown.has(p.id)) score -= 12;
@@ -636,7 +697,7 @@ function reasonFor(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): string {
 
 function pickForSlot(slot: Slot, ctx: SelectCtx, guidance: Guidance): { profile: ExerciseProfile; reason: string } | null {
   let pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(
-    p => !ctx.used.has(p.id) && allowedByGuidance(p, guidance),
+    p => !ctx.dayUsed.has(p.id) && (slot.reuse || !ctx.used.has(p.id)) && allowedByGuidance(p, guidance),
   );
   if (pool.length === 0) return null;
 
@@ -686,18 +747,39 @@ function confidenceFor(snapshot: TrainingSnapshot | null, experience: Experience
 const MINUTES_PER_SET = 3;       // matches the coach planner's estimate
 const SESSION_OVERHEAD_MIN = 10;
 const LONG_SESSION_MIN = 95;
+const HOUR_SESSION_MIN = 65;    // "under an hour" splits, with the warm-up overhead
+const NO_MARATHON_MIN = 75;     // "no marathon sessions"
 const SPORT_SESSION_MIN = 55;   // a support session that outgrows this is defeating itself
 const MAX_VOLUME_TRIMS = 40;    // loop guard for the ceiling pass
+/** how many under-target muscles a retrospective may add a set to, per block */
+const MAX_RETRO_BUMPS = 3;
+/** weekly sets may grow by at most this share block over block */
+export const MAX_BLOCK_GROWTH = 0.25;
+
+/** The session length a split's own copy commits to. */
+export function sessionBudgetFor(splitName: string, goal: Goal, sport: boolean): number {
+  if (sport) return SPORT_SESSION_MIN;
+  if (splitName.startsWith('Upper / Lower')) return HOUR_SESSION_MIN;
+  if (splitName.includes('+') || goal === 'general') return NO_MARATHON_MIN;
+  return LONG_SESSION_MIN;
+}
 
 export function buildPlanProposal(
   input: PlannerInput,
   currentProgram: WorkoutDay[],
   snapshot: TrainingSnapshot | null,
   previousRetro: BlockRetrospective | null = null,
+  /** which planned phase governed each past session — keeps deload weeks out of the trends */
+  phaseOf: PhaseResolver | null = null,
 ): PlanProposal {
-  // Injuries and free-text notes are parsed together, then structured
-  // equipment access is layered on top.
+  // Injuries and free-text notes are parsed together, structured injury areas
+  // and equipment access are layered on top.
   const guidance = parseGuidance([input.notes, input.injuries ?? ''].join('. '));
+  for (const area of input.injuryAreas ?? []) applyInjuryArea(guidance, area);
+  if (guidance.notes.length > 1) {
+    const idx = guidance.notes.indexOf('Notes saved with the plan — review the workouts below and swap anything that doesn\'t fit.');
+    if (idx >= 0) guidance.notes.splice(idx, 1);
+  }
   applyEquipmentAccess(guidance, input.equipmentAccess);
 
   // Supporting another sport replaces the split wholesale: the sport registry
@@ -731,7 +813,7 @@ export function buildPlanProposal(
     for (const logs of snapshot.setsBySession.values()) {
       for (const l of logs) loggedIds.add(l.exerciseId);
     }
-    const directions = progressDirections(assessSnapshot(snapshot, input.goal));
+    const directions = progressDirections(assessSnapshot(snapshot, input.goal, () => true, phaseOf));
     trendUp = directions.up;
     trendDown = directions.down;
     for (const id of loggedIds) {
@@ -758,6 +840,7 @@ export function buildPlanProposal(
     experience: input.experience,
     byMuscle,
     used: new Set<string>(),
+    dayUsed: new Set<string>(),
     currentIds,
     trendUp,
     trendDown,
@@ -776,6 +859,7 @@ export function buildPlanProposal(
   split.days.forEach((template, i) => {
     const dayId = i + 1;
     const exercises: Exercise[] = [];
+    ctx.dayUsed = new Set<string>();
     for (const slot of template.slots) {
       const picked = pickForSlot(slot, ctx, guidance);
       if (!picked) {
@@ -783,8 +867,12 @@ export function buildPlanProposal(
         continue;
       }
       ctx.used.add(picked.profile.id);
+      ctx.dayUsed.add(picked.profile.id);
       const dose = doseFor(input.goal, slot, picked.profile, input.experience);
-      exercises.push({ id: picked.profile.id, name: picked.profile.name, ...dose });
+      exercises.push({
+        id: picked.profile.id, name: picked.profile.name, ...dose,
+        ...(slot.main ? { main: true } : {}),
+      });
       decisions.push({
         exerciseId: picked.profile.id,
         name: picked.profile.name,
@@ -826,9 +914,13 @@ export function buildPlanProposal(
   // retro's "add a set" and the priority-muscle bump are both skipped: they are
   // hypertrophy instincts, and here they would spend recovery the athlete's
   // sport has a prior claim on.
+  // The retro's +1 is capped at MAX_RETRO_BUMPS muscles per block: "0 of 12
+  // muscles in band" used to add a set to every one of them at once.
+  const bumped: Exercise[] = [];
   if (previousRetro && !sportPlan) {
-    for (const muscle of previousRetro.carryover.underMuscles) {
-      bumpSets(days, decisions, muscle, +1, `+1 set — ${muscle} finished last block under its weekly volume target.`);
+    for (const muscle of previousRetro.carryover.underMuscles.slice(0, MAX_RETRO_BUMPS)) {
+      const ex = bumpSets(days, decisions, muscle, +1, `+1 set — ${muscle} finished last block under its weekly volume target.`);
+      if (ex) bumped.push(ex);
     }
     for (const muscle of previousRetro.carryover.overMuscles) {
       bumpSets(days, decisions, muscle, -1, `−1 set — ${muscle} ran past the weekly ceiling last block; trimming protects recovery.`);
@@ -839,7 +931,28 @@ export function buildPlanProposal(
   // within the same guardrails — a targeted bias toward what they care about.
   if (!sportPlan) {
     for (const muscle of input.priorityMuscles ?? []) {
-      bumpSets(days, decisions, muscle, +1, `+1 set — you flagged ${muscle} as a priority, so it gets extra volume.`);
+      const ex = bumpSets(days, decisions, muscle, +1, `+1 set — you flagged ${muscle} as a priority, so it gets extra volume.`);
+      if (ex) bumped.push(ex);
+    }
+  }
+
+  // Block-over-block growth cap. A block is allowed to be bigger than the one
+  // it follows, but not by 60–70%: the retro bumps come back off (newest
+  // first) until weekly sets sit within MAX_BLOCK_GROWTH of the current
+  // program. A first plan has nothing to compare against.
+  const currentSets = currentProgram.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
+  const totalSets = () => days.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
+  if (currentSets > 0 && !sportPlan) {
+    let undone = 0;
+    while (totalSets() > currentSets * (1 + MAX_BLOCK_GROWTH) && bumped.length > 0) {
+      const ex = bumped.pop()!;
+      if (ex.sets > 2) { ex.sets -= 1; undone += 1; }
+    }
+    if (undone > 0) {
+      warnings.push(`Weekly volume is held within ${Math.round(MAX_BLOCK_GROWTH * 100)}% of your current block — ${undone} of the extra sets wait for the block after this one.`);
+    }
+    if (totalSets() > currentSets * (1 + MAX_BLOCK_GROWTH)) {
+      warnings.push(`This block carries ${Math.round((totalSets() / currentSets - 1) * 100)}% more weekly sets than your current one — a big step. Trim a set or two in the review below if the sessions run long.`);
     }
   }
 
@@ -853,7 +966,7 @@ export function buildPlanProposal(
   // Ceiling pass — last, so it sees every bump the retro and priority passes
   // made. A plan that starts over the ceiling is a plan the in-block coach will
   // spend the block undoing.
-  const band = volumeTargetFor(input.goal);
+  const band = volumeTargetFor(input.goal, input.experience);
   capWeeklyVolume(days, decisions, band);
 
   const weekly = projectWeeklySets(days);
@@ -868,15 +981,17 @@ export function buildPlanProposal(
     .map(([muscle, sets]) => ({ muscle, sets: Math.round(sets * 2) / 2 }))
     .sort((a, b) => b.sets - a.sets);
 
-  // Sport-support sessions have a much tighter budget: 40 minutes is the point,
-  // not a nice-to-have, because the session has to fit around training that
-  // matters more.
-  const sessionCap = sportPlan ? SPORT_SESSION_MIN : LONG_SESSION_MIN;
+  // Each split is held to the promise its own rationale makes: "under an
+  // hour" for upper/lower, "no marathon sessions" for the five-day blend and
+  // general fitness, and a sport-support session has to fit around training
+  // that matters more. A flat 95-minute line let an 82-minute "under an hour"
+  // day through without a word.
+  const sessionCap = sessionBudgetFor(split.name, input.goal, sportPlan != null);
   for (const day of days) {
     const setCount = day.exercises.reduce((s, e) => s + e.sets, 0);
     const est = SESSION_OVERHEAD_MIN + setCount * MINUTES_PER_SET;
     if (est > sessionCap) {
-      warnings.push(`Day ${day.id} projects ~${est} minutes — trim a set or drop an exercise if that doesn't fit your schedule.`);
+      warnings.push(`Day ${day.id} projects ~${est} minutes against the ~${sessionCap} this split promises — trim a set or drop an exercise if that doesn't fit your schedule.`);
     }
   }
 
@@ -905,21 +1020,28 @@ function bumpSets(
   muscle: MuscleGroup,
   delta: 1 | -1,
   note: string,
-): boolean {
+): Exercise | null {
   let best: Exercise | null = null;
   for (const day of days) {
     for (const ex of day.exercises) {
       if (profileFor(ex.id, ex.name).primaryMuscle !== muscle) continue;
       if (delta > 0 && ex.sets >= 5) continue;
-      if (delta < 0 && ex.sets <= 2) continue;
-      if (!best || (delta > 0 ? ex.sets < best.sets : ex.sets > best.sets)) best = ex;
+      // A main lift is trimmed last and never below three sets — the same floor
+      // the sport templates hold, so the two capping passes stop disagreeing.
+      if (delta < 0 && ex.sets <= (ex.main ? 3 : 2)) continue;
+      if (!best) { best = ex; continue; }
+      if (delta < 0) {
+        if ((best.main && !ex.main) || (best.main === ex.main && ex.sets > best.sets)) best = ex;
+      } else if (ex.sets < best.sets) {
+        best = ex;
+      }
     }
   }
-  if (!best) return false;
+  if (!best) return null;
   best.sets += delta;
   const d = decisions.find(dec => dec.exerciseId === best!.id);
   if (d) d.reason = `${d.reason} ${note}`;
-  return true;
+  return best;
 }
 
 /** Weekly hard sets per muscle for a program (primary 1, secondary 0.5). */
@@ -985,9 +1107,12 @@ function intentFor(input: PlannerInput, splitName: string, phases: PhaseKind[]):
   }
 
   const deload = phases[phases.length - 1] === 'deload';
+  const hard = phases.filter(p => !isEasyPhase(p)).length;
   const arc = deload
-    ? `build for ${weeks - (phases[0] === 'recovery' ? 2 : 1)} weeks, then deload and reassess`
-    : `build across all ${weeks} weeks, then roll straight into the next block`;
+    ? `build for ${hard} weeks, then deload and reassess`
+    : hard === weeks
+      ? `build across all ${weeks} weeks, then roll straight into the next block`
+      : `ease in, build for ${hard} weeks, then roll straight into the next block`;
   switch (input.goal) {
     case 'strength':
       return `${weeks} weeks aimed at moving more weight: ${splitName} keeps the big lifts fresh, loading climbs from volume work toward a heavy peak week, and assistance volume keeps joints and muscles resilient. The plan is to ${arc}.`;

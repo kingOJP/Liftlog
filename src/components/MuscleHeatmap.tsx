@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { MuscleGroup } from '../data/taxonomy';
 import type { TrainingSnapshot } from '../data/analytics';
 import { volumeTargetFor } from '../data/analytics';
-import { getTrainingGoal } from '../data/planStore';
+import { getTrainingGoal, getProfileOrDefault } from '../data/planStore';
 import { computeMuscleHeat, heatColor, heatLabel, presetWindow } from '../data/heatmap';
 import type { HeatPreset } from '../data/heatmap';
 import './MuscleHeatmap.css';
@@ -32,7 +32,7 @@ function fromDateInput(value: string, endOfDay = false): number {
 export default function MuscleHeatmap({ snapshot }: Props) {
   // The "on target" band belongs to the active goal — 6 weekly sets is on
   // target for a triathlete and well under it for a bodybuilder.
-  const band = volumeTargetFor(getTrainingGoal());
+  const band = volumeTargetFor(getTrainingGoal(), getProfileOrDefault().experience);
   const [preset, setPreset] = useState<HeatPreset>('30d');
   const [customFrom, setCustomFrom] = useState(() => toDateInput(Date.now() - 30 * 86_400_000));
   const [customTo, setCustomTo] = useState(() => toDateInput(Date.now()));

@@ -334,3 +334,26 @@
   border: 1px solid var(--red);
   border-radius: 8px;
 }
+
+/* Accept / decline a coach adjustment for the rest of the block */
+.coach-plan-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.coach-plan-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.coach-plan-btn--keep {
+  border-color: var(--purple);
+  color: var(--purple);
+}

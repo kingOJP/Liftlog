@@ -401,3 +401,74 @@ describe('the proposal respects the weekly volume ceiling', () => {
     }
   });
 });
+
+
+// ── Phase 3: the injury parser reads clauses, not keywords (audit M7, F10) ──
+
+describe('parseGuidance — benign sentences ban nothing', () => {
+  it('a shoulder complaint that mentions back squats is a shoulder, not a back', () => {
+    const g = parseGuidance('my shoulder hurts when I do back squats');
+    expect(g.avoidPatterns.has('Vertical Press')).toBe(true);
+    expect(g.avoidPatterns.has('Squat')).toBe(false);
+    expect(g.avoidPatterns.has('Hip Hinge')).toBe(false);
+  });
+
+  it('a negated knee is a fine knee', () => {
+    const g = parseGuidance('no knee problems, but my elbow hurts');
+    expect(g.avoidPatterns.has('Squat')).toBe(false);
+    expect(g.avoidPatterns.has('Dip')).toBe(true); // the elbow rule
+  });
+
+  it('a recovered injury is not a constraint', () => {
+    const g = parseGuidance('knee surgery 10 years ago, fully recovered');
+    expect(g.avoidPatterns.size).toBe(0);
+  });
+
+  it("understands the wizard's own placeholder", () => {
+    const g = parseGuidance('sore right shoulder overhead');
+    expect(g.avoidPatterns.has('Vertical Press')).toBe(true);
+  });
+
+  it('structured injury chips apply the same constraints without any prose', () => {
+    const p = buildPlanProposal({ ...input(), injuryAreas: ['shoulder'] }, [], null);
+    const ids = p.days.flatMap(d => d.exercises.map(e => e.id));
+    expect(ids).not.toContain('machine-shoulder-press');
+    expect(ids).not.toContain('barbell-overhead-press');
+    expect(p.guidanceNotes.join(' ')).toMatch(/Shoulder issue noted/);
+  });
+});
+
+describe('full-body blocks repeat the big movements (audit F7)', () => {
+  it('day C reuses day A\'s squat and press instead of inventing new ones', () => {
+    const p = buildPlanProposal({ ...input(), experience: 'beginner', daysPerWeek: 3 }, [], null);
+    const [a, , c] = p.days;
+    const aIds = new Set(a.exercises.map(e => e.id));
+    const shared = c.exercises.filter(e => aIds.has(e.id));
+    expect(shared.length).toBeGreaterThanOrEqual(2);
+    // ...but never twice within one day
+    for (const d of p.days) expect(new Set(d.exercises.map(e => e.id)).size).toBe(d.exercises.length);
+  });
+});
+
+describe('block-over-block volume growth is capped (audit F6)', () => {
+  it('holds a replan within a quarter more weekly sets than the current program', () => {
+    const first = buildPlanProposal({ ...input(), experience: 'beginner', daysPerWeek: 3 }, [], null);
+    const sets = (days: typeof first.days) => days.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
+    const retro = makeRetro({ underMuscles: ['Chest', 'Quads', 'Lats', 'Delts', 'Biceps', 'Triceps', 'Calves', 'Abs', 'Hamstrings', 'Glutes', 'Upper Back'] });
+    const second = buildPlanProposal({ ...input(), experience: 'beginner', daysPerWeek: 3, priorityMuscles: ['Biceps', 'Triceps'] }, first.days, null, retro);
+    expect(sets(second.days)).toBeLessThanOrEqual(sets(first.days) * 1.25 + 0.001);
+  });
+
+  it('judges a beginner against the beginner band', () => {
+    expect(volumeTargetFor('hypertrophy', 'beginner')).toEqual({ low: 6, high: 12 });
+    expect(volumeTargetFor('hypertrophy', 'intermediate')).toEqual({ low: 10, high: 20 });
+    expect(volumeTargetFor('sport-support', 'beginner')).toEqual({ low: 4, high: 10 });
+  });
+});
+
+describe('main lifts are marked and protected', () => {
+  it('flags the template anchors on the generated slots', () => {
+    const p = buildPlanProposal({ ...input(), daysPerWeek: 4 }, [], null);
+    for (const d of p.days) expect(d.exercises.some(e => e.main)).toBe(true);
+  });
+});

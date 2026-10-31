@@ -8,7 +8,7 @@ import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
 import type { MuscleGroup, MovementPattern } from './taxonomy';
 import { startOfWeek } from './program';
-import type { Goal } from './plan';
+import type { Goal, ExperienceLevel } from './plan';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
 import { getExerciseLibrary } from './programStore';
 
@@ -44,9 +44,21 @@ export const DEFAULT_VOLUME_TARGET: VolumeTarget = { low: SETS_TARGET_LOW, high:
  * fatigue that lands on the next endurance session rather than adaptation.
  * Every other goal keeps the 10–20 band unchanged.
  */
-export function volumeTargetFor(goal: Goal | null | undefined): VolumeTarget {
-  return goal === 'sport-support' ? { low: 4, high: 10 } : DEFAULT_VOLUME_TARGET;
+export function volumeTargetFor(
+  goal: Goal | null | undefined,
+  experience: ExperienceLevel | null | undefined = null,
+): VolumeTarget {
+  if (goal === 'sport-support') return { low: 4, high: 10 };
+  // A novice's dose is lower by design — the beginner templates prescribe ~5–8
+  // weekly sets per muscle because recovery, not stimulus, is the early
+  // limiter. Judging that against 10–20 made the coach add a set at every
+  // workout, the metrics call every muscle "low", and the retrospective carry
+  // "0 of 12 muscles in band" into a block-2 that jumped 60–70% in volume.
+  if (experience === 'beginner') return BEGINNER_VOLUME_TARGET;
+  return DEFAULT_VOLUME_TARGET;
 }
+
+export const BEGINNER_VOLUME_TARGET: VolumeTarget = { low: 6, high: 12 };
 
 // ── Training snapshot ─────────────────────────────────────────────────────────
 

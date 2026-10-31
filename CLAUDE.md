@@ -1012,7 +1012,25 @@ The planning layer above individual workouts. Two domain levels, deliberately no
 - **Phase-aware engines:** `getActivePhase()` (planStore) resolves this week's phase;
   during `deload`/`recovery` weeks `calculateRecommendation(…, phase)` prescribes ~10%
   off (rep-goal floor for bodyweight) and `computeProgramPlan(…, phase)` returns the
-  empty plan (no set fiddling in a planned easy week). WorkoutView shows a phase banner.
+  empty plan (no set fiddling in a planned easy week). WorkoutView shows a phase banner
+  for every easy phase, intro included. Intro and recovery weeks back off from the
+  heaviest *recent* working weight (a recovery week after a deload must not compound);
+  a deload backs off from the last session. A lift whose only session was logged in the
+  current intro week is **repeated**, not backed off (`ctx.phaseOf`) — the first session
+  was the easy exposure. The wizard never opens with a recovery week after a block that
+  ended on its deload, nor on a mid-block replan.
+- **Activation is one-directional.** A block whose start Monday is ahead is *always*
+  queued as a `pendingActivation`, whether or not something is running. Blocks record how
+  they closed (`completedBy: 'activation' | 'user'`), what they replaced
+  (`replacedBlockId`) and the *live* program at that moment (`replacedProgram`);
+  `deferActiveBlockToNextWeek()` only undoes an activation-close, refuses while another
+  block is queued, and restores the live program (edits included) rather than the replaced
+  block's snapshot. A block also records the `experience` it was planned at.
+- **Coach decisions are the overlay's memory.** The in-block coach stays a pure overlay,
+  but each adjustment has a `key` and the WorkoutView banner offers "Keep it for this
+  block" / "Not this block". Answers live on the active block (`coachDecisions`, synced
+  with the journey): accepted ones keep applying quietly, declined ones are no longer
+  proposed, and the banner only shows open ones.
 - **Deload guardrails** (`validatePhases`): recovery only as the opener, one deload max,
   deload closes the block, ≥3 productive weeks before it. `buildPhases` auto-drops an
   unearned deload and says why.
@@ -1043,9 +1061,13 @@ The coach designs around **the person**, not just the goal. A `TrainingProfile` 
 inside `PlanState`, so it rides the existing `liftlog_plan` LWW sync with no backend change)
 holds two tiers, collected by the onboarding wizard:
 
-- **Tier 1 — hard constraints** (gate exercise selection): injuries/limitations (free text,
-  parsed by `parseGuidance`), `EquipmentAccess` (full-gym / home-rack / dumbbells-only /
-  minimal → banned weight/equipment sets), days per week.
+- **Tier 1 — hard constraints** (gate exercise selection): injuries as structured
+  **`injuryAreas`** chips (knee / shoulder / lower-back / hip / elbow / wrist →
+  `applyInjuryArea`, the one place each area's bans live) plus free text parsed by
+  `parseGuidance` — clause by clause, with negation ("no knee problems", "fully recovered",
+  "years ago"), lift names stripped first ("back squat" is not a back) and the complaint
+  vocabulary people use ("sore", "tight", "niggle"); `EquipmentAccess` (full-gym / home-rack /
+  dumbbells-only / minimal → banned weight/equipment sets), days per week.
 - **Tier 2 — calibration:** `ExperienceLevel` (+ training age), `priorityMuscles`
   (weak points).
 
@@ -1068,12 +1090,16 @@ level):
 - **Copy** — beginners get concrete starting-weight/effort guidance and a linear-progression
   framing; the deload defaults off for them.
 
-**Experience is inferred, and only ratchets up** (`experience.ts`): `inferExperience(snapshot)`
-reads training age (weeks spanned), consistency (session count), and difficulty mastered
-(advanced lifts trained ≥3 sessions). `effectiveExperience()` = max(self-reported, inferred),
-so a beginner whose data says otherwise still gets the better plan; the wizard plans with the
-effective level and JourneyView shows a **"level up" nudge** (`experienceSuggestion`) to bump
-the stored profile. Never downgrades.
+**Experience is inferred, but only the nudge changes anything** (`experience.ts`):
+`inferExperience(snapshot, now)` is gated on training *age* — intermediate at ≥26 weeks and
+≥40 sessions, advanced at ≥78 weeks and ≥120 sessions (or ≥3 catalog-classified advanced lifts
+mastered across ≥52 weeks / ≥80 sessions). Only ids with explicit catalog difficulty count as
+evidence (`hasCatalogDifficulty`); a custom exercise defaults to intermediate for *selection*
+but says nothing about the athlete. `effectiveExperience()` now simply returns the stored
+level: every engine plans and prescribes with what the athlete said until they accept the
+Journey's **"level up" nudge** (`experienceSuggestion`). The old max(self-report, inferred)
+rule promoted a newcomer to intermediate in week four on the strength of a hip-thrust tag and
+took away the beginner protections with it.
 
 **The wizard** (`PlanSetupView`) is **one question per screen** with a slide animation
 (`prefers-reduced-motion` respected), a progress bar, single-select auto-advance, Skip on
@@ -1350,9 +1376,20 @@ PROGRAM references) that are otherwise only checked by hand.
   on the load engine ("go to 2.5 lbs" is not advice). `dosage()` checks the
   unit before any pattern rule. The unit travels on `PrescriptionContext` so
   every reason string reads right.
-- **The weekly set band belongs to the goal, not the app** — every engine takes a
-  `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
-  A new goal that needs a different dose changes one function. On `sport-support` the coach
+- **The weekly set band belongs to the goal and the athlete, not the app** — every engine
+  takes a `VolumeTarget` from `volumeTargetFor(goal, experience)` instead of importing
+  `SETS_TARGET_LOW/HIGH`: 4–10 on sport-support, **6–12 for a beginner**
+  (`BEGINNER_VOLUME_TARGET` — the beginner templates prescribe ~5–8 sets a muscle by
+  design; judging that against 10–20 made the coach add a set at every workout and the
+  retrospective report "0 of 12 muscles in band"), 10–20 otherwise. The planner also caps
+  block-over-block growth (`MAX_BLOCK_GROWTH`, +25% weekly sets; retro bumps come back off
+  first) and limits retro +1s to three muscles, holds each split to the session length its
+  own copy promises (`sessionBudgetFor`), lets full-body day C **reuse** day A's big
+  compounds (`Slot.reuse` — the movement that matters most is trained twice a week), marks
+  template anchors `main` on the generated slots (trimmed last, floor 3 sets), and runs its
+  trend read through the phase resolver so a block that climbed to its deload is not rotated.
+  On the sport templates `heavy` (bilateral squat/hinge) takes the event rep range and `main`
+  only protects, and `intro` is a build-side phase so every day gets its easy first exposure. On `sport-support` the coach
   planner may **trim but never add** sets (also true in any `maintenance` week): volume
   creep is the specific failure mode of concurrent training, and the coach cannot see the
   swim/bike/run sessions its extra set would cost.

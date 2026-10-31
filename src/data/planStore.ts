@@ -17,7 +17,7 @@ import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { loadTrainingSnapshot } from './analytics';
 import type { TrainingSnapshot } from './analytics';
-import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, TrainingProfile, PhaseResolver } from './plan';
+import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, TrainingProfile, PhaseResolver, CoachDecision } from './plan';
 import { blockAnchor, currentPhase, defaultTrainingProfile, generatePlanId, goalLabel, nextMonday, toPlanDate, phaseResolverFor } from './plan';
 import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
@@ -139,6 +139,19 @@ export function getPhaseResolver(): PhaseResolver {
   return phaseResolverFor(getPlanState().plans);
 }
 
+/** The most recently completed block, if any. */
+export function getLatestCompletedBlock(): TrainingBlock | null {
+  let best: TrainingBlock | null = null;
+  for (const plan of getPlanState().plans) {
+    for (const block of plan.blocks) {
+      if (block.status === 'completed' && block.completedAt != null) {
+        if (!best || block.completedAt > (best.completedAt ?? 0)) best = block;
+      }
+    }
+  }
+  return best;
+}
+
 /** Newest completed block's retrospective — the planner's primary input. */
 export function getLatestRetrospective(): BlockRetrospective | null {
   let best: { at: number; retro: BlockRetrospective } | null = null;
@@ -170,6 +183,7 @@ export function completeActiveBlock(
   if (block) {
     block.status = 'completed';
     block.completedAt = now;
+    block.completedBy = 'user';
     if (retro) block.retrospective = retro;
   }
   if (alsoPlan) {
@@ -249,6 +263,7 @@ export function activateProposal(
     progression: proposal.progression,
     status: 'pending',
     activatedAt: now,
+    experience: proposal.input.experience,
   };
   const pending: PendingActivation = {
     goal: proposal.input.goal,
@@ -257,12 +272,13 @@ export function activateProposal(
     createdAt: now,
   };
 
-  const hasRunningBlock = state.plans.some(
-    p => p.status === 'active' && p.blocks.some(b => b.status === 'active'),
-  );
+  // One rule, one direction: a block whose start Monday is still ahead waits
+  // for it, whether or not something is running. Installing a future-dated
+  // block immediately (as happened when nothing was running) produced an
+  // active block weeks before its own start, with no phase and every
+  // phase-gated day visible.
   const startsInFuture = blockAnchor(block).getTime() > now;
-
-  if (hasRunningBlock && startsInFuture) {
+  if (startsInFuture) {
     state.pendingActivation = pending;
     state.updatedAt = now;
     savePlanState(state);
@@ -282,13 +298,21 @@ function commitActivation(
   now: number,
 ): TrainingPlan {
   const active = state.plans.find(p => p.status === 'active');
+  const block = pending.block;
 
   if (active) {
     const running = active.blocks.find(b => b.status === 'active');
     if (running) {
       running.status = 'completed';
       running.completedAt = now;
+      running.completedBy = 'activation';
       if (outgoingRetro) running.retrospective = outgoingRetro;
+      // Remember what this activation displaced, so "finish the week on the
+      // previous workouts" can undo exactly this and nothing else — and can
+      // restore the LIVE program (with any mid-block edits), not the replaced
+      // block's activation-time snapshot.
+      block.replacedBlockId = running.id;
+      block.replacedProgram = getStoredProgram();
     }
   }
 
@@ -315,7 +339,6 @@ function commitActivation(
   }
 
   const seq = state.plans.reduce((n, p) => n + p.blocks.length, 0) + 1;
-  const block = pending.block;
   block.name = `Block ${seq} · ${goalLabel(pending.goal)}`;
   block.status = 'active';
   plan.blocks.push(block);
@@ -383,17 +406,23 @@ export function getTrainingGoal(): Goal {
   return getPlannedGoal() ?? 'general';
 }
 
-/** The block the currently-active block replaced (most recently completed). */
-function mostRecentCompletedBlock(state: PlanState): { plan: TrainingPlan; block: TrainingBlock } | null {
-  let best: { plan: TrainingPlan; block: TrainingBlock } | null = null;
+/**
+ * The block the active one displaced at activation — only if that activation
+ * is what closed it. A block the user wrapped up deliberately is never
+ * reactivated by the undo path, and nothing is offered while another block is
+ * already queued (the undo would silently overwrite it).
+ */
+function undoableActivation(state: PlanState): { plan: TrainingPlan; block: TrainingBlock } | null {
+  if (state.pendingActivation) return null;
+  const active = state.plans.find(p => p.status === 'active')?.blocks.find(b => b.status === 'active');
+  if (!active || active.openEnded || !active.replacedBlockId) return null;
   for (const plan of state.plans) {
-    for (const block of plan.blocks) {
-      if (block.status === 'completed' && block.completedAt != null) {
-        if (!best || block.completedAt > (best.block.completedAt ?? 0)) best = { plan, block };
-      }
+    const block = plan.blocks.find(b => b.id === active.replacedBlockId);
+    if (block) {
+      return block.status === 'completed' && block.completedBy === 'activation' ? { plan, block } : null;
     }
   }
-  return best;
+  return null;
 }
 
 /**
@@ -402,9 +431,7 @@ function mostRecentCompletedBlock(state: PlanState): { plan: TrainingPlan; block
  * still finish the week on their previous workouts.
  */
 export function canDeferActiveBlock(): boolean {
-  const state = getPlanState();
-  const active = getActiveBlockInfo();
-  return !!active && !active.block.openEnded && mostRecentCompletedBlock(state) != null;
+  return undoableActivation(getPlanState()) != null;
 }
 
 /**
@@ -419,13 +446,15 @@ export function deferActiveBlockToNextWeek(now = Date.now()): boolean {
   const activeBlock = activePlan?.blocks.find(b => b.status === 'active');
   if (!activePlan || !activeBlock || activeBlock.openEnded) return false;
 
-  const prev = mostRecentCompletedBlock(state);
+  const prev = undoableActivation(state);
   if (!prev) return false;
+  const restoreProgram = activeBlock.replacedProgram ?? prev.block.program;
 
   // Reactivate the previous block (and its plan, if a goal transition had
   // completed it) — clearing the retrospective activation auto-generated.
   prev.block.status = 'active';
   delete prev.block.completedAt;
+  delete prev.block.completedBy;
   delete prev.block.retrospective;
   prev.plan.status = 'active';
   delete prev.plan.completedAt;
@@ -440,6 +469,8 @@ export function deferActiveBlockToNextWeek(now = Date.now()): boolean {
   // Queue it for next Monday instead.
   activeBlock.status = 'pending';
   activeBlock.startDate = nextMonday(new Date(now));
+  delete activeBlock.replacedBlockId;
+  delete activeBlock.replacedProgram;
   state.pendingActivation = {
     goal: activeBlock.focus,
     ...(activePlan.goalNotes ? { goalNotes: activePlan.goalNotes } : {}),
@@ -447,8 +478,8 @@ export function deferActiveBlockToNextWeek(now = Date.now()): boolean {
     createdAt: now,
   };
 
-  // Restore the previous block's program + week anchor as the live program.
-  saveStoredProgram(prev.block.program);
+  // Restore the live program as it was (edits included) + the week anchor.
+  saveStoredProgram(restoreProgram);
   saveProgramStart(prev.block.startDate);
 
   state.updatedAt = now;
@@ -500,8 +531,32 @@ export async function ensureJourneyMigrated(): Promise<boolean> {
     }],
   };
 
-  savePlanState({ version: 1, plans: [plan], updatedAt: now });
+  // Keep whatever else the document already holds (an onboarding profile
+  // saved before the first plan, a queued activation) — this used to write a
+  // fresh document and drop both.
+  savePlanState({ ...state, plans: [plan], updatedAt: now });
   return true;
+}
+
+// ── Coach decisions ───────────────────────────────────────────────────────────
+// The in-block coach's set adjustments are a pure overlay; this is its memory.
+// Stored on the active block so it syncs with the journey and resets per block.
+
+/** Decisions recorded for the active block (empty when there is none). */
+export function getCoachDecisions(): CoachDecision[] {
+  return getActiveBlockInfo()?.block.coachDecisions ?? [];
+}
+
+/** Accept or decline one adjustment for the rest of the block. */
+export function recordCoachDecision(key: string, accepted: boolean, now = Date.now()): void {
+  const state = getPlanState();
+  const block = state.plans.find(p => p.status === 'active')?.blocks.find(b => b.status === 'active');
+  if (!block) return;
+  const decisions = (block.coachDecisions ?? []).filter(d => d.key !== key);
+  decisions.push({ key, accepted, at: now });
+  block.coachDecisions = decisions;
+  state.updatedAt = now;
+  savePlanState(state);
 }
 
 // ── Sync merge ────────────────────────────────────────────────────────────────

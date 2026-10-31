@@ -7,7 +7,7 @@ import type { Metrics } from '../data/metrics';
 import { computeCoaching } from '../data/insights';
 import { volumeTargetFor } from '../data/analytics';
 import type { Coaching, Insight } from '../data/insights';
-import { getActivePhase, getTrainingGoal, getPhaseResolver } from '../data/planStore';
+import { getActivePhase, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
 import { BarChart, LineChart } from './charts';
@@ -40,7 +40,7 @@ export default function MetricsView({ program, onBack }: Props) {
       setMetrics(m);
       setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal(), getPhaseResolver()));
+      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal(), getPhaseResolver(), getProfileOrDefault().experience, getCoachDecisions()));
     });
     return () => { cancelled = true; };
   }, [program]);
@@ -48,7 +48,7 @@ export default function MetricsView({ program, onBack }: Props) {
   const selected = metrics?.exercises.find(e => e.exerciseId === selectedExercise);
   const goal = getTrainingGoal();
   // The weekly set band the charts judge against belongs to the active goal.
-  const band = volumeTargetFor(goal);
+  const band = volumeTargetFor(goal, getProfileOrDefault().experience);
   const maxMuscleSets = Math.max(...(metrics?.muscleSets.map(m => m.sets) ?? [0]), band.high);
 
   // Progress report: current-program exercises with enough data, attention

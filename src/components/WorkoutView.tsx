@@ -15,9 +15,9 @@ import type { TrainingSnapshot } from '../data/analytics';
 import { buildSetPlan, historyDepthFor } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
 import { getExerciseMeta, unitFor } from '../data/exercises';
-import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal } from '../data/planStore';
+import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal, getCoachDecisions, recordCoachDecision } from '../data/planStore';
 import { effectiveExperience } from '../data/experience';
-import { PHASE_INFO } from '../data/plan';
+import { PHASE_INFO, isEasyPhase } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { slotFor } from '../data/prescribe';
@@ -159,6 +159,9 @@ export default function WorkoutView({
   const [effectiveDay, setEffectiveDay] = useState<WorkoutDay>(day);
   const [planChanges, setPlanChanges] = useState<PlanChange[]>([]);
   const [planDismissed, setPlanDismissed] = useState(false);
+  // The user's standing answers to this block's coach adjustments. Accepted
+  // ones keep applying quietly; declined ones are no longer proposed.
+  const [coachDecisions, setCoachDecisions] = useState(() => (isEditMode ? [] : getCoachDecisions()));
   const [finishing, setFinishing] = useState(false);
   // A failed save (IndexedDB quota, a thrown error) is shown, not swallowed —
   // the button comes back and the draft is kept until the save succeeds.
@@ -259,13 +262,23 @@ export default function WorkoutView({
     loadTrainingSnapshot().then(snap => {
       if (cancelled) return;
       setSnapshot(snap);
-      const plan = computeProgramPlan(program, snap, Date.now(), phase, getTrainingGoal(), getPhaseResolver());
+      const plan = computeProgramPlan(
+        program, snap, Date.now(), phase, getTrainingGoal(), getPhaseResolver(),
+        getProfileOrDefault().experience, coachDecisions,
+      );
       const adjusted = applyPlanToDay(day, plan);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);
     });
     return () => { cancelled = true; };
-  }, [day, program, isEditMode, phase]);
+  }, [day, program, isEditMode, phase, coachDecisions]);
+
+  function decideCoachChange(key: string, accepted: boolean) {
+    recordCoachDecision(key, accepted);
+    setCoachDecisions(getCoachDecisions());
+  }
+  // Changes still awaiting an answer are what the banner shows
+  const openChanges = planChanges.filter(c => !coachDecisions.some(d => d.key === c.key));
 
   // Recommendations + "last time" context for every rendered exercise (the
   // day's plus any added mid-workout), derived from the snapshot. Recomputes
@@ -283,6 +296,7 @@ export default function WorkoutView({
         phase,
         goal: getTrainingGoal(),
         experience: effectiveExperience(getProfileOrDefault(), snapshot),
+        phaseOf: getPhaseResolver(),
       };
       for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
         const { plan, rec, last } = contextForExercise(ex, snapshot, positions, ctx);
@@ -522,13 +536,18 @@ export default function WorkoutView({
             </button>
           </div>
         )}
-        {!isEditMode && (phase === 'deload' || phase === 'recovery') && (
+        {!isEditMode && phase && isEasyPhase(phase) && (
           <div className="phase-banner">
             <span className="phase-banner-title">{PHASE_INFO[phase].label} week</span>
-            <span className="phase-banner-detail">{PHASE_INFO[phase].blurb} — the lighter targets are the plan working, not you slacking.</span>
+            <span className="phase-banner-detail">
+              {PHASE_INFO[phase].blurb}
+              {phase === 'intro'
+                ? ' — easy loads on purpose. A first-time lift keeps the weight you pick; a known one sits well under your working weight.'
+                : ' — the lighter targets are the plan working, not you slacking.'}
+            </span>
           </div>
         )}
-        {!isEditMode && planChanges.length > 0 && !planDismissed && (
+        {!isEditMode && openChanges.length > 0 && !planDismissed && (
           <div className="coach-plan-banner">
             <div className="coach-plan-head">
               <span className="coach-plan-title">Coach adjusted today's workout</span>
@@ -540,12 +559,20 @@ export default function WorkoutView({
                 ×
               </button>
             </div>
-            {planChanges.map(c => (
-              <div className="coach-plan-change" key={c.exerciseId}>
+            {openChanges.map(c => (
+              <div className="coach-plan-change" key={c.key}>
                 <span className="coach-plan-what">
                   {c.exerciseName}: {c.fromSets} → {c.toSets} sets
                 </span>
                 <span className="coach-plan-why">{c.reason}</span>
+                <div className="coach-plan-actions">
+                  <button className="coach-plan-btn coach-plan-btn--keep" onClick={() => decideCoachChange(c.key, true)}>
+                    Keep it for this block
+                  </button>
+                  <button className="coach-plan-btn" onClick={() => decideCoachChange(c.key, false)}>
+                    Not this block
+                  </button>
+                </div>
               </div>
             ))}
           </div>
