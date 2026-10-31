@@ -968,6 +968,93 @@ describe('timed exercises progress by seconds', () => {
 // Missed *reps* are covered thoroughly above. Missed *sessions* are a separate
 // axis: the engine reads the last N sessions of an exercise regardless of when
 // they happened, so the calendar has to be handled deliberately.
+describe('a known one-rep max anchors the load', () => {
+  // 300 lb max, 3 × 8–12 → 300/1.4 × 0.95 ≈ 203 → 200 on a barbell
+  const max = (updatedAt: number) => ({ weight: 300, updatedAt });
+
+  it('gives a never-trained lift a real starting weight instead of "find one"', () => {
+    const rec = advise([], exercise, { oneRepMax: max(NOW), weightType: 'Barbell' })!;
+    expect(rec).toMatchObject({ weight: 200, kind: 'reanchor', direction: 'hold' });
+    expect(rec.reason).toMatch(/300 lbs 1RM/);
+    expect(rec.reason).toMatch(/67% of max/);
+  });
+
+  it('still returns null with no history and no max — the coach does not guess', () => {
+    expect(advise([], exercise, { oneRepMax: null })).toBeNull();
+  });
+
+  it('does not anchor count-progressed work to a load', () => {
+    expect(advise([], exercise, { oneRepMax: max(NOW), weightType: 'Bodyweight' })).toBeNull();
+    expect(advise([], exercise, { oneRepMax: max(NOW), unit: 'seconds' })).toBeNull();
+  });
+
+  it('backs an easy week off from the anchored load', () => {
+    const rec = advise([], exercise, { oneRepMax: max(NOW), weightType: 'Barbell', phase: 'intro' })!;
+    expect(rec.kind).toBe('deload');
+    expect(rec.weight).toBeLessThan(200);
+    expect(rec.weight).toBe(160); // 80% of 200
+  });
+
+  it('plans the first anchored session one rep under the ceiling', () => {
+    const p = plan([], exercise, { oneRepMax: max(NOW), weightType: 'Barbell' });
+    expect(p.sets.map(s => s.weight)).toEqual([200, 200, 200]);
+    expect(p.sets[0].targetReps).toBe(11);
+    expect(p.sets[2].targetReps!).toBeLessThanOrEqual(11);
+    expect(p.goal).toMatch(/set from your 1RM/);
+  });
+
+  it('re-anchors upward to a max entered after the last session', () => {
+    // Working 170 for 10s; a fresh 300 lb test says 8–12 belongs at 200.
+    const rec = advise([session([[170, 10], [170, 10], [170, 9]])], exercise, {
+      oneRepMax: max(NOW), weightType: 'Barbell',
+    })!;
+    expect(rec).toMatchObject({ kind: 'reanchor', direction: 'up', weight: 200 });
+    expect(rec.reason).toMatch(/Re-anchoring to the max you entered/);
+  });
+
+  it('ignores a max older than the latest session — the log has moved on', () => {
+    const rec = advise([session([[170, 10], [170, 10], [170, 9]])], exercise, {
+      oneRepMax: max(NOW - 3 * WEEK), weightType: 'Barbell',
+    })!;
+    expect(rec).toMatchObject({ kind: 'hold', weight: 170 });
+  });
+
+  it('leaves a max that agrees with the log to the ordinary branches', () => {
+    // 195 × 10s is within 5% of the 200 the max prescribes → normal hold
+    const rec = advise([session([[195, 10], [195, 9], [195, 9]])], exercise, {
+      oneRepMax: max(NOW), weightType: 'Barbell',
+    })!;
+    expect(rec.kind).toBe('hold');
+    expect(rec.weight).toBe(195);
+  });
+
+  it('caps a single re-anchor at 20% — the next session corrects from evidence', () => {
+    const rec = advise([session([[120, 10], [120, 10], [120, 10]])], exercise, {
+      oneRepMax: max(NOW), weightType: 'Barbell',
+    })!;
+    expect(rec.kind).toBe('reanchor');
+    expect(rec.weight).toBeLessThanOrEqual(120 * 1.2);
+  });
+
+  it('never cuts a load the lifter is completing in range on the strength of a lower max', () => {
+    // 230 × 10s says the max is ~300+; a 250 lb entry would prescribe ~165.
+    // Completed sets beat an entered number.
+    const rec = advise([session([[230, 10], [230, 9], [230, 8]])], exercise, {
+      oneRepMax: { weight: 250, updatedAt: NOW }, weightType: 'Barbell',
+    })!;
+    expect(rec.kind).not.toBe('reanchor');
+    expect(rec.weight).toBe(230);
+  });
+
+  it('does cut when the lower max and an under-range session agree', () => {
+    const rec = advise([session([[230, 5], [230, 4], [230, 4]])], exercise, {
+      oneRepMax: { weight: 250, updatedAt: NOW }, weightType: 'Barbell',
+    })!;
+    expect(rec).toMatchObject({ kind: 'reanchor', direction: 'down' });
+    expect(rec.weight).toBeLessThan(230);
+  });
+});
+
 describe('a lifter coming back from time off', () => {
   const ex = { sets: 3, repLow: 8, repHigh: 12 };
   const at = (daysAgo: number, weight: number, reps: number): ExerciseSession => ({

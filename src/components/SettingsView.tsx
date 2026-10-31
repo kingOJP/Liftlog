@@ -14,9 +14,10 @@ interface Props {
   onViewExercises: () => void;
   onViewGlossary: () => void;
   onSyncNow: () => Promise<void>;
+  onViewStrength: () => void;
 }
 
-export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow }: Props) {
+export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow, onViewStrength }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
   const [unit, setUnit] = useState<WeightUnit>(getWeightUnit);
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
@@ -48,6 +49,14 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
             <span className="settings-nav-text">
               <span className="settings-nav-title">Exercises</span>
               <span className="settings-nav-sub">Browse the library and edit muscle groups &amp; equipment</span>
+            </span>
+            <span className="settings-nav-chevron">›</span>
+          </button>
+          <button className="settings-nav-row" onClick={onViewStrength}>
+            <span className="settings-nav-icon">🏋️</span>
+            <span className="settings-nav-text">
+              <span className="settings-nav-title">1RMs &amp; goals</span>
+              <span className="settings-nav-sub">Enter your maxes for %-based loading; set a target and see how long it'll take</span>
             </span>
             <span className="settings-nav-chevron">›</span>
           </button>

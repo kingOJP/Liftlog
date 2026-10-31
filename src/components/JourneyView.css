@@ -321,6 +321,70 @@
   font-size: 13px;
 }
 
+/* ── Strength targets (1RM goals) ── */
+.journey-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journey-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.journey-target:active {
+  border-color: var(--purple);
+}
+
+.journey-target-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.journey-target-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.journey-target-nums {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-target-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.journey-target-fill {
+  height: 100%;
+  background: var(--purple);
+  border-radius: 2px;
+}
+
+.journey-target-eta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ── Experience-level nudge ── */
 .journey-nudge {
   border-color: var(--purple-dim, rgba(124, 114, 232, 0.4));

@@ -146,6 +146,16 @@ export interface PrescriptionContext {
    * prescription *says*, so a 45-second plank never reads as 45 repetitions.
    */
   unit?: MeasureUnit;
+  /**
+   * The lifter's known one-rep max for this exercise (strength.ts), when they
+   * have entered one. A MEASUREMENT, where everything else the engine reads is
+   * an estimate — so it anchors the load in two situations the log can't
+   * cover: a movement with no history at all (the 1RM gives a real starting
+   * weight instead of "find one"), and a max entered AFTER the last session
+   * (a fresh test says more about today's strength than last week's sets).
+   * A max older than the latest session is ignored here; the log has moved on.
+   */
+  oneRepMax?: OneRepMaxInput | null;
   /** For the weekly rate cap; defaults to now */
   now?: number;
   /** which planned phase governed a past session (planStore.getPhaseResolver) */
@@ -158,6 +168,13 @@ export interface PrescriptionContext {
    * volume at a load that does not cost the lifter anything.
    */
   scheme?: 'straight' | 'top-set';
+}
+
+/** What the engine needs to know about a stored 1RM. */
+export interface OneRepMaxInput {
+  weight: number;
+  /** when it was entered or tested — compared against the latest session */
+  updatedAt: number;
 }
 
 // How many recent sessions at the same weight without progress on either lever
@@ -186,7 +203,7 @@ const MIN_WEIGHT = 5;
 const PCT_LOAD_PER_REP = 3;
 // 1RM prediction equations are fitted on sets of ~1–10 reps and drift badly
 // beyond this. Past it, progress is read from reps, not estimated strength.
-const E1RM_VALID_REPS = 12;
+export const E1RM_VALID_REPS = 12;
 // est. 1RM gain at an unchanged load that earns the increase on its own.
 const E1RM_BREAKOUT_PCT = 0.03;
 // Reps below repLow that count as a clear miss rather than a bad day.
@@ -210,7 +227,13 @@ const RANGE_MISMATCH_REPS = 2;
 // count necessarily lives below it, so the re-anchored load is shaded off the
 // estimate — and on a goal whose whole point is arriving fresh for another
 // sport, arriving slightly light is the cheap error.
-const REANCHOR_SAFETY = 0.95;
+export const REANCHOR_SAFETY = 0.95;
+// A stored 1RM only overrides the log when it actually disagrees with it. A
+// max that lands within a few percent of where the lifter is already working
+// confirms the prescription rather than correcting it, and the normal
+// branches — which read the sets that were actually performed — are the
+// better judge of the next step from there.
+const MAX_ANCHOR_MIN_SHIFT = 0.05;
 // The most a single re-anchor may move the load. The estimate is built from a
 // formula fitted on other people's fatigue profiles; if one step lands short,
 // the next session re-anchors again from fresh evidence rather than betting the
@@ -256,7 +279,7 @@ const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x
 // scales with the load — and with what the equipment can actually be loaded in:
 // a dumbbell rack goes up in 5s whatever you'd prefer, while a barbell, a belt
 // or a machine takes 2.5 lb microloading happily.
-function incrementFor(weight: number, weightType?: WeightType | null): number {
+export function incrementFor(weight: number, weightType?: WeightType | null): number {
   const rackLoaded = weightType === 'Dumbbell' || weightType === 'Kettlebell';
   if (weight < 30 && !rackLoaded) return 2.5;
   return Math.max(5, roundTo5(weight * 0.025));
@@ -477,8 +500,21 @@ export function historyDepthFor(experience: ExperienceLevel = DEFAULT_EXPERIENCE
  * BETWEEN rep ranges: 205×7 and 245×3 are the same lifter, and only the e1RM
  * says so.
  */
-function loadForReps(e1rm: number, reps: number): number {
+export function loadForReps(e1rm: number, reps: number): number {
   return e1rm / (1 + reps / 30);
+}
+
+/**
+ * The working load a known 1RM prescribes for this slot: the load at which
+ * `repHigh` is roughly the lifter's limit, shaded by REANCHOR_SAFETY because
+ * several sets at a rep count sit below one all-out set, snapped DOWN to what
+ * the equipment loads in. Shared with the rep-range re-anchor so a 1RM and an
+ * estimated 1RM produce the same answer for the same number.
+ */
+export function loadFromMax(oneRepMax: number, repHigh: number, weightType?: WeightType | null): number {
+  const raw = loadForReps(oneRepMax, repHigh) * REANCHOR_SAFETY;
+  const step = incrementFor(raw, weightType);
+  return Math.max(MIN_WEIGHT, Math.floor(raw / step) * step);
 }
 
 /**
@@ -503,6 +539,42 @@ interface Reanchor {
   avgReps: number;
   /** The estimate the new load came from; 0 when the load–rep model was used */
   e1rm: number;
+  /** the anchor is a 1RM the lifter entered, not an estimate read off the log */
+  fromMax?: boolean;
+}
+
+/**
+ * Re-anchor to a 1RM the lifter entered more recently than they last trained
+ * the movement. A test result is the one input this engine gets that is a
+ * measurement rather than an inference, so when it is the freshest evidence
+ * it sets the load — but with the same guard rails as the rep-range
+ * re-anchor: the shift has to be real (MAX_ANCHOR_MIN_SHIFT), and one step
+ * moves the load at most REANCHOR_MAX_STEP; the next session corrects from
+ * what was actually lifted.
+ */
+function maxReanchor(
+  max: OneRepMaxInput | null | undefined,
+  last: ExerciseSession,
+  ex: PrescribedSlot,
+  weight: number,
+  weightType: WeightType | null | undefined,
+): Reanchor | null {
+  if (!max || max.weight <= 0 || weight <= 0) return null;
+  if (max.updatedAt <= last.completedAt) return null;
+  const anchor = loadFromMax(max.weight, ex.repHigh, weightType);
+  if (Math.abs(anchor - weight) / weight < MAX_ANCHOR_MIN_SHIFT) return null;
+  // The two directions carry different burdens of proof, as everywhere in this
+  // engine. A max that says "heavier" is acted on: the lifter produced it. A
+  // max that says "lighter" contradicts sets the lifter actually completed at
+  // the current load, and completed sets are the stronger evidence — unless
+  // those sets fell short of the range, in which case the log agrees.
+  const lastAvg = creditedAverage(last, ex.sets);
+  if (anchor < weight && (lastAvg == null || lastAvg >= ex.repLow)) return null;
+  const step = incrementFor(weight, weightType);
+  const capped = clamp(anchor, weight * (1 - REANCHOR_MAX_STEP), weight * (1 + REANCHOR_MAX_STEP));
+  const target = Math.max(MIN_WEIGHT, Math.floor(capped / step) * step);
+  if (target === weight) return null;
+  return { weight: target, direction: target > weight ? 'up' : 'down', avgReps: lastAvg ?? 0, e1rm: max.weight, fromMax: true };
 }
 
 /**
@@ -669,7 +741,9 @@ export function calculateRecommendation(
   } = ctx;
 
   const baseline = freshBaseline(history);
-  if (baseline.length === 0) return null;
+  if (baseline.length === 0) {
+    return firstSessionFromMax(exercise, ctx);
+  }
 
   const withSets = history.filter(h => h.sets.length > 0);
   const skippedShifted = baseline[0] !== withSets[0];
@@ -732,8 +806,13 @@ export function calculateRecommendation(
   // Only a range somebody CHOSE can re-anchor a load. A range read off the
   // lifter's own log (`rangeSource: 'history'`) is a description of what they
   // do, not a prescription to be matched — re-anchoring to it is circular.
+  // A 1RM entered since the last session is different: it is a measurement,
+  // and it outranks the inference from the reps whatever chose the range.
   const chosenRange = exercise.rangeSource !== 'history';
-  const reanchor = countProgressed || !chosenRange ? null : rangeReanchor(baseline, ex, weight, step);
+  const reanchor = countProgressed
+    ? null
+    : maxReanchor(ctx.oneRepMax, last, ex, weight, weightType)
+      ?? (chosenRange ? rangeReanchor(baseline, ex, weight, step) : null);
 
   // Planned easy week: back off regardless of how the last session went. A
   // taper keeps the load respectable (intensity is what preserves strength on
@@ -818,6 +897,16 @@ export function calculateRecommendation(
   if (reanchor) {
     const { weight: target, direction, avgReps: was, e1rm } = reanchor;
     const range = `${ex.repLow}–${ex.repHigh}`;
+    if (reanchor.fromMax) {
+      return withContext({
+        weight: target,
+        direction,
+        kind: 'reanchor',
+        reason: `Your ${fmtWeight(e1rm)} 1RM puts ${range} reps at ${fmtWeight(target)} (${pctOfMax(target, e1rm)}% of max) — ${
+          direction === 'up' ? 'more than' : 'less than'
+        } the ${fmtWeight(weight)} you've been working. Re-anchoring to the max you entered`,
+      });
+    }
     const basis = e1rm > 0
       ? `your est. 1RM of ${fmtWeight(Math.round(e1rm))} puts ${range} reps at`
       : `matching that effort to ${range} reps puts you at`;
@@ -1091,6 +1180,48 @@ export function calculateRecommendation(
           ? `Match your best at ${fmtWeight(weight)} (${Math.round(priorBest ?? 0)} reps) with a set at ${ex.repHigh} to earn the next increase`
           : `${Math.round((priorBest ?? 0) - repTotal)} more rep${Math.round((priorBest ?? 0) - repTotal) === 1 ? '' : 's'} would match your best at ${fmtWeight(weight)} (${Math.round(priorBest ?? 0)}) — that earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
+}
+
+/** A load as a whole-number percentage of a 1RM, for reason strings. */
+function pctOfMax(load: number, oneRepMax: number): number {
+  return Math.round((load / oneRepMax) * 100);
+}
+
+/**
+ * The first session of a movement the lifter has never logged — but has a
+ * known 1RM for. Without the max the honest answer is null ("find a weight");
+ * with it there is a real number: the load at which the top of the range is
+ * about the lifter's limit, shaded so the first exposure is comfortably
+ * completable. An easy week backs off from there, same as any other load.
+ */
+function firstSessionFromMax(
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+  ctx: PrescriptionContext,
+): WeightRec | null {
+  const max = ctx.oneRepMax;
+  if (!max || max.weight <= 0) return null;
+  if (exercise.repLow == null || exercise.repHigh == null) return null;
+  // Count-progressed work has no load to anchor.
+  if (ctx.weightType === 'Bodyweight' || ctx.unit === 'seconds') return null;
+
+  const anchor = loadFromMax(max.weight, exercise.repHigh, ctx.weightType);
+  const range = `${exercise.repLow}–${exercise.repHigh}`;
+  if (isEasyPhase(ctx.phase ?? null)) {
+    const factor = ctx.phase === 'race-week' ? 0.7 : ctx.phase === 'intro' ? 0.8 : 0.9;
+    const eased = easeBack(anchor, factor, incrementFor(anchor, ctx.weightType));
+    return {
+      weight: eased,
+      direction: 'down',
+      kind: 'deload',
+      reason: `Easy week — your ${fmtWeight(max.weight)} 1RM puts ${range} reps at ${fmtWeight(anchor)}; starting well under that at ${fmtWeight(eased)}`,
+    };
+  }
+  return {
+    weight: anchor,
+    direction: 'hold',
+    kind: 'reanchor',
+    reason: `First time logging this one — your ${fmtWeight(max.weight)} 1RM puts ${range} reps at ${fmtWeight(anchor)} (${pctOfMax(anchor, max.weight)}% of max)`,
+  };
 }
 
 // ── Rep progression (bodyweight at 0 lbs) ─────────────────────────────────────
@@ -1433,13 +1564,20 @@ export function buildSetPlan(
   // Unloaded work may be told to build UP to the range from below it (a
   // regression target under repLow) — the floor follows the recommendation.
   const floor = bodyweight && rec.targetReps != null ? Math.min(ex.repLow, rec.targetReps) : ex.repLow;
+
+  // A first session prescribed off a 1RM (no history at all): the load was
+  // chosen so the top of the range is roughly the limit, shaded 5% — so set 1
+  // is aimed one rep under the ceiling and the default drop-off takes the rest.
+  const anchoredFirstSession = baseline.length === 0 && rec.kind === 'reanchor';
   const baseReps = rec.kind === 'hold'
     ? clamp((lastCounted[0]?.reps ?? ex.repLow) + 1, ex.repLow, bodyweight ? Math.max(ex.repHigh, rec.targetReps ?? 0) : ex.repHigh)
     : bodyweight
       ? clamp(rec.targetReps!, floor, topClamp)
-      : lastAvg != null && lastWeight != null && lastWeight > 0
-        ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), ex.repLow, ex.repHigh)
-        : ex.repLow;
+      : anchoredFirstSession
+        ? clamp(ex.repHigh - 1, ex.repLow, ex.repHigh)
+        : lastAvg != null && lastWeight != null && lastWeight > 0
+          ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), ex.repLow, ex.repHigh)
+          : ex.repLow;
 
   const drops = fatigueDrops(baseline, count, baseReps);
   const sets: PrescribedSet[] = Array.from({ length: count }, (_, i) => ({
@@ -1469,6 +1607,8 @@ export function buildSetPlan(
 
   const goal = bodyweight
     ? countGoal
+    : anchoredFirstSession
+      ? `First session at ${fmtWeight(rec.weight)}, set from your 1RM. Around ${planTotal} reps with 1–2 in reserve — the coach corrects from what you actually hit.`
     : rec.kind === 'reanchor'
       ? `First session at ${fmtWeight(rec.weight)} — this is an estimate from your log, not a test. Around ${planTotal} reps with 1–2 in reserve, and the coach corrects from what you actually hit.`
       : rec.kind === 'increase'

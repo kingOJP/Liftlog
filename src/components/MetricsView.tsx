@@ -7,7 +7,7 @@ import type { Metrics } from '../data/metrics';
 import { computeCoaching } from '../data/insights';
 import { volumeTargetFor } from '../data/analytics';
 import type { Coaching, Insight } from '../data/insights';
-import { getActivePhase, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions } from '../data/planStore';
+import { getActivePhase, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions, getOneRepMax } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
 import { BarChart, LineChart } from './charts';
@@ -19,6 +19,8 @@ import './MetricsView.css';
 interface Props {
   program: WorkoutDay[];
   onBack: () => void;
+  /** open the Strength screen (1RM + goal) for a lift */
+  onViewStrength: (exerciseId: string) => void;
 }
 
 function formatVolume(v: number): string {
@@ -27,7 +29,7 @@ function formatVolume(v: number): string {
 
 type CoachTab = 'coach' | 'progress' | 'prs';
 
-export default function MetricsView({ program, onBack }: Props) {
+export default function MetricsView({ program, onBack, onViewStrength }: Props) {
   const [showAllProgress, setShowAllProgress] = useState(false);
   // Per-exercise history sheet, opened from a Progress row
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
@@ -322,6 +324,11 @@ export default function MetricsView({ program, onBack }: Props) {
                 </>
               ) : (
                 <p className="metrics-empty">Log this exercise at least twice to see a trend.</p>
+              )}
+              {selected && (
+                <button className="metric-link-btn" onClick={() => onViewStrength(selected.exerciseId)}>
+                  {getOneRepMax(selected.exerciseId) ? 'Your 1RM & goal for this lift ›' : 'Set a 1RM or a goal for this lift ›'}
+                </button>
               )}
             </section>
 

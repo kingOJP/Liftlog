@@ -160,6 +160,15 @@
   margin-top: 2px;
 }
 
+/* The lifter's first 1RM goal with its live estimate */
+.journey-goal-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
 .journey-track {
   display: flex;
   gap: 3px;

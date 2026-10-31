@@ -21,6 +21,7 @@ import {
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
+import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { suggestReplacements } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
@@ -28,8 +29,20 @@ import { InfoButton } from './InstructionSheet';
 import { useInstructionSheet } from './useInstructionSheet';
 import './PlanSetupView.css';
 
+/**
+ * Pre-answers for the wizard when it's opened FOR something — today, a block
+ * designed around a 1RM goal (StrengthView → "Design a block around this
+ * lift"). The goal lift rides into the planner as a focus exercise, so it is
+ * guaranteed a main slot; everything else is still the athlete's to answer.
+ */
+export interface PlanSeed {
+  goal?: Goal;
+  focusExerciseIds?: string[];
+}
+
 interface Props {
   program: WorkoutDay[];
+  seed?: PlanSeed;
   onBack: () => void;
   onActivated: () => void;
 }
@@ -103,7 +116,7 @@ const PRIORITY_OPTIONS: { label: string; muscles: MuscleGroup[] }[] = [
   { label: 'Core', muscles: ['Abs', 'Obliques'] },
 ];
 
-export default function PlanSetupView({ program, onBack, onActivated }: Props) {
+export default function PlanSetupView({ program, seed, onBack, onActivated }: Props) {
   const info = useInstructionSheet();
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [snapshotReady, setSnapshotReady] = useState(false);
@@ -121,7 +134,12 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [dir, setDir] = useState<'next' | 'back'>('next');
 
   // Answers
-  const [goal, setGoal] = useState<Goal>(activeGoal ?? 'hypertrophy');
+  const [goal, setGoal] = useState<Goal>(seed?.goal ?? activeGoal ?? 'hypertrophy');
+  const focusExerciseIds = seed?.focusExerciseIds ?? [];
+  const focusNames = useMemo(
+    () => focusExerciseIds.map(id => getExerciseLibrary().find(e => e.id === id)?.name ?? getExerciseName(id)),
+    [focusExerciseIds], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const [experience, setExperience] = useState<ExperienceLevel>(saved.experience);
   const [trainingAgeMonths, setTrainingAgeMonths] = useState<number | undefined>(saved.trainingAgeMonths);
   const [daysPerWeek, setDaysPerWeek] = useState(saved.daysPerWeek);
@@ -277,6 +295,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       // A goal change is one of the things that earns an introductory week.
       previousGoal: activeGoal ?? null,
       ...(goal === 'sport-support' ? { sport: sportContext() } : {}),
+      ...(focusExerciseIds.length > 0 ? { focusExerciseIds } : {}),
     };
     const p = buildPlanProposal(input, program, snapshot, plannerRetro, getPhaseResolver());
     setProposal(p);
@@ -574,6 +593,12 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       case 'goal':
         return (
           <Question title="What matters most right now?" subtitle="This sets the whole shape of your training.">
+            {focusNames.length > 0 && (
+              <p className="wizard-inferred">
+                This block is being designed around your <strong>{focusNames.join(', ')}</strong> goal —
+                it'll lead its day as the main lift whatever you pick here. Strength is the natural fit.
+              </p>
+            )}
             <div className="opt-list">
               {GOALS.map(g => (
                 <OptionCard key={g.id} active={goal === g.id} label={g.label} blurb={g.blurb}
