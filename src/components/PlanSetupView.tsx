@@ -24,6 +24,8 @@ import { unitFor } from '../data/exercises';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { suggestReplacements } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './PlanSetupView.css';
 
 interface Props {
@@ -102,6 +104,7 @@ const PRIORITY_OPTIONS: { label: string; muscles: MuscleGroup[] }[] = [
 ];
 
 export default function PlanSetupView({ program, onBack, onActivated }: Props) {
+  const info = useInstructionSheet();
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [snapshotReady, setSnapshotReady] = useState(false);
 
@@ -493,6 +496,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                           </span>
                         </div>
                         <div className="review-ex-actions">
+                          <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                           <button className="review-ex-btn" aria-label={`Replace ${ex.name}`}
                             onClick={() => setSwapTarget(isSwapping ? null : { dayId: day.id, exerciseId: ex.id })}>⇄</button>
                           <button className="review-ex-btn review-ex-btn--danger" aria-label={`Remove ${ex.name}`}
@@ -511,7 +515,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                         <div className="review-swaps">
                           {swapSuggestions.map(s => (
                             <button className="review-swap" key={s.exercise.id} onClick={() => replaceExercise(day.id, ex, s)}>
-                              <span className="review-swap-name">{s.exercise.name}</span>
+                              <span className="review-swap-head">
+                                <span className="review-swap-name">{s.exercise.name}</span>
+                                <InfoButton name={s.exercise.name} onClick={() => info.open(s.exercise.id, s.exercise.name)} />
+                              </span>
                               {s.reasons[0] && <span className="review-swap-reason">{s.reasons[0]}</span>}
                             </button>
                           ))}
@@ -530,6 +537,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
             </section>
           ))}
         </div>
+        {info.sheet}
         <div className="plan-setup-footer">
           <button className="setup-primary-btn" disabled={!canActivate} onClick={handleActivate}>
             {activating ? 'Activating…' : `Activate plan — starts ${startDate}`}

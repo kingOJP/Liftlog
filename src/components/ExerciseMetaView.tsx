@@ -8,6 +8,8 @@ import { archiveExercise, deleteExerciseFromLibrary, getExerciseLibrary } from '
 import { hasSetLogsForExercise, deleteSetLogsByExerciseId } from '../db/database';
 import { getUserRole } from '../data/sync';
 import { getExerciseMerges, saveExerciseMerges, applyExerciseMerges } from '../data/merges';
+import { instructionsFor } from '../data/instructions';
+import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseMetaView.css';
 
 interface Props {
@@ -34,6 +36,8 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
   const [saved, setSaved] = useState(false);
   const [modal, setModal] = useState<Modal | null>(null);
   const [working, setWorking] = useState(false);
+  const info = useInstructionSheet();
+  const hasInstructions = instructionsFor(exerciseId) != null;
 
   // Admin-only: merge this exercise into another. The server records the
   // from→to mapping (audited) and serves it to every client on pull; each
@@ -123,6 +127,16 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
       </header>
 
       <div className="exercise-meta-body">
+        <button className="meta-howto" onClick={() => info.open(exerciseId, exerciseName)}>
+          <span className="meta-howto-text">
+            <span className="meta-howto-title">How to do it</span>
+            <span className="meta-howto-sub">
+              {hasInstructions ? 'Setup, cues and the faults to watch for' : 'No instructions yet for this custom exercise'}
+            </span>
+          </span>
+          <span className="meta-howto-chevron">›</span>
+        </button>
+
         <section className="meta-section">
           <span className="meta-label">Movement Pattern</span>
           <select
@@ -305,6 +319,7 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
           </div>
         </div>
       )}
+      {info.sheet}
     </div>
   );
 }

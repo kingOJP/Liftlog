@@ -293,3 +293,43 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* "How to do it" entry at the top of the detail screen */
+.meta-howto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--purple);
+  border-radius: 12px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.meta-howto-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta-howto-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.meta-howto-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.meta-howto-chevron {
+  font-size: 22px;
+  color: var(--text-muted);
+}

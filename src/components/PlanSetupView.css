@@ -425,6 +425,13 @@
   border-color: var(--purple);
 }
 
+.review-swap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .review-swap-name {
   font-size: 13.5px;
   font-weight: 700;

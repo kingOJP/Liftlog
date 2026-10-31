@@ -21,6 +21,7 @@ import {
 } from './taxonomy';
 import { LEGACY_ID_MAP } from './legacyIds';
 import { PROGRAM } from './program';
+import { instructionsFor, INSTRUCTED_IDS } from './instructions';
 
 const ids = EXERCISES.map(e => e.id);
 
@@ -160,5 +161,29 @@ describe('references into the catalog', () => {
         expect(EXERCISE_MAP.get(ex.id)!.name).toBe(ex.name);
       }
     }
+  });
+});
+
+describe('instructions', () => {
+  it('gives every catalog exercise a setup line, 3–5 cues and no empty strings', () => {
+    for (const id of ids) {
+      const info = instructionsFor(id);
+      expect(info, `${id} has no instructions`).not.toBeNull();
+      expect(info!.setup.trim().length, `${id} setup`).toBeGreaterThan(20);
+      expect(info!.cues.length, `${id} cue count`).toBeGreaterThanOrEqual(3);
+      expect(info!.cues.length, `${id} cue count`).toBeLessThanOrEqual(5);
+      for (const c of [...info!.cues, ...(info!.faults ?? [])]) {
+        expect(c.trim().length, `${id} empty line`).toBeGreaterThan(5);
+      }
+    }
+  });
+
+  it('has no entry for an id that left the catalog', () => {
+    for (const id of INSTRUCTED_IDS) expect(EXERCISE_MAP.has(id), `${id} is not in the catalog`).toBe(true);
+  });
+
+  it('resolves a timestamped copy of a catalog exercise and nothing for a true custom one', () => {
+    expect(instructionsFor('back-extensions-1782324854942')).toBe(instructionsFor('back-extensions'));
+    expect(instructionsFor('jefferson-split-squats-1782324854942')).toBeNull();
   });
 });

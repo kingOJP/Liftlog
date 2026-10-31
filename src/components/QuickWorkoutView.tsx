@@ -7,6 +7,8 @@ import { prescribeFor } from '../data/prescribe';
 import { buildQuickWorkoutDay } from '../data/quickWorkout';
 import AddExercisePanel from './AddExercisePanel';
 import SlotDoseEditor from './SlotDoseEditor';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './DayEditView.css';
 import './QuickWorkoutView.css';
 
@@ -24,6 +26,7 @@ interface Props {
 export default function QuickWorkoutView({ onBack, onStart }: Props) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const info = useInstructionSheet();
 
   // A quick workout is the one path with no plan behind it, so the history
   // fallback matters most here: with no goal to dose from, the coach reads the
@@ -84,6 +87,7 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
                       <span className="exercise-edit-name">{ex.name}</span>
                       <span className="exercise-edit-meta">{prescriptionDetail(ex)} ✎</span>
                     </button>
+                    <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                     <button
                       className="exercise-remove-btn"
                       onClick={() => handleRemove(ex.id)}
@@ -111,6 +115,7 @@ export default function QuickWorkoutView({ onBack, onStart }: Props) {
         </section>
       </div>
 
+      {info.sheet}
       <div className="day-edit-footer">
         <button className="day-edit-save-btn" onClick={handleStart} disabled={exercises.length === 0}>
           {exercises.length === 0 ? 'Add an exercise to start' : `Start Workout · ${exercises.length} exercise${exercises.length !== 1 ? 's' : ''}`}

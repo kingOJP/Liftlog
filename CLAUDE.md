@@ -393,6 +393,11 @@ src/
                                   reviving a tombstoned survivor)
     appUpdate.ts               — "new build ready" flag from the service worker's controllerchange;
                                   App renders the reload toast outside workouts
+    instructions.ts            — compiled, app-owned exercise instructions (setup, 3–5 cues,
+                                  faults) for every catalog exercise; instructionsFor(id) resolves
+                                  timestamped catalog copies, null for a true custom exercise
+    search.ts                  — matchesExerciseQuery()/filterExercises(): every typed word must
+                                  appear in the name, any order — shared by the list and the picker
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
@@ -419,8 +424,13 @@ src/
     HistoryView.tsx/css        — all past sessions in reverse chronological order
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
                                   per-exercise "Find replacement" (⇄) suggestion panel
-    ExerciseListView.tsx/css   — alphabetical list of all exercises, taps into ExerciseMetaView
-    ExerciseMetaView.tsx/css   — edit an exercise's muscle groups, equipment, weight type
+    ExerciseListView.tsx/css   — searchable alphabetical list of all exercises (data/search.ts —
+                                  the same matcher as the picker), taps into ExerciseMetaView
+    ExerciseMetaView.tsx/css   — "How to do it" entry + edit an exercise's muscle groups,
+                                  equipment, weight type
+    InstructionSheet.tsx/css   — the bottom sheet with an exercise's setup / cues / faults and the
+                                  ⓘ InfoButton every surface uses; useInstructionSheet.tsx is the
+                                  per-screen state hook (open(id, name) + the rendered sheet)
     MetricsView.tsx/css        — metrics dashboard: Coach section (highlights, opportunities,
                                   program adjustments), muscle heatmap, volume summary, weekly
                                   chart, e1RM chart, muscle sets chart, unclassified banner
@@ -1225,6 +1235,14 @@ program, not before):
   lifts. Compiled-in catalog data (a `DIFFICULTY`/`PREREQUISITES` map + `DIFFICULTY_RANK`),
   **not** user metadata — never synced. Drives beginner-safe selection + skill-gating in the
   planner; also on `ExerciseProfile`.
+- `instructionsFor(id)` (`instructions.ts`) — how to do the movement: a setup line, 3–5 cues
+  in coaching order and the common faults, for every catalog exercise (`catalog.test.ts`
+  enforces coverage and the cue count). Compiled, app-owned, never synced — the same footing
+  as difficulty. **Text only, by decision (D3):** no links or media to rot, works offline.
+  Surfaced by the ⓘ `InfoButton` → `InstructionSheet` on the workout card, every picker row,
+  the day editor and its replacement cards, the quick-workout builder, the plan review (rows
+  and swap suggestions) and as the "How to do it" entry on the exercise detail screen. A
+  custom exercise with no catalog namesake gets "No instructions yet", never an empty sheet.
 - `unitFor(id)` / `isTimedExercise(id)` — whether a set counts reps or seconds
   (`ExerciseDef.unit`, absent = reps). Intrinsic catalog data like difficulty: app-owned,
   never synced, never a user override. Timed exercises (planks, carries) show **no weight

@@ -10,6 +10,8 @@ import { getTrainingGoal } from '../data/planStore';
 import type { ReplacementSuggestion } from '../data/substitution';
 import AddExercisePanel from './AddExercisePanel';
 import SlotDoseEditor from './SlotDoseEditor';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './DayEditView.css';
 
 interface Props {
@@ -41,6 +43,7 @@ export default function DayEditView({
   const [showAdd, setShowAdd] = useState(false);
   /** the slot whose dose editor is open */
   const [editingId, setEditingId] = useState<string | null>(null);
+  const info = useInstructionSheet();
 
   // Replacement suggestions personalize on training history (familiarity,
   // strength trends, weekly volume balance) — loaded once, used lazily.
@@ -163,6 +166,7 @@ export default function DayEditView({
                       <span className="exercise-edit-name">{ex.name}{ex.main ? <span className="exercise-main-tag">main</span> : null}</span>
                       <span className="exercise-edit-meta">{prescriptionDetail(ex)} ✎</span>
                     </button>
+                    <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                     <button
                       className={`exercise-swap-btn${swapTargetId === ex.id ? ' active' : ''}`}
                       onClick={() => setSwapTargetId(prev => (prev === ex.id ? null : ex.id))}
@@ -224,6 +228,7 @@ export default function DayEditView({
                                 .join(' · ')}
                             </span>
                           </div>
+                          <InfoButton name={s.exercise.name} onClick={() => info.open(s.exercise.id, s.exercise.name)} />
                           <button className="swap-card-btn" onClick={() => handleReplace(ex, s)}>
                             Swap in
                           </button>
@@ -282,6 +287,7 @@ export default function DayEditView({
         )}
       </div>
 
+      {info.sheet}
       <div className="day-edit-footer">
         <button
           className="day-edit-save-btn"

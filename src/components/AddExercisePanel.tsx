@@ -7,6 +7,9 @@ import { getExerciseMeta } from '../data/exercises';
 import type { TrainingSnapshot } from '../data/analytics';
 import { prescribeFor, slotFor } from '../data/prescribe';
 import { parseDose } from '../data/dosage';
+import { filterExercises } from '../data/search';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './DayEditView.css';
 
 interface Props {
@@ -40,14 +43,12 @@ export default function AddExercisePanel({
   const [newSets, setNewSets] = useState('');
   const [newRepLow, setNewRepLow] = useState('');
   const [newRepHigh, setNewRepHigh] = useState('');
+  const info = useInstructionSheet();
 
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return library
-      .filter(e => !e.archived && !excludeIds.has(e.id))
-      .filter(e => q === '' || e.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [library, excludeIds, search]);
+  const searchResults = useMemo(() => filterExercises(
+    library.filter(e => !e.archived && !excludeIds.has(e.id)),
+    search,
+  ).sort((a, b) => a.name.localeCompare(b.name)), [library, excludeIds, search]);
 
   const exactMatch = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -119,12 +120,17 @@ export default function AddExercisePanel({
             {searchResults.slice(0, limit).map(ex => {
               const muscle = getExerciseMeta(ex.id).primaryMuscle;
               return (
-                <button key={ex.id} className="add-search-result" onClick={() => handleAddFromLibrary(ex)}>
-                  <span className="add-search-name">{ex.name}</span>
-                  <span className="add-search-meta">
-                    {[muscle].filter(Boolean).join(' · ')}
-                  </span>
-                </button>
+                <div key={ex.id} className="add-search-result" role="button" tabIndex={0}
+                  onClick={() => handleAddFromLibrary(ex)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAddFromLibrary(ex); } }}>
+                  <div className="add-search-text">
+                    <span className="add-search-name">{ex.name}</span>
+                    <span className="add-search-meta">
+                      {[muscle].filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                  <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
+                </div>
               );
             })}
             {searchResults.length === 0 && (
@@ -187,6 +193,7 @@ export default function AddExercisePanel({
           </div>
         </>
       )}
+      {info.sheet}
     </div>
   );
 }

@@ -346,8 +346,9 @@
 
 .add-search-result {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   text-align: left;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -360,6 +361,13 @@
 
 .add-search-result:active {
   border-color: var(--purple);
+}
+
+.add-search-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .add-search-name {

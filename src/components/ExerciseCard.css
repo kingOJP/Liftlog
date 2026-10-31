@@ -14,8 +14,7 @@
 /* ── Header ── */
 .ex-header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
 }
 
@@ -23,6 +22,10 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
+}
+
+.ex-header .ex-target {
+  margin-left: auto;
 }
 
 .ex-target {

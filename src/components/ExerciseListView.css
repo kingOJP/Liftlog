@@ -22,6 +22,52 @@
   color: var(--text);
 }
 
+.exercise-list-search {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: calc(49px + env(safe-area-inset-top));
+  background: var(--bg);
+  z-index: 9;
+}
+
+.exercise-list-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.exercise-list-search-input:focus {
+  border-color: var(--purple);
+}
+
+.exercise-list-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.exercise-list-muscle {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.exercise-list-empty {
+  margin: 24px 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .exercise-list-body {
   display: flex;
   flex-direction: column;

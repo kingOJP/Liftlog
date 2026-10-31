@@ -5,6 +5,8 @@ import type { WeightRec, ExerciseSession, SetPlan } from '../data/recommendation
 import { unitFor } from '../data/exercises';
 import { unitLabel } from '../data/taxonomy';
 import type { MeasureUnit } from '../data/taxonomy';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
 interface Props {
@@ -56,6 +58,7 @@ export default function ExerciseCard({
   exercise, sets, recommendation, plan, lastSession,
   onLogSet, onEditSet, onDeleteSet, onRemove,
 }: Props) {
+  const info = useInstructionSheet();
   // A draft overrides the prescribed row — set when the lifter edits the
   // pre-filled numbers, adds a warm-up, or adds a set beyond the plan.
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -192,6 +195,7 @@ export default function ExerciseCard({
     <div className="exercise-card">
       <div className="ex-header">
         <span className="ex-name">{exercise.name}</span>
+        <InfoButton name={exercise.name} onClick={() => info.open(exercise.id, exercise.name)} />
         <span className="ex-target">{targetLabel}</span>
         {onRemove && (
           <button
@@ -374,6 +378,7 @@ export default function ExerciseCard({
           )}
         </div>
       )}
+      {info.sheet}
     </div>
   );
 }

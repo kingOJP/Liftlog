@@ -341,23 +341,24 @@ exercise; `applyExerciseMerges` runs once per merge version, not every tick.
 
 ---
 
-## 8. Phase 6 — Teach me how to do it
+## 8. Phase 6 — Teach me how to do it — ✅ landed on `claude/action-plan-2026-10`
 
-**6.1 Instruction data.** `src/data/instructions.ts`: compiled, app-owned, never synced (same
+**6.1 Instruction data.** ✅ `src/data/instructions.ts`: compiled, app-owned, never synced (same
 footing as `difficultyFor`): `{ setup: string; cues: string[]; faults?: string[] }` per catalog
 id, `instructionsFor(id)` resolving timestamped custom ids through `catalogDefFor`. Per
 **[D3]** this is **text only** — no link field, nothing to rot, works offline. Catalog test
 asserts every exercise has an entry with 3–5 cues.
 
-**6.2 Surfaces.** An ⓘ on `ExerciseCard` opening a bottom sheet; the same sheet from the picker
+**6.2 Surfaces.** ✅ An ⓘ on `ExerciseCard` opening a bottom sheet; the same sheet from the picker
 rows, `ExerciseMetaView`, the wizard review and the substitution panel; glossary terms
 cross-link where a cue uses one.
 
-**6.3 Content.** 89 entries drafted, then reviewed by you before merge (one PR per muscle region
-to keep review tractable). Text only per **[D3]**; custom exercises show "No instructions yet"
+**6.3 Content.** ✅ 89 entries drafted in one commit on this branch (all phases ship on one branch
+per your instruction, so the per-region review PRs became a review of `src/data/instructions.ts`
+before merge — flag any cue you'd phrase differently). Text only per **[D3]**; custom exercises show "No instructions yet"
 rather than an empty sheet.
 
-**6.4 Exercise list search.** (F17 part) Search box over the 89-row list, shared with the picker.
+**6.4 Exercise list search.** ✅ (F17 part) Search box over the 89-row list, shared with the picker.
 
 ---
 
