@@ -19,18 +19,18 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay, Exercise } from './program';
-import type { Goal, PhaseKind } from './plan';
+import type { Goal, PhaseKind, PhaseResolver } from './plan';
 import { isEasyPhase } from './plan';
 import type { TrainingSnapshot } from './analytics';
 import {
   avgDurationByDay,
-  e1rmSeries,
   muscleSetTotals,
   musclesForExercise,
   sessionTimestamp,
   volumeTargetFor,
 } from './analytics';
 import { EXERCISES } from './exercises';
+import { assessSnapshot, progressDirections } from './progress';
 
 // ── Tunables ──────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,7 @@ export function computeProgramPlan(
   now = Date.now(),
   phase: PhaseKind | null = null,
   goal: Goal | null = null,
+  phaseOf: PhaseResolver | null = null,
 ): ProgramPlan {
   const { sessions } = snapshot;
   // A planned deload/recovery/race week is deliberately lighter — adding or
@@ -129,14 +130,11 @@ export function computeProgramPlan(
     [...windowSets].map(([m, sets]) => [m, sets / weeks]),
   );
 
-  // Exercises whose e1RM is trending down — don't pile volume onto a
-  // struggling lift.
-  const declining = new Set<string>();
-  for (const [exerciseId, pts] of e1rmSeries(snapshot)) {
-    if (pts.length < 3) continue;
-    const win = pts.slice(-3);
-    if (win[win.length - 1].value < win[0].value * 0.97) declining.add(exerciseId);
-  }
+  // Exercises trending down — don't pile volume onto a struggling lift. Read
+  // from THE progress engine (goal-weighted, easy-week- and order-aware)
+  // rather than a private raw-e1RM rule, so the coach can't call a lift
+  // declining that the Metrics screen calls steady.
+  const declining = progressDirections(assessSnapshot(snapshot, goal ?? 'general', () => true, phaseOf)).down;
 
   const avgDuration = avgDurationByDay(snapshot);
 

@@ -7,7 +7,7 @@ import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
-import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal } from '../data/planStore';
+import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal, getPhaseResolver } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
@@ -78,7 +78,7 @@ export default function Dashboard({
       setCompletedDayIds(new Set(
         snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
       ));
-      setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal));
+      setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal, getPhaseResolver()));
     });
     return () => { cancelled = true; };
   }, [program, weekNumber, phase, goal]);

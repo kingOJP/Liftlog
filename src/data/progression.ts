@@ -185,7 +185,10 @@ export function compositeScore(
  * not evidence of anything.
  */
 export function stallWindowFor(experience: ExperienceLevel = 'intermediate'): number {
-  return experience === 'advanced' ? 4 : 3;
+  // Six for the advanced lifter: their honest rate of progress (~1% a month)
+  // sits inside the session-to-session noise floor, so four flat sessions is
+  // a normal fortnight and deloading on it ends a block lighter than it began.
+  return experience === 'advanced' ? 6 : 3;
 }
 
 /**

@@ -17,7 +17,7 @@ export interface SessionDoc {
   startedAt: number;
   completedAt?: number;
   updatedAt: number;
-  sets: Array<Pick<SetLog, 'exerciseId' | 'setNumber' | 'weight' | 'reps' | 'order' | 'warmup'>>;
+  sets: Array<Pick<SetLog, 'exerciseId' | 'setNumber' | 'weight' | 'reps' | 'order' | 'warmup' | 'repLow' | 'repHigh'>>;
 }
 
 export interface SessionMergePlan {

@@ -195,3 +195,66 @@ describe('categoryProgress — movement-pattern rollup', () => {
     expect(total).toBe(0);
   });
 });
+
+
+describe('planned easy weeks (audit F1)', () => {
+  // Three climbing sessions, then a deload-week session at 90% load. The
+  // deload is the plan working, not the lift declining.
+  const snap = build([
+    { day: 1, sets: s('bench', 100, 8) },
+    { day: 1, sets: s('bench', 105, 8) },
+    { day: 1, sets: s('bench', 110, 8) },
+    { day: 1, sets: s('bench', 99, 8) },
+  ]);
+  const deloadFrom = T0 + 3 * 3 * DAY - DAY;
+  const phaseOf = (ts: number) => (ts >= deloadFrom ? 'deload' as const : 'accumulation' as const);
+
+  it('never reads a deload-week session as a decline', () => {
+    const blind = assessSnapshot(snap, 'strength').get('bench')!;
+    const aware = assessSnapshot(snap, 'strength', () => true, phaseOf).get('bench')!;
+    expect(blind.status).not.toBe('progressing');
+    expect(aware.status).toBe('progressing');
+    expect(aware.e1rmChangePct!).toBeGreaterThan(0);
+    expect(aware.evidence.join(' ')).toMatch(/easy-week/);
+  });
+
+  it('a session in a planned easy week can never be a PR', () => {
+    const heavy = build([
+      { day: 1, sets: s('bench', 100, 8) },
+      { day: 1, sets: s('bench', 120, 8) },
+    ]);
+    const all = (ts: number) => (ts > T0 ? 'intro' as const : null);
+    const points = exercisePointSeries(heavy, () => true, all).get('bench')!;
+    expect(points[1].easy).toBe(true);
+    expect(points[1].weightPR).toBe(false);
+  });
+});
+
+describe('rep PRs are judged against sessions before this one (audit M11)', () => {
+  it('a first session at a new weight sets no rep PR, whatever its sets do', () => {
+    const snap = build([
+      { day: 1, sets: [['bench', 100, 8], ['bench', 100, 10], ['bench', 100, 12]] },
+    ]);
+    const [p] = exercisePointSeries(snap).get('bench')!;
+    expect(p.repPR).toBe(false);
+    expect(p.prLabels).toEqual([]);
+  });
+
+  it('set 2 beating set 1 inside the same session is not a PR', () => {
+    const snap = build([
+      { day: 1, sets: [['bench', 100, 10], ['bench', 100, 10]] },
+      { day: 1, sets: [['bench', 100, 8], ['bench', 100, 9]] },
+    ]);
+    const pts = exercisePointSeries(snap).get('bench')!;
+    expect(pts[1].repPR).toBe(false);
+  });
+
+  it('beating last session\'s best at that weight is', () => {
+    const snap = build([
+      { day: 1, sets: [['bench', 100, 10], ['bench', 100, 10]] },
+      { day: 1, sets: [['bench', 100, 11], ['bench', 100, 9]] },
+    ]);
+    const pts = exercisePointSeries(snap).get('bench')!;
+    expect(pts[1].repPR).toBe(true);
+  });
+});

@@ -67,6 +67,9 @@ import {
 export interface LoggedSet {
   weight: number;
   reps: number;
+  /** the rep range prescribed when the set was logged, when recorded */
+  repLow?: number;
+  repHigh?: number;
 }
 
 export interface ExerciseSession {
@@ -202,6 +205,8 @@ const REANCHOR_SAFETY = 0.95;
 // whole correction on one prediction.
 const REANCHOR_MAX_STEP = 0.20;
 const DEFAULT_EXPERIENCE: ExperienceLevel = 'intermediate';
+// Floating-point slack for the weekly cap comparison (see increaseTo).
+const CAP_EPSILON = 1e-6;
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
 // Sessions of history the fatigue drop-off model is fitted from.
@@ -400,6 +405,61 @@ function bestWorkAt(
 }
 
 /**
+ * The most reps/seconds the lifter has ever totalled on unloaded work — the
+ * bodyweight twin of bestWorkAt. No rep-era exclusion: a bodyweight increase
+ * raises the target PAST the range ceiling on purpose, so sessions above it
+ * are the high-water mark, not another era.
+ */
+function bestCountAt(sessions: ExerciseSession[], sets: number): number | null {
+  let best: number | null = null;
+  for (const h of sessions) {
+    if (h.sets.length === 0 || workingWeight(h.sets) !== 0) continue;
+    const c = credit(h, sets);
+    if (c.count === 0) continue;
+    if (best == null || c.total > best) best = c.total;
+  }
+  return best;
+}
+
+/** The rep range recorded on a session's sets (the most common one), when any. */
+function sessionRange(session: ExerciseSession): { repLow: number; repHigh: number } | null {
+  const counts = new Map<string, number>();
+  for (const s of session.sets) {
+    if (s.repLow == null || s.repHigh == null) continue;
+    const key = `${s.repLow}-${s.repHigh}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [key, count] of counts) if (count > bestCount) { best = key; bestCount = count; }
+  if (!best) return null;
+  const [repLow, repHigh] = best.split('-').map(Number);
+  return { repLow, repHigh };
+}
+
+/**
+ * Was this session trained under the CURRENT prescription's rep range? True
+ * when the sets recorded this exact range, or — for older logs that recorded
+ * nothing — when the reps don't sit a whole era outside it.
+ */
+function sameEra(session: ExerciseSession, ex: PrescribedSlot): boolean {
+  const recorded = sessionRange(session);
+  if (recorded) return recorded.repLow === ex.repLow && recorded.repHigh === ex.repHigh;
+  const avg = creditedAverage(session, ex.sets);
+  if (avg == null) return true;
+  return avg < ex.repHigh + RANGE_MISMATCH_REPS && avg > ex.repLow - RANGE_MISMATCH_REPS;
+}
+
+/**
+ * How many sessions of history the engine wants: the stall window plus room
+ * for a late-slot session to be dropped. Capping at four regardless of
+ * training age switched stall detection off for advanced lifters entirely.
+ */
+export function historyDepthFor(experience: ExperienceLevel = DEFAULT_EXPERIENCE): number {
+  return stallWindowFor(experience) + 2;
+}
+
+/**
  * The load an estimated 1RM predicts for a set of `reps` — Epley solved for
  * weight (e1RM = w × (1 + reps/30)). This is the piece that lets strength move
  * BETWEEN rep ranges: 205×7 and 245×3 are the same lifter, and only the e1RM
@@ -485,10 +545,14 @@ function rangeReanchor(
   // first exposure to an unfamiliar rep bracket, which is where technique goes.
   // Where the estimate isn't trustworthy — every set was past the formula's
   // valid range — fall back to the load–rep model the increments already use.
+  // Two predictors — the est. 1RM (where the formula is valid) and the plain
+  // load–rep model — and the re-anchor takes whichever agrees MORE with the
+  // reps. Picking one or the other by validity made the answer non-monotonic:
+  // 13 reps (one valid set) could land heavier than 14 (none valid).
   const e1rm = validE1rm(baseline[0].sets);
-  const predicted = e1rm > 0
-    ? loadForReps(e1rm, ex.repHigh) * REANCHOR_SAFETY
-    : weight * (1 + ((avg - ex.repHigh) * PCT_LOAD_PER_REP) / 100);
+  const byE1rm = e1rm > 0 ? loadForReps(e1rm, ex.repHigh) * REANCHOR_SAFETY : null;
+  const byReps = weight * (1 + ((avg - ex.repHigh) * PCT_LOAD_PER_REP) / 100);
+  const predicted = byE1rm == null ? byReps : tooLight ? Math.max(byE1rm, byReps) : Math.min(byE1rm, byReps);
 
   const capped = clamp(
     predicted,
@@ -601,9 +665,11 @@ export function calculateRecommendation(
   const last = baseline[0];
   const weight = workingWeight(last.sets);
 
-  // Progression by count (reps or seconds) rather than by load.
-  const countProgressed =
-    weight === 0 && (weightType === 'Bodyweight' || ctx.unit === 'seconds');
+  // Progression by count (reps or seconds) rather than by load: anything
+  // logged at 0 lbs. The weight type and unit only change the wording — a
+  // load engine has nothing to say about a weight of zero whatever the catalog
+  // calls the movement, and "go to 2.5 lbs" is not advice.
+  const countProgressed = weight === 0;
 
   const withContext = (rec: WeightRec): WeightRec => skippedShifted
     ? { ...rec, reason: `${rec.reason} (last session ran later in your workout than usual — not held against you)` }
@@ -614,6 +680,14 @@ export function calculateRecommendation(
   // meaningless without a target, so the honest answer is "start where you left
   // off". Inventing a range here is exactly what this engine no longer does.
   if (exercise.repLow == null || exercise.repHigh == null) {
+    // Even unprescribed work honours a planned easy week.
+    if (isEasyPhase(phase ?? null) && weight > 0) {
+      return withContext({
+        weight: easeBack(weight, phase === 'race-week' ? 0.7 : phase === 'intro' ? 0.8 : 0.9, incrementFor(weight, weightType)),
+        direction: 'down', kind: 'deload',
+        reason: 'Planned easy week — lighter than last time, crisp reps',
+      });
+    }
     return withContext({
       weight,
       direction: 'hold',
@@ -622,9 +696,15 @@ export function calculateRecommendation(
     });
   }
   const ex: PrescribedSlot = {
-    sets: exercise.sets, repLow: exercise.repLow, repHigh: exercise.repHigh,
+    sets: Math.max(1, exercise.sets), repLow: exercise.repLow, repHigh: exercise.repHigh,
   };
   const step = incrementFor(weight, weightType);
+  // The prescription's range changed since the last session (recorded on the
+  // set logs) — the reps logged belong to the old range, not to a miss.
+  const rangeChanged = (() => {
+    const r = sessionRange(last);
+    return r != null && (r.repLow !== ex.repLow || r.repHigh !== ex.repHigh);
+  })();
 
   // Does this load still belong to the prescription at all? Computed before the
   // phase branch as well as before the progression branches, because an easy
@@ -688,7 +768,7 @@ export function calculateRecommendation(
   // external load *was* logged (weighted pull-ups on a belt), the normal weight
   // engine applies.
   if (countProgressed) {
-    return withContext(repProgression(baseline, last, ex, goal, ctx.unit ?? 'reps'));
+    return withContext(repProgression(baseline, last, ex, goal, ctx.unit ?? 'reps', experience));
   }
 
   // 0. The load belongs to a different rep range — re-anchor it before any
@@ -736,11 +816,17 @@ export function calculateRecommendation(
   // Both increase paths funnel through here so the weekly rate cap can never be
   // bypassed by adding another trigger later.
   const increaseTo = (jump: number, evidence: string): WeightRec => {
-    const ceiling = weeklyCeiling(baseline, now, experience);
+    // Only sessions trained under THIS rep range anchor the weekly cap: a
+    // re-anchor to a new range is strength re-expressed in new units, not a
+    // week's progress already spent, so it must not read as "already went up".
+    const era = baseline.filter(h => sameEra(h, ex));
+    const ceiling = weeklyCeiling(era.length > 0 ? era : baseline, now, experience);
 
     // Already climbed as far as this athlete consolidates in a week. Adding
-    // again today out-runs recovery — bank the reps instead.
-    if (ceiling != null && weight >= ceiling) {
+    // again today out-runs recovery — bank the reps instead. The comparison
+    // carries an epsilon: 100 × 1.1 is 110.00000000000001 in floating point,
+    // and a beginner at 110 slipped under the cap to 115 — 15% in a week.
+    if (ceiling != null && weight >= ceiling - CAP_EPSILON) {
       return withContext({
         weight,
         direction: 'hold',
@@ -751,7 +837,7 @@ export function calculateRecommendation(
 
     let target = weight + jump;
     let rateLimited = false;
-    if (ceiling != null && target > ceiling) {
+    if (ceiling != null && target > ceiling + CAP_EPSILON) {
       // Trim the jump to the weekly allowance — but never below one increment.
       // You cannot microload finer than the gym stocks, so a light lift whose
       // weekly allowance is under one plate still gets its single jump.
@@ -868,8 +954,12 @@ export function calculateRecommendation(
     // it was most useful: "holding counts" lifts the score just past a stall,
     // so the lifter got a generic chase-reps line instead of being told that
     // defending the load through a deficit is the objective.
-    const flat = sameWeight && prEvents === 0 && score < PROGRESS_SCORE;
-    const stalled = sameWeight && prEvents === 0 && score < STALL_SCORE;
+    // The composite DECIDES. Gating both verdicts on prEvents === 0 made the
+    // score irrelevant (no PRs already implies every signal ≤ 0 after the dead
+    // band), so a one-rep PR vetoed a deload that a falling est. 1RM should
+    // have confirmed, and the review screen could disagree with the bar.
+    const flat = sameWeight && score < PROGRESS_SCORE;
+    const stalled = sameWeight && score < STALL_SCORE;
 
     if (holdsInsteadOfDeload(goal, experience) ? flat : stalled) {
       // Not everyone gets their load cut. In a deficit the plateau reflects
@@ -904,6 +994,13 @@ export function calculateRecommendation(
   // top set or tacked on an extra set can never be talked into a load cut by
   // work they volunteered for.
   const judgedAvg = Math.max(strictAvg, avgReps);
+  if (judgedAvg < ex.repLow && rangeChanged) {
+    const was = sessionRange(last)!;
+    return withContext({
+      weight, direction: 'hold', kind: 'hold',
+      reason: `Your rep range moved from ${was.repLow}–${was.repHigh} to ${ex.repLow}–${ex.repHigh} — same ${weight} lbs, new targets. Give it a session here before anything changes`,
+    });
+  }
   if (judgedAvg < ex.repLow) {
     // The confirming session has to be at the SAME load. Judging the first
     // session after a back-off against the miss that caused it would walk the
@@ -945,7 +1042,9 @@ export function calculateRecommendation(
       ? `You've been away from this one — settle back in at ${weight} lbs before pushing, then a set at ${ex.repHigh} reps earns the next increase`
       : !rangeTopped
         ? `Get one set to ${ex.repHigh} reps at ${weight} lbs — that's what earns the next increase`
-        : `${Math.round((priorBest ?? 0) - repTotal + 1)} more reps than your best at ${weight} lbs (${Math.round(priorBest ?? 0)}) earns the next increase`;
+        : Math.round((priorBest ?? 0) - repTotal) <= 0
+          ? `Match your best at ${weight} lbs (${Math.round(priorBest ?? 0)} reps) with a set at ${ex.repHigh} to earn the next increase`
+          : `${Math.round((priorBest ?? 0) - repTotal)} more rep${Math.round((priorBest ?? 0) - repTotal) === 1 ? '' : 's'} would match your best at ${weight} lbs (${Math.round(priorBest ?? 0)}) — that earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
 
@@ -961,48 +1060,71 @@ export function calculateRecommendation(
  * reps" is nonsense on a plank.
  */
 function repProgression(
-  history: ExerciseSession[],
+  baseline: ExerciseSession[],
   last: ExerciseSession,
   exercise: PrescribedSlot,
   goal: Goal,
   unit: MeasureUnit = 'reps',
+  experience: ExperienceLevel = DEFAULT_EXPERIENCE,
 ): WeightRec {
-  const minReps = Math.min(...last.sets.map(s => s.reps));
-  const avgReps = repSum(last.sets) / last.sets.length;
   const timed = unit === 'seconds';
   const n = (v: number) => (timed ? `${v}s` : `${v} reps`);
 
-  // 1. Rep range beaten across a full set count → raise the rep goal
-  if (last.sets.length >= exercise.sets && minReps >= exercise.repHigh) {
+  // The same two readings the loaded engine takes. CREDITED (best programmed
+  // sets) is what can earn something, so a failed bonus set is ignored rather
+  // than dragging the target down; STRICT (sets in order) is what set 1
+  // actually managed, which is where next session's target starts.
+  const credited = credit(last, exercise.sets);
+  const strict = countedSets(last, exercise.sets);
+  const set1 = strict[0]?.reps ?? Math.round(credited.average);
+  const fullSetCount = credited.count >= exercise.sets;
+
+  // 1. Mastered → raise the target. Mirrors the loaded trigger exactly: the
+  // top of the range reached on a set, and the most work ever done here. The
+  // old rule demanded EVERY set at repHigh — a bar the per-set plan's
+  // descending targets (12/11/10) never prescribed, so a compliant lifter
+  // never earned an increase and was deloaded every few sessions for it.
+  const priorBest = bestCountAt(baseline.slice(1), exercise.sets);
+  if (fullSetCount && credited.best >= exercise.repHigh && (priorBest == null || credited.total >= priorBest)) {
+    const target = Math.max(set1, exercise.repHigh) + 1;
     return {
       weight: 0,
-      targetReps: minReps + 1,
+      targetReps: target,
       direction: 'up',
       kind: 'increase',
       reason: timed
-        ? `All ${last.sets.length} holds hit ${exercise.repHigh}s+ — push for ${n(minReps + 1)}`
-        : `All ${last.sets.length} sets hit ${exercise.repHigh}+ — push for ${minReps + 1} reps, or add weight`,
+        ? `${Math.round(credited.total)}s total with a hold at ${exercise.repHigh}s — your best here. Push for ${n(target)} on the first hold`
+        : `${Math.round(credited.total)} reps with a set at ${exercise.repHigh} — your best at this one. Push for ${target} reps on set 1, or add weight`,
     };
   }
 
-  // 2. Total reps stalled for several sessions → back off and rebuild.
-  // Same calendar guard as the loaded engine: sessions spread across months are
-  // infrequent training, not a plateau to shed fatigue from.
-  const window = history.filter(h => h.sets.length > 0).slice(0, STALL_SESSIONS);
-  const sparseWindow = window.length >= STALL_SESSIONS &&
+  // 2. Stalled → back off and rebuild. Best-of-window against the anchor, as
+  // for loaded work: one bad day in a window that still holds a high-water
+  // mark is noise, not a plateau. Same calendar guard too — sessions spread
+  // across months are infrequent training, not fatigue to shed.
+  const stallWindow = stallWindowFor(experience);
+  const window = baseline.slice(0, stallWindow);
+  const sparseWindow = window.length >= stallWindow &&
     window[0].completedAt - window[window.length - 1].completedAt > STALL_WINDOW_DAYS * DAY_MS;
-  if (window.length >= STALL_SESSIONS && !sparseWindow) {
-    const oldest = window[window.length - 1];
-    if (repSum(last.sets) <= repSum(oldest.sets)) {
+  if (window.length >= stallWindow && !sparseWindow) {
+    const anchorTotal = credit(window[window.length - 1], exercise.sets).total;
+    const progressed = window.slice(0, -1).some(h => credit(h, exercise.sets).total > anchorTotal);
+    if (!progressed) {
       // Same reasoning as the loaded engine: in a deficit a rep plateau is the
-      // deficit, not fatigue — hold the standard rather than cutting it.
-      if (goal === 'fat-loss') {
+      // deficit, supporting a sport it is the sport, and a novice needs one
+      // more rep at the standard, not a lower standard.
+      if (holdsInsteadOfDeload(goal, experience)) {
+        const standard = Math.max(set1, exercise.repLow);
         return {
           weight: 0,
-          targetReps: minReps,
+          targetReps: standard,
           direction: 'hold',
           kind: 'hold',
-          reason: `Holding ${n(minReps)} through a deficit is the win — defend this standard`,
+          reason: goal === 'fat-loss'
+            ? `Holding ${n(standard)} through a deficit is the win — defend this standard`
+            : goal === 'sport-support'
+              ? `Flat at ${n(standard)}, but the miles are paying for it — holding here through the block is the win`
+              : `Flat for ${window.length} sessions — repeat ${n(standard)} and chase one more before changing anything`,
         };
       }
       return {
@@ -1017,27 +1139,46 @@ function repProgression(
     }
   }
 
-  // 3. Under the range → work back toward it
-  if (avgReps < exercise.repLow) {
+  // 3. Under the range → work back toward it, on evidence: a clear miss, or a
+  // second session confirming the first. One off day is not a trend here
+  // either.
+  const strictAvg = strict.length > 0 ? repSum(strict) / strict.length : credited.average;
+  const judgedAvg = Math.max(strictAvg, credited.average);
+  if (judgedAvg < exercise.repLow) {
+    const previous = baseline[1];
+    const prevAvg = previous ? creditedAverage(previous, exercise.sets) : null;
+    const repeated = prevAvg != null && prevAvg < exercise.repLow;
+    const bigMiss = goal !== 'fat-loss' && judgedAvg <= exercise.repLow - BIG_MISS_REPS;
+    if (repeated || bigMiss) {
+      return {
+        weight: 0,
+        targetReps: exercise.repLow,
+        direction: 'down',
+        kind: 'decrease',
+        reason: timed
+          ? `Holds fell under ${n(exercise.repLow)} — build back into the range`
+          : `Reps fell under ${exercise.repLow} — build back into the range`,
+      };
+    }
     return {
       weight: 0,
       targetReps: exercise.repLow,
-      direction: 'down',
-      kind: 'decrease',
-      reason: timed
-        ? `Holds fell under ${n(exercise.repLow)} — build back into the range`
-        : `Reps fell under ${exercise.repLow} — build back into the range`,
+      direction: 'hold',
+      kind: 'hold',
+      reason: `Short of ${n(exercise.repLow)}, but one session isn't a trend — aim for the range again before changing anything`,
     };
   }
 
-  // 4. In range → chase one more rep per set
-  const target = Math.min(minReps + 1, exercise.repHigh);
+  // 4. In range → one more on set 1 than last time, toward the ceiling
+  const target = clamp(set1 + 1, exercise.repLow, exercise.repHigh);
   const reason =
-    last.sets.length < exercise.sets
+    !fullSetCount
       ? `Complete all ${exercise.sets} sets, then chase ${timed ? 'time' : 'reps'}`
       : sparseWindow
-        ? `You've been away from this one — settle back in, then aim for ${n(target)}+ per set`
-        : `In range — aim for ${n(target)}+ per set, toward ${exercise.sets}×${exercise.repHigh}${timed ? 's' : ''}`;
+        ? `You've been away from this one — settle back in, then aim for ${n(target)}+ on set 1`
+        : priorBest != null && credited.best >= exercise.repHigh
+          ? `${Math.max(1, Math.ceil(priorBest - credited.total))} more ${timed ? 'seconds' : 'reps'} than your best here (${Math.round(priorBest)}) earns the next step`
+          : `In range — aim for ${n(target)} on set 1; a set at ${exercise.repHigh} with your best total earns the next step`;
   return { weight: 0, targetReps: target, direction: 'hold', kind: 'hold', reason };
 }
 
@@ -1162,10 +1303,15 @@ export function buildSetPlan(
   //                   Blanket-prescribing repLow after every change is wrong in
   //                   both directions: a rate-capped 2.5% jump barely costs a
   //                   rep, and a 10% deload buys back about three.
+  // Bodyweight work progresses by raising the count PAST the range ceiling
+  // (there is no heavier bar to move to), so an increase there is not clamped
+  // at repHigh — clamping it was what made the next increase unreachable.
+  const openCeiling = bodyweight && rec.kind === 'increase';
+  const topClamp = openCeiling ? Number.POSITIVE_INFINITY : ex.repHigh;
   const baseReps = rec.kind === 'hold'
-    ? clamp((lastCounted[0]?.reps ?? ex.repLow) + 1, ex.repLow, ex.repHigh)
+    ? clamp((lastCounted[0]?.reps ?? ex.repLow) + 1, ex.repLow, bodyweight ? Math.max(ex.repHigh, rec.targetReps ?? 0) : ex.repHigh)
     : bodyweight
-      ? clamp(rec.targetReps!, ex.repLow, ex.repHigh)
+      ? clamp(rec.targetReps!, ex.repLow, topClamp)
       : lastAvg != null && lastWeight != null && lastWeight > 0
         ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), ex.repLow, ex.repHigh)
         : ex.repLow;
@@ -1174,11 +1320,10 @@ export function buildSetPlan(
   const sets: PrescribedSet[] = Array.from({ length: count }, (_, i) => ({
     setNumber: i + 1,
     weight: rec.weight,
-    targetReps: clamp(baseReps + drops[i], ex.repLow, ex.repHigh),
+    targetReps: clamp(baseReps + drops[i], ex.repLow, topClamp),
   }));
 
   const planTotal = sets.reduce((sum, s) => sum + (s.targetReps ?? 0), 0);
-  const targetTotal = count * ex.repHigh;
 
   // What actually earns the next jump at this load: reach the top of the range
   // on a set, and beat your own best work here. Stating the real number matters
@@ -1189,10 +1334,16 @@ export function buildSetPlan(
     ? `Hit every target (${planTotal} reps) — a set at ${ex.repHigh} reps earns the next increase.`
     : `Hit every target (${planTotal} reps) — a set at ${ex.repHigh}, and ${Math.round(toBeat)}+ total at ${rec.weight} lbs, earns the next increase.`;
 
-  const goal = timed
-    ? `Hit every hold for ${planTotal} total seconds — ${targetTotal} earns a longer target next time.`
-    : bodyweight
-    ? `Hit every target for ${planTotal} total reps — ${targetTotal} earns a harder variation or added load.`
+  // Unloaded work: the real trigger is a set/hold at the ceiling plus beating
+  // the best total here — the old line quoted `sets × repHigh`, which the
+  // descending targets never added up to.
+  const countToBeat = bodyweight ? bestCountAt(freshBaseline(history), count) : null;
+  const countGoal = timed
+    ? `Hit every hold (${planTotal}s total) — a hold at ${ex.repHigh}s${countToBeat != null ? `, and ${Math.round(countToBeat)}s+ in total,` : ''} earns a longer target.`
+    : `Hit every target (${planTotal} reps) — a set at ${ex.repHigh}${countToBeat != null ? `, and ${Math.round(countToBeat)}+ in total,` : ''} earns a harder target or added load.`;
+
+  const goal = bodyweight
+    ? countGoal
     : rec.kind === 'reanchor'
       ? `First session at ${rec.weight} lbs — this is an estimate from your log, not a test. Around ${planTotal} reps with 1–2 in reserve, and the coach corrects from what you actually hit.`
       : rec.kind === 'increase'

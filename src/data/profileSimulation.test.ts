@@ -32,7 +32,7 @@ import type { ExperienceLevel, Goal, PhaseKind, TrainingPlan, TrainingProfile } 
 import { isEasyPhase, toPlanDate } from './plan';
 import { buildPlanProposal } from './planner';
 import type { ExerciseDecision, PlannerInput } from './planner';
-import { buildSetPlan } from './recommendations';
+import { buildSetPlan, historyDepthFor } from './recommendations';
 import type { ExerciseSession, RecKind } from './recommendations';
 import { buildSnapshot, sessionTimestamp } from './analytics';
 import type { TrainingSnapshot } from './analytics';
@@ -44,7 +44,7 @@ import { computeBlockRetrospective } from './retrospective';
 import type { BlockRetrospective } from './plan';
 import {
   activateProposal, getActiveBlockInfo, getActivePhase, getProfileOrDefault,
-  getTrainingGoal, saveTrainingProfile,
+  getTrainingGoal, saveTrainingProfile, getPhaseResolver,
 } from './planStore';
 import { effectiveExperience, inferExperience } from './experience';
 import { getStoredProgram } from './programStore';
@@ -216,19 +216,23 @@ interface PlannedProfile {
   swapAtReview?: { from: string; to: string };
 }
 
-function historyFor(exerciseId: string, snapshot: TrainingSnapshot): ExerciseSession[] {
-  // Mirrors WorkoutView: up to the last 4 sessions containing the lift.
+function historyFor(exerciseId: string, snapshot: TrainingSnapshot, experience: ExperienceLevel): ExerciseSession[] {
+  // Mirrors WorkoutView: the last `historyDepthFor` sessions containing the lift.
   const positions = snapshotPositions(snapshot);
   const out: ExerciseSession[] = [];
+  const depth = historyDepthFor(experience);
   for (const session of snapshot.sessions) {
     const sets = (snapshot.setsBySession.get(session.id!) ?? [])
       .filter(s => s.exerciseId === exerciseId)
       .sort((a, b) => a.setNumber - b.setNumber)
-      .map(s => ({ weight: s.weight, reps: s.reps }));
+      .map(s => ({
+        weight: s.weight, reps: s.reps,
+        ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
+      }));
     if (sets.length > 0) {
       out.push({ completedAt: sessionTimestamp(session), sets, position: positions.get(session.id!)?.get(exerciseId) ?? null });
     }
-    if (out.length >= 4) break;
+    if (out.length >= depth) break;
   }
   return out;
 }
@@ -246,8 +250,11 @@ class Log {
     return id;
   }
 
-  logSet(sessionId: number, exerciseId: string, setNumber: number, weight: number, reps: number, order: number): void {
-    this.setLogs.push({ id: this.nextSet++, sessionId, exerciseId, setNumber, weight, reps, order });
+  logSet(sessionId: number, exerciseId: string, setNumber: number, weight: number, reps: number, order: number, range?: { repLow?: number; repHigh?: number }): void {
+    this.setLogs.push({
+      id: this.nextSet++, sessionId, exerciseId, setNumber, weight, reps, order,
+      ...(range?.repLow != null && range.repHigh != null ? { repLow: range.repLow, repHigh: range.repHigh } : {}),
+    });
   }
 
   refresh(): void {
@@ -262,9 +269,9 @@ function trainWeek(week: number, athlete: Athlete, log: Log, program: WorkoutDay
   const goal = getTrainingGoal();
   const experience = effectiveExperience(getProfileOrDefault(), log.snapshot);
   const coaching = log.snapshot.sessions.length > 0
-    ? computeCoaching(program, log.snapshot, monday, phase, goal)
+    ? computeCoaching(program, log.snapshot, monday, phase, goal, getPhaseResolver())
     : null;
-  const overlay = computeProgramPlan(program, log.snapshot, monday, phase, goal);
+  const overlay = computeProgramPlan(program, log.snapshot, monday, phase, goal, getPhaseResolver());
   const scheduled = program.filter(d => dayInPhase(d, phase));
   const chips: ChipRecord[] = [];
   const loads = new Map<string, number>();
@@ -280,7 +287,7 @@ function trainWeek(week: number, athlete: Athlete, log: Log, program: WorkoutDay
       const startedAt = monday + di * DAY + 17 * 3_600_000;
       const sessionId = log.startSession(day.id, startedAt);
       effDay.exercises.forEach((ex, order) => {
-        const plan = buildSetPlan(historyFor(ex.id, log.snapshot), ex, {
+        const plan = buildSetPlan(historyFor(ex.id, log.snapshot, experience), ex, {
           phase, goal, experience, now: startedAt,
           weightType: getExerciseMeta(ex.id).weightType, unit: unitFor(ex.id),
         });
@@ -290,7 +297,7 @@ function trainWeek(week: number, athlete: Athlete, log: Log, program: WorkoutDay
         plan.sets.forEach((s, i) => {
           const weight = s.weight ?? chosen;
           const reps = athlete.perform(ex.id, weight, s.targetReps, i);
-          log.logSet(sessionId, ex.id, i + 1, weight, reps, order);
+          log.logSet(sessionId, ex.id, i + 1, weight, reps, order, ex);
           weeklySets += 1;
         });
       });
@@ -361,7 +368,7 @@ function simulatePlanned(p: PlannedProfile): Journey {
   const info = getActiveBlockInfo();
   return {
     weeks, blocks, snapshot: log.snapshot,
-    finalCoaching: computeCoaching(getStoredProgram(), log.snapshot, END, getActivePhase(END), getTrainingGoal()),
+    finalCoaching: computeCoaching(getStoredProgram(), log.snapshot, END, getActivePhase(END), getTrainingGoal(), getPhaseResolver()),
     finalPlan: info?.plan ?? null,
   };
 }
@@ -474,7 +481,7 @@ function simulateSelfDirected(): SelfDirectedJourney {
         // their own sets × reps on top of it.
         const slot = slotFor(lift.id, def.name, { snapshot: log.snapshot });
         weekSlots.set(lift.id, slot);
-        const plan = buildSetPlan(historyFor(lift.id, log.snapshot), slot, {
+        const plan = buildSetPlan(historyFor(lift.id, log.snapshot, experience), slot, {
           goal, experience, now: startedAt, weightType: def.weightType, unit: unitFor(lift.id),
         });
         chips.push({ week, exerciseId: lift.id, kind: plan.rec?.kind ?? null, reason: plan.rec?.reason ?? null, weight: plan.sets[0].weight });
@@ -488,7 +495,7 @@ function simulateSelfDirected(): SelfDirectedJourney {
         for (let i = 0; i < lift.sets; i++) {
           const r = athlete.perform(lift.id, weight, lift.reps, i);
           reps.push(r);
-          log.logSet(sessionId, lift.id, i + 1, weight, r, order);
+          log.logSet(sessionId, lift.id, i + 1, weight, r, order, slot);
           weeklySets += 1;
         }
         if (weight > 0 && reps.every(r => r >= lift.reps)) own.set(lift.id, weight + (def.primaryMuscle === 'Quads' || def.primaryMuscle === 'Glutes' || def.primaryMuscle === 'Hamstrings' ? 10 : 5));
@@ -515,7 +522,9 @@ function chipsOfKind(weeks: WeekRecord[], kind: RecKind, fromWeek = 0): ChipReco
 }
 
 function decliningOn(coaching: Coaching | null): string[] {
-  return (coaching?.progress ?? []).filter(p => p.status === 'declining').map(p => p.exerciseId);
+  return (coaching?.progress ?? [])
+    .filter(p => p.status === 'declining')
+    .map(p => `${p.exerciseId} [${p.evidence.join('; ')}]`);
 }
 
 // ── Properties every planned journey holds today ─────────────────────────────
@@ -591,7 +600,7 @@ describe('F1 — progress is blind to planned easy weeks (Phase 2.1)', () => {
   // The synthetic athlete's capacity only ever grows, so a "declining" verdict
   // can only come from reading a planned back-off as weakness.
   for (const p of PLANNED.filter(x => x.name.startsWith('Newcomer') || x.name.startsWith('Optimizer'))) {
-    it.fails(`${p.name.split(' ·')[0]}: nothing reads declining the Monday after a planned easy week`, () => {
+    it(`${p.name.split(' ·')[0]}: nothing reads declining the Monday after a planned easy week`, () => {
       const j = simulatePlanned(p);
       const afterEasy = j.weeks.filter((w, i) => i > 0 && isEasyPhase(j.weeks[i - 1].phase) && w.coaching);
       expect(afterEasy.length, 'the journey must contain an easy week to test this').toBeGreaterThan(0);
@@ -600,11 +609,16 @@ describe('F1 — progress is blind to planned easy weeks (Phase 2.1)', () => {
     });
   }
 
+  // Phase 2.1 fixed the review half (the retrospective now reads 24 of 27
+  // lifts as progressing and flags one for rotation); the planner still
+  // replaces most slots on a replan regardless of the carryover. Phase 3.
   it.fails('Optimizer: the block review does not rotate out most of a program that climbed all block', () => {
     const j = simulatePlanned(PLANNED[2]);
-    const replaced = j.blocks[1].decisions.filter(d => d.status === 'replacement').length;
+    const replaced = j.blocks[1].decisions.filter(d => d.status === 'replacement');
     const total = j.blocks[0].program.reduce((n, d) => n + d.exercises.length, 0);
-    expect(replaced / total).toBeLessThan(0.5);
+    const review = j.blocks[1].previousReview!;
+    const verdicts = review.strength.map(s => `${s.exerciseId}:${s.status}:${s.changePct.toFixed(1)}%`).join(', ');
+    expect(replaced.length / total, `replaced ${replaced.map(d => d.replacesName).join(', ')} | review: ${verdicts} | ${review.summary.join(' ')}`).toBeLessThan(0.5);
   });
 });
 

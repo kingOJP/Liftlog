@@ -73,7 +73,10 @@ describe('computeBlockRetrospective', () => {
     const retro = computeBlockRetrospective(makeBlock(), snapshot, NOW);
     const outcome = retro.strength.find(s => s.exerciseId === 'incline-barbell-press');
     expect(outcome).toBeDefined();
-    expect(outcome!.changePct).toBeGreaterThan(10);
+    // Day 21 falls in the block's planned deload week, so the review runs
+    // 100 → 110 (the last hard week), not 100 → 115.
+    expect(outcome!.changePct).toBeGreaterThanOrEqual(10);
+    expect(outcome!.endE1rm / outcome!.startE1rm).toBeCloseTo(1.1, 1);
     expect(retro.carryover.keepExerciseIds).toContain('incline-barbell-press');
     expect(retro.summary.join(' ')).toContain('Incline Barbell Press');
   });
@@ -125,5 +128,23 @@ describe('computeBlockRetrospective', () => {
     const retro = computeBlockRetrospective(makeBlock(), buildSnapshot([], []), NOW);
     expect(retro.sessionsCompleted).toBe(0);
     expect(retro.summary[0]).toMatch(/no workouts/i);
+  });
+});
+
+
+describe('a block that ends on its planned deload (audit F1)', () => {
+  it('is judged to its last hard week, not to the deload session', () => {
+    const snapshot = makeSnapshot([
+      [0, 'incline-barbell-press', 100],
+      [7, 'incline-barbell-press', 105],
+      [14, 'incline-barbell-press', 110],
+      [21, 'incline-barbell-press', 95],   // deload week, 90% by prescription
+    ]);
+    const retro = computeBlockRetrospective(makeBlock(), snapshot, NOW);
+    const outcome = retro.strength.find(s => s.exerciseId === 'incline-barbell-press')!;
+    expect(outcome.changePct).toBeGreaterThan(5);
+    expect(outcome.status).toBe('progressing');
+    expect(retro.carryover.reviewExerciseIds).not.toContain('incline-barbell-press');
+    expect(retro.summary.join(' ')).toMatch(/moved the right way/);
   });
 });

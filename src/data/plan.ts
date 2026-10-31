@@ -21,7 +21,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay } from './program';
-import { startOfWeek } from './program';
+import { startOfWeek, addWeeks } from './program';
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
@@ -359,7 +359,52 @@ export function blockEnded(block: TrainingBlock, now = Date.now()): boolean {
 /** Exclusive end timestamp of a scheduled block (start of the week after). */
 export function blockEndTs(block: TrainingBlock): number | null {
   if (block.openEnded) return null;
-  return blockAnchor(block).getTime() + block.phases.length * 7 * DAY_MS;
+  // Calendar weeks, not n × 7 × 24 h — a DST change inside the block would
+  // otherwise put the boundary an hour off the Monday midnight it means.
+  return addWeeks(blockAnchor(block).getTime(), block.phases.length);
+}
+
+/** Answers "which planned phase governed this moment?" for any timestamp. */
+export type PhaseResolver = (ts: number) => PhaseKind | null;
+
+/**
+ * The phase in force at `ts` inside one block, or null when `ts` falls outside
+ * it. Open-ended (migrated) blocks are perpetual accumulation.
+ */
+export function blockPhaseAt(block: TrainingBlock, ts: number): PhaseKind | null {
+  if (block.status === 'pending') return null;
+  const start = blockAnchor(block).getTime();
+  if (ts < start) return null;
+  if (block.openEnded) {
+    return block.completedAt != null && ts > block.completedAt ? null : 'accumulation';
+  }
+  const week = blockWeekIndex(block, ts);
+  return week >= 0 && week < block.phases.length ? block.phases[week] : null;
+}
+
+/**
+ * A resolver over a whole journey: which phase was planned for the week a
+ * session was logged in. This is how the progress engine knows that a session
+ * in a deload, recovery or intro week was deliberately lighter — and must not
+ * be read as the lifter getting weaker. The newest block containing `ts` wins
+ * (a block started mid-week over the one it replaced).
+ */
+export function phaseResolverFor(plans: TrainingPlan[]): PhaseResolver {
+  const blocks = plans.flatMap(p => p.blocks)
+    .filter(b => b.status !== 'pending')
+    .sort((a, b) => blockAnchor(b).getTime() - blockAnchor(a).getTime());
+  return (ts: number) => {
+    for (const block of blocks) {
+      const phase = blockPhaseAt(block, ts);
+      if (phase) return phase;
+    }
+    return null;
+  };
+}
+
+/** A resolver scoped to one block — what a retrospective reviews itself with. */
+export function blockPhaseResolver(block: TrainingBlock): PhaseResolver {
+  return (ts: number) => blockPhaseAt(block, ts);
 }
 
 /**

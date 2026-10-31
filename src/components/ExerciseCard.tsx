@@ -69,11 +69,16 @@ export default function ExerciseCard({
   const [editWarmup, setEditWarmup] = useState(false);
 
   // The prescription arrives asynchronously (it needs a history read) — drop a
-  // stale working weight when a new plan lands, per the React "adjusting state
-  // when a prop changes" pattern.
-  const [appliedPlan, setAppliedPlan] = useState<SetPlan | undefined>(undefined);
-  if (plan !== appliedPlan) {
-    setAppliedPlan(plan);
+  // stale working weight when a DIFFERENT plan lands, per the React "adjusting
+  // state when a prop changes" pattern. Compared by content, not identity:
+  // the plan object is rebuilt whenever anything in the workout changes
+  // (an exercise added mid-session, a background program refresh), and
+  // resetting on every rebuild snapped the lifter's chosen weight back to the
+  // recommendation so the next one-tap log recorded the wrong load.
+  const signature = plan ? plan.sets.map(s => `${s.weight ?? ''}:${s.targetReps ?? ''}`).join('|') : '';
+  const [appliedSignature, setAppliedSignature] = useState(signature);
+  if (signature !== appliedSignature) {
+    setAppliedSignature(signature);
     setWorkingWeight(null);
   }
 
@@ -210,7 +215,7 @@ export default function ExerciseCard({
           <span className="ex-rec-weight">
             {DIRECTION_ICON[recommendation.direction]}{' '}
             {recommendation.targetReps != null
-              ? `${recommendation.targetReps} reps`
+              ? `${recommendation.targetReps} ${timed ? 'sec' : 'reps'}`
               : `${recommendation.weight} lbs`}
           </span>
           <span className="ex-rec-reason">{recommendation.reason}</span>

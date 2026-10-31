@@ -578,6 +578,17 @@ context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four sign
   latest session ran ≥2 slots later than the exercise's usual position (median), it's excluded
   as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
 
+Three validity rules keep the signals honest, all shared with the prescription engine:
+**planned easy weeks are never endpoints** — each point carries `easy` (from a `PhaseResolver`,
+`planStore.getPhaseResolver()` app-wide or `blockPhaseResolver(block)` inside a retrospective)
+and deload/recovery/intro sessions are excluded from the trend and can never be PRs, so a block
+that ends on its deload is judged to its last hard week; **volume is load-normalized**
+(`normalizedReps`: reps at the first session's working weight, ~1 rep per 3% of load) so a
+successful load increase can't read as lost volume, and both signals pass through `deadband()`;
+**e1RM is only read from sets of ≤12 reps** (`validE1rm`). A verdict needs three *hard*
+sessions; rep PRs compare a session's bests against sessions before it (set 2 beating set 1 is
+not a PR).
+
 The signals combine into a −1…+1 composite with **goal-dependent weights**
 (`GOAL_SIGNAL_WEIGHTS` in `progression.ts`, shared with the prescription engine):
 strength leans on e1RM, hypertrophy/fat-loss on volume, and where adding strength isn't the
@@ -600,6 +611,13 @@ sessions containing that exercise, newest first), then calls
 the engine reads the athlete and the plan, not just the lift. WorkoutView supplies
 `getTrainingGoal()` and `effectiveExperience(getProfileOrDefault(), snapshot)`.
 
+`ctx.phase` and `ctx.goal` come from the plan; the history depth WorkoutView passes is
+`historyDepthFor(experience)` (the stall window + 2), not a flat four. Every set log records the
+rep range in force (`repLow`/`repHigh`, Stage 0 of the adaptive-engine roadmap), so the engine
+can tell a range that changed between blocks from a missed session: under the new range it
+**holds** with "your rep range moved" instead of easing back, and the weekly cap anchors only to
+same-era sessions so a re-anchor never reads as "already went up this week".
+
 Branches, evaluated in order:
 
 0. **Re-anchor (rep range changed)** — the reps logged sit ≥2 outside the prescribed range →
@@ -611,8 +629,9 @@ Branches, evaluated in order:
    `repHigh − 1`+, and best e1RM up ≥3% across them → move up now rather than waiting for a
    perfect rep total. Skipped on high-rep work (see the e1RM validity note below).
 3. **Deload** — a window of sessions at the same weight whose **goal-weighted composite**
-   (`progression.ts`) shows no progress → drop ~10% and build back up. Window length and who
-   gets a cut at all depend on training age and goal (see below).
+   (`progression.ts`) scores under `STALL_SCORE` → drop ~10% and build back up. The score
+   *decides* (it is no longer gated on "no PR events", which made it irrelevant); window
+   length (3, or 6 for advanced) and who gets a cut at all depend on training age and goal.
 4. **Decrease** — reps under `repLow`, **confirmed** (see below) → ease back ~5%.
 5. **Hold** (double progression) — reps in range → keep the weight, chase reps. The reason
    names the exact gap ("2 more reps than last time (36 total) earns the next increase").
@@ -636,8 +655,8 @@ a bar a 4×4–6 prescription cannot clear by design. The **stall** verdict is
 `compositeScore()` — the same goal-weighted blend of e1RM trend, volume trend and PR events
 the Metrics screen reports, so the app can no longer call a lift steady and deload it in the
 next workout. `deadband()` (3%) keeps ordinary session-to-session noise out of the decision,
-`stallWindowFor()` gives advanced lifters 4 sessions instead of 3 (they progress across a
-block, not session to session), and `holdsInsteadOfDeload()` decides who repeats the weight
+`stallWindowFor()` gives advanced lifters 6 sessions instead of 3 (they progress across a
+block, not session to session, and their honest rate sits inside the noise floor), and `holdsInsteadOfDeload()` decides who repeats the weight
 rather than cutting it: `fat-loss`, `sport-support`, and **beginners** (whose path is linear
 progression — a novice who stopped adding reps needs another rep, not a lighter bar).
 Full marks scale with training age (`fullMarksFor`, same 2×/1×/0.5× ratios as the weekly load
@@ -734,15 +753,17 @@ fresh-slot sessions, so a lift that dipped because it ran last doesn't get ratch
 falsely flagged as stalled. The reason string says so. Falls back to all sessions when none
 are fresh-slot.
 
-**Bodyweight exercises progress by reps, not load.** When the exercise's `weightType` is
-`Bodyweight` *and* the last session's working weight was 0 lbs, the engine switches to rep
-progression (`repProgression()` in the same file): the recommendation carries a `targetReps`
-per-set goal, total session reps replace e1RM as the stall metric, and the four branches mirror
-the weight engine (beat the range → +1 rep goal; stalled 3 sessions → reset to `repLow`, or
-*hold the standard* on a fat-loss goal; under range → build back to `repLow`; in range → chase
-one more rep). If external load *was* logged
-(e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
-"↑ N reps" instead of a weight when `targetReps` is set.
+**Unloaded work progresses by count, not load.** Any session whose working weight is 0 lbs —
+bodyweight, timed holds, or a loaded exercise logged unloaded — switches to count progression
+(`repProgression()` in the same file), with the SAME rules as the loaded engine read through
+`credit()`/`countedSets()`: increase when the best set reaches `repHigh` **and** the credited
+total matches the best ever here (`bestCountAt`; the set-1 target then goes *past* the ceiling,
+since there is no heavier bar), stall is best-of-window vs the anchor (one bad day never
+deloads; a failed bonus set is ignored), beginners/fat-loss/sport-support hold the standard
+instead of resetting, under-range needs a confirming session or a clear miss, and the in-range
+target is set 1 + 1. The old rule (every set at `repHigh`) was unreachable against the plan's
+descending targets and deloaded a compliant lifter forever (audit C1). ExerciseCard shows
+"↑ N reps" (or "N sec") instead of a weight when `targetReps` is set.
 
 Returns `{ weight, targetReps?, direction, kind, reason }`
 (`kind`: `increase`/`hold`/`decrease`/`deload`/`reanchor`). ExerciseCard colours the chip by
@@ -1324,9 +1345,11 @@ PROGRAM references) that are otherwise only checked by hand.
 - **Timed work is progressed by time** — a set of an exercise with
   `unit: 'seconds'` logs at 0 lbs with no weight input, and `repProgression`
   drives the hold through the same four branches as a bodyweight rep count.
-  Count progression is gated on `weight === 0 && (bodyweight || timed)`, so
-  editing a plank's weight-type metadata can't flip it onto the load engine.
-  The unit travels on `PrescriptionContext` so every reason string reads right.
+  Count progression is gated on `weight === 0` alone, so neither editing a
+  plank's weight-type metadata nor logging a machine unloaded can put a zero
+  on the load engine ("go to 2.5 lbs" is not advice). `dosage()` checks the
+  unit before any pattern rule. The unit travels on `PrescriptionContext` so
+  every reason string reads right.
 - **The weekly set band belongs to the goal, not the app** — every engine takes a
   `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
   A new goal that needs a different dose changes one function. On `sport-support` the coach

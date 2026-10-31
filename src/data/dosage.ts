@@ -68,23 +68,23 @@ export function dosage(
   profile: ExerciseProfile,
   experience: ExperienceLevel,
 ): RepPrescription {
-  if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
-    return experience === 'beginner'
-      ? { sets: 2, repLow: 12, repHigh: 20 }
-      : { sets: 3, repLow: 12, repHigh: 20 };
-  }
-  const compound = profile.mechanics === 'compound';
-
   // Timed work — planks, carries, dead hangs — is prescribed in SECONDS, and
-  // the numbers below are durations, not repetitions. It sits ahead of the
-  // beginner branch because a hold is a hold whoever is doing it; only the
-  // duration moves. See exercises.ts `unit`.
+  // the numbers below are durations, not repetitions. It sits ahead of EVERY
+  // other branch because a hold is a hold whoever is doing it and whatever
+  // pattern it has been filed under: a plank whose metadata was edited onto a
+  // high-rep pattern must still read "30–45 seconds", not "12–20 seconds".
   if (profile.unit === 'seconds') {
     if (experience === 'beginner') return { sets: 2, repLow: 20, repHigh: 30 };
     return goal === 'sport-support'
       ? { sets: 2, repLow: 30, repHigh: 45 }
       : { sets: 3, repLow: 30, repHigh: 45 };
   }
+  if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
+    return experience === 'beginner'
+      ? { sets: 2, repLow: 12, repHigh: 20 }
+      : { sets: 3, repLow: 12, repHigh: 20 };
+  }
+  const compound = profile.mechanics === 'compound';
 
   // Lifting in service of another sport. The dose is maximal-strength work at
   // low volume: heavy multi-joint lifts in the 4–6 region, accessories kept

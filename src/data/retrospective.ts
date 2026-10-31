@@ -22,7 +22,7 @@ import { getExerciseName } from './programStore';
 import { primaryMuscleFor } from './analytics';
 import { assessExercise, exercisePointSeries, MIN_TREND_SESSIONS } from './progress';
 import type { BlockRetrospective, ExerciseOutcome, MuscleOutcome, TrainingBlock } from './plan';
-import { blockAnchor, blockEndTs } from './plan';
+import { blockAnchor, blockEndTs, blockPhaseResolver } from './plan';
 
 const WEEK_MS = 7 * 86_400_000;
 const MIN_SESSIONS_FOR_TREND = MIN_TREND_SESSIONS;
@@ -69,13 +69,22 @@ export function computeBlockRetrospective(
   // volume-load trend, and PR events — not e1RM alone. The whole block is the
   // window (first vs last session inside it), with exercise-order freshness
   // discounting applied to the endpoints.
+  // The block's own phases say which of its weeks were planned easy weeks:
+  // the deload it ends on, the intro or recovery week it opened with. Those
+  // sessions are lighter by prescription and are kept out of the endpoints —
+  // judging first-session-to-deload-session reported every block that ended
+  // as designed as "strength flat to down" and flagged most of it for
+  // rotation.
+  const phaseOf = blockPhaseResolver(block);
   const strength: ExerciseOutcome[] = [];
   let blockPRs = 0;
-  for (const [exerciseId, points] of exercisePointSeries(snapshot, include)) {
+  for (const [exerciseId, points] of exercisePointSeries(snapshot, include, phaseOf)) {
     if (points.length < 2) continue;
     const assessment = assessExercise(exerciseId, points, block.focus, undefined, Infinity);
-    const first = points[0];
-    const end = points[points.length - 1];
+    const hard = points.filter(p => !p.easy);
+    const judged = hard.length > 0 ? hard : points;
+    const first = judged[0];
+    const end = judged[judged.length - 1];
     const prCount = points.reduce((n, p) => n + (p.weightPR ? 1 : 0) + (p.repPR ? 1 : 0), 0);
     blockPRs += prCount;
     strength.push({

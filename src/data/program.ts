@@ -169,10 +169,12 @@ export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHi
 /** Monday 00:00 local time of the week containing `date`, as a timestamp. */
 export function startOfWeek(date: Date | number): number {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
   const day = d.getDay();
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d.getTime();
+  // Construct the Monday directly rather than via setHours + setDate: in a
+  // zone whose DST transition falls at 00:00 (Santiago, Havana, Beirut),
+  // setHours(0) on the spring-forward day yields 01:00 and the subsequent
+  // setDate lands on Monday 01:00 — a different key from the rest of the week.
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - (day === 0 ? 6 : day - 1)).getTime();
 }
 
 /** `n` weeks after a week-start timestamp — calendar math, so DST can't drift it. */

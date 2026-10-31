@@ -7,7 +7,7 @@ import type { Metrics } from '../data/metrics';
 import { computeCoaching } from '../data/insights';
 import { volumeTargetFor } from '../data/analytics';
 import type { Coaching, Insight } from '../data/insights';
-import { getActivePhase, getTrainingGoal } from '../data/planStore';
+import { getActivePhase, getTrainingGoal, getPhaseResolver } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
 import { BarChart, LineChart } from './charts';
@@ -40,7 +40,7 @@ export default function MetricsView({ program, onBack }: Props) {
       setMetrics(m);
       setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal()));
+      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal(), getPhaseResolver()));
     });
     return () => { cancelled = true; };
   }, [program]);

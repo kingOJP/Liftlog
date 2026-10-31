@@ -391,6 +391,8 @@ function groupWireSessions(sessions: WireSession[], setLogs: SetLog[]): SessionD
       reps:       l.reps,
       order:      l.order,
       warmup:     l.warmup,
+      repLow:     l.repLow,
+      repHigh:    l.repHigh,
     })),
   }));
 }

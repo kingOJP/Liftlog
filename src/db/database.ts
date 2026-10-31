@@ -39,6 +39,15 @@ export interface SetLog {
    * by JSON so legacy docs stay byte-identical on the wire.
    */
   warmup?: boolean;
+  /**
+   * The rep range prescribed when this set was logged (Stage 0 of the
+   * adaptive-engine roadmap). Lets the engine tell "the range changed under
+   * me" from "I missed" — a 10–15 slot becoming 12–15 the week after an
+   * increase used to read as a failed session. Absent on pre-prescription
+   * rows and on unprescribed (free) logging; schemaless like `order`.
+   */
+  repLow?: number;
+  repHigh?: number;
 }
 
 // Difficulty ratings — feature removed, store kept for compatibility
@@ -138,6 +147,8 @@ export interface SetInput {
   reps: number;
   order?: number;
   warmup?: boolean;
+  repLow?: number;
+  repHigh?: number;
 }
 
 function setLogRecord(sessionId: number, s: SetInput): SetLog {
@@ -149,6 +160,7 @@ function setLogRecord(sessionId: number, s: SetInput): SetLog {
     reps: s.reps,
     ...(s.order != null ? { order: s.order } : {}),
     ...(s.warmup ? { warmup: true } : {}),
+    ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
   } as SetLog;
 }
 
@@ -541,6 +553,7 @@ function queueSessionDoc(tx: IDBTransaction, doc: SessionDoc, localId?: number):
       store.add(setLogRecord(sid, {
         exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps,
         order: s.order ?? undefined, warmup: s.warmup ?? undefined,
+        repLow: s.repLow ?? undefined, repHigh: s.repHigh ?? undefined,
       }));
     }
   };

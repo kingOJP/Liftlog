@@ -12,7 +12,7 @@
 //                     the plan's changes carry their own plain-language reasons.
 
 import type { MuscleGroup } from './taxonomy';
-import type { Goal, PhaseKind } from './plan';
+import type { Goal, PhaseKind, PhaseResolver } from './plan';
 import { addWeeks, startOfWeek, weekStartLabel } from './program';
 import type { WorkoutDay } from './program';
 import type { TrainingSnapshot } from './analytics';
@@ -96,9 +96,11 @@ export function computeCoaching(
   now = Date.now(),
   phase: PhaseKind | null = null,
   goal: Goal = 'general',
+  /** which planned phase governed each past session (planStore.getPhaseResolver) */
+  phaseOf: PhaseResolver | null = null,
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
-  const plan = computeProgramPlan(program, snapshot, now, phase, goal);
+  const plan = computeProgramPlan(program, snapshot, now, phase, goal, phaseOf);
   const currentWeekStart = startOfWeek(now);
   // The weekly set band is a property of the goal, not a constant: a
   // sport-support athlete measured against a hypertrophy dose reads as
@@ -145,7 +147,7 @@ export function computeCoaching(
   // ── Per-exercise progress: the multi-signal assessment (progress.ts) ──
   // e1RM trend + volume-load trend + weight/rep PRs, blended with
   // goal-dependent weights, with exercise-order freshness discounting.
-  const assessments = assessSnapshot(snapshot, goal);
+  const assessments = assessSnapshot(snapshot, goal, () => true, phaseOf);
   const progress = [...assessments.values()]
     .sort((a, b) => b.totalSessions - a.totalSessions || a.name.localeCompare(b.name));
 

@@ -12,10 +12,10 @@ import {
 import type { SetInput } from '../db/database';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
-import { buildSetPlan } from '../data/recommendations';
+import { buildSetPlan, historyDepthFor } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
 import { getExerciseMeta, unitFor } from '../data/exercises';
-import { getActivePhase, getProfileOrDefault, getTrainingGoal } from '../data/planStore';
+import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal } from '../data/planStore';
 import { effectiveExperience } from '../data/experience';
 import { PHASE_INFO } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
@@ -83,11 +83,17 @@ function contextForExercise(
   ctx: PrescriptionContext,
 ): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession } {
   const history: ExerciseSession[] = [];
+  // Enough sessions for the athlete's stall window plus a dropped late-slot
+  // one — a flat cap of four switched stall detection off for advanced lifters.
+  const depth = historyDepthFor(ctx.experience);
   for (const session of snapshot.sessions) { // newest first
     const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
       .filter(s => s.exerciseId === ex.id)
       .sort((a, b) => a.setNumber - b.setNumber)
-      .map(s => ({ weight: s.weight, reps: s.reps }));
+      .map(s => ({
+        weight: s.weight, reps: s.reps,
+        ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
+      }));
     if (exSets.length > 0) {
       history.push({
         completedAt: sessionTimestamp(session),
@@ -95,7 +101,7 @@ function contextForExercise(
         position: positions.get(session.id!)?.get(ex.id) ?? null,
       });
     }
-    if (history.length >= 4) break;
+    if (history.length >= depth) break;
   }
   const plan = buildSetPlan(history, ex, {
     ...ctx,
@@ -253,7 +259,7 @@ export default function WorkoutView({
     loadTrainingSnapshot().then(snap => {
       if (cancelled) return;
       setSnapshot(snap);
-      const plan = computeProgramPlan(program, snap, Date.now(), phase, getTrainingGoal());
+      const plan = computeProgramPlan(program, snap, Date.now(), phase, getTrainingGoal(), getPhaseResolver());
       const adjusted = applyPlanToDay(day, plan);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);
@@ -375,13 +381,19 @@ export default function WorkoutView({
 
     const startedAt = sessionStart;
     const setInputs: SetInput[] = [];
+    // The prescription in force is recorded on every set, so a later range
+    // change can be told apart from a missed session.
+    const slots = new Map([...effectiveDay.exercises, ...addedExercises].map(e => [e.id, e]));
     for (const [exerciseId, exerciseSets] of Object.entries(sets)) {
       const orderIdx = exerciseOrderRef.current.indexOf(exerciseId);
       const order = orderIdx >= 0 ? orderIdx : undefined;
+      const slot = slots.get(exerciseId);
+      const range = slot?.repLow != null && slot.repHigh != null ? { repLow: slot.repLow, repHigh: slot.repHigh } : {};
       exerciseSets.forEach((set, i) => {
         setInputs.push({
           exerciseId, setNumber: i + 1, weight: set.weight, reps: set.reps, order,
           ...(set.warmup ? { warmup: true } : {}),
+          ...range,
         });
       });
     }

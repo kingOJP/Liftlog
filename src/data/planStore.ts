@@ -17,8 +17,8 @@ import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { loadTrainingSnapshot } from './analytics';
 import type { TrainingSnapshot } from './analytics';
-import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, TrainingProfile } from './plan';
-import { blockAnchor, currentPhase, defaultTrainingProfile, generatePlanId, goalLabel, nextMonday, toPlanDate } from './plan';
+import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, TrainingProfile, PhaseResolver } from './plan';
+import { blockAnchor, currentPhase, defaultTrainingProfile, generatePlanId, goalLabel, nextMonday, toPlanDate, phaseResolverFor } from './plan';
 import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
 
@@ -129,6 +129,14 @@ export function reconcileActiveProgram(): boolean {
 export function getActivePhase(now = Date.now()): PhaseKind | null {
   const info = getActiveBlockInfo();
   return info ? currentPhase(info.block, now) : null;
+}
+
+/**
+ * The planned phase for ANY past moment — what progress, insights and the
+ * coach overlay use to keep planned easy weeks out of trend verdicts.
+ */
+export function getPhaseResolver(): PhaseResolver {
+  return phaseResolverFor(getPlanState().plans);
 }
 
 /** Newest completed block's retrospective — the planner's primary input. */

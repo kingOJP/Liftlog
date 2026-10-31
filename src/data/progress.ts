@@ -23,12 +23,27 @@ import type { Session, SetLog } from '../db/database';
 import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp, movementPatternFor } from './analytics';
 import { getExerciseName } from './programStore';
-import type { Goal } from './plan';
+import type { Goal, PhaseResolver } from './plan';
+import { isEasyPhase } from './plan';
 import type { MovementCategory } from './taxonomy';
 import { patternCategoryFor } from './taxonomy';
 import {
-  compositeScore, pctChange, PROGRESS_SCORE, DECLINE_SCORE, STALL_SCORE,
+  compositeScore, pctChange, deadband, PROGRESS_SCORE, DECLINE_SCORE, STALL_SCORE,
 } from './progression';
+
+// The load–rep trade-off the prescription engine sizes increments with (~1 rep
+// per 3% of load). Used here to compare volume ACROSS load changes: raw
+// tonnage falls after every successful increase (3×10 at 145 → 3×8 at 150 is
+// −17% tonnage for a stronger lifter), so volume is read as "reps at a fixed
+// reference load" instead, where a heavier set is worth the reps it would
+// have been at the reference.
+const PCT_LOAD_PER_REP = 3;
+// 1RM prediction equations are fitted on sets of ~1–10 reps and drift badly
+// past this. Above it the estimate is noise — enough that a one-rep shuffle
+// on 3×16–20 calf raises reads as an 11% strength loss — so the TREND only
+// consults estimates from sets inside the valid range (the same rule the
+// prescription engine applies).
+const E1RM_VALID_REPS = 12;
 
 // ── Tunables ──────────────────────────────────────────────────────────────────
 
@@ -54,14 +69,28 @@ export interface ExercisePoint {
   ts: number;
   sessionId: number;
   bestE1rm: number;       // 0 when everything was logged at 0 lbs
+  /** best estimate from sets of ≤ E1RM_VALID_REPS reps only; 0 when none qualify */
+  validE1rm: number;
   tonnage: number;        // Σ weight × reps
   totalReps: number;
   maxWeight: number;
+  /** the session's working weight (most-used, tie → heaviest) */
+  workingWeight: number;
+  /** the working sets themselves, for load-normalized volume */
+  sets: Array<{ weight: number; reps: number }>;
   /** 0-based slot of this exercise within the workout, null when unknown */
   position: number | null;
   weightPR: boolean;      // beat the all-time heaviest load
   repPR: boolean;         // beat the all-time best reps at a weight lifted before
   prLabels: string[];     // human-readable PR descriptions for this session
+  /**
+   * Logged in a planned easy week (deload / recovery / intro). Deliberately
+   * lighter by prescription, so never a trend endpoint and neutral for PR and
+   * stall logic — otherwise every block that ends in its deload reads as a
+   * block of declining lifts and the retrospective rotates a program that
+   * climbed all the way to its last hard week.
+   */
+  easy: boolean;
 }
 
 // Position of each exercise within a session: explicit `order` when the logs
@@ -93,6 +122,7 @@ export function snapshotPositions(snapshot: TrainingSnapshot): Map<number, Map<s
 export function exercisePointSeries(
   snapshot: TrainingSnapshot,
   include: (s: Session) => boolean = () => true,
+  phaseOf: PhaseResolver | null = null,
 ): Map<string, ExercisePoint[]> {
   const positions = snapshotPositions(snapshot);
 
@@ -110,6 +140,7 @@ export function exercisePointSeries(
     if (logs.length === 0) continue;
     const ts = sessionTimestamp(session);
     const posMap = positions.get(session.id!);
+    const easy = isEasyPhase(phaseOf?.(ts) ?? null);
 
     const byExercise = new Map<string, SetLog[]>();
     for (const log of logs) {
@@ -119,32 +150,48 @@ export function exercisePointSeries(
     }
 
     for (const [exerciseId, sets] of byExercise) {
-      let bestE1rm = 0, tonnage = 0, totalReps = 0, maxWeight = 0;
+      let bestE1rm = 0, validE1rm = 0, tonnage = 0, totalReps = 0, maxWeight = 0;
+      const weightCounts = new Map<number, number>();
       for (const s of sets) {
         bestE1rm = Math.max(bestE1rm, epley1RM(s.weight, s.reps));
+        if (s.reps <= E1RM_VALID_REPS) validE1rm = Math.max(validE1rm, epley1RM(s.weight, s.reps));
         tonnage += s.weight * s.reps;
         totalReps += s.reps;
         maxWeight = Math.max(maxWeight, s.weight);
+        weightCounts.set(s.weight, (weightCounts.get(s.weight) ?? 0) + 1);
+      }
+      let workingWeight = sets[0].weight;
+      let workingCount = 0;
+      for (const [w, c] of weightCounts) {
+        if (c > workingCount || (c === workingCount && w > workingWeight)) { workingWeight = w; workingCount = c; }
       }
 
       const prLabels: string[] = [];
       const prevBestWeight = bestWeight.get(exerciseId);
-      const weightPR = prevBestWeight != null && maxWeight > prevBestWeight;
+      // A planned easy week can't set a PR — the load is lighter by design,
+      // and "PR" there would only ever mean the lifter ignored the plan.
+      const weightPR = !easy && prevBestWeight != null && maxWeight > prevBestWeight;
       if (weightPR) prLabels.push(`Weight PR — ${maxWeight} lbs`);
       bestWeight.set(exerciseId, Math.max(prevBestWeight ?? 0, maxWeight));
 
-      // Rep PR: more reps than ever before at a weight you've lifted before
+      // Rep PR: more reps than ever before at a weight you've lifted BEFORE
+      // THIS SESSION. The session's bests are computed first and compared to
+      // the pre-session map, then the map is updated — comparing set by set
+      // while updating made set 2 beating set 1 a "PR", including on the very
+      // first session at a never-lifted weight.
       let repPR = false;
       const repMap = bestRepsAtWeight.get(exerciseId) ?? new Map<number, number>();
-      for (const s of sets) {
-        const prev = repMap.get(s.weight);
-        if (prev != null && s.reps > prev) {
+      const sessionBest = new Map<number, number>();
+      for (const s of sets) sessionBest.set(s.weight, Math.max(sessionBest.get(s.weight) ?? 0, s.reps));
+      for (const [weight, reps] of sessionBest) {
+        const prev = repMap.get(weight);
+        if (!easy && prev != null && reps > prev) {
           repPR = true;
-          prLabels.push(s.weight > 0
-            ? `Rep PR — ${s.reps} × ${s.weight} lbs`
-            : `Rep PR — ${s.reps} bodyweight reps`);
+          prLabels.push(weight > 0
+            ? `Rep PR — ${reps} × ${weight} lbs`
+            : `Rep PR — ${reps} bodyweight reps`);
         }
-        repMap.set(s.weight, Math.max(prev ?? 0, s.reps));
+        repMap.set(weight, Math.max(prev ?? 0, reps));
       }
       bestRepsAtWeight.set(exerciseId, repMap);
 
@@ -152,13 +199,17 @@ export function exercisePointSeries(
         ts,
         sessionId: session.id!,
         bestE1rm,
+        validE1rm,
         tonnage,
         totalReps,
         maxWeight,
+        workingWeight,
+        sets: sets.map(s => ({ weight: s.weight, reps: s.reps })),
         position: posMap?.get(exerciseId) ?? null,
         weightPR,
         repPR,
         prLabels: [...new Set(prLabels)].slice(0, 2),
+        easy,
       };
       const arr = series.get(exerciseId);
       if (arr) arr.push(point);
@@ -192,6 +243,19 @@ export interface ExerciseProgress {
   recentPRs: { ts: number; label: string }[];
 }
 
+/**
+ * A session's volume as reps at `ref` lbs: each set's reps shifted by what its
+ * load difference is worth (~1 rep per PCT_LOAD_PER_REP % of load). This is
+ * what makes volume comparable across a load increase.
+ */
+function normalizedReps(point: ExercisePoint, ref: number): number {
+  if (ref <= 0) return point.totalReps;
+  return point.sets.reduce((sum, s) => {
+    const pct = ((s.weight - ref) / ref) * 100;
+    return sum + Math.max(0, s.reps + pct / PCT_LOAD_PER_REP);
+  }, 0);
+}
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -210,28 +274,44 @@ export function assessExercise(
   const window = Number.isFinite(windowSize) ? points.slice(-windowSize) : [...points];
   const last = window[window.length - 1];
 
+  // Planned easy weeks are never trend endpoints: a deload at 90% is the plan
+  // working, not strength leaving. When every session in the window was easy
+  // (a recovery week opening a block), there is no hard evidence either way
+  // and the window is used as-is rather than inventing a verdict from nothing.
+  const hardWindow = window.filter(p => !p.easy);
+  const judged = hardWindow.length > 0 ? hardWindow : window;
+  const lastHard = judged[judged.length - 1];
+
   // Freshness context: was the latest session trained much later in the
   // workout than this exercise usually is? If so its lower numbers are
   // expected — drop it from the trend endpoints instead of reading weakness.
   const typicalPos = median(points.slice(0, -1).map(p => p.position).filter((p): p is number => p != null));
   const positionShifted =
-    last?.position != null && typicalPos != null &&
-    last.position >= typicalPos + POSITION_SHIFT_SLOTS;
+    lastHard?.position != null && typicalPos != null &&
+    lastHard.position >= typicalPos + POSITION_SHIFT_SLOTS;
 
-  const trendWindow = positionShifted && window.length > 1 ? window.slice(0, -1) : window;
+  const trendWindow = positionShifted && judged.length > 1 ? judged.slice(0, -1) : judged;
   const first = trendWindow[0];
   const end = trendWindow[trendWindow.length - 1];
 
   // Bodyweight-at-0 work has no meaningful e1RM or tonnage — total reps is the
   // volume signal, and rep PRs carry the progression story.
+  // Both signals pass through the same dead band the prescription engine
+  // applies before scoring, so a 1–2% wobble is "no change" on the review
+  // screen as well as on the bar. Loaded volume is load-normalized (see
+  // normalizedReps) so a successful increase cannot read as lost volume.
   const bodyweight = points.every(p => p.maxWeight === 0);
-  const e1rmChangePct = bodyweight || !first || !end ? null : pct(first.bestE1rm, end.bestE1rm);
+  const e1rmChangePct = bodyweight || !first || !end || first.validE1rm <= 0 || end.validE1rm <= 0
+    ? null
+    : deadband(pct(first.validE1rm, end.validE1rm));
   const volumeChangePct = !first || !end ? null
-    : bodyweight ? pct(first.totalReps, end.totalReps) : pct(first.tonnage, end.tonnage);
+    : bodyweight
+      ? deadband(pct(first.totalReps, end.totalReps))
+      : deadband(pct(normalizedReps(first, first.workingWeight), normalizedReps(end, first.workingWeight)));
 
-  const weightPRs = window.filter(p => p.weightPR).length;
-  const repPRs = window.filter(p => p.repPR).length;
-  const recentPRs = window
+  const weightPRs = judged.filter(p => p.weightPR).length;
+  const repPRs = judged.filter(p => p.repPR).length;
+  const recentPRs = judged
     .flatMap(p => p.prLabels.map(label => ({ ts: p.ts, label })))
     .sort((a, b) => b.ts - a.ts);
 
@@ -247,7 +327,7 @@ export function assessExercise(
 
   // ── Status ──
   let status: ProgressStatus;
-  if (points.length < MIN_TREND_SESSIONS) {
+  if (points.length < MIN_TREND_SESSIONS || judged.length < MIN_TREND_SESSIONS) {
     status = 'steady'; // still building a baseline — no verdict yet
   } else if (score >= PROGRESS_SCORE) {
     status = 'progressing';
@@ -277,8 +357,13 @@ export function assessExercise(
   if (positionShifted) {
     evidence.push(`trained later in the workout than usual last time — that session isn't counted against you`);
   }
+  if (hardWindow.length > 0 && hardWindow.length < window.length) {
+    evidence.push('planned easy-week sessions are left out of the trend');
+  }
   if (points.length < MIN_TREND_SESSIONS) {
     evidence.push('still building a baseline — log a few more sessions for a verdict');
+  } else if (judged.length < MIN_TREND_SESSIONS) {
+    evidence.push('only a couple of hard sessions since the easy week — no verdict yet');
   }
 
   return {
@@ -307,9 +392,10 @@ export function assessSnapshot(
   snapshot: TrainingSnapshot,
   goal: Goal,
   include: (s: Session) => boolean = () => true,
+  phaseOf: PhaseResolver | null = null,
 ): Map<string, ExerciseProgress> {
   const out = new Map<string, ExerciseProgress>();
-  for (const [exerciseId, points] of exercisePointSeries(snapshot, include)) {
+  for (const [exerciseId, points] of exercisePointSeries(snapshot, include, phaseOf)) {
     if (points.length < 2) continue;
     out.set(exerciseId, assessExercise(exerciseId, points, goal));
   }
