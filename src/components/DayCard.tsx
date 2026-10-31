@@ -1,5 +1,6 @@
 import type { WorkoutDay } from '../data/program';
 import { estimatedMinutesFor } from '../data/coach';
+import Icon from './Icon';
 import './DayCard.css';
 
 interface Props {
@@ -25,8 +26,16 @@ export default function DayCard({ day, done, onClick, onEdit }: Props) {
         <div className="day-number">{day.label}</div>
         <div className="day-muscles">{day.muscleGroups}</div>
         <div className="day-count">
-          {day.exercises.length} exercise{day.exercises.length !== 1 ? 's' : ''}
-          {minutes > 0 ? ` · ~${minutes} min` : ''}
+          <span className="day-meta">
+            <Icon name="dumbbell" size={15} />
+            {day.exercises.length} exercise{day.exercises.length !== 1 ? 's' : ''}
+          </span>
+          {minutes > 0 && (
+            <span className="day-meta">
+              <Icon name="clock" size={14} />
+              ~{minutes} min
+            </span>
+          )}
         </div>
       </button>
       <div className="day-card-right">
@@ -38,7 +47,12 @@ export default function DayCard({ day, done, onClick, onEdit }: Props) {
         >
           Edit
         </button>
-        {done && <span className="done-badge">DONE</span>}
+        {done && (
+          <span className="done-badge">
+            <Icon name="check" size={12} strokeWidth={3} />
+            Done
+          </span>
+        )}
       </div>
     </div>
   );

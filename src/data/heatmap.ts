@@ -1,6 +1,6 @@
 // Muscle heatmap data: accumulated training volume per muscle over an
 // arbitrary time window, normalized to a weekly rate and mapped onto the
-// blue → green → yellow → red recovery gradient. Muscle involvement reuses
+// slate → teal → blue → violet recovery gradient. Muscle involvement reuses
 // musclesForExercise() (override → master list → name match) — no duplicate
 // muscle mapping lives here.
 
@@ -66,15 +66,16 @@ export function presetWindow(preset: Exclude<HeatPreset, 'custom'>, now = Date.n
 }
 
 // ── Color scale ───────────────────────────────────────────────────────────────
-// Blue = no recent training → green = inside the goal's weekly-set band →
-// yellow = elevated → red = very high / approaching recovery limits. The band
-// is passed in rather than fixed, so a sport-support athlete's 6 weekly sets
-// reads as "on target" instead of permanently blue.
+// Slate = no recent training → teal = inside the goal's weekly-set band →
+// blue = elevated → violet = very high / approaching recovery limits. A cool
+// scale on purpose: high volume is a thing to watch, not an error, so it
+// shouldn't shout in alarm-red. The band is passed in rather than fixed, so a
+// sport-support athlete's 6 weekly sets reads as "on target" instead of slate.
 
-const HEAT_BLUE   = '#3D6BE8';
-const HEAT_GREEN  = '#1D9E75';
-const HEAT_YELLOW = '#E8C44A';
-const HEAT_RED    = '#E85555';
+const HEAT_NONE     = '#2E3754';
+const HEAT_TARGET   = '#22C3A6';
+const HEAT_ELEVATED = '#4C8DFF';
+const HEAT_HIGH     = '#A06BFF';
 
 // Gradient stops in weekly-set space. Green holds across the whole target
 // range so "on target" reads as one state, not a spectrum. The two overshoot
@@ -82,11 +83,11 @@ const HEAT_RED    = '#E85555';
 function stopsFor(band: VolumeTarget): Array<[number, string]> {
   const overshoot = Math.max(3, Math.round((band.high - band.low) * 0.6));
   return [
-    [0, HEAT_BLUE],
-    [band.low, HEAT_GREEN],
-    [band.high, HEAT_GREEN],
-    [band.high + overshoot, HEAT_YELLOW],
-    [band.high + overshoot * 2, HEAT_RED],
+    [0, HEAT_NONE],
+    [band.low, HEAT_TARGET],
+    [band.high, HEAT_TARGET],
+    [band.high + overshoot, HEAT_ELEVATED],
+    [band.high + overshoot * 2, HEAT_HIGH],
   ];
 }
 

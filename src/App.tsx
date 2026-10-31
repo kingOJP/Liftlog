@@ -24,6 +24,7 @@ import JourneyView from './components/JourneyView';
 import PlanSetupView from './components/PlanSetupView';
 import QuickWorkoutView from './components/QuickWorkoutView';
 import SharedWorkoutView from './components/SharedWorkoutView';
+import Icon from './components/Icon';
 import {
   captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
   acceptSharedWorkout, SHARED_DAY_ID,
@@ -498,7 +499,18 @@ function App() {
     return (
       <>
         <header className="app-header">
-          <h1>LiftLog</h1>
+          <h1 className="app-brand">
+            <Icon name="logo" size={26} strokeWidth={2.4} className="app-brand-mark" />
+            LiftLog
+          </h1>
+          <button
+            type="button"
+            className="app-header-action"
+            aria-label="Settings"
+            onClick={() => setView({ screen: 'settings' })}
+          >
+            <Icon name="settings" size={20} />
+          </button>
         </header>
         <main className="app-main">
           <Dashboard

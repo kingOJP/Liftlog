@@ -1,31 +1,93 @@
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
+/* ── Week hero ── */
 .week-header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding-bottom: 4px;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.week-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.25);
+}
+
+.week-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .week-label {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--text);
 }
 
-.week-progress {
-  font-size: 14px;
+.week-sub {
+  font-size: 13px;
   color: var(--text-muted);
+}
+
+.week-progress {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.3);
+  border-radius: 999px;
+  padding: 6px 11px;
+}
+
+.week-progress--done {
+  color: var(--green-bright);
+  background: var(--green-tint);
+  border-color: rgba(29, 158, 117, 0.35);
+}
+
+.dash-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 2px 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.dash-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
 }
 
 .day-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .day-list-empty {
@@ -35,12 +97,13 @@
   align-items: center;
   text-align: center;
   border: 1px dashed var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 28px 20px;
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .day-list-empty-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text);
 }
@@ -63,10 +126,10 @@
 }
 
 .empty-quick-or {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--text-faint);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.12em;
 }
 
 .empty-quick-hint {
@@ -77,28 +140,33 @@
 }
 
 .quick-workout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   max-width: 300px;
-  background: var(--bg-card);
-  border: 1px solid var(--purple);
-  border-radius: 12px;
-  color: var(--purple);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.45);
+  border-radius: 14px;
+  color: var(--purple-bright);
   font-size: 15px;
   font-weight: 700;
   padding: 13px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.12s;
 }
 
 .quick-workout-btn:active {
-  background: var(--bg-input);
+  transform: scale(0.98);
+  background: rgba(124, 114, 232, 0.2);
 }
 
 /* Subtle variant shown below the day list for users who already have a program */
 .quick-workout-btn--inline {
   max-width: none;
-  margin-top: 12px;
+  margin-top: 4px;
   background: transparent;
   border-style: dashed;
   border-color: var(--border);
@@ -107,99 +175,123 @@
   font-size: 14px;
 }
 
+.quick-workout-btn--inline:active {
+  color: var(--text);
+  border-color: var(--purple-dim);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 /* ── Journey card ── */
 .journey-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   text-align: left;
   width: 100%;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 16px;
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  color: inherit;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.1s, border-color 0.15s;
+  transition: transform 0.12s, border-color 0.15s;
 }
 
 .journey-card:active {
   transform: scale(0.99);
-  border-color: var(--purple);
+  border-color: var(--purple-dim);
 }
 
 .journey-card--cta {
   border-style: dashed;
-  border-color: var(--purple-dim, var(--purple));
+  border-color: var(--purple-dim);
+  background: var(--accent-wash);
 }
 
 .journey-eyebrow {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.1em;
   color: var(--text-muted);
 }
 
 .journey-status {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
 }
 
 .journey-status--done {
-  color: var(--green);
+  color: var(--green-bright);
 }
 
 .journey-pending {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--purple);
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
-  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-top: 1px solid var(--hairline);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.journey-pending::before {
+  content: '→ ';
+  color: var(--purple-bright);
+  font-weight: 700;
 }
 
 .journey-track {
   display: flex;
-  gap: 3px;
-  margin-top: 2px;
+  gap: 5px;
+  margin-top: 4px;
 }
 
 .journey-seg {
   flex: 1;
-  height: 5px;
-  border-radius: 3px;
+  height: 6px;
+  border-radius: 999px;
   background: var(--border);
-  opacity: 0.55;
+  opacity: 0.4;
 }
 
 .journey-seg--past { opacity: 1; }
-.journey-seg--now { opacity: 1; outline: 1.5px solid var(--text); outline-offset: 1px; }
-.journey-seg--recovery        { background: #3D6BE8; }
-.journey-seg--intro           { background: #7fa3ff; }
-.journey-seg--accumulation    { background: var(--green); }
-.journey-seg--intensification { background: #E8C44A; }
-.journey-seg--peak            { background: var(--red); }
-.journey-seg--deload          { background: #3D6BE8; }
+/* The current week glows in its own phase colour (set via `color` below) */
+.journey-seg--now {
+  opacity: 1;
+  box-shadow: 0 0 0 1.5px var(--bg-card), 0 0 0 3px rgba(255, 255, 255, 0.7), 0 0 14px 2px currentColor;
+}
+.journey-seg--recovery        { background: #4f74e6; color: rgba(79, 116, 230, 0.6); }
+.journey-seg--intro           { background: #7fa3ff; color: rgba(127, 163, 255, 0.6); }
+.journey-seg--accumulation    { background: var(--green); color: rgba(29, 158, 117, 0.6); }
+.journey-seg--intensification { background: var(--amber); color: rgba(232, 196, 74, 0.5); }
+.journey-seg--peak            { background: var(--red); color: rgba(232, 85, 85, 0.5); }
+.journey-seg--deload          { background: var(--purple); color: rgba(124, 114, 232, 0.7); }
 /* Sport-support phases: maintenance holds steady, race week is the destination. */
-.journey-seg--maintenance     { background: #6C7A89; }
-.journey-seg--race-week       { background: var(--purple); }
+.journey-seg--maintenance     { background: #6C7A89; color: rgba(108, 122, 137, 0.5); }
+.journey-seg--race-week       { background: var(--purple-bright); color: rgba(154, 145, 255, 0.6); }
 
 /* ── Coach card ── */
 .coach-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   text-align: left;
   width: 100%;
-  background: linear-gradient(135deg, rgba(124, 114, 232, 0.18), rgba(124, 114, 232, 0.04));
-  border: 1px solid var(--purple-dim);
-  border-radius: 14px;
-  padding: 14px 16px;
+  color: inherit;
+  background: var(--bg-card);
+  background-image: var(--accent-wash);
+  border: 1px solid rgba(124, 114, 232, 0.45);
+  border-radius: var(--radius-lg);
+  padding: 16px 56px 16px 16px;
   cursor: pointer;
+  box-shadow: var(--shadow-glow);
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.1s, border-color 0.15s;
+  transition: transform 0.12s, border-color 0.15s;
 }
 
 .coach-card:active {
@@ -207,28 +299,48 @@
   border-color: var(--purple);
 }
 
+.coach-go {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .coach-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--purple);
+  letter-spacing: 0.1em;
+  color: var(--purple-bright);
 }
 
 .coach-day {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
   color: var(--text);
 }
 
 .coach-insight {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  gap: 2px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
   border-left: 3px solid var(--text-muted);
 }
 
@@ -239,23 +351,24 @@
 .coach-insight--trend-down,
 .coach-insight--plateau { border-left-color: var(--red); }
 .coach-insight--volume-high,
-.coach-insight--program-gap { border-left-color: #E8C44A; }
+.coach-insight--program-gap { border-left-color: var(--amber); }
 
 .coach-adjusted {
   font-size: 12px;
   font-weight: 600;
-  color: var(--purple);
+  color: var(--purple-bright);
   margin-top: 2px;
 }
 
 .coach-insight-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text);
 }
 
 .coach-insight-detail {
   font-size: 12px;
+  line-height: 1.45;
   color: var(--text-muted);
 }
 
@@ -264,38 +377,41 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  margin-top: 6px;
 }
 
 .dash-nav-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 7px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
-  padding: 14px 8px;
+  padding: 16px 8px 14px;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
+  transition: transform 0.12s, border-color 0.15s;
 }
 
 .dash-nav-btn:active {
-  background: var(--bg-input);
+  transform: scale(0.97);
+  border-color: var(--purple-dim);
 }
 
 .dash-nav-icon {
-  font-size: 20px;
-  line-height: 1;
+  color: var(--purple-bright);
 }
 
 /* Sessions paused by the current block phase (a sport-support taper drops its
    power day once maintenance weeks start) — explained, not silently missing. */
 .day-list-note {
-  margin: 10px 2px 0;
+  margin: 4px 2px 0;
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-muted);
@@ -307,22 +423,23 @@
   flex-direction: column;
   gap: 4px;
   width: 100%;
-  margin-bottom: 12px;
-  padding: 14px 16px;
+  padding: 16px;
   text-align: left;
   background: var(--bg-card);
+  background-image: var(--accent-wash);
   border: 1px solid var(--purple);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   color: var(--text);
   cursor: pointer;
+  box-shadow: var(--shadow-glow);
 }
 
 .resume-eyebrow {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--purple);
+  color: var(--purple-bright);
 }
 
 .resume-title {
@@ -337,14 +454,14 @@
 
 /* Quiet sync-trouble notice — never alarming, never hidden */
 .sync-badge {
-  margin: 0 2px 12px;
-  padding: 8px 12px;
+  margin: 0 2px;
+  padding: 10px 14px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-muted);
   background: var(--bg-card);
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .day-list-actions {

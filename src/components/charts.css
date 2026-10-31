@@ -34,14 +34,15 @@
 
 .bar-fill {
   width: 100%;
-  background: var(--border);
-  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #2c2c3a, #1f1f2a);
+  border-radius: 6px 6px 2px 2px;
   min-height: 2px;
   transition: height 0.3s ease;
 }
 
 .bar-fill.is-max {
-  background: var(--purple);
+  background: linear-gradient(180deg, var(--purple-bright), var(--purple));
+  box-shadow: 0 0 18px -4px rgba(124, 114, 232, 0.7);
 }
 
 /* A week with no training reads as a gap, not a hairline bar */

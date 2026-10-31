@@ -33,10 +33,10 @@ describe('computeMuscleHeat', () => {
 
 describe('heatColor', () => {
   it('maps the gradient endpoints', () => {
-    expect(heatColor(0)).toBe('#3D6BE8');                          // blue — untrained
-    expect(heatColor(SETS_TARGET_LOW)).toBe('rgb(29, 158, 117)');  // green — on target
-    expect(heatColor(SETS_TARGET_HIGH)).toBe('rgb(29, 158, 117)'); // green holds across the range
-    expect(heatColor(999)).toBe('#E85555');                        // red — very high
+    expect(heatColor(0)).toBe('#2E3754');                          // slate — untrained
+    expect(heatColor(SETS_TARGET_LOW)).toBe('rgb(34, 195, 166)');  // teal — on target
+    expect(heatColor(SETS_TARGET_HIGH)).toBe('rgb(34, 195, 166)'); // teal holds across the range
+    expect(heatColor(999)).toBe('#A06BFF');                        // violet — very high
   });
 
   it('blends between stops', () => {

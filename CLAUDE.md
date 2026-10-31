@@ -200,17 +200,27 @@ Value imports are fine as normal: `import { PROGRAM, getWeekNumber } from '../da
 
 ## Design tokens (src/index.css)
 
+Premium-minimal direction: near-black layered surfaces, hairline borders, soft depth, one violet
+accent that glows on the card that matters (the Next Up coach card, banners), pill-shaped
+segmented controls, and line icons from `components/Icon.tsx` (never emoji in chrome).
+
 | Token | Value | Usage |
 |---|---|---|
-| `--bg` | `#0f0f12` | Page background |
-| `--bg-card` | `#1a1a1e` | Card backgrounds |
-| `--bg-input` | `#1a1a1e` | Input backgrounds |
-| `--border` | `#2a2a30` | Borders |
-| `--text` | `#f0f0f4` | Primary text |
-| `--text-muted` | `#888891` | Secondary text |
-| `--purple` | `#7C72E8` | Accent / primary action |
-| `--green` | `#1D9E75` | Success / done state |
-| `--red` | `#E85555` | Destructive actions |
+| `--bg` | `#0a0a0f` | Page background (plus a faint violet bloom on `body`) |
+| `--bg-card` | `#14141b` | Card backgrounds — pair with `background-image: var(--surface)` |
+| `--bg-input` | `#1c1c26` | Input backgrounds, bar tracks |
+| `--surface` | white 3.5% → 0.8% gradient | Top-lit sheen on cards |
+| `--border` / `--hairline` | `#24242e` / white 6% | Solid lines / card edges |
+| `--text` / `--text-muted` / `--text-faint` | `#f2f2f7` / `#8a8a96` / `#5d5d6a` | Text tiers |
+| `--purple` / `--purple-bright` | `#7C72E8` / `#9a91ff` | Accent / accent text and icons |
+| `--purple-tint`, `--accent-wash`, `--accent-grad` | — | Icon tiles & pills / highlighted cards / primary buttons |
+| `--green` / `--green-bright` | `#1D9E75` / `#2fc493` | Success / done state |
+| `--red` | `#E85555` | Destructive actions, declining trends |
+| `--radius` / `--radius-lg` | `16px` / `20px` | Cards / hero cards |
+| `--shadow-card` / `--shadow-glow` / `--shadow-btn` | — | Card depth / accent glow / primary button |
+
+Sticky sub-view headers and fixed footers are frosted (`backdrop-filter`) by one rule in
+`App.css` scoped under `.app`, so a new view's header only needs its class added there.
 
 ---
 
@@ -398,7 +408,7 @@ src/
                                   ensureJourneyMigrated() (wraps legacy history in a Foundation
                                   block), mergeServerPlanState() (LWW sync)
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
-                                  heatColor()/heatLabel() (blue→green→yellow→red weekly-rate
+                                  heatColor()/heatLabel() (slate→teal→blue→violet weekly-rate
                                   gradient), presetWindow()/mesocycleWindow()
     metrics.ts                 — computeMetrics(snapshot, now) → Metrics (weekly volume bucketed
                                   by calendar week, e1RM series, muscle sets)
@@ -1103,7 +1113,8 @@ volume-load charts), the heatmap, and volume charts.
 ### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx`)
 
 Front/back SVG silhouettes with one region per `MuscleGroup`, colored by weekly-rate volume:
-blue (untrained) → green (10–20 target) → yellow (elevated) → red (very high). Muscle mapping
+slate (untrained) → teal (10–20 target) → blue (elevated) → violet (very high) — a cool scale on
+purpose: high volume is something to watch, not an error. Muscle mapping
 reuses `musclesForExercise()` — no duplicate mapping. Presets: 7 days / 30 days / current
 mesocycle (4-week blocks anchored to the program start date) / custom range. Tap a region for
 sets + weekly rate + status.

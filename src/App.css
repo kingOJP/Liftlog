@@ -10,15 +10,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(20px + env(safe-area-inset-top)) 16px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: calc(18px + env(safe-area-inset-top)) 20px 6px;
 }
 
-.app-header h1 {
-  color: var(--purple);
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.03em;
+}
+
+.app-brand-mark {
+  color: var(--purple-bright);
+  filter: drop-shadow(0 0 10px rgba(124, 114, 232, 0.55));
+}
+
+.app-header-action {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, border-color 0.15s;
+}
+
+.app-header-action:active {
+  transform: scale(0.94);
+  border-color: var(--purple-dim);
 }
 
 .logout-btn {
@@ -37,7 +65,7 @@
 
 .app-main {
   flex: 1;
-  padding: 16px;
+  padding: 14px 16px calc(24px + env(safe-area-inset-bottom));
 }
 
 .placeholder {
@@ -45,22 +73,54 @@
   font-size: 15px;
 }
 
+/* Frosted chrome — every sticky sub-view header and fixed footer. Scoped under
+   .app so it outranks each view's own flat `background: var(--bg)`. */
+.app :is(.metrics-header, .history-header, .settings-header, .glossary-header,
+  .day-edit-header, .exercise-list-header, .exercise-list-search,
+  .exercise-meta-header, .journey-header, .plan-setup-header, .shared-header) {
+  background: rgba(10, 10, 15, 0.78);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  backdrop-filter: saturate(160%) blur(18px);
+  border-bottom-color: var(--hairline);
+}
+
+.app :is(.day-edit-footer, .exercise-meta-footer, .shared-footer) {
+  background: rgba(10, 10, 15, 0.8);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  backdrop-filter: saturate(160%) blur(18px);
+  border-top-color: var(--hairline);
+}
+
+.app :is(.metrics-title, .history-title, .settings-title, .glossary-title,
+  .journey-title, .exercise-list-title) {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
 /* Shared back button used by every sub-view header */
 .back-btn {
-  background: none;
-  border: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
   color: var(--text);
-  font-size: 22px;
+  font-size: 20px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 0;
+  border-radius: 12px;
   line-height: 1;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, border-color 0.15s;
 }
 
 .back-btn:active {
-  background: var(--bg-card);
+  transform: scale(0.94);
+  border-color: var(--purple-dim);
 }
 
 /* Expired sign-in: local logging still works, syncing does not */

@@ -14,6 +14,7 @@ import { BarChart, LineChart } from './charts';
 import { toDisplay, unitLabelFor } from '../data/units';
 import ExerciseHistorySheet from './ExerciseHistorySheet';
 import MuscleHeatmap from './MuscleHeatmap';
+import Icon from './Icon';
 import './MetricsView.css';
 
 interface Props {
@@ -235,7 +236,7 @@ export default function MetricsView({ program, onBack }: Props) {
             {/* ── Muscle heatmap ── */}
             {snapshot && (
               <section className="metric-section">
-                <h2 className="metric-heading">Training Heatmap</h2>
+                <h2 className="metric-heading"><Icon name="body" size={18} className="metric-heading-icon" />Training Heatmap</h2>
                 <p className="metric-sub">Where your training volume is landing — per muscle, per week.</p>
                 <MuscleHeatmap snapshot={snapshot} />
               </section>
@@ -244,18 +245,22 @@ export default function MetricsView({ program, onBack }: Props) {
             {/* ── Summary stats ── */}
             <div className="stat-grid">
               <div className="stat-card">
+                <span className="stat-icon"><Icon name="dumbbell" size={18} /></span>
                 <span className="stat-value">{metrics.summary.totalWorkouts}</span>
                 <span className="stat-label">Workouts</span>
               </div>
               <div className="stat-card">
+                <span className="stat-icon"><Icon name="chart" size={18} /></span>
                 <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.totalVolume)))}</span>
                 <span className="stat-label">Total {unitLabelFor()} lifted</span>
               </div>
               <div className="stat-card">
+                <span className="stat-icon"><Icon name="calendar" size={18} /></span>
                 <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.thisWeekVolume)))}</span>
                 <span className="stat-label">This week ({unitLabelFor()})</span>
               </div>
               <div className="stat-card">
+                <span className="stat-icon"><Icon name="bolt" size={18} /></span>
                 <span className={`stat-value ${deltaClass(metrics.summary.deltaPct)}`}>
                   {formatDelta(metrics.summary.deltaPct)}
                 </span>
@@ -278,7 +283,7 @@ export default function MetricsView({ program, onBack }: Props) {
 
             {/* ── Weekly volume ── */}
             <section className="metric-section">
-              <h2 className="metric-heading">Weekly Volume</h2>
+              <h2 className="metric-heading"><Icon name="chart" size={18} className="metric-heading-icon" />Weekly Volume</h2>
               <p className="metric-sub">
                 Total weight × reps lifted each week (Mon–Sun), oldest to newest — your
                 progressive-overload signal. This week is highlighted.
@@ -293,7 +298,7 @@ export default function MetricsView({ program, onBack }: Props) {
 
             {/* ── Per-exercise strength & volume trends ── */}
             <section className="metric-section">
-              <h2 className="metric-heading">Exercise Trends</h2>
+              <h2 className="metric-heading"><Icon name="trophy" size={18} className="metric-heading-icon" />Exercise Trends</h2>
               <p className="metric-sub">
                 Strength (est. 1RM) and work capacity (volume load) per session — two different
                 kinds of progress, shown side by side.
@@ -327,7 +332,7 @@ export default function MetricsView({ program, onBack }: Props) {
 
             {/* ── Sets per muscle group ── */}
             <section className="metric-section">
-              <h2 className="metric-heading">Sets per Muscle Group</h2>
+              <h2 className="metric-heading"><Icon name="target" size={18} className="metric-heading-icon" />Sets per Muscle Group</h2>
               <p className="metric-sub">
                 {metrics.muscleWeekLabel} · aim for {band.low}–{band.high} hard sets per muscle weekly.
               </p>
