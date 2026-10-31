@@ -18,7 +18,8 @@
 // context, which keeps this testable and free of import cycles with planStore.
 
 import type { Exercise } from './program';
-import type { Goal, ExperienceLevel } from './plan';
+import type { Goal, ExperienceLevel, PhaseKind } from './plan';
+import type { WeightType } from './taxonomy';
 import type { MovementPattern } from './taxonomy';
 import type { ExerciseProfile } from './substitution';
 
@@ -244,4 +245,84 @@ export function resolvePrescription(input: PrescriptionInput): RepPrescription |
     return { ...dosage(input.goal, input.slot ?? {}, input.profile, input.experience), source: 'plan' };
   }
   return rangeFromHistory(input.history ?? []);
+}
+
+// ── Strength intensity structure (audit F9, decision D4) ─────────────────────
+// A strength block promises that "reps drop and loads climb" across build →
+// push → peak. Before this, the phase tags changed nothing the engine could
+// see: a 4×4–6 main lift stayed 4×4–6 for the whole block. Two layers now
+// enforce it, both keyed off the same gate (`strengthMainSlot`): the rep range
+// of a main lift tightens by phase, and its sets are laid out as one top set
+// plus back-offs. Neither needs a 1RM input or an RPE — the engine still reads
+// what was lifted, and the top set is what it judges.
+
+/** How many reps the main-lift range tightens by in each strength phase. */
+export const STRENGTH_PHASE_SHIFT: Partial<Record<PhaseKind, number>> = {
+  intensification: 1,
+  peak: 2,
+};
+
+/** Back-off sets as a fraction of the top set, by phase (0.9 outside a peak). */
+export const BACKOFF_PCT: Partial<Record<PhaseKind, number>> = {
+  peak: 0.85,
+};
+export const DEFAULT_BACKOFF_PCT = 0.9;
+
+export function backoffFactor(phase: PhaseKind | null | undefined): number {
+  return (phase && BACKOFF_PCT[phase]) ?? DEFAULT_BACKOFF_PCT;
+}
+
+type SlotLike = Pick<Exercise, 'main' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>;
+
+/**
+ * Is this a strength block's main lift, dosed by the plan in the strength tier
+ * (ceiling ≤ 6)? Beginners never qualify — their main work is 8–12 by the
+ * beginner floor — and a range the lifter typed themselves is theirs to keep.
+ */
+export function strengthMainSlot(slot: SlotLike, goal: Goal | null | undefined): boolean {
+  return goal === 'strength' && slot.main === true && slot.progression !== 'manual' &&
+    slot.repLow != null && slot.repHigh != null && slot.repHigh <= 6 &&
+    slot.rangeSource !== 'user' && slot.rangeSource !== 'history';
+}
+
+/**
+ * The rep range in force for a slot THIS week. Only a strength block's main
+ * lifts move: build weeks keep the dosed range (4–6 / 3–5), push weeks sit one
+ * rep lower (3–5 / 2–4), peak weeks two (2–4 / 1–3). Easy weeks keep the base
+ * range at a backed-off load. Everything else returns the slot untouched.
+ */
+export function phaseRange(
+  slot: SlotLike, goal: Goal | null | undefined, phase: PhaseKind | null | undefined,
+): { repLow: number; repHigh: number } | null {
+  if (!strengthMainSlot(slot, goal)) return null;
+  const shift = (phase && STRENGTH_PHASE_SHIFT[phase]) ?? 0;
+  if (shift === 0) return null;
+  const repLow = Math.max(1, slot.repLow! - shift);
+  const repHigh = Math.max(repLow + 1, slot.repHigh! - shift);
+  return { repLow, repHigh };
+}
+
+/** Apply `phaseRange` to every slot of a day — the overlay WorkoutView trains against. */
+export function applyPhaseRanges<T extends { exercises: Exercise[] }>(
+  day: T, goal: Goal | null | undefined, phase: PhaseKind | null | undefined,
+): T {
+  let changed = false;
+  const exercises = day.exercises.map(ex => {
+    const r = phaseRange(ex, goal, phase);
+    if (!r) return ex;
+    changed = true;
+    return { ...ex, ...r };
+  });
+  return changed ? { ...day, exercises } : day;
+}
+
+/**
+ * Should this slot be prescribed as a top set plus back-offs? The strength
+ * main lifts, for anyone past the beginner floor, on a loadable implement.
+ */
+export function topSetScheme(
+  slot: SlotLike, goal: Goal | null | undefined, experience: ExperienceLevel | undefined,
+  weightType: WeightType | null | undefined,
+): boolean {
+  return strengthMainSlot(slot, goal) && experience !== 'beginner' && weightType !== 'Bodyweight';
 }

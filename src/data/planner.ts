@@ -31,7 +31,7 @@ import type {
   Goal, PhaseKind, BlockRetrospective, EquipmentAccess, ExperienceLevel, SportContext, InjuryArea, PhaseResolver,
 } from './plan';
 import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_OPENER_WEEKS, isEasyPhase } from './plan';
-import { dosage } from './dosage';
+import { dosage, isHeavyAxial } from './dosage';
 import type { Slot, DayTemplate } from './sports';
 import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
 
@@ -602,6 +602,8 @@ interface SelectCtx {
   goal: Goal;
   experience: ExperienceLevel;
   byMuscle: Map<MuscleGroup, ExerciseProfile[]>;
+  /** every candidate by id — lets a slot's preferIds reach past its muscle pool */
+  byId: Map<string, ExerciseProfile>;
   used: Set<string>;
   /** exercises already placed in the day being built (reuse never repeats within a day) */
   dayUsed: Set<string>;
@@ -620,10 +622,37 @@ interface SelectCtx {
 // lifters clear the gate outright.
 function meetsSkillGate(p: ExerciseProfile, ctx: SelectCtx): boolean {
   if (ctx.experience !== 'beginner') return true;
-  if (DIFFICULTY_RANK[p.difficulty] < DIFFICULTY_RANK.advanced) return true;
-  // Advanced lift + beginner: allowed once they've trained the lift itself or
-  // at least one prerequisite for it.
+  // Any lift that names prerequisites is gated for a beginner — the advanced
+  // ones, and the few intermediate ones with a hard strength floor (chin-ups):
+  // allowed once they've trained the lift itself or at least one prerequisite.
+  if (p.prerequisites.length === 0) return true;
   return ctx.loggedIds.has(p.id) || p.prerequisites.some(id => ctx.loggedIds.has(id));
+}
+
+// ── Strength anchoring (audit F9) ─────────────────────────────────────────────
+// A strength block is built around the barbell lifts, not around whichever
+// chest exercise sorts first. The main slots name their preferred lifts (the
+// mechanism the sport templates already use), the overhead press becomes a
+// main lift in its own right, and the current program's mains are kept out of
+// the rotation set so a stall on the squat is answered with the deload the
+// block already schedules, never with a goblet squat.
+const STRENGTH_ANCHORS: Array<{ muscle: MuscleGroup; pattern: MovementPattern; preferIds: string[] }> = [
+  { muscle: 'Chest',      pattern: 'Horizontal Press', preferIds: ['flat-barbell-bench-press', 'incline-barbell-press'] },
+  { muscle: 'Quads',      pattern: 'Squat',            preferIds: ['barbell-back-squat'] },
+  { muscle: 'Hamstrings', pattern: 'Hip Hinge',        preferIds: ['conventional-deadlift', 'romanian-deadlifts'] },
+  { muscle: 'Delts',      pattern: 'Vertical Press',   preferIds: ['barbell-overhead-press'] },
+];
+
+function anchorStrengthMains(days: DayTemplate[]): DayTemplate[] {
+  return days.map(day => ({
+    ...day,
+    slots: day.slots.map(slot => {
+      const anchor = STRENGTH_ANCHORS.find(a =>
+        a.muscle === slot.muscle && slot.patterns?.includes(a.pattern) && (slot.main || a.pattern === 'Vertical Press'));
+      if (!anchor || slot.preferIds) return slot;
+      return { ...slot, main: true, preferIds: anchor.preferIds };
+    }),
+  }));
 }
 
 function allowedByGuidance(p: ExerciseProfile, g: Guidance): boolean {
@@ -696,10 +725,30 @@ function reasonFor(p: ExerciseProfile, slot: Slot, ctx: SelectCtx): string {
 }
 
 function pickForSlot(slot: Slot, ctx: SelectCtx, guidance: Guidance): { profile: ExerciseProfile; reason: string } | null {
-  let pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(
-    p => !ctx.dayUsed.has(p.id) && (slot.reuse || !ctx.used.has(p.id)) && allowedByGuidance(p, guidance),
-  );
+  const eligible = (p: ExerciseProfile) =>
+    !ctx.dayUsed.has(p.id) && (slot.reuse || !ctx.used.has(p.id)) && allowedByGuidance(p, guidance);
+  let pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(eligible);
+  // A slot's preferred lifts are explicit, and may be filed under a
+  // neighbouring muscle (the conventional deadlift is Glutes-primary; a
+  // strength block's hamstring slot still wants it). They join the pool.
+  for (const id of slot.preferIds ?? []) {
+    const p = ctx.byId.get(id);
+    if (p && eligible(p) && !pool.includes(p)) pool.push(p);
+  }
   if (pool.length === 0) return null;
+
+  // One heavy axial lift per session. A back squat and a conventional deadlift
+  // at 4×3–5 in the same workout is two spinal-loading maxes back to back —
+  // the second is done tired and the session runs long (audit F9: Good
+  // Mornings + Deadlift). When the day already has one, the hinge slot takes a
+  // leg curl or an RDL variant that isn't a barbell, and the squat slot a
+  // machine — unless nothing else fits the muscle.
+  // A sport template's `heavy` slot is an explicit prescription (squat AND
+  // hinge on the one lifting day a triathlete has) and is left alone.
+  if (!slot.heavy && [...ctx.dayUsed].some(id => isHeavyAxial(profileFor(id)))) {
+    const unloaded = pool.filter(p => !isHeavyAxial(p));
+    if (unloaded.length > 0) pool = unloaded;
+  }
 
   // Skill gate: hide advanced lifts a beginner hasn't earned — unless nothing
   // else is left for the muscle, in which case a scored penalty still applies.
@@ -788,9 +837,12 @@ export function buildPlanProposal(
   const sportPlan = input.goal === 'sport-support' && input.sport
     ? buildSportPlan(input.sport, input.daysPerWeek, input.experience)
     : null;
+  const generic = sportPlan ? null : splitFor(input.daysPerWeek, input.experience);
   const split = sportPlan
     ? { name: sportPlan.splitName, reason: sportPlan.splitReason, days: sportPlan.days, warning: undefined }
-    : splitFor(input.daysPerWeek, input.experience);
+    : input.goal === 'strength'
+      ? { ...generic!, days: anchorStrengthMains(generic!.days) }
+      : generic!;
   // Phases are resolved *after* the workouts, further down: whether the block
   // opens with an introductory week depends on how much of the selection is new
   // to this athlete, which isn't known until the days exist.
@@ -823,8 +875,10 @@ export function buildPlanProposal(
   }
 
   const byMuscle = new Map<MuscleGroup, ExerciseProfile[]>();
+  const byId = new Map<string, ExerciseProfile>();
   for (const p of candidateProfiles()) {
     if (!p.primaryMuscle) continue;
+    byId.set(p.id, p);
     const arr = byMuscle.get(p.primaryMuscle);
     if (arr) arr.push(p);
     else byMuscle.set(p.primaryMuscle, [p]);
@@ -839,6 +893,7 @@ export function buildPlanProposal(
     goal: input.goal,
     experience: input.experience,
     byMuscle,
+    byId,
     used: new Set<string>(),
     dayUsed: new Set<string>(),
     currentIds,
@@ -852,6 +907,17 @@ export function buildPlanProposal(
       ...trendDown, // a declining lift is a rotation candidate even without a retro
     ]),
   };
+  // In a strength plan the main lifts ARE the plan: a stalled squat is not
+  // rotated for a different squat, it is kept and deloaded.
+  if (input.goal === 'strength') {
+    for (const day of currentProgram) {
+      for (const ex of day.exercises) {
+        if (!ex.main) continue;
+        ctx.review.delete(ex.id);
+        ctx.keep.add(ex.id);
+      }
+    }
+  }
 
   const days: WorkoutDay[] = [];
   const decisions: ExerciseDecision[] = [];

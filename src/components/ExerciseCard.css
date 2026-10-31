@@ -437,3 +437,33 @@
   flex: 1;
   text-align: left;
 }
+
+/* Easier-variant offer after repeated misses on bodyweight work */
+.ex-regress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--purple);
+  border-radius: 10px;
+  background: rgba(124, 114, 232, 0.08);
+}
+
+.ex-regress-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.ex-regress-btn {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--purple);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

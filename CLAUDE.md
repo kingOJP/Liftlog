@@ -892,6 +892,38 @@ plain-language `goal` line stating what this session must do to earn the next in
 - Targets and the fatigue fit both read the **fresh-slot baseline**, so a late-slot session
   can't skew the plan any more than it can skew the recommendation.
 
+**A strength block's main lifts are one top set plus back-offs** (decision D4, audit F9).
+`dosage.topSetScheme(slot, goal, experience, weightType)` gates it — a `strength` plan, a
+`main` slot dosed by the plan in the strength tier (ceiling ≤ 6), not a beginner, a loadable
+implement — and WorkoutView passes `scheme: 'top-set'` on the `PrescriptionContext`.
+`topSetPlan()` then computes the recommendation on the **top set alone** (`topSetView`: each
+past session reduced to its heaviest sets, judged as a one-set prescription), so "a top set at
+the ceiling earns the next jump" is literally what the engine checks — the weekly cap, the
+stall window and the re-anchor all read that set. Set 1 is the top set at the recommended
+load; sets 2…n sit at `backoffFactor(phase)` of it (90%, 85% in a peak week), snapped to the
+increment, with the rep target the load–rep relationship predicts at the lighter weight. A
+planned easy week flattens everything to `repLow` at the backed-off load. With no loaded
+history it falls through to the straight layout.
+
+**The main lifts' rep range tightens by phase** in a strength block (`dosage.phaseRange` /
+`applyPhaseRanges`, the same gate minus experience): build weeks keep the dosed range (4–6,
+3–5 for heavy axial), push weeks sit one rep lower, peak weeks two (floor 1). WorkoutView
+applies it to `effectiveDay` after the coach overlay, so the card, the recorded `repLow`/
+`repHigh` on the set logs and the engine all see this week's range — and because the logs
+carry the range, the move into a tighter range reads as a **range change** (hold with "your
+rep range moved"), never as a miss. Typed (`rangeSource: 'user'`) and history-derived ranges
+never shift; easy weeks keep the base range at a backed-off load.
+
+**Unloaded work can be told to build UP to its range** (audit F11). The under-range branch of
+`repProgression` sets `targetReps` to one more than what was managed, capped at `repLow`
+("build to it: 6 clean reps per set this time") instead of demanding the floor forever, and
+`buildSetPlan` lets the row targets sit below `repLow` on the way back. After
+`REGRESSION_MISSES` (3) consecutive unloaded sessions under the range (`needsRegression`),
+WorkoutView asks the substitution engine for a **regression** (`{ regression: true }`: no
+harder than the target, strong preference for a loadable implement) and the card offers "Add
+X today" — a lat pull-down for a chin-up — through the ordinary mid-workout add path; making
+it permanent is a day-editor decision.
+
 `recommendations.test.ts` covers each branch plus a **loop-level simulation**: 12 weeks of a
 lifter who hits their targets must climb monotonically, never trip a deload, and never exceed
 the weekly rate for any training age.
@@ -1074,6 +1106,10 @@ storage writes, fully unit-tested (`substitution.test.ts`).
   updated program automatically — on every device, once it syncs.
 - Without history (`snapshot: null`) the engine still works on structural factors; the
   history-driven factors simply contribute nothing.
+- **Regression mode** (`suggestReplacements(…, { regression: true })`) is the "easier way
+  to train this" variant WorkoutView asks for after three unloaded misses: candidates no
+  harder than the target (`DIFFICULTY_RANK`), +16 for a loadable implement ("start below
+  bodyweight"), −10 for another bodyweight lift.
 
 ---
 
@@ -1193,6 +1229,21 @@ level):
   hidden unless the athlete has logged the lift itself or a prerequisite (train the RDL
   before the pull deadlift). Advanced profiles get a nudge toward the barbell compounds.
 - **Priority muscles** get +1 set each (same guardrails as the retro under-muscle bump).
+- **A strength block anchors on the barbell lifts** (audit F9, `anchorStrengthMains`): the
+  main chest / squat / hinge slots carry `preferIds` (bench, back squat, conventional
+  deadlift → RDL), the vertical-press slot becomes a `main` preferring the barbell overhead
+  press, a slot's preferred lifts join its candidate pool even when filed under a
+  neighbouring muscle (the deadlift is Glutes-primary; the hamstring slot still wants it),
+  and the current program's `main` lifts are removed from the rotation set — a stalled squat
+  is kept and deloaded, never swapped for a goblet squat. Sport templates already name their
+  movements and are untouched.
+- **One heavy axial lift per session** (`pickForSlot`): once a day holds a barbell squat or
+  hinge, later slots filter out `isHeavyAxial` candidates when anything else fits — a squat
+  day gets a leg curl, a deadlift day gets a hack squat. A sport template's `heavy` slot is
+  an explicit prescription and is exempt.
+- **Any lift with prerequisites is gated for a beginner**, not only advanced ones:
+  `chin-ups` is listed as intermediate with `lat-pull-down`/`straight-arm-pulldowns` as
+  prerequisites, so a novice is handed the pull-down first (audit F11).
 - **Copy** — beginners get concrete starting-weight/effort guidance and a linear-progression
   framing; the deload defaults off for them.
 
@@ -1393,7 +1444,11 @@ collection time, so hoist them to the `describe` body rather than repeating them
 skipping sessions — through the real planner, planStore, prescription, coach, retrospective
 and replan loop), the bodyweight/timed loop in `recommendations.test.ts`, and any future
 reproduction of an audit finding are written as `it.fails(...)` with a comment naming the
-phase of `docs/action-plan-2026-10.md` that fixes them. vitest reports an `it.fails` test
+phase of `docs/action-plan-2026-10.md` that fixes them. (As of Phase 7 every pinned finding
+has flipped to a plain `it`; the convention stays for the next audit.) The synthetic athlete
+in `profileSimulation.test.ts` answers the coach the way a compliant one does — every open
+adjustment is accepted the first time it is shown — so the "same adjustment every workout"
+check measures what a real user who taps *Keep it* would see. vitest reports an `it.fails` test
 that starts passing as a failure, so fixing the bug *forces* the test to flip to a plain
 `it` in the same PR — the reproduction becomes the regression test with no step forgotten.
 `catalog.test.ts` pins the catalog invariants (unique ids/names, vocabulary membership,

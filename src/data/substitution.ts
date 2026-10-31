@@ -33,7 +33,7 @@ import {
 } from './analytics';
 import type { Goal } from './plan';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor, unitFor } from './exercises';
+import { EXERCISES, EXERCISE_MAP, DIFFICULTY_RANK, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor, unitFor } from './exercises';
 import type { ExerciseDifficulty } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
@@ -175,6 +175,16 @@ interface RankContext {
   band: VolumeTarget;
 }
 
+export interface SuggestOptions {
+  /**
+   * An EASIER way to train the same thing — for a bodyweight lift the athlete
+   * keeps missing (audit F11): candidates no harder than the target, with a
+   * strong preference for a loadable implement (a pull-down can start below
+   * bodyweight; a chin-up cannot).
+   */
+  regression?: boolean;
+}
+
 export function suggestReplacements(
   target: Exercise,
   day: WorkoutDay,
@@ -182,6 +192,7 @@ export function suggestReplacements(
   limit = 3,
   now = Date.now(),
   goal: Goal | null = null,
+  opts: SuggestOptions = {},
 ): ReplacementSuggestion[] {
   const targetProfile = profileFor(target.id, target.name);
   // Without a primary muscle there is no training intent to preserve — the UI
@@ -197,8 +208,17 @@ export function suggestReplacements(
     if (sameLift(cand.name, target.name)) continue; // same movement under another name
     const candMuscles = [cand.primaryMuscle!, ...cand.secondaryMuscles];
     if (!candMuscles.includes(targetProfile.primaryMuscle)) continue;
+    if (opts.regression && DIFFICULTY_RANK[cand.difficulty] > DIFFICULTY_RANK[targetProfile.difficulty]) continue;
 
     const factors = scoreCandidate(cand, ctx);
+    if (opts.regression) {
+      factors.push(cand.weightType === 'Bodyweight'
+        ? { points: -10, caution: 'Still bodyweight — no way to start lighter' }
+        : { points: 16, reason: 'Loadable, so you can start below bodyweight and build up to the real thing' });
+      if (cand.primaryMuscle === targetProfile.primaryMuscle && cand.workoutType !== targetProfile.workoutType) {
+        factors.push({ points: 4, reason: 'Same muscle through an easier movement' });
+      }
+    }
     const score = factors.reduce((s, f) => s + f.points, 0);
     if (score <= 0) continue;
 

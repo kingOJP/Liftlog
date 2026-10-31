@@ -3,6 +3,7 @@ import type { WeightType, MeasureUnit } from './taxonomy';
 import type { ExperienceLevel, Goal, PhaseKind, PhaseResolver } from './plan';
 import { isEasyPhase } from './plan';
 import { epley1RM } from './analytics';
+import { backoffFactor } from './dosage';
 import {
   compositeScore, deadband, pctChange, stallWindowFor, holdsInsteadOfDeload,
   STALL_SCORE, PROGRESS_SCORE,
@@ -148,6 +149,14 @@ export interface PrescriptionContext {
   now?: number;
   /** which planned phase governed a past session (planStore.getPhaseResolver) */
   phaseOf?: PhaseResolver | null;
+  /**
+   * How the sets are laid out. 'top-set' (a strength block's main lifts —
+   * dosage.topSetScheme) prescribes set 1 as the top set at the recommended
+   * load and the rest as back-offs; the engine then judges the TOP set, so a
+   * heavier single set is what earns the next jump and the back-offs are
+   * volume at a load that does not cost the lifter anything.
+   */
+  scheme?: 'straight' | 'top-set';
 }
 
 // How many recent sessions at the same weight without progress on either lever
@@ -1133,6 +1142,14 @@ function repProgression(
     };
   }
 
+  // How the last session reads against the floor of the range — needed by the
+  // stall branch as well as the under-range one: a lifter stalled BELOW the
+  // range cannot be "reset to repLow" when repLow is more than they can do.
+  const strictAvg = strict.length > 0 ? repSum(strict) / strict.length : credited.average;
+  const judgedAvg = Math.max(strictAvg, credited.average);
+  // One more than what was managed, walking up to the floor (audit F11).
+  const buildTarget = Math.max(1, Math.min(exercise.repLow, Math.round(judgedAvg) + 1));
+
   // 2. Stalled → back off and rebuild. Best-of-window against the anchor, as
   // for loaded work: one bad day in a window that still holds a high-water
   // mark is noise, not a plateau. Same calendar guard too — sessions spread
@@ -1162,6 +1179,17 @@ function repProgression(
               : `Flat for ${window.length} sessions — repeat ${n(standard)} and chase one more before changing anything`,
         };
       }
+      if (judgedAvg < exercise.repLow) {
+        return {
+          weight: 0,
+          targetReps: buildTarget,
+          direction: 'down',
+          kind: 'deload',
+          reason: timed
+            ? `Stalled ${window.length} sessions under ${n(exercise.repLow)} — build to it: ${n(buildTarget)} per hold, clean`
+            : `Stalled ${window.length} sessions under ${exercise.repLow} reps — build to it: ${buildTarget} clean reps per set`,
+        };
+      }
       return {
         weight: 0,
         targetReps: exercise.repLow,
@@ -1177,22 +1205,23 @@ function repProgression(
   // 3. Under the range → work back toward it, on evidence: a clear miss, or a
   // second session confirming the first. One off day is not a trend here
   // either.
-  const strictAvg = strict.length > 0 ? repSum(strict) / strict.length : credited.average;
-  const judgedAvg = Math.max(strictAvg, credited.average);
   if (judgedAvg < exercise.repLow) {
     const previous = baseline[1];
     const prevAvg = previous ? creditedAverage(previous, exercise.sets) : null;
     const repeated = prevAvg != null && prevAvg < exercise.repLow;
     const bigMiss = goal !== 'fat-loss' && judgedAvg <= exercise.repLow - BIG_MISS_REPS;
     if (repeated || bigMiss) {
+      // A target UNDER the range: "build back into 8–12" told a lifter doing
+      // sets of 5 chin-ups to do 8, forever (audit F11).
+      const target = buildTarget;
       return {
         weight: 0,
-        targetReps: exercise.repLow,
+        targetReps: target,
         direction: 'down',
         kind: 'decrease',
         reason: timed
-          ? `Holds fell under ${n(exercise.repLow)} — build back into the range`
-          : `Reps fell under ${exercise.repLow} — build back into the range`,
+          ? `Holds fell under ${n(exercise.repLow)} — build to it: ${n(target)} per hold this time`
+          : `Reps fell under ${exercise.repLow} — build to it: ${target} clean reps per set this time`,
       };
     }
     return {
@@ -1215,6 +1244,39 @@ function repProgression(
           ? `${Math.max(1, Math.ceil(priorBest - credited.total))} more ${timed ? 'seconds' : 'reps'} than your best here (${Math.round(priorBest)}) earns the next step`
           : `In range — aim for ${n(target)} on set 1; a set at ${exercise.repHigh} with your best total earns the next step`;
   return { weight: 0, targetReps: target, direction: 'hold', kind: 'hold', reason };
+}
+
+/**
+ * Three sessions in a row under the range on unloaded work — the signal that
+ * the movement itself is too hard for now and an easier variant (a loadable
+ * one, usually) belongs in the slot. Audit F11: the engine could only ever say
+ * "build back into the range"; it never offered a way down.
+ */
+export const REGRESSION_MISSES = 3;
+export function needsRegression(history: ExerciseSession[], exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): boolean {
+  if (exercise.repLow == null || exercise.repHigh == null) return false;
+  const baseline = freshBaseline(history).slice(0, REGRESSION_MISSES);
+  if (baseline.length < REGRESSION_MISSES) return false;
+  const sets = Math.max(1, exercise.sets);
+  return baseline.every(h => {
+    if (workingWeight(h.sets) !== 0) return false;
+    const avg = creditedAverage(h, sets);
+    return avg != null && avg < exercise.repLow!;
+  });
+}
+
+/**
+ * A session seen through its top set: only the sets at the heaviest weight
+ * logged. Under the top-set scheme the back-offs outnumber the top set, so the
+ * most-used weight would be the back-off; this is how the engine is told
+ * which set it is judging.
+ */
+function topSetView(history: ExerciseSession[]): ExerciseSession[] {
+  return history.map(h => {
+    if (h.sets.length === 0) return h;
+    const top = Math.max(...h.sets.map(s => s.weight));
+    return { ...h, sets: h.sets.filter(s => s.weight === top) };
+  });
 }
 
 // ── Per-set prescription ──────────────────────────────────────────────────────
@@ -1308,6 +1370,14 @@ export function buildSetPlan(
     sets: exercise.sets, repLow: exercise.repLow, repHigh: exercise.repHigh,
   };
 
+  // A strength block's main lift: one top set, judged by the engine, and
+  // back-offs at a fraction of it. Falls through to the ordinary layout when
+  // there is no loaded history to build a top set from.
+  if (ctx.scheme === 'top-set' && count > 1) {
+    const topPlan = topSetPlan(history, exercise, ex, count, ctx);
+    if (topPlan) return topPlan;
+  }
+
   // Never trained: prescribe the rep range and let the lifter find the load.
   if (!rec) {
     return {
@@ -1359,10 +1429,13 @@ export function buildSetPlan(
   // at repHigh — clamping it was what made the next increase unreachable.
   const openCeiling = bodyweight && rec.kind === 'increase';
   const topClamp = openCeiling ? Number.POSITIVE_INFINITY : ex.repHigh;
+  // Unloaded work may be told to build UP to the range from below it (a
+  // regression target under repLow) — the floor follows the recommendation.
+  const floor = bodyweight && rec.targetReps != null ? Math.min(ex.repLow, rec.targetReps) : ex.repLow;
   const baseReps = rec.kind === 'hold'
     ? clamp((lastCounted[0]?.reps ?? ex.repLow) + 1, ex.repLow, bodyweight ? Math.max(ex.repHigh, rec.targetReps ?? 0) : ex.repHigh)
     : bodyweight
-      ? clamp(rec.targetReps!, ex.repLow, topClamp)
+      ? clamp(rec.targetReps!, floor, topClamp)
       : lastAvg != null && lastWeight != null && lastWeight > 0
         ? clamp(Math.round(predictReps(lastAvg, lastWeight, rec.weight)), ex.repLow, ex.repHigh)
         : ex.repLow;
@@ -1371,7 +1444,7 @@ export function buildSetPlan(
   const sets: PrescribedSet[] = Array.from({ length: count }, (_, i) => ({
     setNumber: i + 1,
     weight: rec.weight,
-    targetReps: clamp(baseReps + drops[i], ex.repLow, topClamp),
+    targetReps: clamp(baseReps + drops[i], floor, topClamp),
   }));
 
   const planTotal = sets.reduce((sum, s) => sum + (s.targetReps ?? 0), 0);
@@ -1404,4 +1477,71 @@ export function buildSetPlan(
           : `Rebuild at ${rec.weight} lbs: ${planTotal} clean reps, then start climbing again.`;
 
   return { rec, sets, goal };
+}
+
+/**
+ * The top-set / back-off layout for a strength block's main lift (decision D4).
+ *
+ *   • The recommendation is computed on the TOP SET ALONE — each past session
+ *     reduced to its heaviest sets, judged as a one-set prescription. That is
+ *     what makes "the top set earns the increase" literally true: a set at the
+ *     ceiling, matching the best single set ever done at this load, moves the
+ *     bar; the weekly cap, the stall window and the re-anchor all read the
+ *     same set.
+ *   • The back-offs sit at BACKOFF_PCT of the top set (85% in a peak week),
+ *     snapped to the equipment's increment, and carry the rep target the
+ *     load–rep relationship predicts for that lighter weight, clamped to the
+ *     range — volume that does not cost the top set anything.
+ *   • A planned easy week flattens everything to the backed-off load at the
+ *     bottom of the range, exactly as the straight-set layout does.
+ *
+ * Returns null when there is no loaded history to build from (first session,
+ * or a lift logged unloaded), so the caller falls through to the ordinary plan.
+ */
+function topSetPlan(
+  history: ExerciseSession[],
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>,
+  ex: PrescribedSlot,
+  count: number,
+  ctx: PrescriptionContext,
+): SetPlan | null {
+  const topHistory = topSetView(history);
+  const rec = calculateRecommendation(topHistory, { ...exercise, sets: 1 }, ctx);
+  if (!rec || rec.weight <= 0) return null;
+
+  const step = incrementFor(rec.weight, ctx.weightType);
+  const factor = backoffFactor(ctx.phase);
+  const backoff = Math.max(MIN_WEIGHT, Math.min(rec.weight - step, roundToStep(rec.weight * factor, step)));
+  const rows = (topWeight: number, topReps: number, offWeight: number, offReps: number): PrescribedSet[] =>
+    Array.from({ length: count }, (_, i) => (i === 0
+      ? { setNumber: 1, weight: topWeight, targetReps: topReps }
+      : { setNumber: i + 1, weight: offWeight, targetReps: offReps }));
+
+  if (rec.kind === 'deload' && isEasyPhase(ctx.phase ?? null)) {
+    return {
+      rec,
+      sets: rows(rec.weight, ex.repLow, backoff, ex.repLow),
+      goal: 'Easy week — the top set stays submaximal and the back-offs are light. Leave 3–4 reps in reserve on every set.',
+    };
+  }
+
+  const baseline = freshBaseline(topHistory);
+  const lastTop = baseline.length > 0 ? countedSets(baseline[0], 1)[0] : undefined;
+  const topReps = rec.kind === 'hold'
+    ? clamp((lastTop?.reps ?? ex.repLow) + 1, ex.repLow, ex.repHigh)
+    : lastTop && lastTop.weight > 0
+      ? clamp(Math.round(predictReps(lastTop.reps, lastTop.weight, rec.weight)), ex.repLow, ex.repHigh)
+      : ex.repLow;
+  const offReps = clamp(Math.round(predictReps(topReps, rec.weight, backoff)), ex.repLow, ex.repHigh);
+  const toBeat = bestWorkAt(baseline, rec.weight, { ...ex, sets: 1 });
+
+  const goal = rec.kind === 'reanchor'
+    ? `Top set re-anchored to ${rec.weight} lbs from your log — around ${topReps} reps with 1–2 in reserve, then ${count - 1} back-offs at ${backoff} lbs.`
+    : rec.kind === 'increase'
+      ? `New top set: ${rec.weight} lbs × ${topReps}, then ${count - 1} back-offs at ${backoff} lbs. A top set at ${ex.repHigh} reps earns the next jump.`
+      : rec.kind === 'hold'
+        ? `Top set ${rec.weight} lbs × ${topReps}${toBeat != null && toBeat > topReps ? ` (your best here is ${Math.round(toBeat)})` : ''}, then ${count - 1} back-offs at ${backoff} lbs. A top set at ${ex.repHigh} earns the next jump.`
+        : `Rebuild: top set ${rec.weight} lbs × ${topReps}, back-offs at ${backoff} lbs, then start climbing again.`;
+
+  return { rec, sets: rows(rec.weight, topReps, backoff, offReps), goal };
 }

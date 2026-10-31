@@ -12,7 +12,7 @@ import {
 import type { SetInput } from '../db/database';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
-import { buildSetPlan, historyDepthFor } from '../data/recommendations';
+import { buildSetPlan, historyDepthFor, needsRegression } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
 import { getExerciseMeta, unitFor } from '../data/exercises';
 import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal, getCoachDecisions, recordCoachDecision } from '../data/planStore';
@@ -21,6 +21,9 @@ import { PHASE_INFO, isEasyPhase } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { slotFor } from '../data/prescribe';
+import { applyPhaseRanges, topSetScheme } from '../data/dosage';
+import { suggestReplacements } from '../data/substitution';
+import type { ReplacementSuggestion } from '../data/substitution';
 import {
   getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets, conflictingDraft, draftSetCount,
 } from '../data/draftSession';
@@ -81,7 +84,7 @@ function contextForExercise(
   snapshot: TrainingSnapshot,
   positions: ReturnType<typeof snapshotPositions>,
   ctx: PrescriptionContext,
-): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession } {
+): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession; history: ExerciseSession[] } {
   const history: ExerciseSession[] = [];
   // Enough sessions for the athlete's stall window plus a dropped late-slot
   // one — a flat cap of four switched stall detection off for advanced lifters.
@@ -103,13 +106,16 @@ function contextForExercise(
     }
     if (history.length >= depth) break;
   }
+  const weightType = getExerciseMeta(ex.id).weightType;
   const plan = buildSetPlan(history, ex, {
     ...ctx,
-    weightType: getExerciseMeta(ex.id).weightType,
+    weightType,
     // Timed holds are prescribed and progressed in seconds, not reps.
     unit: unitFor(ex.id),
+    // A strength block's main lifts: one top set, judged, plus back-offs.
+    scheme: topSetScheme(ex, ctx.goal, ctx.experience, weightType) ? 'top-set' : 'straight',
   });
-  return { plan, last: history[0], rec: plan.rec ?? undefined };
+  return { plan, last: history[0], rec: plan.rec ?? undefined, history };
 }
 
 export default function WorkoutView({
@@ -266,7 +272,9 @@ export default function WorkoutView({
         program, snap, Date.now(), phase, getTrainingGoal(), getPhaseResolver(),
         getProfileOrDefault().experience, coachDecisions,
       );
-      const adjusted = applyPlanToDay(day, plan);
+      // The coach's set counts, then this week's rep ranges: a strength
+      // block's main lifts tighten as the block advances (dosage.phaseRange).
+      const adjusted = applyPhaseRanges(applyPlanToDay(day, plan), getTrainingGoal(), phase);
       setEffectiveDay(adjusted);
       setPlanChanges(plan.days.get(day.id)?.changes ?? []);
     });
@@ -283,10 +291,11 @@ export default function WorkoutView({
   // Recommendations + "last time" context for every rendered exercise (the
   // day's plus any added mid-workout), derived from the snapshot. Recomputes
   // when an exercise is added so a newcomer gets its history-driven rec too.
-  const { recommendations, lastSessions, setPlans } = useMemo(() => {
+  const { recommendations, lastSessions, setPlans, regressions } = useMemo(() => {
     const recs: Record<string, WeightRec> = {};
     const lasts: Record<string, ExerciseSession> = {};
     const plans: Record<string, SetPlan> = {};
+    const easier: Record<string, ReplacementSuggestion> = {};
     if (snapshot) {
       const positions = snapshotPositions(snapshot);
       // The prescription reads the athlete as well as the lift: the plan's goal
@@ -298,15 +307,22 @@ export default function WorkoutView({
         experience: effectiveExperience(getProfileOrDefault(), snapshot),
         phaseOf: getPhaseResolver(),
       };
+      const present = new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id));
       for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
-        const { plan, rec, last } = contextForExercise(ex, snapshot, positions, ctx);
+        const { plan, rec, last, history } = contextForExercise(ex, snapshot, positions, ctx);
         plans[ex.id] = plan;
         if (last) lasts[ex.id] = last;
         if (rec) recs[ex.id] = rec;
+        // Three sessions under the range on unloaded work: offer an easier
+        // way to train the same muscle (audit F11) — unless it's already here.
+        if (!isEditMode && needsRegression(history, ex)) {
+          const [best] = suggestReplacements(ex, effectiveDay, snapshot, 1, sessionStart, ctx.goal, { regression: true });
+          if (best && !present.has(best.exercise.id)) easier[ex.id] = best;
+        }
       }
     }
-    return { recommendations: recs, lastSessions: lasts, setPlans: plans };
-  }, [snapshot, effectiveDay, addedExercises, phase]);
+    return { recommendations: recs, lastSessions: lasts, setPlans: plans, regressions: easier };
+  }, [snapshot, effectiveDay, addedExercises, phase, isEditMode, sessionStart]);
 
   useEffect(() => {
     if (!existingSessionId) return;
@@ -585,6 +601,8 @@ export default function WorkoutView({
             recommendation={recommendations[ex.id]}
             plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
+            regression={regressions[ex.id]}
+            onRegress={s => handleAddExercise(slotFor(s.exercise.id, s.exercise.name, { snapshot }))}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}

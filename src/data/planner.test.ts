@@ -472,3 +472,47 @@ describe('main lifts are marked and protected', () => {
     for (const d of p.days) expect(d.exercises.some(e => e.main)).toBe(true);
   });
 });
+
+describe('strength anchoring (audit F9)', () => {
+  const ids = (p: ReturnType<typeof buildPlanProposal>) => p.days.flatMap(d => d.exercises.map(e => e.id));
+
+  it('anchors an experienced strength block on the barbell lifts', () => {
+    const p = buildPlanProposal(input({ experience: 'advanced', goal: 'strength', daysPerWeek: 4 }), [], null);
+    const all = ids(p);
+    for (const id of ['flat-barbell-bench-press', 'barbell-back-squat', 'conventional-deadlift', 'barbell-overhead-press']) {
+      expect(all, id).toContain(id);
+    }
+    const ohp = p.days.flatMap(d => d.exercises).find(e => e.id === 'barbell-overhead-press')!;
+    expect(ohp.main).toBe(true);
+  });
+
+  it('never puts two heavy barbell squats or hinges in one session', () => {
+    for (const goal of ['strength', 'hypertrophy', 'general'] as const) {
+      for (const days of [3, 4, 5, 6]) {
+        const p = buildPlanProposal(input({ experience: 'advanced', goal, daysPerWeek: days }), [], null);
+        for (const d of p.days) {
+          const axial = d.exercises.filter(e => ['barbell-back-squat', 'conventional-deadlift', 'romanian-deadlifts', 'good-mornings'].includes(e.id));
+          expect(axial.length, `${goal} ${days}d ${d.muscleGroups}: ${axial.map(e => e.id).join(', ')}`).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it('keeps a stalled main lift in a strength plan instead of rotating it', () => {
+    const current: WorkoutDay[] = [{
+      id: 1, label: 'Lower', muscleGroups: 'Lower',
+      exercises: [{ id: 'barbell-back-squat', name: 'Barbell Back Squat', sets: 4, repLow: 4, repHigh: 6, main: true }],
+    }];
+    const retro = makeRetro({ reviewExerciseIds: ['barbell-back-squat'], keepExerciseIds: [] });
+    const p = buildPlanProposal(input({ experience: 'advanced', goal: 'strength', daysPerWeek: 4 }), current, null, retro);
+    expect(ids(p)).toContain('barbell-back-squat');
+    expect(p.decisions.find(d => d.exerciseId === 'barbell-back-squat')?.status).toBe('kept');
+    expect(p.decisions.some(d => d.replacesName === 'Barbell Back Squat')).toBe(false);
+  });
+
+  it('holds chin-ups back from a beginner until a pull-down has been trained', () => {
+    const fresh = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 4 }), [], null);
+    expect(ids(fresh)).not.toContain('chin-ups');
+    expect(ids(fresh)).not.toContain('weighted-pull-ups');
+  });
+});

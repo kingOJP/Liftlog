@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSetPlan, calculateRecommendation } from './recommendations';
+import { buildSetPlan, calculateRecommendation, needsRegression } from './recommendations';
 import type { ExerciseSession, PrescriptionContext } from './recommendations';
 import type { Exercise } from './program';
 
@@ -334,9 +334,24 @@ describe('calculateRecommendation — bodyweight (rep progression)', () => {
     expect(rec).toMatchObject({ kind: 'increase', targetReps: 13 });
   });
 
-  it('resets to the bottom of the range when reps fall under it', () => {
+  // Audit F11: "build back into 8–12" told a lifter doing fives to do eight,
+  // forever. The target is one more than they managed, walking up to the floor.
+  it('sets a target just above what was managed when reps fall under the range', () => {
     const rec = advise([session([[0, 6], [0, 6], [0, 5]])], exercise, bw);
-    expect(rec).toMatchObject({ targetReps: 8, direction: 'down', kind: 'decrease' });
+    expect(rec).toMatchObject({ targetReps: 7, direction: 'down', kind: 'decrease' });
+    expect(rec!.reason).toContain('build to it');
+  });
+
+  it('builds up from below the range even when the stall branch fires first', () => {
+    const history = [session([[0, 5], [0, 5], [0, 5]], 1), session([[0, 5], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)];
+    const rec = advise(history, exercise, { ...bw, experience: 'intermediate' });
+    expect(rec).toMatchObject({ kind: 'deload', targetReps: 6 });
+    expect(rec!.reason).toContain('build to it');
+  });
+
+  it('never sets the build-up target above the floor of the range', () => {
+    const rec = advise([session([[0, 7], [0, 7], [0, 7]]), session([[0, 7], [0, 7], [0, 6]])], exercise, bw);
+    expect(rec).toMatchObject({ targetReps: 8, kind: 'decrease' });
   });
 
   it('suggests a rep deload after 3 sessions with no total-rep progress', () => {
@@ -1153,5 +1168,70 @@ describe('slots the lifter owns (Phase 4)', () => {
     expect(p.sets.map(s => s.weight)).toEqual([225, 225, 225]);
     expect(p.sets.every(s => s.targetReps === null)).toBe(true);
     expect(p.goal).toMatch(/own progression/i);
+  });
+});
+
+describe('top set + back-offs (strength main lifts, decision D4)', () => {
+  const main = { sets: 4, repLow: 4, repHigh: 6, main: true, rangeSource: 'plan' as const };
+  const top = (w: number, reps: number, weeksAgo = 1, off = 0.9) =>
+    session([[w, reps], [Math.round(w * off / 5) * 5, reps + 1], [Math.round(w * off / 5) * 5, reps + 1], [Math.round(w * off / 5) * 5, reps]], weeksAgo);
+  const ctx = { scheme: 'top-set' as const, goal: 'strength' as const, experience: 'advanced' as const, weightType: 'Barbell' as const, now: NOW };
+
+  it('lays out set 1 as the top set and the rest at the back-off load', () => {
+    const plan = buildSetPlan([top(300, 5)], main, ctx);
+    expect(plan.sets).toHaveLength(4);
+    expect(plan.sets[0].weight).toBe(300);
+    for (const s of plan.sets.slice(1)) expect(s.weight).toBe(270);
+    expect(plan.sets[0].weight!).toBeGreaterThan(plan.sets[1].weight!);
+    expect(plan.goal).toContain('Top set');
+  });
+
+  it('judges the top set, not the back-offs: a top set at the ceiling earns the jump', () => {
+    const plan = buildSetPlan([top(300, 6)], main, ctx);
+    expect(plan.rec?.kind).toBe('increase');
+    expect(plan.sets[0].weight!).toBeGreaterThan(300);
+    expect(plan.sets[1].weight!).toBeLessThan(plan.sets[0].weight!);
+  });
+
+  it('is never lighter on the top set than the back-offs, in any phase', () => {
+    for (const phase of ['accumulation', 'intensification', 'peak'] as const) {
+      const plan = buildSetPlan([top(300, 5)], main, { ...ctx, phase });
+      expect(plan.sets[0].weight!).toBeGreaterThanOrEqual(plan.sets[1].weight!);
+    }
+    // 85% in a peak week (snapped to the bar's increment), lighter than the 90% build back-off
+    const build = buildSetPlan([top(300, 5)], main, { ...ctx, phase: 'accumulation' });
+    const peak = buildSetPlan([top(300, 5)], main, { ...ctx, phase: 'peak' });
+    expect(peak.sets[1].weight!).toBeLessThan(build.sets[1].weight!);
+    expect(peak.sets[1].weight!).toBeLessThanOrEqual(260);
+  });
+
+  it('falls back to the straight layout with no loaded history', () => {
+    const plan = buildSetPlan([], main, ctx);
+    expect(plan.rec).toBeNull();
+    expect(plan.sets.every(s => s.weight === null)).toBe(true);
+  });
+
+  it('keeps straight sets when the scheme is not asked for', () => {
+    const plan = buildSetPlan([top(300, 5)], main, { ...ctx, scheme: 'straight' });
+    expect(new Set(plan.sets.map(s => s.weight)).size).toBe(1);
+  });
+});
+
+describe('needsRegression (audit F11)', () => {
+  const chins = { sets: 3, repLow: 8, repHigh: 12 };
+  it('fires after three unloaded sessions under the range', () => {
+    const history = [session([[0, 5], [0, 5], [0, 4]], 1), session([[0, 6], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)];
+    expect(needsRegression(history, chins)).toBe(true);
+  });
+  it('does not fire on two misses, on loaded work, or once a session reaches the range', () => {
+    expect(needsRegression([session([[0, 5], [0, 5], [0, 4]], 1), session([[0, 5], [0, 5], [0, 5]], 2)], chins)).toBe(false);
+    expect(needsRegression([session([[100, 5], [100, 5], [100, 4]], 1), session([[100, 5], [100, 5], [100, 5]], 2), session([[100, 5], [100, 5], [100, 5]], 3)], chins)).toBe(false);
+    expect(needsRegression([session([[0, 8], [0, 8], [0, 8]], 1), session([[0, 5], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)], chins)).toBe(false);
+  });
+  it('lets the plan carry a target under the range on the way back up', () => {
+    const plan = buildSetPlan([session([[0, 5], [0, 5], [0, 5]], 1), session([[0, 5], [0, 5], [0, 4]], 2)], chins, { weightType: 'Bodyweight' });
+    expect(plan.rec?.kind).toBe('decrease');
+    expect(plan.sets[0].targetReps).toBe(6);
+    expect(plan.sets.every(s => (s.targetReps ?? 0) < 8)).toBe(true);
   });
 });

@@ -362,14 +362,14 @@ rather than an empty sheet.
 
 ---
 
-## 9. Phase 7 — Strength and advanced lifters
+## 9. Phase 7 — Strength and advanced lifters — ✅ landed on `claude/action-plan-2026-10`
 
-**7.1 Main-lift anchoring.** (F9 part) Strength main slots carry `preferIds` (the mechanism
+**7.1 Main-lift anchoring.** ✅ (F9 part) Strength main slots carry `preferIds` (the mechanism
 sport templates already use) so squat/bench/deadlift/press anchor the block; never rotate a
 main lift to a different pattern or implement in a `strength` plan; never schedule two heavy
 axial lifts in one session. Test: Advanced simulation's block 2 keeps all four main lifts.
 
-**7.2 Intensity structure.** (F9 part) Per **[D4]**, two layers: (a) phase-dependent rep
+**7.2 Intensity structure.** ✅ (F9 part) Per **[D4]**, two layers: (a) phase-dependent rep
 ranges for `strength` (build 4–6, push 3–5, peak 2–4) threaded through `dosage()` and read by
 `calculateRecommendation` via `PrescriptionContext.phase`, so "reps drop and loads climb" is
 enforced, not described — and a phase change counts as a range change for 2.7, so it re-anchors
@@ -380,7 +380,7 @@ the volume credit on the back-offs. No 1RM input, no RPE (consistent with the ad
 roadmap's rejection of self-reported effort). Tests: Advanced simulation shows reps falling and
 loads rising across build → push → peak; the top set is never lighter than the back-offs.
 
-**7.3 Bodyweight regressions.** (F11) Chin/pull-ups skill-gated for beginners; the rep engine
+**7.3 Bodyweight regressions.** ✅ (F11) _The regression is offered from the card and added to today's session; making it the slot's permanent exercise stays a day-editor decision._ Chin/pull-ups skill-gated for beginners; the rep engine
 may set a target below `repLow` with "build to N" copy; after three misses the substitution
 engine proposes a regression (lat pull-down, banded) from the card.
 

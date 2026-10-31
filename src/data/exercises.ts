@@ -280,13 +280,19 @@ export const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   // A whole-body, multi-position sequence with no room to muscle through a
   // missed step — the highest skill floor in the catalog.
   'kettlebell-turkish-get-up': 'advanced',
+  // A chin-up is intermediate skill but a hard STRENGTH floor: a beginner who
+  // can manage five is told to build to eight forever (audit F11). Listing it
+  // here with a prerequisite is what lets the planner hold it back until the
+  // pull-down has been trained, without calling it an advanced lift.
+  'chin-ups': 'intermediate',
   // everything else (barbell/dumbbell pressing, rows, RDLs, hip thrusts,
-  // dips, chin-ups, lunges, plyometrics, carries) defaults to intermediate
+  // dips, lunges, plyometrics, carries) defaults to intermediate
 };
 
 // Advanced lifts a novice should earn: at least one prerequisite trained (or
 // an intermediate+ profile) before the planner will program them.
 export const PREREQUISITES: Record<string, string[]> = {
+  'chin-ups':              ['lat-pull-down', 'straight-arm-pulldowns'],
   'conventional-deadlift': ['romanian-deadlifts', 'dumbbell-rdl'],
   'barbell-back-squat':    ['goblet-squat', 'leg-press', 'hack-squat'],
   'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],

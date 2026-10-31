@@ -6,6 +6,7 @@ import { unitFor } from '../data/exercises';
 import { unitLabel } from '../data/taxonomy';
 import type { MeasureUnit } from '../data/taxonomy';
 import { InfoButton } from './InstructionSheet';
+import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
@@ -22,6 +23,10 @@ interface Props {
   /** When provided, shows a control to remove this exercise from the workout
    *  (used for exercises added mid-session). */
   onRemove?: () => void;
+  /** An easier variant to offer after repeated misses on unloaded work (audit F11) */
+  regression?: ReplacementSuggestion;
+  /** Accept the easier variant — WorkoutView adds it to today's session */
+  onRegress?: (s: ReplacementSuggestion) => void;
 }
 
 /** The row the lifter is filling in right now. */
@@ -56,7 +61,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 
 export default function ExerciseCard({
   exercise, sets, recommendation, plan, lastSession,
-  onLogSet, onEditSet, onDeleteSet, onRemove,
+  onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress,
 }: Props) {
   const info = useInstructionSheet();
   // A draft overrides the prescribed row — set when the lifter edits the
@@ -234,6 +239,18 @@ export default function ExerciseCard({
       )}
 
       {plan && <p className="ex-goal">{plan.goal}</p>}
+
+      {regression && onRegress && (
+        <div className="ex-regress">
+          <span className="ex-regress-text">
+            Three sessions short of the range. <strong>{regression.exercise.name}</strong> trains the
+            same muscle with a way to start lighter — build strength there and come back to this.
+          </span>
+          <button className="ex-regress-btn" onClick={() => onRegress(regression)}>
+            Add {regression.exercise.name} today
+          </button>
+        </div>
+      )}
 
       {sets.length > 0 && (
         <div className="set-log">
