@@ -279,3 +279,58 @@
   border-color: var(--purple);
   color: var(--purple);
 }
+
+/* A different day's unfinished workout is in the way — resolve before logging */
+.draft-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 16px;
+}
+
+.draft-conflict-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.draft-conflict-detail {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.draft-conflict-primary,
+.draft-conflict-secondary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draft-conflict-primary {
+  border: none;
+  background: var(--purple);
+  color: #fff;
+}
+
+.draft-conflict-secondary {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+/* A failed save is shown above the finish button, never swallowed */
+.finish-error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--red);
+  background: var(--bg-card);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+}

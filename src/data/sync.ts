@@ -20,6 +20,11 @@ import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore'
 import { saveExerciseMerges, applyExerciseMerges } from './merges';
 import type { MergeMap } from './merges';
 import type { PlanState } from './planStore';
+import { syncLock } from './syncLock';
+import {
+  markAuthExpired, markPullSucceeded, markPushStarted, markPushSucceeded, markSyncFailed,
+  clearSyncStatus,
+} from './syncStatus';
 
 export interface SyncUser {
   email: string;
@@ -144,12 +149,49 @@ export async function ensureLocalDataOwner(): Promise<void> {
     clearPlanState();
     clearExerciseLibraryData();
     clearExerciseMeta();
+    clearSyncStatus();
     localStorage.removeItem(ROLE_KEY);
   }
   localStorage.setItem(OWNER_KEY, user.email);
 }
 
-export async function pushSync(): Promise<void> {
+/**
+ * Upload local state. Serialized with every other sync entry point through
+ * `syncLock`, and reported through `syncStatus`: a failed push leaves
+ * `hasUnpushed` set so the background tick retries instead of waiting for the
+ * next cold start, and a 401 flips `authExpired` so the UI can ask the user to
+ * sign in again rather than looking synced while uploading nothing.
+ */
+export function pushSync(): Promise<void> {
+  return syncLock.run(async () => {
+    markPushStarted();
+    try {
+      const status = await pushSyncUnlocked();
+      if (status === 'unauthorized') markAuthExpired();
+      else markPushSucceeded();
+    } catch (err) {
+      markSyncFailed(err);
+      throw err;
+    }
+  });
+}
+
+// Returns true if local state changed (caller should refresh UI state)
+export function pullSync(): Promise<boolean> {
+  return syncLock.run(async () => {
+    try {
+      const result = await pullSyncUnlocked();
+      if (result === 'unauthorized') { markAuthExpired(); return false; }
+      markPullSucceeded();
+      return result;
+    } catch (err) {
+      markSyncFailed(err);
+      throw err;
+    }
+  });
+}
+
+async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
   // Drop ghost/empty workouts before uploading so they don't propagate
   // (the purge records tombstones, which this push carries)
   await purgeEmptySessions();
@@ -188,14 +230,14 @@ export async function pushSync(): Promise<void> {
     body:    JSON.stringify(payload),
   });
 
-  if (res.status === 401) return;
+  if (res.status === 401) return 'unauthorized';
   if (!res.ok) throw new Error(`Sync push failed: ${res.status}`);
+  return 'ok';
 }
 
-// Returns true if local state changed (caller should refresh UI state)
-export async function pullSync(): Promise<boolean> {
+async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
   const res = await fetch('/api/sync');
-  if (res.status === 401) return false;
+  if (res.status === 401) return 'unauthorized';
   if (!res.ok) throw new Error(`Sync pull failed: ${res.status}`);
   // Guard against non-API responses served with a 200 (dev server fallback,
   // captive portals, misbehaving proxies) — never parse HTML as sync data.

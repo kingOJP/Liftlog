@@ -189,9 +189,16 @@ describe('merging, not replacing', () => {
   it('does not resurrect a deleted session', async () => {
     await createSession(1, 1, 3_000); // a ghost: no sets
     await logWorkout(1_000);
-    await pushSync();                 // purges the ghost and tombstones it
-
-    await pullSync();
+    // A ghost is only purged once it is older than the grace period — move the
+    // clock on so the push sees an old empty session, not a fresh one.
+    const real = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => real + 2 * 60 * 60_000);
+    try {
+      await pushSync();               // purges the ghost and tombstones it
+      await pullSync();
+    } finally {
+      clock.mockRestore();
+    }
     expect((await dumpIDB()).sessions).toHaveLength(1);
   });
 });

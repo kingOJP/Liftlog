@@ -471,7 +471,18 @@ src/
 v2 added `exerciseMuscles` + `exerciseDetails` stores; v3 deleted them (metadata moved to localStorage).
 `guid`/`updatedAt` needed no version bump — IDB records are schemaless; only stores/indexes are versioned.
 
-Key exported functions: `createSession`, `completeSession`, `touchSession`, `ensureSessionGuids`, `addSetLog`, `getSession`, `updateSessionDate`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `mergeServerSessions`, `clearIDB`.
+Key exported functions: `saveWorkout`, `rewriteSessionSets`, `createSession`, `completeSession`, `touchSession`, `ensureSessionGuids`, `addSetLog`, `getSession`, `updateSessionDate`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `mergeServerSessions`, `clearIDB`.
+
+**Session writes are atomic.** A session row must never exist without its sets, because
+`purgeEmptySessions()` tombstones empty sessions *app-wide*. So the three write paths each run
+as ONE `readwrite` transaction over `sessions` + `setLogs`: `saveWorkout()` (Finish — the row's
+`add` success callback queues every set on the same transaction), `rewriteSessionSets()`
+(edit-session — old keys deleted, new rows inserted, `updatedAt` bumped, optional re-date, one
+commit; aborts if the session is gone) and `applySessionMergePlan` (the whole pull plan in one
+transaction). `createSession`/`addSetLog`/`completeSession` survive for tests and tooling but
+WorkoutView no longer uses them. Belt and braces: the purge skips any empty session younger
+than `PURGE_GRACE_MS` (1 h) — a ghost is old by definition — and `completeSession` tolerates a
+missing row.
 
 Anything that *analyzes* history (dashboard, metrics, coaching, recommendations, history list) goes through `loadTrainingSnapshot()` in `data/analytics.ts` — one `dumpIDB()` read per screen, never per-session queries.
 
@@ -515,6 +526,15 @@ only a newer copy, the client replaces local only with a newer copy). On pull, m
 is *merged* into local (server wins per exercise; unsynced local edits survive).
 `pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
 resurrect through sync (the server additionally refuses to store empty session docs).
+
+**Sync is serialized and visible.** Every entry point runs through `syncLock` (`syncLock.ts`,
+a promise chain) so the 60 s tick, the focus handler, startup and the post-workout push never
+interleave. `syncStatus.ts` (device-local, `liftlog_sync_status`) records `lastSuccessAt`,
+`lastError`, `hasUnpushed` (set when a push starts, cleared only when one succeeds — so a push
+that failed after Finish is retried by the next background tick, not the next cold start) and
+`authExpired` (a 401 from either direction). Surfaced as a Settings line + "Sync now", a quiet
+Dashboard badge when failing, and an app-wide "sign in again" banner when the session expired.
+`App` is wrapped in an `ErrorBoundary` whose recovery screen notes that the draft survived.
 
 **Ownership on the server (D1)** — full design in `docs/ownership-architecture.md`.
 Exercises live in three owned layers. **Layer 1 (application-owned):** the compiled-in
@@ -1227,8 +1247,27 @@ PROGRAM references) that are otherwise only checked by hand.
   inline editing/deletion free (no DB rollback needed). A localStorage draft
   (`draftSession.ts`) shadows the state on every set change so an app kill mid-workout loses
   nothing: reopening the same day within 12 h auto-restores it (with a Discard button); the
-  draft is cleared at Finish. Edit-session mode never drafts.
-- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session, re-writes them, and calls `touchSession()` so merge sync propagates the edit.
+  draft is cleared at Finish. Edit-session mode never drafts. Finish is wrapped in
+  try/catch: a failed save shows an error above the button, keeps the sets and the draft, and
+  re-enables the button.
+- **The draft slot is protected and self-describing.** One slot, but a draft that holds logged
+  sets is never overwritten by opening another day: WorkoutView asks `conflictingDraft()` first
+  and shows a sheet (resume it / discard it and start this one). The draft carries the
+  `WorkoutDay` snapshot, its `origin` (`program`/`quick`/`shared`) and mid-workout additions,
+  so quick and shared workouts resume after a kill like program days, via the Dashboard's
+  "Resume unfinished workout" card (`getUnfinishedWorkout()` → `App.handleResumeDraft`). Back
+  with logged sets asks for confirmation (the draft survives either way).
+- **An open workout is frozen.** `App` snapshots the day into the view (`{ screen: 'workout';
+  day }`) and WorkoutView freezes `day`/`program` in state, so a background pull that replaces
+  the program can neither unmount the workout nor change its exercises mid-set; the tick also
+  skips `startPendingActivation()` while a workout is open. WorkoutView instances are keyed by
+  day/session id so resuming a different day mounts fresh state.
+- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`.
+  On save `rewriteSessionSets()` replaces the set logs and bumps `updatedAt` in one transaction
+  so merge sync propagates the edit. The loader effect depends on `existingSessionId` only (the
+  day is frozen), so a program refresh can't wipe unsaved edits. A quick/shared session, or one
+  whose day the program no longer has, is edited from a placeholder day — WorkoutView renders
+  every logged exercise the day doesn't list.
 - **New accounts get no default program** — `getStoredProgram()` falls back to `[]`, not
   `PROGRAM`. The dashboard shows an empty state + plan CTA; the wizard builds the first
   program. Existing accounts are unaffected (their program is in localStorage and in the

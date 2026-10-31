@@ -60,3 +60,7 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+
+.share-modal-hint--error {
+  color: var(--red);
+}

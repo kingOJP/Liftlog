@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from '../data/program';
+import { getUnfinishedWorkout, draftSetCount } from '../data/draftSession';
+import type { DraftSession } from '../data/draftSession';
+import { getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
 import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
@@ -20,6 +23,7 @@ interface Props {
   onViewJourney: () => void;
   onPlanSetup: () => void;
   onQuickWorkout: () => void;
+  onResumeWorkout: (draft: DraftSession) => void;
 }
 
 function startLabel(startDate: string): string {
@@ -36,9 +40,15 @@ function lastTrainedLabel(ts: number | null): string {
 
 export default function Dashboard({
   program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup, onQuickWorkout,
+  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout,
 }: Props) {
   const weekNumber = getWeekNumber();
+  // An interrupted or abandoned-for-now workout, offered for resumption. Read
+  // on every render (cheap localStorage) so finishing or discarding it updates.
+  const unfinished = getUnfinishedWorkout();
+  const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
+  const syncTrouble = !syncStatus.authExpired && syncStatus.lastError != null
+    && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt);
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
 
@@ -165,7 +175,25 @@ export default function Dashboard({
         )}
       </div>
 
+      {unfinished && (
+        <button className="resume-card" onClick={() => onResumeWorkout(unfinished)}>
+          <div className="resume-eyebrow">Unfinished workout</div>
+          <div className="resume-title">
+            Resume {unfinished.day?.label ?? (unfinished.dayId < 0 ? 'quick workout' : `Day ${unfinished.dayId}`)} ›
+          </div>
+          <div className="resume-detail">
+            {draftSetCount(unfinished)} set{draftSetCount(unfinished) === 1 ? '' : 's'} logged · started {lastTrainedLabel(unfinished.startedAt).replace('trained ', '')}
+          </div>
+        </button>
+      )}
+
       {journeyCard}
+
+      {syncTrouble && (
+        <p className="sync-badge" role="status">
+          Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
+        </p>
+      )}
 
       {nextDay && (
         <button className="coach-card" onClick={() => onStartWorkout(nextDay.dayId)}>

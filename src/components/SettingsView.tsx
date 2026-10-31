@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import {
   getRestDuration, saveRestDuration, REST_PRESETS,
 } from '../data/settings';
 import type { SyncUser } from '../data/sync';
+import { describeSyncStatus, getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
 import './SettingsView.css';
 
 interface Props {
@@ -10,10 +11,19 @@ interface Props {
   onBack: () => void;
   onViewExercises: () => void;
   onViewGlossary: () => void;
+  onSyncNow: () => Promise<void>;
 }
 
-export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary }: Props) {
+export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
+  const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSyncNow() {
+    if (syncing) return;
+    setSyncing(true);
+    try { await onSyncNow(); } finally { setSyncing(false); }
+  }
 
   function handleRestChange(seconds: number) {
     setRestSeconds(seconds);
@@ -73,8 +83,21 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
             </div>
             <a href="/api/auth/logout" className="settings-logout">Sign out</a>
           </div>
+          <div className="settings-sync">
+            <span className={`settings-sync-status${syncStatus.authExpired || (syncStatus.lastError && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt)) ? ' settings-sync-status--error' : ''}`}>
+              {describeSyncStatus(syncStatus)}
+            </span>
+            {syncStatus.authExpired ? (
+              <a href="/api/auth/google" className="settings-sync-btn">Sign in again</a>
+            ) : (
+              <button className="settings-sync-btn" onClick={handleSyncNow} disabled={syncing}>
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </button>
+            )}
+          </div>
           <p className="settings-hint">
-            Workouts sync to your account. Exercise muscle metadata and these settings stay on this device.
+            Workouts, your program, exercise metadata and your training journey sync to your account.
+            The rest timer and other device preferences stay on this device.
           </p>
         </section>
       </div>

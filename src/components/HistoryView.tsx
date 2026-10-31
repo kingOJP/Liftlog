@@ -93,7 +93,7 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
             >
               <div className="history-card-header">
                 <div className="history-card-left">
-                  <span className="history-date">{formatDate(session.completedAt!)}</span>
+                  <span className="history-date">{formatDate(session.completedAt ?? session.startedAt)}</span>
                   <span className="history-day-label">
                     {day
                       ? `${day.label} — ${day.muscleGroups}`

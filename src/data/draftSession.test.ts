@@ -55,3 +55,41 @@ describe('draft session persistence', () => {
     expect(getResumableDraft(2, NOW)).toBeNull();
   });
 });
+
+// ── Draft protection (audit H1) ──────────────────────────────────────────────
+
+import { conflictingDraft, getUnfinishedWorkout, draftSetCount } from './draftSession';
+
+describe('a draft with logged sets is protected from being overwritten', () => {
+  it('is reported as a conflict when a different day opens', () => {
+    saveDraftSession(draft({ dayId: 2 }));
+    expect(conflictingDraft(3, NOW)?.dayId).toBe(2);
+  });
+
+  it('is not a conflict for the same day — that is a resume', () => {
+    saveDraftSession(draft({ dayId: 2 }));
+    expect(conflictingDraft(2, NOW)).toBeNull();
+  });
+
+  it('a draft with no sets never blocks anything', () => {
+    saveDraftSession(draft({ dayId: 2, sets: {} }));
+    expect(conflictingDraft(3, NOW)).toBeNull();
+    expect(getUnfinishedWorkout(NOW)).toBeNull();
+  });
+
+  it('an expired draft is neither a conflict nor resumable', () => {
+    saveDraftSession(draft({ savedAt: NOW - DRAFT_MAX_AGE_MS - 1 }));
+    expect(conflictingDraft(3, NOW)).toBeNull();
+    expect(getUnfinishedWorkout(NOW)).toBeNull();
+  });
+
+  it('carries the day snapshot and origin so a quick workout can be resumed after a kill', () => {
+    const day = { id: -2, label: 'Quick Workout', muscleGroups: 'One-off', exercises: [{ id: 'squat', name: 'Squat', sets: 5 }] };
+    saveDraftSession(draft({ dayId: -2, day, origin: 'quick', added: [{ id: 'dips', name: 'Dips', sets: 3 }] }));
+    const d = getUnfinishedWorkout(NOW)!;
+    expect(d.day).toEqual(day);
+    expect(d.origin).toBe('quick');
+    expect(d.added).toHaveLength(1);
+    expect(draftSetCount(d)).toBe(1);
+  });
+});

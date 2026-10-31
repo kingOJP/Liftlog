@@ -4,15 +4,12 @@ import { getWeekNumber, getWeekNumberForDate } from '../data/program';
 import { computeProgramPlan, applyPlanToDay } from '../data/coach';
 import type { PlanChange } from '../data/coach';
 import {
-  createSession,
-  completeSession,
-  touchSession,
-  addSetLog,
+  saveWorkout,
+  rewriteSessionSets,
   getSetLogsForSession,
-  deleteSetLogsForSession,
   getSession,
-  updateSessionDate,
 } from '../db/database';
+import type { SetInput } from '../db/database';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { buildSetPlan } from '../data/recommendations';
@@ -24,7 +21,10 @@ import { PHASE_INFO } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { slotFor } from '../data/prescribe';
-import { getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets } from '../data/draftSession';
+import {
+  getResumableDraft, saveDraftSession, clearDraftSession, draftHasSets, conflictingDraft, draftSetCount,
+} from '../data/draftSession';
+import type { DraftOrigin, DraftSession } from '../data/draftSession';
 import ExerciseCard from './ExerciseCard';
 import AddExercisePanel from './AddExercisePanel';
 import RestTimer from './RestTimer';
@@ -36,8 +36,12 @@ interface Props {
   /** Full program — the coach plans volume holistically across every day */
   program: WorkoutDay[];
   existingSessionId?: number;
+  /** where `day` came from — stored on the draft so a resume can re-open it */
+  origin?: DraftOrigin;
   onBack: () => void;
   onComplete: () => void;
+  /** the user chose to resume a different day's unfinished workout instead */
+  onResumeDraft?: (draft: DraftSession) => void;
 }
 
 type SetEntry = { weight: number; reps: number; warmup?: boolean };
@@ -102,15 +106,30 @@ function contextForExercise(
   return { plan, last: history[0], rec: plan.rec ?? undefined };
 }
 
-export default function WorkoutView({ day, program, existingSessionId, onBack, onComplete }: Props) {
+export default function WorkoutView({
+  day: dayProp, program: programProp, existingSessionId, origin = 'program', onBack, onComplete, onResumeDraft,
+}: Props) {
   const isEditMode = existingSessionId !== undefined;
+  // The day and program are FROZEN for the lifetime of the workout. A
+  // background pull can replace the live program (a pending block starting, a
+  // sync from another device) while a workout is open; the session being
+  // logged must keep the exercises it started with — the user is holding a
+  // dumbbell, not reading release notes. The coach overlay and prescriptions
+  // are built from these snapshots too.
+  const [day] = useState(dayProp);
+  const [program] = useState(programProp);
   // The training-block phase governing this week — planned deload/recovery
   // weeks flip the engines into back-off mode. Editing history ignores phase.
   const [phase] = useState(() => (existingSessionId !== undefined ? null : getActivePhase()));
+  // A draft with logged sets for a DIFFERENT day would be overwritten by this
+  // workout's first draft save. Hold everything until the user decides.
+  const [conflict, setConflict] = useState<DraftSession | null>(() =>
+    isEditMode || !onResumeDraft ? null : conflictingDraft(dayProp.id),
+  );
   // An interrupted workout (app killed mid-session) left a draft behind —
   // restore it so no logged set is ever lost. Edit mode never drafts.
   const [restoredDraft, setRestoredDraft] = useState(() =>
-    isEditMode ? null : getResumableDraft(day.id),
+    isEditMode ? null : getResumableDraft(dayProp.id),
   );
   const [sets, setSets] = useState<Record<string, SetEntry[]>>(() => restoredDraft?.sets ?? {});
   // Exercise ids in the order they were first trained this session — stored on
@@ -122,6 +141,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // after the day's exercises and logged like any other. Restored from a draft.
   const [addedExercises, setAddedExercises] = useState<Exercise[]>(() => {
     if (isEditMode || !restoredDraft) return [];
+    if (restoredDraft.added) return restoredDraft.added;
     const dayIds = new Set(day.exercises.map(e => e.id));
     return Object.keys(restoredDraft.sets).filter(id => !dayIds.has(id)).map(id => exerciseFromId(id, null));
   });
@@ -134,6 +154,9 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   const [planChanges, setPlanChanges] = useState<PlanChange[]>([]);
   const [planDismissed, setPlanDismissed] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // A failed save (IndexedDB quota, a thrown error) is shown, not swallowed —
+  // the button comes back and the draft is kept until the save succeeds.
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Share-this-workout QR overlay (gym buddy scans it with their camera)
   const [sharing, setSharing] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
@@ -188,12 +211,26 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   // anything — not even the start time before the first set is logged.
   // Cleared at Finish (or when the draft is discarded).
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || conflict) return;
     saveDraftSession({
       dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets,
       order: exerciseOrderRef.current,
+      day, origin, added: addedExercises,
     });
-  }, [sets, isEditMode, day.id, sessionStart]);
+  }, [sets, isEditMode, day, origin, sessionStart, conflict, addedExercises]);
+
+  // Leaving a workout with logged sets: nothing is lost (the draft persists
+  // and the Dashboard offers to resume it), but an accidental Back tap
+  // shouldn't silently end a session either.
+  function handleBack() {
+    if (!isEditMode && totalSets > 0) {
+      const ok = window.confirm(
+        `Leave this workout? Your ${totalSets} logged set${totalSets === 1 ? '' : 's'} are saved — you can resume from the dashboard.`,
+      );
+      if (!ok) return;
+    }
+    onBack();
+  }
 
   function handleDiscardDraft() {
     clearDraftSession();
@@ -275,7 +312,10 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       if (extras.length > 0) setAddedExercises(extras.map(id => exerciseFromId(id, null)));
       setLoading(false);
     });
-  }, [existingSessionId, day]);
+    // `day` is frozen state, so this runs exactly once per session being
+    // edited — it used to re-run on every program refresh and wipe the edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingSessionId]);
 
   function handleLogSet(exerciseId: string, weight: number, reps: number, warmup: boolean) {
     if (!exerciseOrderRef.current.includes(exerciseId)) {
@@ -331,42 +371,80 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   async function handleFinish() {
     if (finishing) return;
     setFinishing(true);
+    setSaveError(null);
 
     const startedAt = sessionStart;
-    const sid = isEditMode
-      ? existingSessionId
-      : await createSession(day.id, getWeekNumber(), startedAt);
-
-    if (isEditMode) {
-      await deleteSetLogsForSession(sid);
-      // Persist a re-dated session if the date was changed
-      if (dateInput && originalCompletedAt != null) {
-        const newCompletedAt = dateInputToTimestamp(dateInput, originalCompletedAt);
-        if (newCompletedAt !== originalCompletedAt) {
-          await updateSessionDate(sid, newCompletedAt, getWeekNumberForDate(new Date(newCompletedAt)));
-        }
-      }
-    }
-
+    const setInputs: SetInput[] = [];
     for (const [exerciseId, exerciseSets] of Object.entries(sets)) {
       const orderIdx = exerciseOrderRef.current.indexOf(exerciseId);
       const order = orderIdx >= 0 ? orderIdx : undefined;
-      for (let i = 0; i < exerciseSets.length; i++) {
-        await addSetLog(sid, exerciseId, i + 1, exerciseSets[i].weight, exerciseSets[i].reps, order, exerciseSets[i].warmup);
-      }
+      exerciseSets.forEach((set, i) => {
+        setInputs.push({
+          exerciseId, setNumber: i + 1, weight: set.weight, reps: set.reps, order,
+          ...(set.warmup ? { warmup: true } : {}),
+        });
+      });
     }
 
-    if (isEditMode) {
-      // Mark the session as freshly edited so merge sync propagates this copy
-      await touchSession(sid);
-    } else {
-      // The session ends at the final logged set, not the "Finish" tap — the
-      // duration engine needs the training window, not phone-in-hand time.
-      const completedAt = Math.max(lastSetAtRef.current ?? Date.now(), startedAt);
-      await completeSession(sid, completedAt);
-      clearDraftSession();
+    try {
+      if (isEditMode) {
+        // Old logs out, new logs in, updatedAt bumped — one transaction, so an
+        // interruption can never leave the session empty (and purge-able).
+        let redate: { completedAt: number; weekNumber: number } | undefined;
+        if (dateInput && originalCompletedAt != null) {
+          const newCompletedAt = dateInputToTimestamp(dateInput, originalCompletedAt);
+          if (Number.isFinite(newCompletedAt) && newCompletedAt !== originalCompletedAt) {
+            redate = { completedAt: newCompletedAt, weekNumber: getWeekNumberForDate(new Date(newCompletedAt)) };
+          }
+        }
+        await rewriteSessionSets(existingSessionId, setInputs, redate);
+      } else {
+        // The session ends at the final logged set, not the "Finish" tap — the
+        // duration engine needs the training window, not phone-in-hand time.
+        // Session row and sets land together: no window in which a ghost purge
+        // could see (and tombstone) a workout with no sets.
+        const completedAt = Math.max(lastSetAtRef.current ?? Date.now(), startedAt);
+        await saveWorkout({ dayId: day.id, weekNumber: getWeekNumber(), startedAt, completedAt, sets: setInputs });
+        clearDraftSession();
+      }
+    } catch (err) {
+      console.error('Saving the workout failed', err);
+      setSaveError(err instanceof Error ? err.message : 'Could not save the workout');
+      setFinishing(false);
+      return;
     }
+    setFinishing(false);
     onComplete();
+  }
+
+  if (conflict && onResumeDraft) {
+    const count = draftSetCount(conflict);
+    const label = conflict.day?.label ?? (conflict.dayId < 0 ? 'Quick workout' : `Day ${conflict.dayId}`);
+    return (
+      <div className="workout-view">
+        <header className="workout-header">
+          <button className="back-btn" onClick={onBack} aria-label="Back">&#8592;</button>
+          <div className="workout-title">
+            <span className="workout-day-label">Unfinished workout</span>
+          </div>
+        </header>
+        <div className="draft-conflict">
+          <p className="draft-conflict-title">You have an unfinished {label} workout</p>
+          <p className="draft-conflict-detail">
+            {count === 1 ? '1 logged set from earlier is' : `${count} logged sets from earlier are`} waiting. Starting {day.label} now would replace {count === 1 ? 'it' : 'them'}.
+          </p>
+          <button className="draft-conflict-primary" onClick={() => onResumeDraft(conflict)}>
+            Resume {label}
+          </button>
+          <button
+            className="draft-conflict-secondary"
+            onClick={() => { clearDraftSession(); setConflict(null); }}
+          >
+            Discard it and start {day.label}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -387,7 +465,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
   return (
     <div className="workout-view">
       <header className="workout-header">
-        <button className="back-btn" onClick={onBack} aria-label="Back">&#8592;</button>
+        <button className="back-btn" onClick={handleBack} aria-label="Back">&#8592;</button>
         <div className="workout-title">
           <span className="workout-day-label">{day.label}</span>
           <span className="workout-muscles">{day.muscleGroups}</span>
@@ -409,7 +487,7 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
         className="exercise-list"
         style={restRunId > 0 ? { paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' } : undefined}
       >
-        {isEditMode && dateInput && (
+        {isEditMode && originalCompletedAt != null && (
           <div className="workout-date-field">
             <label className="workout-date-label" htmlFor="workout-date">Workout date</label>
             <input
@@ -505,6 +583,11 @@ export default function WorkoutView({ day, program, existingSessionId, onBack, o
       {!isEditMode && <RestTimer runId={restRunId} onDismiss={() => setRestRunId(0)} />}
 
       <div className={`finish-bar${atBottom ? '' : ' finish-bar--hidden'}`}>
+        {saveError && (
+          <p className="finish-error" role="alert">
+            Couldn't save: {saveError}. Your sets are still here — try again.
+          </p>
+        )}
         <button
           className="finish-btn"
           tabIndex={atBottom ? 0 : -1}

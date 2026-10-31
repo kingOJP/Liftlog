@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
+import { clearDraftSession } from './data/draftSession';
+import type { DraftSession } from './data/draftSession';
+import { getSyncStatus, subscribeSyncStatus } from './data/syncStatus';
+import { isQuickWorkout } from './data/quickWorkout';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import HistoryView from './components/HistoryView';
@@ -27,7 +31,11 @@ import './App.css';
 
 type View =
   | { screen: 'dashboard' }
-  | { screen: 'workout'; dayId: number }
+  // The day is SNAPSHOTTED into the view when the workout opens. A background
+  // pull can replace the program while the user is mid-set; looking the day
+  // up by id on every render would unmount the workout the moment its id
+  // vanished. WorkoutView freezes the day too; this keeps it mounted.
+  | { screen: 'workout'; day: WorkoutDay }
   | { screen: 'history' }
   | { screen: 'edit-session'; sessionId: number; dayId: number }
   | { screen: 'edit-day'; dayId: number }
@@ -57,6 +65,12 @@ function App() {
   const [sharedDay, setSharedDay] = useState<WorkoutDay | null>(null);
   // A quick/one-off workout assembled in QuickWorkoutView (never added to the program)
   const [quickDay, setQuickDay] = useState<WorkoutDay | null>(null);
+  // True while a workout is being logged — the background tick must not swap
+  // the program underneath it (a pending block waits for the workout to end).
+  const workoutOpenRef = useRef(false);
+  const workoutOpen = view.screen === 'workout' || view.screen === 'quick-workout' || view.screen === 'shared-workout';
+  useEffect(() => { workoutOpenRef.current = workoutOpen; }, [workoutOpen]);
+  const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
   // The exercise-ID migration runs independently of pull so a sync failure can't
@@ -124,14 +138,17 @@ function App() {
       try {
         const didPull = await pullSync();
         // A pending block whose start date arrived while the app was open
-        // installs here (the interval doubles as its scheduler).
-        const started = await startPendingActivation();
+        // installs here (the interval doubles as its scheduler) — but never
+        // while a workout is being logged against the current program.
+        const started = workoutOpenRef.current ? false : await startPendingActivation();
         const healed = reconcileActiveProgram();
         if (didPull) ensureWeekAnchor();
         if (didPull || started || healed) setProgram(getStoredProgram());
-        if (started || healed) pushSync().catch(() => {});
+        // Anything this device still owes the server (a push that failed after
+        // a workout, offline edits) goes up now rather than at the next cold start.
+        if (started || healed || getSyncStatus().hasUnpushed) pushSync().catch(() => {});
       } catch {
-        // silent — background refresh is best-effort
+        // reported through syncStatus; the UI shows it, the next tick retries
       }
     }
 
@@ -147,6 +164,28 @@ function App() {
 
   function sync() {
     if (user) pushSync().catch(console.error);
+  }
+
+  // Resume an unfinished workout from the draft — a program day by its live
+  // definition (or the snapshot, if the program no longer has it), a quick or
+  // shared workout from the snapshot the draft carries.
+  function handleResumeDraft(draft: DraftSession) {
+    const snapshot = draft.day;
+    if (draft.origin === 'quick' || (!draft.origin && isQuickWorkout(draft.dayId))) {
+      if (!snapshot) { clearDraftSession(); return; }
+      setQuickDay(snapshot);
+      setView({ screen: 'quick-workout' });
+      return;
+    }
+    if (draft.origin === 'shared' || (!draft.origin && draft.dayId === SHARED_DAY_ID)) {
+      if (!snapshot) { clearDraftSession(); return; }
+      setSharedDay(snapshot);
+      setView({ screen: 'shared-workout' });
+      return;
+    }
+    const day = program.find(d => d.id === draft.dayId) ?? snapshot;
+    if (!day) { clearDraftSession(); return; }
+    setView({ screen: 'workout', day });
   }
 
   function handleUpdateDay(updated: WorkoutDay) {
@@ -174,22 +213,34 @@ function App() {
   function renderView(): React.ReactNode {
     switch (view.screen) {
       case 'workout': {
-        const day = findDay(view.dayId);
-        if (!day) break;
+        // Keyed by day so resuming a different day's draft from the conflict
+        // sheet mounts a fresh view (the day is frozen state inside it).
         return (
           <WorkoutView
-            day={day}
+            key={`workout-${view.day.id}`}
+            day={view.day}
             program={program}
+            origin="program"
             onBack={() => setView({ screen: 'dashboard' })}
             onComplete={() => { setView({ screen: 'dashboard' }); sync(); }}
+            onResumeDraft={handleResumeDraft}
           />
         );
       }
       case 'edit-session': {
-        const day = findDay(view.dayId);
-        if (!day) break;
+        // A quick or shared workout (negative dayId) or a day the program no
+        // longer has: edit it from its own logged exercises. WorkoutView
+        // renders every logged exercise the day's design doesn't list.
+        const day = findDay(view.dayId) ?? {
+          id: view.dayId,
+          label: isQuickWorkout(view.dayId) ? 'Quick workout'
+            : view.dayId === SHARED_DAY_ID ? 'Shared workout' : `Day ${view.dayId}`,
+          muscleGroups: 'Logged exercises',
+          exercises: [],
+        };
         return (
           <WorkoutView
+            key={`edit-${view.sessionId}`}
             day={day}
             program={program}
             existingSessionId={view.sessionId}
@@ -250,6 +301,14 @@ function App() {
           <SettingsView
             user={user!}
             onBack={() => setView({ screen: 'dashboard' })}
+            onSyncNow={async () => {
+              try {
+                if (await pullSync()) setProgram(getStoredProgram());
+                await pushSync();
+              } catch (err) {
+                console.error(err);
+              }
+            }}
             onViewExercises={() => setView({ screen: 'exercise-list' })}
             onViewGlossary={() => setView({ screen: 'glossary' })}
           />
@@ -291,14 +350,17 @@ function App() {
         if (!quickDay) break;
         return (
           <WorkoutView
+            key="quick"
             day={quickDay}
             program={program}
+            origin="quick"
             onBack={() => { setQuickDay(null); setView({ screen: 'dashboard' }); }}
             onComplete={() => {
               setQuickDay(null);
               setView({ screen: 'dashboard' });
               sync();
             }}
+            onResumeDraft={handleResumeDraft}
           />
         );
       }
@@ -338,14 +400,17 @@ function App() {
         if (!sharedDay) break;
         return (
           <WorkoutView
+            key="shared"
             day={sharedDay}
             program={program}
+            origin="shared"
             onBack={() => setView({ screen: 'dashboard' })}
             onComplete={() => {
               setSharedDay(null);
               setView({ screen: 'dashboard' });
               sync();
             }}
+            onResumeDraft={handleResumeDraft}
           />
         );
       }
@@ -361,7 +426,11 @@ function App() {
         <main className="app-main">
           <Dashboard
             program={program}
-            onStartWorkout={dayId => setView({ screen: 'workout', dayId })}
+            onStartWorkout={dayId => {
+              const day = findDay(dayId);
+              if (day) setView({ screen: 'workout', day });
+            }}
+            onResumeWorkout={handleResumeDraft}
             onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
             onViewHistory={() => setView({ screen: 'history' })}
             onViewMetrics={() => setView({ screen: 'metrics' })}
@@ -375,7 +444,17 @@ function App() {
     );
   }
 
-  return <div className="app">{renderView()}</div>;
+  return (
+    <div className="app">
+      {syncStatus.authExpired && (
+        <div className="auth-banner" role="alert">
+          <span>Your sign-in expired — workouts are saved on this phone but not syncing.</span>
+          <a className="auth-banner-link" href="/api/auth/google">Sign in again</a>
+        </div>
+      )}
+      {renderView()}
+    </div>
+  );
 }
 
 export default App;
