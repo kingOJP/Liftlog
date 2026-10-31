@@ -17,7 +17,7 @@ import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
 import {
   activateProposal, getActiveBlockInfo, getLatestRetrospective,
-  getProfileOrDefault, getActivePlan, saveTrainingProfile, getPhaseResolver, getLatestCompletedBlock,
+  getProfileOrDefault, saveTrainingProfile, getPhaseResolver, getLatestCompletedBlock, getPlannedGoal,
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
@@ -108,7 +108,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   // Pre-fill from the saved profile (repeat plans breeze through) and the
   // active plan's goal.
   const saved = useMemo(() => getProfileOrDefault(), []);
-  const activeGoal = useMemo(() => getActivePlan()?.goal, []);
+  // Only a goal the user actually chose pre-fills (and counts as "changed
+  // goal" for the intro-week rule) — a migrated Foundation plan's placeholder
+  // goal is not something they picked.
+  const activeGoal = useMemo(() => getPlannedGoal() ?? undefined, []);
 
   const [stage, setStage] = useState<Stage>('questions');
   const [qIndex, setQIndex] = useState(0);

@@ -850,10 +850,20 @@ Now:
 | Ad-hoc, no plan, has history | `rangeFromHistory()` — median reps ± 2, median set count |
 | Ad-hoc, no plan, never trained | **null** — no targets, weight still prefilled from last time |
 
-`getPlannedGoal()` (planStore) returns `null` when there's no plan, which is what makes step 3
-reachable; `getTrainingGoal()` keeps its `'general'` fallback for analytics that just need *a*
-goal to weight signals. Note that `ensureJourneyMigrated()` gives legacy users a Foundation
-plan with a real goal, so in practice most accounts resolve at step 2.
+`getPlannedGoal()` (planStore) returns `null` when there's no plan **or when the active plan's
+goal was never chosen** (`planHasChosenGoal`: `origin === 'planned'`, or any non-open-ended block
+— i.e. a wizard block — in it), which is what makes step 3 reachable; `getTrainingGoal()` keeps
+its `'general'` fallback for analytics that just need *a* goal to weight signals.
+`ensureJourneyMigrated()` wraps pre-journey or quick-workout-only history in a Foundation plan
+with a **placeholder `general` goal that is not a prescription source**; the rule applies at
+read time, so existing accounts' migrated plans (goal hypertrophy, origin migrated) are covered
+without a data migration, and a migrated plan that later received a wizard block keeps its goal
+because that activation was the choice. Every prescription records its provenance on the slot:
+`Exercise.rangeSource` is `'plan'` (dosed from a goal), `'user'` (typed) or `'history'` (read off
+the log). **The engine only re-anchors a load to a chosen range** — re-anchoring to a
+history-derived one is circular, and it is how a 5×5 lifter was told to drop 20% every session.
+`Exercise.progression: 'manual'` switches the coach off for a slot (no chip, no targets, last
+weights pre-filled). `parseDose()` (dosage.ts) is the one validator for typed sets × reps.
 
 **Heavy axial work has its own tier.** `isHeavyAxial()` = barbell **and** Hip Hinge or Squat
 pattern — so conventional/Romanian deadlifts and back squats qualify, while cable pull-throughs,
@@ -1319,6 +1329,13 @@ PROGRAM references) that are otherwise only checked by hand.
   `PROGRAM`. The dashboard shows an empty state + plan CTA; the wizard builds the first
   program. Existing accounts are unaffected (their program is in localStorage and in the
   per-user `user_programs` server row, restored by pull on any device).
+- **A program can be built by hand.** Dashboard "＋ Add a day" / "Build my own program" opens
+  `DayEditView` with `isNew` (nothing is stored until saved with an exercise); the editor
+  renames a day, edits each slot's sets × rep range and coach/manual progression through the
+  shared `SlotDoseEditor`, reorders and removes days, and all three pickers (day editor,
+  quick workout, mid-workout add) are the one `AddExercisePanel`. Finishing a quick workout
+  offers to keep it as a program day. The Metrics Progress tab lists every lift trained in the
+  last 60 days, not just the current program, with a show-all control.
 - **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
 - **The week-numbering anchor is managed automatically** — the "Training block start"

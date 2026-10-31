@@ -870,7 +870,7 @@ export function buildPlanProposal(
       ctx.dayUsed.add(picked.profile.id);
       const dose = doseFor(input.goal, slot, picked.profile, input.experience);
       exercises.push({
-        id: picked.profile.id, name: picked.profile.name, ...dose,
+        id: picked.profile.id, name: picked.profile.name, ...dose, rangeSource: 'plan',
         ...(slot.main ? { main: true } : {}),
       });
       decisions.push({

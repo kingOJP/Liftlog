@@ -25,6 +25,20 @@ export interface Exercise {
    * sets, and a strength plan never rotates one for a lighter variant.
    */
   main?: boolean;
+  /**
+   * Where the rep range came from: the plan's dosage, the user's own numbers,
+   * or the lifter's logged history. The prescription engine only re-anchors a
+   * load to a range that was CHOSEN (plan or user) — re-anchoring to a range
+   * read off the lifter's own log is circular, and it is how a 5×5 lifter was
+   * told to drop 20% every session for months.
+   */
+  rangeSource?: 'plan' | 'user' | 'history';
+  /**
+   * 'manual' switches the coach off for this slot: no recommendation chip, no
+   * rep targets, the weight pre-filled from last time and nothing else. For
+   * lifters who run their own progression.
+   */
+  progression?: 'coach' | 'manual';
   archived?: boolean;
 }
 
@@ -152,16 +166,22 @@ export function getExerciseName(id: string): string {
  */
 export function prescriptionLabel(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
   return ex.repLow != null && ex.repHigh != null
-    ? `${ex.sets} × ${ex.repLow}–${ex.repHigh}`
+    ? `${ex.sets} × ${rangeLabel(ex.repLow, ex.repHigh)}`
     : `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
 }
 
+/** "8–12", or "5" when the range is a single number (never "5–5"). */
+export function rangeLabel(repLow: number, repHigh: number): string {
+  return repLow === repHigh ? `${repLow}` : `${repLow}–${repHigh}`;
+}
+
 /** "3 sets · 8–12 reps", or "3 sets" when unprescribed — the long form. */
-export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
+export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'progression'>): string {
   const sets = `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
-  return ex.repLow != null && ex.repHigh != null
-    ? `${sets} · ${ex.repLow}–${ex.repHigh} reps`
+  const base = ex.repLow != null && ex.repHigh != null
+    ? `${sets} · ${rangeLabel(ex.repLow, ex.repHigh)} reps`
     : sets;
+  return ex.progression === 'manual' ? `${base} · your own progression` : base;
 }
 
 // ── Calendar weeks (Monday-anchored) ─────────────────────────────────────────

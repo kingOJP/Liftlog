@@ -1131,3 +1131,27 @@ describe('unloaded work on a loaded exercise (audit LOW)', () => {
     expect(rec!.weight).toBeLessThan(100);
   });
 });
+
+
+describe('slots the lifter owns (Phase 4)', () => {
+  it('never re-anchors a range that was read off the lifter\'s own log', () => {
+    // 5 × 5 at 185 is what they do; a history-derived 3–7 range must not pull
+    // the load toward "8–12" or anywhere else — there is nothing to match.
+    const history = [session([[185, 5], [185, 5], [185, 5], [185, 5], [185, 5]])];
+    const rec = advise(history, { sets: 5, repLow: 8, repHigh: 12, rangeSource: 'history' });
+    expect(rec!.kind).not.toBe('reanchor');
+  });
+
+  it('still re-anchors to a range the plan or the lifter chose', () => {
+    const history = [session([[185, 5], [185, 5], [185, 5]]), session([[185, 5], [185, 5], [185, 5]], 2)];
+    expect(advise(history, { sets: 3, repLow: 10, repHigh: 12, rangeSource: 'plan' })!.kind).toBe('reanchor');
+  });
+
+  it('a manual slot gets no chip and no targets — just last time\'s weights', () => {
+    const p = plan([session([[225, 5], [225, 5], [225, 4]])], { sets: 3, repLow: 5, repHigh: 5, progression: 'manual' });
+    expect(p.rec).toBeNull();
+    expect(p.sets.map(s => s.weight)).toEqual([225, 225, 225]);
+    expect(p.sets.every(s => s.targetReps === null)).toBe(true);
+    expect(p.goal).toMatch(/own progression/i);
+  });
+});

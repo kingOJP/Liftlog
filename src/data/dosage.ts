@@ -23,7 +23,40 @@ import type { MovementPattern } from './taxonomy';
 import type { ExerciseProfile } from './substitution';
 
 /** sets × rep range — the prescription, without the exercise it belongs to. */
-export type RepPrescription = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>;
+export type RepPrescription = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> & {
+  /** where the numbers came from (recorded on the slot as `rangeSource`) */
+  source?: 'plan' | 'history';
+};
+
+/**
+ * THE validator for user-typed sets × reps. Three screens used to apply their
+ * own `Number(x) || fallback || 3`, which accepted -3, 2.5 and a low above the
+ * high. Whole numbers ≥ 1; a half-entered range falls back to the suggestion;
+ * a reversed range is put the right way round.
+ */
+export function parseDose(
+  sets: string | number,
+  repLow: string | number,
+  repHigh: string | number,
+  fallback: RepPrescription | null,
+): RepPrescription {
+  const int = (v: string | number): number | null => {
+    const n = typeof v === 'number' ? v : Number(String(v).trim());
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  };
+  const s = int(sets) ?? fallback?.sets ?? 3;
+  let lo = int(repLow);
+  let hi = int(repHigh);
+  if (lo == null && hi == null) {
+    return fallback?.repLow != null && fallback.repHigh != null
+      ? { sets: Math.min(MAX_SETS, s), repLow: fallback.repLow, repHigh: fallback.repHigh }
+      : { sets: Math.min(MAX_SETS, s) };
+  }
+  lo ??= hi!;
+  hi ??= lo;
+  if (lo > hi) [lo, hi] = [hi, lo];
+  return { sets: Math.min(MAX_SETS, s), repLow: lo, repHigh: hi };
+}
 
 /** The parts of a program slot that change the dose. */
 export interface DosageSlot {
@@ -178,6 +211,7 @@ export function rangeFromHistory(history: DosageHistorySession[]): RepPrescripti
     sets: Math.min(MAX_SETS, Math.max(MIN_SETS, Math.round(typicalSets))),
     repLow: Math.max(1, typicalReps - DERIVED_RANGE_SPREAD),
     repHigh: typicalReps + DERIVED_RANGE_SPREAD,
+    source: 'history',
   };
 }
 
@@ -207,7 +241,7 @@ export interface PrescriptionInput {
  */
 export function resolvePrescription(input: PrescriptionInput): RepPrescription | null {
   if (input.goal) {
-    return dosage(input.goal, input.slot ?? {}, input.profile, input.experience);
+    return { ...dosage(input.goal, input.slot ?? {}, input.profile, input.experience), source: 'plan' };
   }
   return rangeFromHistory(input.history ?? []);
 }

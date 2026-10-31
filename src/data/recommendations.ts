@@ -648,7 +648,7 @@ function weeklyCeiling(
  */
 export function calculateRecommendation(
   history: ExerciseSession[],
-  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>,
   ctx: PrescriptionContext = {},
 ): WeightRec | null {
   const {
@@ -666,6 +666,12 @@ export function calculateRecommendation(
 
   const last = baseline[0];
   const weight = workingWeight(last.sets);
+
+  // The lifter runs their own progression on this slot: the coach's only job
+  // is to remember the weight.
+  if (exercise.progression === 'manual') {
+    return { weight, direction: 'hold', kind: 'hold', reason: 'Your own progression — last time\'s weight is pre-filled, the rest is yours' };
+  }
 
   // Progression by count (reps or seconds) rather than by load: anything
   // logged at 0 lbs. The weight type and unit only change the wording — a
@@ -713,7 +719,11 @@ export function calculateRecommendation(
   // week off the WRONG load is still the wrong load: a new block that opens
   // with an intro week would otherwise spend it 20% below a weight that was
   // already 15 lbs light for the range.
-  const reanchor = countProgressed ? null : rangeReanchor(baseline, ex, weight, step);
+  // Only a range somebody CHOSE can re-anchor a load. A range read off the
+  // lifter's own log (`rangeSource: 'history'`) is a description of what they
+  // do, not a prescription to be matched — re-anchoring to it is circular.
+  const chosenRange = exercise.rangeSource !== 'history';
+  const reanchor = countProgressed || !chosenRange ? null : rangeReanchor(baseline, ex, weight, step);
 
   // Planned easy week: back off regardless of how the last session went. A
   // taper keeps the load respectable (intensity is what preserves strength on
@@ -1257,7 +1267,7 @@ function fatigueDrops(baseline: ExerciseSession[], sets: number, baseReps: numbe
  */
 export function buildSetPlan(
   history: ExerciseSession[],
-  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>,
+  exercise: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>,
   ctx: PrescriptionContext = {},
 ): SetPlan {
   const count = Math.max(1, exercise.sets);
@@ -1265,6 +1275,22 @@ export function buildSetPlan(
   const { phase } = ctx;
   const timed = ctx.unit === 'seconds';
   const unitWord = timed ? 'seconds' : 'reps';
+
+  // A manual slot: the lifter's own numbers, pre-filled from last time, no
+  // targets and no chip. The rep range (if any) still shows on the card header.
+  if (exercise.progression === 'manual') {
+    const baseline = freshBaseline(history);
+    const lastSets = baseline.length > 0 ? countedSets(baseline[0], count) : [];
+    return {
+      rec: null,
+      sets: Array.from({ length: count }, (_, i) => ({
+        setNumber: i + 1,
+        weight: lastSets[i]?.weight ?? lastSets[0]?.weight ?? rec?.weight ?? null,
+        targetReps: null,
+      })),
+      goal: 'Your own progression — the coach stays out of this one and just remembers the weights.',
+    };
+  }
 
   // Nothing prescribed — ad-hoc work with no plan to dose it and no history to
   // read a range off. Lay out the sets and let the lifter log freely; showing a

@@ -39,6 +39,7 @@ type View =
   | { screen: 'history' }
   | { screen: 'edit-session'; sessionId: number; dayId: number }
   | { screen: 'edit-day'; dayId: number }
+  | { screen: 'new-day'; day: WorkoutDay }
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
@@ -189,11 +190,62 @@ function App() {
   }
 
   function handleUpdateDay(updated: WorkoutDay) {
-    const next = program.map(d => (d.id === updated.id ? updated : d));
+    const exists = program.some(d => d.id === updated.id);
+    const next = exists ? program.map(d => (d.id === updated.id ? updated : d)) : [...program, updated];
     setProgram(next);
     saveStoredProgram(next);
     setView({ screen: 'dashboard' });
     sync();
+  }
+
+  function nextDayId(): number {
+    return program.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+  }
+
+  // A day of the user's own — nothing is stored until they save it with at
+  // least one exercise.
+  function handleAddDay() {
+    setView({
+      screen: 'new-day',
+      day: { id: nextDayId(), label: `Day ${program.length + 1}`, muscleGroups: '', exercises: [] },
+    });
+  }
+
+  function handleMoveDay(dayId: number, dir: -1 | 1) {
+    const idx = program.findIndex(d => d.id === dayId);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= program.length) return;
+    const next = [...program];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setProgram(next);
+    saveStoredProgram(next);
+    sync();
+  }
+
+  function handleDeleteDay(dayId: number) {
+    const next = program.filter(d => d.id !== dayId);
+    setProgram(next);
+    saveStoredProgram(next);
+    setView({ screen: 'dashboard' });
+    sync();
+  }
+
+  // After a quick workout, offer to keep it: the exercises and the sets × reps
+  // the lifter actually ran become a program day. The one-off session itself
+  // is already saved either way.
+  function offerQuickDayAsProgramDay(day: WorkoutDay) {
+    if (day.exercises.length === 0) return;
+    const keep = window.confirm('Keep this workout as a day in your program? You can rename and edit it afterwards.');
+    if (!keep) return;
+    const added: WorkoutDay = {
+      ...day,
+      id: nextDayId(),
+      label: `Day ${program.length + 1}`,
+      muscleGroups: day.exercises.map(e => e.name).slice(0, 3).join(' / '),
+    };
+    const next = [...program, added];
+    setProgram(next);
+    saveStoredProgram(next);
   }
 
   const loginError = new URLSearchParams(window.location.search).get('error') ?? undefined;
@@ -252,14 +304,30 @@ function App() {
       case 'edit-day': {
         const day = findDay(view.dayId);
         if (!day) break;
+        const idx = program.findIndex(d => d.id === day.id);
         return (
           <DayEditView
+            key={`edit-day-${day.id}`}
             day={day}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < program.length - 1}
+            onMove={dir => handleMoveDay(day.id, dir)}
+            onDelete={() => handleDeleteDay(day.id)}
             onBack={() => setView({ screen: 'dashboard' })}
             onSave={handleUpdateDay}
           />
         );
       }
+      case 'new-day':
+        return (
+          <DayEditView
+            key="new-day"
+            day={view.day}
+            isNew
+            onBack={() => setView({ screen: 'dashboard' })}
+            onSave={handleUpdateDay}
+          />
+        );
       case 'history':
         return (
           <HistoryView
@@ -356,8 +424,10 @@ function App() {
             origin="quick"
             onBack={() => { setQuickDay(null); setView({ screen: 'dashboard' }); }}
             onComplete={() => {
+              const finished = quickDay;
               setQuickDay(null);
               setView({ screen: 'dashboard' });
+              if (finished) offerQuickDayAsProgramDay(finished);
               sync();
             }}
             onResumeDraft={handleResumeDraft}
@@ -431,6 +501,7 @@ function App() {
               if (day) setView({ screen: 'workout', day });
             }}
             onResumeWorkout={handleResumeDraft}
+            onAddDay={handleAddDay}
             onEditDay={dayId => setView({ screen: 'edit-day', dayId })}
             onViewHistory={() => setView({ screen: 'history' })}
             onViewMetrics={() => setView({ screen: 'metrics' })}

@@ -5,7 +5,7 @@ import {
   PHASE_INFO, blockEndTs, blockEnded, blockWeekIndex, currentPhase, goalLabel,
 } from '../data/plan';
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
-import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, getTrainingProfile, saveTrainingProfile, startPendingActivation } from '../data/planStore';
+import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, getTrainingProfile, saveTrainingProfile, startPendingActivation, planHasChosenGoal } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { experienceSuggestion, experienceSuggestionText } from '../data/experience';
 import './JourneyView.css';
@@ -193,7 +193,7 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
 
         {activePlan && activeBlock && !justWrapped ? (
           <section className="journey-section">
-            <span className="journey-label">{goalLabel(activePlan.goal)} · active block</span>
+            <span className="journey-label">{planHasChosenGoal(activePlan) ? `${goalLabel(activePlan.goal)} · active block` : 'Your training so far'}</span>
             <div className="journey-block-name">{activeBlock.name}</div>
             <div className="journey-block-dates">{blockDateRange(activeBlock)}</div>
 

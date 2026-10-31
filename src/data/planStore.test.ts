@@ -25,9 +25,11 @@ import {
   mergeServerPlanState,
   reconcileActiveProgram,
   saveTrainingProfile,
-  startPendingActivation,
+  startPendingActivation, getPlannedGoal, getTrainingGoal, ensureJourneyMigrated,
 } from './planStore';
 import { defaultTrainingProfile } from './plan';
+import 'fake-indexeddb/auto';
+import { createSession, addSetLog, completeSession, clearIDB } from '../db/database';
 
 beforeEach(() => localStorage.clear());
 
@@ -391,5 +393,33 @@ describe('coach decisions live on the active block', () => {
     completeActiveBlock(makeRetro('x'), JUL6 + 10);
     expect(getCoachDecisions()).toEqual([]);
     expect(getLatestCompletedBlock()?.coachDecisions).toHaveLength(1);
+  });
+});
+
+
+describe('a goal nobody chose is not a prescription source (audit F2)', () => {
+  it('a migrated plan has no planned goal until a wizard block joins it', () => {
+    const now = JUL6;
+    localStorage.setItem('liftlog_plan', JSON.stringify({
+      version: 1, updatedAt: now,
+      plans: [{ id: 'm', goal: 'hypertrophy', origin: 'migrated', status: 'active', createdAt: now,
+        blocks: [{ id: 'f', name: 'Foundation training', focus: 'hypertrophy', startDate: '2026-06-01', phases: [], openEnded: true, program: [], intent: '', progression: '', status: 'active', activatedAt: now }] }],
+    }));
+    expect(getPlannedGoal()).toBeNull();
+    expect(getTrainingGoal()).toBe('general');
+    // Activating a wizard block with the same goal appends it to the migrated
+    // plan — and THAT is the choice.
+    activateProposal(makeProposal({ goal: 'hypertrophy', startDate: '2026-07-06' }), null, JUL6);
+    expect(getPlannedGoal()).toBe('hypertrophy');
+  });
+
+  it('a migrated plan is built around a neutral placeholder goal', async () => {
+    await clearIDB();
+    const id = await createSession(1, 1, JUL6 - 86_400_000);
+    await addSetLog(id, 'leg-press', 1, 100, 10);
+    await completeSession(id, JUL6 - 86_400_000 + 3_600_000);
+    expect(await ensureJourneyMigrated()).toBe(true);
+    expect(getActivePlan()?.goal).toBe('general');
+    expect(getPlannedGoal()).toBeNull();
   });
 });

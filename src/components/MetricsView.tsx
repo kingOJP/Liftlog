@@ -26,6 +26,9 @@ function formatVolume(v: number): string {
 type CoachTab = 'coach' | 'progress' | 'prs';
 
 export default function MetricsView({ program, onBack }: Props) {
+  const [showAllProgress, setShowAllProgress] = useState(false);
+  // Captured once at mount — the clock must not be read during render.
+  const [now] = useState(() => Date.now());
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
@@ -55,13 +58,19 @@ export default function MetricsView({ program, onBack }: Props) {
   // items (declining, stalled) first so the page leads with what needs action.
   // Capped at 5 so the list stays scannable — the top of the sort is the part
   // that needs attention.
+  // Every lift trained recently, not just the current program's: a quick-
+  // workout lifter has no program, and a lift the last replan rotated out is
+  // exactly the one worth comparing. Program lifts sort first within a status.
   const programIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
   const statusRank = { declining: 0, stalled: 1, progressing: 2, steady: 3 } as const;
   const PROGRESS_LIMIT = 5;
+  const PROGRESS_WINDOW_MS = 60 * 86_400_000;
   const progressAll = (coaching?.progress ?? [])
-    .filter(p => programIds.has(p.exerciseId))
-    .sort((a, b) => statusRank[a.status] - statusRank[b.status] || b.totalSessions - a.totalSessions);
-  const progressReport = progressAll.slice(0, PROGRESS_LIMIT);
+    .filter(p => programIds.has(p.exerciseId) || now - p.lastTs <= PROGRESS_WINDOW_MS)
+    .sort((a, b) => statusRank[a.status] - statusRank[b.status]
+      || Number(programIds.has(b.exerciseId)) - Number(programIds.has(a.exerciseId))
+      || b.totalSessions - a.totalSessions);
+  const progressReport = showAllProgress ? progressAll : progressAll.slice(0, PROGRESS_LIMIT);
 
   // PR timeline: every PR event in the recent assessment windows, newest first,
   // capped to the 5 most recent.
@@ -182,10 +191,10 @@ export default function MetricsView({ program, onBack }: Props) {
                         </div>
                       ))}
                     </div>
-                    {progressAll.length > PROGRESS_LIMIT && (
-                      <p className="metric-sub">
-                        Showing the {PROGRESS_LIMIT} lifts that need attention most, of {progressAll.length} tracked.
-                      </p>
+                    {progressAll.length > PROGRESS_LIMIT && !showAllProgress && (
+                      <button className="metric-link-btn" onClick={() => setShowAllProgress(true)}>
+                        Showing the {PROGRESS_LIMIT} lifts that need attention most — show all {progressAll.length}
+                      </button>
                     )}
                   </div>
                 )}

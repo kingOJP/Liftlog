@@ -396,9 +396,24 @@ export async function startPendingActivation(
  */
 export function getPlannedGoal(): Goal | null {
   const state = getPlanState();
-  return state.plans.find(p => p.status === 'active')?.goal
+  const active = state.plans.find(p => p.status === 'active');
+  return (active && planHasChosenGoal(active) ? active.goal : null)
     ?? state.pendingActivation?.goal
     ?? null;
+}
+
+/**
+ * Did the user ever CHOOSE this plan's goal? A migrated "Foundation" plan was
+ * created by the app around pre-journey history (or around a quick workout
+ * the user logged once) with a goal nobody picked. Until a wizard-made block
+ * joins it, its goal is not a prescription source: a lifter running their own
+ * 5×5 as quick workouts must not be dosed 2×8–12 "for this block's goal".
+ * This rule applies at read time, so existing accounts are covered without
+ * a data migration; a migrated plan that later received a wizard block keeps
+ * its goal, because that block's activation was the choice.
+ */
+export function planHasChosenGoal(plan: TrainingPlan): boolean {
+  return plan.origin === 'planned' || plan.blocks.some(b => !b.openEnded);
 }
 
 /** The goal the user is currently training toward (weights the progress engine). */
@@ -510,16 +525,18 @@ export async function ensureJourneyMigrated(): Promise<boolean> {
     : configured;
 
   const program: WorkoutDay[] = getStoredProgram();
+  // The goal here is a placeholder for analytics weighting only — the user
+  // never chose it, and planHasChosenGoal() keeps it out of prescription.
   const plan: TrainingPlan = {
     id: generatePlanId(),
-    goal: 'hypertrophy',
+    goal: 'general',
     origin: 'migrated',
     status: 'active',
     createdAt: now,
     blocks: [{
       id: generatePlanId(),
       name: 'Foundation training',
-      focus: 'hypertrophy',
+      focus: 'general',
       startDate,
       phases: [],
       openEnded: true,

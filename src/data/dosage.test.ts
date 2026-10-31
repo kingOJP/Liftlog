@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dosage, isHeavyAxial, rangeFromHistory, resolvePrescription } from './dosage';
+import { dosage, isHeavyAxial, rangeFromHistory, resolvePrescription, parseDose } from './dosage';
 import { profileFor } from './substitution';
 import type { ExerciseProfile } from './substitution';
 
@@ -35,41 +35,41 @@ describe('dosage', () => {
   it('keeps heavy axial work in a low, narrow range on a hypertrophy goal', () => {
     // The bug that started this: a barbell deadlift dosed like a cable row.
     expect(dosage('hypertrophy', main, deadlift, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 5, repHigh: 8 });
+      .toMatchObject({ sets: 3, repLow: 5, repHigh: 8 });
     expect(dosage('general', accessory, deadlift, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 5, repHigh: 8 });
+      .toMatchObject({ sets: 3, repLow: 5, repHigh: 8 });
   });
 
   it('goes lower still on a strength goal', () => {
     expect(dosage('strength', main, deadlift, 'intermediate'))
-      .toEqual({ sets: 4, repLow: 3, repHigh: 5 });
+      .toMatchObject({ sets: 4, repLow: 3, repHigh: 5 });
   });
 
   it('leaves other compounds where they were', () => {
     expect(dosage('hypertrophy', main, benchPress, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 6, repHigh: 10 });
+      .toMatchObject({ sets: 3, repLow: 6, repHigh: 10 });
     expect(dosage('hypertrophy', accessory, benchPress, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+      .toMatchObject({ sets: 3, repLow: 8, repHigh: 12 });
   });
 
   it('doses isolation work by goal', () => {
     expect(dosage('hypertrophy', accessory, curl, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 10, repHigh: 15 });
+      .toMatchObject({ sets: 3, repLow: 10, repHigh: 15 });
     expect(dosage('strength', accessory, curl, 'intermediate'))
-      .toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+      .toMatchObject({ sets: 3, repLow: 8, repHigh: 12 });
   });
 
   it('sends high-rep patterns high whatever the goal', () => {
     for (const goal of ['strength', 'hypertrophy', 'general'] as const) {
       expect(dosage(goal, accessory, laterals, 'intermediate'))
-        .toEqual({ sets: 3, repLow: 12, repHigh: 20 });
+        .toMatchObject({ sets: 3, repLow: 12, repHigh: 20 });
     }
   });
 
   it('never drops a beginner below 8 reps, axial work included', () => {
     // Technique before intensity — the beginner floor outranks the axial tier.
     expect(dosage('strength', main, deadlift, 'beginner'))
-      .toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+      .toMatchObject({ sets: 3, repLow: 8, repHigh: 12 });
   });
 });
 
@@ -78,7 +78,7 @@ describe('rangeFromHistory', () => {
 
   it('reads the range off what the lifter actually does', () => {
     const range = rangeFromHistory([sess(10, 9, 10), sess(10, 10, 9), sess(9, 10, 10)]);
-    expect(range).toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+    expect(range).toMatchObject({ sets: 3, repLow: 8, repHigh: 12 });
   });
 
   it('tracks a high-rep movement rather than assuming 8–12', () => {
@@ -105,14 +105,14 @@ describe('resolvePrescription — the cascade', () => {
     const out = resolvePrescription({
       profile: deadlift, goal: 'hypertrophy', experience: 'intermediate', history,
     });
-    expect(out).toEqual({ sets: 3, repLow: 5, repHigh: 8 });
+    expect(out).toMatchObject({ sets: 3, repLow: 5, repHigh: 8 });
   });
 
   it('falls back to the lifter\'s own history when there is no plan', () => {
     const out = resolvePrescription({
       profile: deadlift, goal: null, experience: 'intermediate', history,
     });
-    expect(out).toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+    expect(out).toMatchObject({ sets: 3, repLow: 8, repHigh: 12 });
   });
 
   it('prescribes nothing when there is no plan and no history', () => {
@@ -151,7 +151,7 @@ const sidePlank = profileFor('side-plank');
 describe('sport-support dosage', () => {
   it('doses a main compound as heavy, low-volume strength work', () => {
     expect(dosage('sport-support', main, backSquat, 'intermediate'))
-      .toEqual({ sets: 4, repLow: 4, repHigh: 6 });
+      .toMatchObject({ sets: 4, repLow: 4, repHigh: 6 });
   });
 
   it('overrides the heavy-axial range: maximal strength is the point here', () => {
@@ -188,7 +188,7 @@ describe('sport-support dosage', () => {
     const d = resolvePrescription({
       profile: backSquat, slot: main, goal: 'sport-support', experience: 'intermediate',
     });
-    expect(d).toEqual({ sets: 4, repLow: 4, repHigh: 6 });
+    expect(d).toMatchObject({ sets: 4, repLow: 4, repHigh: 6 });
   });
 });
 
@@ -214,5 +214,31 @@ describe('timed exercises are prescribed in seconds', () => {
     // come out as "3 × 12–20" reps.
     const d = dosage('general', accessory, plank, 'intermediate');
     expect(d.repHigh!).toBeGreaterThan(20);
+  });
+});
+
+
+describe('prescription sources (Phase 4)', () => {
+  it('tags a goal-dosed range as the plan\'s and a history-derived one as the lifter\'s own', () => {
+    const fromHistory = rangeFromHistory([{ sets: [{ reps: 10 }, { reps: 10 }, { reps: 9 }] }]);
+    expect(fromHistory?.source).toBe('history');
+  });
+});
+
+describe('parseDose — the one validator for typed sets × reps', () => {
+  it('accepts whole numbers and puts a reversed range the right way round', () => {
+    expect(parseDose('4', '8', '5', null)).toEqual({ sets: 4, repLow: 5, repHigh: 8 });
+  });
+
+  it('rejects negatives and fractions, falling back to the suggestion', () => {
+    expect(parseDose('-3', '2.5', '', { sets: 3, repLow: 8, repHigh: 12 })).toEqual({ sets: 3, repLow: 8, repHigh: 12 });
+  });
+
+  it('turns a single number into a fixed range', () => {
+    expect(parseDose('5', '5', '', null)).toEqual({ sets: 5, repLow: 5, repHigh: 5 });
+  });
+
+  it('leaves the range off when nothing was typed and nothing is suggested', () => {
+    expect(parseDose('', '', '', null)).toEqual({ sets: 3 });
   });
 });

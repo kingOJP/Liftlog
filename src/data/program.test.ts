@@ -121,3 +121,12 @@ describe('dayInPhase — per-day block-phase gating', () => {
     expect(dayInPhase(day(['accumulation']), null)).toBe(true);
   });
 });
+
+
+describe('fixed-rep slots (audit F17)', () => {
+  it('renders 5 × 5, never 5 × 5–5', () => {
+    expect(prescriptionLabel({ sets: 5, repLow: 5, repHigh: 5 })).toBe('5 × 5');
+    expect(prescriptionDetail({ sets: 5, repLow: 5, repHigh: 5 })).toBe('5 sets · 5 reps');
+    expect(prescriptionDetail({ sets: 3, repLow: 8, repHigh: 12, progression: 'manual' })).toMatch(/your own progression/);
+  });
+});

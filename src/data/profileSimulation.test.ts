@@ -707,11 +707,11 @@ describe('F2 — a quick-workout lifter is silently given a plan and then fought
     expect(j.snapshot.sessions.length).toBeGreaterThan(30);
   });
 
-  it.fails('never re-anchors a lift to a rep range the lifter did not choose', () => {
+  it('never re-anchors a lift to a rep range the lifter did not choose', () => {
     expect(chipsOfKind(j.weeks, 'reanchor', 2).map(c => `week ${c.week + 1}: ${c.exerciseId}`)).toEqual([]);
   });
 
-  it.fails('does not dose a 5×5 lifter as a beginner on a hypertrophy block they never planned', () => {
+  it('does not dose a 5×5 lifter as a beginner on a hypertrophy block they never planned', () => {
     const bench = j.slots.get(QUARTER - 1)!.get('flat-barbell-bench-press')!;
     // A slot derived from the lifter's own history reads 5 × ~5; the migrated
     // plan's beginner hypertrophy dose reads 2 × 8–12.

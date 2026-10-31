@@ -7,7 +7,7 @@ import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
-import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions } from '../data/planStore';
+import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
@@ -24,6 +24,7 @@ interface Props {
   onPlanSetup: () => void;
   onQuickWorkout: () => void;
   onResumeWorkout: (draft: DraftSession) => void;
+  onAddDay: () => void;
 }
 
 function startLabel(startDate: string): string {
@@ -40,7 +41,7 @@ function lastTrainedLabel(ts: number | null): string {
 
 export default function Dashboard({
   program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout,
+  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay,
 }: Props) {
   const weekNumber = getWeekNumber();
   // An interrupted or abandoned-for-now workout, offered for resumption. Read
@@ -97,10 +98,13 @@ export default function Dashboard({
     const ended = blockEnded(block);
     const phaseLabel = phase ? PHASE_INFO[phase].label : null;
     // Block names already carry the goal ("Block 2 · Strength") — only prefix
-    // the goal when the name doesn't say it.
-    const eyebrow = block.name.includes(goalLabel(plan.goal))
-      ? block.name
-      : `${goalLabel(plan.goal)} · ${block.name}`;
+    // the goal when the name doesn't say it. A migrated plan whose goal the
+    // user never chose is "your training so far", not "Muscle Growth".
+    const eyebrow = !planHasChosenGoal(plan)
+      ? 'Your training so far'
+      : block.name.includes(goalLabel(plan.goal))
+        ? block.name
+        : `${goalLabel(plan.goal)} · ${block.name}`;
     journeyCard = (
       <button className="journey-card" onClick={onViewJourney}>
         <div className="journey-eyebrow">{eyebrow}</div>
@@ -222,11 +226,14 @@ export default function Dashboard({
           </span>
           <div className="empty-quick-cta">
             <span className="empty-quick-or">or</span>
+            <button className="quick-workout-btn" onClick={onAddDay}>
+              ＋ Build my own program
+            </button>
             <button className="quick-workout-btn" onClick={onQuickWorkout}>
               ＋ Log a quick workout
             </button>
             <span className="empty-quick-hint">
-              Just want to train today? Log a one-off session — no plan required.
+              Know what you want to run? Add your own days and sets. Just want to train today? Log a one-off session.
             </span>
           </div>
         </div>
@@ -249,9 +256,14 @@ export default function Dashboard({
               {' '}{PHASE_INFO[phase].blurb}.
             </p>
           )}
-          <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
-            ＋ Log a one-off workout
-          </button>
+          <div className="day-list-actions">
+            <button className="quick-workout-btn quick-workout-btn--inline" onClick={onAddDay}>
+              ＋ Add a day
+            </button>
+            <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
+              ＋ Log a one-off workout
+            </button>
+          </div>
         </>
       )}
 

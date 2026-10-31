@@ -346,3 +346,12 @@
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
+
+.day-list-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.day-list-actions .quick-workout-btn--inline {
+  flex: 1;
+}
