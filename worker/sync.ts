@@ -41,6 +41,8 @@ interface SessionDoc {
   startedAt: number;
   completedAt: number | null;
   updatedAt: number;
+  /** free-text session note (absent/null when none) */
+  note?: string | null;
   sets: SetEntry[];
 }
 
@@ -50,7 +52,7 @@ interface SessionDoc {
 // so both sides agree on identity. Empty sessions (ghosts) are dropped.
 async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> {
   const docs = await env.DB.prepare(
-    'SELECT guid, day_id, week_number, started_at, completed_at, updated_at, sets_json FROM session_docs WHERE user_id = ?',
+    'SELECT guid, day_id, week_number, started_at, completed_at, updated_at, sets_json, note FROM session_docs WHERE user_id = ?',
   ).bind(userId).all();
 
   if (docs.results.length > 0) {
@@ -61,6 +63,7 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
       startedAt:   r.started_at as number,
       completedAt: (r.completed_at as number | null) ?? null,
       updatedAt:   r.updated_at as number,
+      note:        (r.note as string | null) ?? null,
       sets:        JSON.parse(r.sets_json as string) as SetEntry[],
     }));
   }
@@ -187,6 +190,7 @@ async function pull(request: Request, userId: string, role: Role, env: Env): Pro
       startedAt:   d.startedAt,
       completedAt: d.completedAt ?? undefined,
       updatedAt:   d.updatedAt,
+      ...(d.note ? { note: d.note } : {}),
     });
     for (const s of d.sets) {
       wireSetLogs.push({ id: nextLogId++, sessionId: id, ...s });
@@ -327,7 +331,7 @@ interface PushPayload {
   // guid/updatedAt are absent from stale cached clients — the server derives
   // the same deterministic fallbacks the client would (legacy-<startedAt>,
   // completedAt) so identities agree across versions.
-  sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number | null; updatedAt?: number }>;
+  sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number | null; updatedAt?: number; note?: string | null }>;
   setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean; repLow?: number; repHigh?: number }>;
   /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
   exerciseLogs:  unknown[];
@@ -353,6 +357,7 @@ const MAX_EXERCISES  = 10_000;
 const MAX_PLANS      = 200;
 const MAX_PLAN_BYTES = 1_000_000;
 const MAX_PROGRAM_BYTES = 512_000;
+const MAX_NOTE_CHARS = 2_000;
 
 const isOptString = (v: unknown) => v === undefined || v === null || typeof v === 'string';
 const isOptNumber = (v: unknown) => v === undefined || typeof v === 'number';
@@ -371,9 +376,10 @@ function validatePush(data: PushPayload): string | null {
         typeof s.weekNumber !== 'number' || typeof s.startedAt !== 'number' ||
         (s.completedAt != null && typeof s.completedAt !== 'number') ||
         (s.guid !== undefined && typeof s.guid !== 'string') ||
-        !isOptNumber(s.updatedAt)) {
+        !isOptNumber(s.updatedAt) || !isOptString(s.note)) {
       return 'malformed session';
     }
+    if (typeof s.note === 'string' && s.note.length > MAX_NOTE_CHARS) return 'session note too long';
   }
   for (const [key, list] of [['deletedSessionGuids', data.deletedSessionGuids]] as const) {
     if (list == null) continue;
@@ -550,17 +556,18 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     if (sets.length === 0) continue; // ghost/empty session — never store
     const updatedAt = s.updatedAt ?? s.completedAt ?? s.startedAt;
     upserts.push(env.DB.prepare(
-      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, guid) DO UPDATE SET
          day_id       = excluded.day_id,
          week_number  = excluded.week_number,
          started_at   = excluded.started_at,
          completed_at = excluded.completed_at,
          updated_at   = excluded.updated_at,
-         sets_json    = excluded.sets_json
+         sets_json    = excluded.sets_json,
+         note         = excluded.note
        WHERE excluded.updated_at > session_docs.updated_at`,
-    ).bind(userId, guid, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null, updatedAt, JSON.stringify(sets)));
+    ).bind(userId, guid, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null, updatedAt, JSON.stringify(sets), s.note?.trim() ? s.note.trim() : null));
   }
 
   // The legacy per-row tables (workout_sessions/set_logs/exercise_logs) are

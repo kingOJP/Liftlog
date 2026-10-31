@@ -32,6 +32,7 @@ import type {
 } from './plan';
 import { goalLabel, experienceLabel, validatePhases, MIN_PRODUCTIVE_WEEKS_BEFORE_DELOAD, MAX_OPENER_WEEKS, isEasyPhase } from './plan';
 import { dosage, isHeavyAxial } from './dosage';
+import { fmtWeight } from './units';
 import type { Slot, DayTemplate } from './sports';
 import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
 
@@ -1244,7 +1245,7 @@ function progressionFor(
   if (experience === 'beginner') {
     return introLine
       + 'Start each new lift lighter than feels necessary — a weight you could do 3–4 more reps with — and focus on clean, controlled form. '
-      + 'Each session, if you hit the top of the rep range with good technique, add the smallest jump (usually 5 lbs, or 2.5 on smaller lifts) next time. '
+      + `Each session, if you hit the top of the rep range with good technique, add the smallest jump (usually ${fmtWeight(5)}, or ${fmtWeight(2.5)} on smaller lifts) next time. `
       + 'As a beginner this simple "add a little every week" progression works for months — the coach handles the bookkeeping and eases you back if a weight gets away from you.'
       + deloadLine + ` ${goalLabel(goal)} stays the destination — just keep showing up.`;
   }

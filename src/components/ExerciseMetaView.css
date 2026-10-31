@@ -333,3 +333,13 @@
   font-size: 22px;
   color: var(--text-muted);
 }
+
+.meta-howto--history {
+  border-color: var(--border);
+}
+
+.meta-modal-error {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--red);
+}

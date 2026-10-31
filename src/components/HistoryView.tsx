@@ -5,6 +5,7 @@ import { unitFor } from '../data/exercises';
 import { SHARED_DAY_ID } from '../data/share';
 import { isQuickWorkout } from '../data/quickWorkout';
 import { loadTrainingSnapshot } from '../data/analytics';
+import { fmtWeight } from '../data/units';
 import type { Session, SetLog } from '../db/database';
 import './HistoryView.css';
 
@@ -79,19 +80,16 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
 
           const toggle = () => setExpandedId(isExpanded ? null : (session.id ?? null));
 
+          // The header is the one real button; the detail (with its own Edit
+          // button) sits beside it rather than inside a role="button" container.
           return (
-            <div
-              key={session.id}
-              className={`history-card${isExpanded ? ' expanded' : ''}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={isExpanded}
-              onClick={toggle}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-              }}
-            >
-              <div className="history-card-header">
+            <div key={session.id} className={`history-card${isExpanded ? ' expanded' : ''}`}>
+              <button
+                type="button"
+                className="history-card-header"
+                aria-expanded={isExpanded}
+                onClick={toggle}
+              >
                 <div className="history-card-left">
                   <span className="history-date">{formatDate(session.completedAt ?? session.startedAt)}</span>
                   <span className="history-day-label">
@@ -105,13 +103,15 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                   </span>
                   <span className="history-summary">
                     {orderedExercises.length} exercise{orderedExercises.length !== 1 ? 's' : ''} · {sets.filter(s => !s.warmup).length} sets
+                    {session.note ? ' · 📝' : ''}
                   </span>
                 </div>
-                <span className="history-chevron">{isExpanded ? '▲' : '▼'}</span>
-              </div>
+                <span className="history-chevron" aria-hidden="true">{isExpanded ? '▲' : '▼'}</span>
+              </button>
 
               {isExpanded && (
                 <div className="history-detail">
+                  {session.note && <p className="history-note">{session.note}</p>}
                   {orderedExercises.map(exId => (
                     <div key={exId} className="history-exercise">
                       <span className="history-ex-name">{getExerciseName(exId)}</span>
@@ -123,7 +123,7 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                               <span className="history-set-reps">{s.reps} sec</span>
                             ) : (
                               <>
-                                <span className="history-set-weight">{s.weight} lbs</span>
+                                <span className="history-set-weight">{fmtWeight(s.weight)}</span>
                                 <span className="history-set-reps">{s.reps} reps</span>
                               </>
                             )}
@@ -136,10 +136,7 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
 
                   <button
                     className="edit-session-btn"
-                    onClick={e => {
-                      e.stopPropagation();
-                      onEditSession(session.id!, session.dayId);
-                    }}
+                    onClick={() => onEditSession(session.id!, session.dayId)}
                   >
                     Edit Session
                   </button>

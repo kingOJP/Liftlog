@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { WorkoutDay, Exercise } from '../data/program';
-import { getWeekNumber, getWeekNumberForDate } from '../data/program';
+import { getWeekNumber, getWeekNumberForDate, toLocalDateValue } from '../data/program';
 import { computeProgramPlan, applyPlanToDay } from '../data/coach';
 import type { PlanChange } from '../data/coach';
 import {
@@ -32,6 +32,7 @@ import ExerciseCard from './ExerciseCard';
 import AddExercisePanel from './AddExercisePanel';
 import RestTimer from './RestTimer';
 import ShareWorkoutModal from './ShareWorkoutModal';
+import ExerciseHistorySheet from './ExerciseHistorySheet';
 import './WorkoutView.css';
 
 interface Props {
@@ -50,12 +51,6 @@ interface Props {
 type SetEntry = { weight: number; reps: number; warmup?: boolean };
 
 // Local-time yyyy-mm-dd for an <input type="date"> value
-function toDateInputValue(ts: number): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 // Combine a yyyy-mm-dd value with the original session's time-of-day, so re-dating
 // a workout keeps its clock time (and within-day ordering) intact.
 function dateInputToTimestamp(value: string, originalTs: number): number {
@@ -143,6 +138,11 @@ export default function WorkoutView({
   const [restoredDraft, setRestoredDraft] = useState(() =>
     isEditMode ? null : getResumableDraft(dayProp.id),
   );
+  // A free-text note for the session ("how did it go?") — drafted with the
+  // sets, saved on the session document, synced like anything else on it.
+  const [note, setNote] = useState(() => restoredDraft?.note ?? '');
+  // Per-exercise history sheet, opened from a card's "Last time" line
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   const [sets, setSets] = useState<Record<string, SetEntry[]>>(() => restoredDraft?.sets ?? {});
   // Exercise ids in the order they were first trained this session — stored on
   // every set log so the progress engine can tell "benched 4th" from
@@ -231,8 +231,9 @@ export default function WorkoutView({
       dayId: day.id, startedAt: sessionStart, savedAt: Date.now(), sets,
       order: exerciseOrderRef.current,
       day, origin, added: addedExercises,
+      ...(note ? { note } : {}),
     });
-  }, [sets, isEditMode, day, origin, sessionStart, conflict, addedExercises]);
+  }, [sets, isEditMode, day, origin, sessionStart, conflict, addedExercises, note]);
 
   // Leaving a workout with logged sets: nothing is lost (the draft persists
   // and the Dashboard offers to resume it), but an accidental Back tap
@@ -257,7 +258,7 @@ export default function WorkoutView({
   // Edit mode only: the session's original completedAt + the (editable) date.
   const [originalCompletedAt, setOriginalCompletedAt] = useState<number | null>(null);
   const [dateInput, setDateInput] = useState('');
-  const [maxDate] = useState(() => toDateInputValue(Date.now())); // can't re-date into the future
+  const [maxDate] = useState(() => toLocalDateValue(Date.now())); // can't re-date into the future
 
   // Load the snapshot once and overlay the coach's program plan (adjusted set
   // counts). The snapshot is kept in state so a mid-workout exercise can be
@@ -329,7 +330,8 @@ export default function WorkoutView({
     getSession(existingSessionId).then(session => {
       const ts = session?.completedAt ?? session?.startedAt ?? Date.now();
       setOriginalCompletedAt(ts);
-      setDateInput(toDateInputValue(ts));
+      setDateInput(toLocalDateValue(ts));
+      setNote(session?.note ?? '');
     });
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
@@ -439,14 +441,14 @@ export default function WorkoutView({
             redate = { completedAt: newCompletedAt, weekNumber: getWeekNumberForDate(new Date(newCompletedAt)) };
           }
         }
-        await rewriteSessionSets(existingSessionId, setInputs, redate);
+        await rewriteSessionSets(existingSessionId, setInputs, redate, note.trim() || null);
       } else {
         // The session ends at the final logged set, not the "Finish" tap — the
         // duration engine needs the training window, not phone-in-hand time.
         // Session row and sets land together: no window in which a ghost purge
         // could see (and tombstone) a workout with no sets.
         const completedAt = Math.max(lastSetAtRef.current ?? Date.now(), startedAt);
-        await saveWorkout({ dayId: day.id, weekNumber: getWeekNumber(), startedAt, completedAt, sets: setInputs });
+        await saveWorkout({ dayId: day.id, weekNumber: getWeekNumber(), startedAt, completedAt, sets: setInputs, note: note.trim() || undefined });
         clearDraftSession();
       }
     } catch (err) {
@@ -603,6 +605,7 @@ export default function WorkoutView({
             lastSession={lastSessions[ex.id]}
             regression={regressions[ex.id]}
             onRegress={s => handleAddExercise(slotFor(s.exercise.id, s.exercise.name, { snapshot }))}
+            onViewHistory={(id, name) => setHistoryFor({ id, name })}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
@@ -616,6 +619,7 @@ export default function WorkoutView({
             recommendation={recommendations[ex.id]}
             plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
+            onViewHistory={(id, name) => setHistoryFor({ id, name })}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
@@ -635,7 +639,24 @@ export default function WorkoutView({
             ＋ Add exercise
           </button>
         )}
+
+        <div className="session-note">
+          <label className="session-note-label" htmlFor="session-note">Session notes</label>
+          <textarea
+            id="session-note"
+            className="session-note-input"
+            rows={2}
+            maxLength={2000}
+            placeholder="How did it go? Sleep, soreness, a cue that clicked…"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
       </div>
+
+      {historyFor && (
+        <ExerciseHistorySheet exerciseId={historyFor.id} exerciseName={historyFor.name} onClose={() => setHistoryFor(null)} />
+      )}
 
       {!isEditMode && <RestTimer runId={restRunId} onDismiss={() => setRestRunId(0)} />}
 

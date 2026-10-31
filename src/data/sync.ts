@@ -62,6 +62,7 @@ interface WireSession {
   startedAt: number;
   completedAt?: number;
   updatedAt: number;
+  note?: string;
 }
 
 interface SyncPayload {
@@ -225,6 +226,7 @@ async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
       startedAt:   s.startedAt,
       completedAt: s.completedAt,
       updatedAt:   sessionUpdatedAt(s),
+      ...(s.note ? { note: s.note } : {}),
     })),
     setLogs:             idb.setLogs,
     exerciseLogs:        [],
@@ -428,6 +430,7 @@ function groupWireSessions(sessions: WireSession[], setLogs: SetLog[]): SessionD
     startedAt:   s.startedAt,
     completedAt: s.completedAt,
     updatedAt:   sessionUpdatedAt(s as Session),
+    ...(typeof s.note === 'string' && s.note ? { note: s.note } : {}),
     sets: (setsBySession.get(s.id) ?? []).map(l => ({
       exerciseId: l.exerciseId,
       setNumber:  l.setNumber,

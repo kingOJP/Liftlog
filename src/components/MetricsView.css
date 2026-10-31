@@ -425,3 +425,13 @@
   text-align: left;
   cursor: pointer;
 }
+
+.progress-row--link {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.progress-row--link:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}

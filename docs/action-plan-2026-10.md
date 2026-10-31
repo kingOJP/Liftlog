@@ -386,27 +386,27 @@ engine proposes a regression (lat pull-down, banded) from the card.
 
 ---
 
-## 10. Phase 8 — Polish, visibility, docs
+## 10. Phase 8 — Polish, visibility, docs — ✅ landed on `claude/action-plan-2026-10`
 
-**8.1 Per-exercise history screen** (F13) reachable from the card's "Last time" line and the
+**8.1 Per-exercise history screen** ✅ (F13) _Built as an overlay sheet (`ExerciseHistorySheet`) so it opens over a live workout;_ reachable from the card's "Last time" line and the
 Progress tab: all sessions, e1RM and volume trend, PRs.
 
-**8.2 Session information + units.** (F17) Day-card estimated duration (3 min/set, the same
+**8.2 Session information + units.** ✅ (F17) Day-card estimated duration (3 min/set, the same
 estimate the coach uses); per-session notes (a `note?` string on the session document, synced
 like any other field); and per **[D8]** a kg/lb preference in `settings.ts` with
 `toDisplay()`/`fromDisplay()` helpers at every weight input and label — storage stays in lbs,
 increments stay equipment-based in lbs and are displayed converted. The body-weight log stays
 on the roadmap.
 
-**8.3 Accessibility LOWs.** No nested interactive elements (HistoryView, DayCard); keyboard path
+**8.3 Accessibility LOWs.** ✅ No nested interactive elements (HistoryView, DayCard); keyboard path
 for set rows; labelled heatmap regions and `<select>`s; modals with `role="dialog"`, focus trap,
 Escape; cleared `setTimeout` in ExerciseMetaView; try/catch around `handleArchive`/`handleDelete`
 /`handleActivate`; `removeExerciseFromProgram` side-effect out of the state updater.
 
-**8.4 Remaining duplication.** One override→catalog→name-match resolver (`analytics.ts`,
+**8.4 Remaining duplication.** ✅ One override→catalog→name-match resolver (`analytics.ts`,
 `substitution.ts`); one date-input formatter; delete dead `program.ts getExerciseName`.
 
-**8.5 CLAUDE.md reconciliation.** Each phase updates its section, but this item re-reads the
+**8.5 CLAUDE.md reconciliation.** ✅ Each phase updates its section, but this item re-reads the
 whole file against the code: "Exercise library never deletes", the `View` union, the removed
 `→ 'Press'` remap, SettingsView metadata copy, the composite-stall claim, and the new
 instruction/beginner-band/clock sections.

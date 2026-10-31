@@ -17,6 +17,8 @@ export interface SessionDoc {
   startedAt: number;
   completedAt?: number;
   updatedAt: number;
+  /** free-text session note; absent when none */
+  note?: string;
   sets: Array<Pick<SetLog, 'exerciseId' | 'setNumber' | 'weight' | 'reps' | 'order' | 'warmup' | 'repLow' | 'repHigh'>>;
 }
 

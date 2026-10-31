@@ -11,6 +11,8 @@ import { getActivePhase, getTrainingGoal, getPhaseResolver, getProfileOrDefault,
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
 import { BarChart, LineChart } from './charts';
+import { toDisplay, unitLabelFor } from '../data/units';
+import ExerciseHistorySheet from './ExerciseHistorySheet';
 import MuscleHeatmap from './MuscleHeatmap';
 import './MetricsView.css';
 
@@ -27,6 +29,8 @@ type CoachTab = 'coach' | 'progress' | 'prs';
 
 export default function MetricsView({ program, onBack }: Props) {
   const [showAllProgress, setShowAllProgress] = useState(false);
+  // Per-exercise history sheet, opened from a Progress row
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   // Captured once at mount — the clock must not be read during render.
   const [now] = useState(() => Date.now());
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -169,9 +173,17 @@ export default function MetricsView({ program, onBack }: Props) {
                     </p>
                     <div className="progress-list">
                       {progressReport.map(p => (
-                        <div className="progress-row" key={p.exerciseId}>
+                        <div
+                          className="progress-row progress-row--link"
+                          key={p.exerciseId}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`History for ${p.name}`}
+                          onClick={() => setHistoryFor({ id: p.exerciseId, name: p.name })}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHistoryFor({ id: p.exerciseId, name: p.name }); } }}
+                        >
                           <div className="progress-row-head">
-                            <span className="progress-name">{p.name}</span>
+                            <span className="progress-name">{p.name} ›</span>
                             <span className={`progress-badge progress-badge--${p.status}`}>
                               {STATUS_INFO[p.status].label}
                             </span>
@@ -236,12 +248,12 @@ export default function MetricsView({ program, onBack }: Props) {
                 <span className="stat-label">Workouts</span>
               </div>
               <div className="stat-card">
-                <span className="stat-value">{formatVolume(metrics.summary.totalVolume)}</span>
-                <span className="stat-label">Total lbs lifted</span>
+                <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.totalVolume)))}</span>
+                <span className="stat-label">Total {unitLabelFor()} lifted</span>
               </div>
               <div className="stat-card">
-                <span className="stat-value">{formatVolume(metrics.summary.thisWeekVolume)}</span>
-                <span className="stat-label">This week (lbs)</span>
+                <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.thisWeekVolume)))}</span>
+                <span className="stat-label">This week ({unitLabelFor()})</span>
               </div>
               <div className="stat-card">
                 <span className={`stat-value ${deltaClass(metrics.summary.deltaPct)}`}>
@@ -300,11 +312,11 @@ export default function MetricsView({ program, onBack }: Props) {
               {selected && selected.points.length >= 2 ? (
                 <>
                   <h3 className="chart-subhead">Estimated 1RM</h3>
-                  <LineChart data={selected.points} unit="lbs" />
+                  <LineChart data={selected.points.map(pt => ({ ...pt, value: Math.round(toDisplay(pt.value)) }))} unit={unitLabelFor()} />
                   {selected.volumePoints.length >= 2 && selected.volumePoints.some(p => p.value > 0) && (
                     <>
                       <h3 className="chart-subhead">Volume load per session</h3>
-                      <LineChart data={selected.volumePoints} unit="lbs" />
+                      <LineChart data={selected.volumePoints.map(pt => ({ ...pt, value: Math.round(toDisplay(pt.value)) }))} unit={unitLabelFor()} />
                     </>
                   )}
                 </>
@@ -342,6 +354,9 @@ export default function MetricsView({ program, onBack }: Props) {
           );
         })()}
       </div>
+      {historyFor && (
+        <ExerciseHistorySheet exerciseId={historyFor.id} exerciseName={historyFor.name} onClose={() => setHistoryFor(null)} />
+      )}
     </div>
   );
 }

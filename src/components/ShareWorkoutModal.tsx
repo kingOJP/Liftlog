@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import qrcode from 'qrcode-generator';
 import type { WorkoutDay } from '../data/program';
 import { buildShareUrl } from '../data/share';
+import { useDialog } from './useDialog';
 import './ShareWorkoutModal.css';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 // camera, the link opens LiftLog, and the workout imports into their account
 // (their own history drives the weight recommendations, not the sharer's).
 export default function ShareWorkoutModal({ day, onClose }: Props) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   // null when the payload exceeds what a QR code can carry (a day with many
   // long custom names). qr.make() throws 'code length overflow' in that case;
   // uncaught, that unmounted the whole workout screen.
@@ -30,8 +32,16 @@ export default function ShareWorkoutModal({ day, onClose }: Props) {
 
   return (
     <div className="share-modal-overlay" onClick={onClose}>
-      <div className="share-modal" onClick={e => e.stopPropagation()}>
-        <p className="share-modal-title">Share “{day.label}”</p>
+      <div
+        className="share-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-modal-title"
+        ref={dialogRef}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="share-modal-title" id="share-modal-title">Share “{day.label}”</p>
         {svg ? (
           <div
             className="share-modal-qr"

@@ -361,7 +361,9 @@ function App() {
             onSaved={sync}
             onDeleted={() => {
               const exerciseId = view.exerciseId;
-              setProgram(p => removeExerciseFromProgram(exerciseId, p));
+              // The store write happens outside the updater (an updater runs
+              // twice under StrictMode); the saved program is the new state.
+              setProgram(removeExerciseFromProgram(exerciseId, program));
               setView({ screen: 'exercise-list' });
               sync();
             }}

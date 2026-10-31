@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { instructionsFor } from '../data/instructions';
 import { getExerciseMeta } from '../data/exercises';
+import { useDialog } from './useDialog';
 import './InstructionSheet.css';
 
 interface SheetProps {
@@ -22,16 +23,12 @@ export default function InstructionSheet({ exerciseId, exerciseName, onClose }: 
   const meta = getExerciseMeta(exerciseId);
   const line = [meta.primaryMuscle, meta.workoutType, meta.equipment].filter(Boolean).join(' · ');
 
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
@@ -40,6 +37,8 @@ export default function InstructionSheet({ exerciseId, exerciseName, onClose }: 
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={e => e.stopPropagation()}
       >
         <div className="sheet-grab" aria-hidden="true" />

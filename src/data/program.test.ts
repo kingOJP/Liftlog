@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  prescriptionLabel, prescriptionDetail, getExerciseName,
+  prescriptionLabel, prescriptionDetail,
   startOfWeek, addWeeks, weeksBetween, weekStartLabel, getWeekDateRange,
   dayInPhase,
 } from './program';
@@ -36,16 +36,6 @@ describe('prescription labels', () => {
   it('gets the singular right for a one-set slot', () => {
     expect(prescriptionLabel({ sets: 1 })).toBe('1 set');
     expect(prescriptionDetail({ sets: 1 })).toBe('1 set');
-  });
-});
-
-describe('getExerciseName', () => {
-  it('resolves a catalog id to its name', () => {
-    expect(getExerciseName('face-pulls')).toBe('Face Pulls');
-  });
-
-  it('falls back to the id rather than rendering nothing', () => {
-    expect(getExerciseName('not-in-the-catalog')).toBe('not-in-the-catalog');
   });
 });
 

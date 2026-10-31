@@ -20,6 +20,7 @@
 // Pure functions of a TrainingSnapshot, like every other engine in data/.
 
 import type { Session, SetLog } from '../db/database';
+import { fmtWeight } from './units';
 import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp, movementPatternFor } from './analytics';
 import { getExerciseName } from './programStore';
@@ -171,7 +172,7 @@ export function exercisePointSeries(
       // A planned easy week can't set a PR — the load is lighter by design,
       // and "PR" there would only ever mean the lifter ignored the plan.
       const weightPR = !easy && prevBestWeight != null && maxWeight > prevBestWeight;
-      if (weightPR) prLabels.push(`Weight PR — ${maxWeight} lbs`);
+      if (weightPR) prLabels.push(`Weight PR — ${fmtWeight(maxWeight)}`);
       bestWeight.set(exerciseId, Math.max(prevBestWeight ?? 0, maxWeight));
 
       // Rep PR: more reps than ever before at a weight you've lifted BEFORE
@@ -188,7 +189,7 @@ export function exercisePointSeries(
         if (!easy && prev != null && reps > prev) {
           repPR = true;
           prLabels.push(weight > 0
-            ? `Rep PR — ${reps} × ${weight} lbs`
+            ? `Rep PR — ${reps} × ${fmtWeight(weight)}`
             : `Rep PR — ${reps} bodyweight reps`);
         }
         repMap.set(weight, Math.max(prev ?? 0, reps));

@@ -34,6 +34,8 @@ export interface DraftSession {
   origin?: DraftOrigin;
   /** exercises added mid-workout (so a resumed quick/shared session keeps them) */
   added?: WorkoutDay['exercises'];
+  /** the session note as typed so far */
+  note?: string;
 }
 
 const KEY = 'liftlog_draft_session';

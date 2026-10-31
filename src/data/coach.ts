@@ -44,6 +44,12 @@ const MIN_DAY_SESSIONS = 2;          // recent sessions required before touching
 const HIGH_VOLUME_BUFFER = 2;        // sets past the ceiling before we trim
 const SUGGEST_GAP = 3;               // weekly-set gap that earns an add-exercise suggestion
 export const MINUTES_PER_SET = 3;    // set + rest, for duration projections
+
+/** "~45 min" for a day card — the same 3-minutes-a-set estimate the coach budgets with, to the nearest 5. */
+export function estimatedMinutesFor(day: { exercises: Array<{ sets: number }> }): number {
+  const sets = day.exercises.reduce((n, e) => n + Math.max(1, e.sets), 0);
+  return Math.round((sets * MINUTES_PER_SET) / 5) * 5;
+}
 const DURATION_TOLERANCE = 0.15;     // keep days within ±15% of their average
 
 const DAY_MS = 86_400_000;

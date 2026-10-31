@@ -6,6 +6,7 @@ files in this folder, in order, once each:
 
 ```sh
 npx wrangler d1 execute liftlog --remote --file worker/migrations/0008_sync_clocks.sql
+npx wrangler d1 execute liftlog --remote --file worker/migrations/0009_session_notes.sql
 ```
 
 Every migration records itself in `schema_migrations`, so the applied set is

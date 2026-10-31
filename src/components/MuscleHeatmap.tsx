@@ -54,10 +54,19 @@ export default function MuscleHeatmap({ snapshot }: Props) {
   );
 
   const rate = (m: MuscleGroup) => heat.byMuscle.get(m)?.weeklyRate ?? 0;
+  const toggleRegion = (m: MuscleGroup) => setSelected(sel => (sel === m ? null : m));
+  // Each region is a labelled, keyboard-reachable control, not a bare path.
   const region = (m: MuscleGroup) => ({
     fill: heatColor(rate(m), band),
     className: `hm-region${selected === m ? ' hm-selected' : ''}`,
-    onClick: () => setSelected(sel => (sel === m ? null : m)),
+    role: 'button' as const,
+    tabIndex: 0,
+    'aria-label': `${m}: ${rate(m).toFixed(1)} sets a week`,
+    'aria-pressed': selected === m,
+    onClick: () => toggleRegion(m),
+    onKeyDown: (e: React.KeyboardEvent<SVGPathElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRegion(m); }
+    },
   });
 
   const selectedHeat = selected ? heat.byMuscle.get(selected) : null;

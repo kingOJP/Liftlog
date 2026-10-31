@@ -25,7 +25,8 @@ const pull = (c: string | null = cookie) => handleSync(syncRequest('GET', c), en
 /** A session document as the client sends it: session row + its set logs. */
 function doc(guid: string, updatedAt: number, sets = 1) {
   return {
-    sessions: [{ id: 1, guid, dayId: 1, weekNumber: 1, startedAt: updatedAt, completedAt: updatedAt, updatedAt }],
+    sessions: [{ id: 1, guid, dayId: 1, weekNumber: 1, startedAt: updatedAt, completedAt: updatedAt, updatedAt }] as
+      Array<{ id: number; guid: string; dayId: number; weekNumber: number; startedAt: number; completedAt: number; updatedAt: number; note?: string }>,
     setLogs: Array.from({ length: sets }, (_, i) => ({
       id: i + 1, sessionId: 1, exerciseId: 'bench-press', setNumber: i + 1, weight: 135, reps: 8,
     })),
@@ -207,6 +208,36 @@ describe('session documents merge per document', () => {
     const data = await (await pull()).json() as { setLogs: Array<{ warmup?: boolean; order?: number }> };
     expect(data.setLogs.find(s => s.warmup)).toBeTruthy();
     expect(data.setLogs.every(s => s.order === 0)).toBe(true);
+  });
+});
+
+describe('session notes', () => {
+  it('stores a note on the session document and serves it back', async () => {
+    const body = doc('g1', 1000);
+    body.sessions[0] = { ...body.sessions[0], note: 'Slept badly, bar felt heavy' };
+    expect((await push(body)).status).toBe(200);
+    const data = await (await pull()).json() as { sessions: Array<{ guid: string; note?: string }> };
+    expect(data.sessions.find(s => s.guid === 'g1')?.note).toBe('Slept badly, bar felt heavy');
+  });
+
+  it('clears the note when a newer copy arrives without one', async () => {
+    const body = doc('g1', 1000);
+    body.sessions[0] = { ...body.sessions[0], note: 'first' };
+    await push(body);
+    await push(doc('g1', 2000));
+    const data = await (await pull()).json() as { sessions: Array<{ guid: string; note?: string }> };
+    expect(data.sessions.find(s => s.guid === 'g1')?.note).toBeUndefined();
+  });
+
+  it('rejects a note that is not a string, or is absurdly long', async () => {
+    const bad = doc('g1', 1000);
+    bad.sessions[0] = { ...bad.sessions[0], note: 42 as unknown as string };
+    expect((await push(bad)).status).toBe(400);
+    const long = doc('g1', 1000);
+    long.sessions[0] = { ...long.sessions[0], note: 'x'.repeat(2_001) };
+    const res = await push(long);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'session note too long' });
   });
 });
 

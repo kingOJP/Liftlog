@@ -442,3 +442,35 @@ describe('mergeServerSessions — one transaction for the whole pull', () => {
     expect(setLogs).toHaveLength(2);
   });
 });
+
+describe('session notes', () => {
+  it('saves a trimmed note with the workout and drops an empty one', async () => {
+    const id = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 2_000,
+      sets: [{ exerciseId: 'bench-press', setNumber: 1, weight: 100, reps: 5 }],
+      note: '  good session  ',
+    });
+    expect((await getSession(id))!.note).toBe('good session');
+    const blank = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 3_000, completedAt: 4_000,
+      sets: [{ exerciseId: 'bench-press', setNumber: 1, weight: 100, reps: 5 }],
+      note: '   ',
+    });
+    expect((await getSession(blank))!.note).toBeUndefined();
+  });
+
+  it('rewrites, keeps or clears the note on edit as asked', async () => {
+    const id = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 2_000,
+      sets: [{ exerciseId: 'bench-press', setNumber: 1, weight: 100, reps: 5 }],
+      note: 'first',
+    });
+    const sets = [{ exerciseId: 'bench-press', setNumber: 1, weight: 100, reps: 6 }];
+    await rewriteSessionSets(id, sets);                 // undefined → unchanged
+    expect((await getSession(id))!.note).toBe('first');
+    await rewriteSessionSets(id, sets, undefined, 'second');
+    expect((await getSession(id))!.note).toBe('second');
+    await rewriteSessionSets(id, sets, undefined, null); // null → cleared
+    expect((await getSession(id))!.note).toBeUndefined();
+  });
+});

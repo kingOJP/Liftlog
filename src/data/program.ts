@@ -1,4 +1,3 @@
-import { EXERCISE_MAP } from './exercises';
 import { getProgramStart } from './settings';
 import type { PhaseKind } from './plan';
 
@@ -162,10 +161,6 @@ export const PROGRAM: WorkoutDay[] = [
   },
 ];
 
-export function getExerciseName(id: string): string {
-  return EXERCISE_MAP.get(id)?.name ?? id;
-}
-
 /**
  * "3 × 8–12", or "3 sets" when the slot carries no rep range. Every surface
  * that shows a slot's dose goes through here, so an unprescribed exercise never
@@ -226,6 +221,13 @@ export function weeksBetween(a: number, b: number): number {
 // Intl.DateTimeFormat per call — on two years of history that was most of
 // the metrics screen's render time (audit M17).
 const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' });
+
+/** "2026-07-27" — a LOCAL calendar date as the yyyy-mm-dd the date inputs and the plan use. */
+export function toLocalDateValue(d: Date | number): string {
+  const date = typeof d === 'number' ? new Date(d) : d;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 /** "7/27" — month/day of a timestamp, the label every chart axis uses. */
 export function shortDateLabel(ts: number): string {

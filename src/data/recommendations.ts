@@ -1,4 +1,5 @@
 import type { Exercise } from './program';
+import { fmtWeight } from './units';
 import type { WeightType, MeasureUnit } from './taxonomy';
 import type { ExperienceLevel, Goal, PhaseKind, PhaseResolver } from './plan';
 import { isEasyPhase } from './plan';
@@ -818,15 +819,15 @@ export function calculateRecommendation(
     const { weight: target, direction, avgReps: was, e1rm } = reanchor;
     const range = `${ex.repLow}–${ex.repHigh}`;
     const basis = e1rm > 0
-      ? `your est. 1RM of ${Math.round(e1rm)} lbs puts ${range} reps at`
+      ? `your est. 1RM of ${fmtWeight(Math.round(e1rm))} puts ${range} reps at`
       : `matching that effort to ${range} reps puts you at`;
     return withContext({
       weight: target,
       direction,
       kind: 'reanchor',
-      reason: `You've been working ${weight} lbs for about ${Math.round(was)} reps — that's a ${
+      reason: `You've been working ${fmtWeight(weight)} for about ${Math.round(was)} reps — that's a ${
         direction === 'up' ? 'lighter' : 'heavier'
-      } range than this block's ${range}. Re-anchoring: ${basis} ${target} lbs`,
+      } range than this block's ${range}. Re-anchoring: ${basis} ${fmtWeight(target)}`,
     });
   }
 
@@ -870,7 +871,7 @@ export function calculateRecommendation(
         weight,
         direction: 'hold',
         kind: 'hold',
-        reason: `${evidence} — but this lift already went up this week. Repeat ${weight} lbs and add load next week`,
+        reason: `${evidence} — but this lift already went up this week. Repeat ${fmtWeight(weight)} and add load next week`,
       });
     }
 
@@ -892,8 +893,8 @@ export function calculateRecommendation(
       direction: 'up',
       kind: 'increase',
       reason: rateLimited
-        ? `${evidence} — up to ${target} lbs, holding a steady week-over-week climb`
-        : `${evidence} — go to ${target} lbs`,
+        ? `${evidence} — up to ${fmtWeight(target)}, holding a steady week-over-week climb`
+        : `${evidence} — go to ${fmtWeight(target)}`,
     });
   };
 
@@ -928,8 +929,8 @@ export function calculateRecommendation(
       ? step
       : sizedIncrement(weight, avgReps, ex.repLow, step);
     const evidence = priorBest == null
-      ? `Hit ${ex.repHigh} reps at ${weight} lbs`
-      : `${Math.round(repTotal)} reps at ${weight} lbs — your best work at this load, with a set at ${ex.repHigh}`;
+      ? `Hit ${ex.repHigh} reps at ${fmtWeight(weight)}`
+      : `${Math.round(repTotal)} reps at ${fmtWeight(weight)} — your best work at this load, with a set at ${ex.repHigh}`;
     return increaseTo(jump, evidence);
   }
 
@@ -942,7 +943,7 @@ export function calculateRecommendation(
     const oldest = priorAtWeight[priorAtWeight.length - 1];
     if (oldest && bestE1rm(last.sets) >= bestE1rm(oldest.sets) * (1 + E1RM_BREAKOUT_PCT)) {
       const gain = Math.round((bestE1rm(last.sets) / bestE1rm(oldest.sets) - 1) * 100);
-      return increaseTo(step, `Est. 1RM up ${gain}% at ${weight} lbs with reps at the top of the range`);
+      return increaseTo(step, `Est. 1RM up ${gain}% at ${fmtWeight(weight)} with reps at the top of the range`);
     }
   }
 
@@ -1012,17 +1013,17 @@ export function calculateRecommendation(
       // reps needs another rep at this weight, not a lighter one.
       if (holdsInsteadOfDeload(goal, experience)) {
         const why = goal === 'fat-loss'
-          ? `Holding ${weight} lbs through a deficit is the win — defend this load, PRs come back when you eat`
+          ? `Holding ${fmtWeight(weight)} through a deficit is the win — defend this load, PRs come back when you eat`
           : goal === 'sport-support'
-            ? `Flat at ${weight} lbs, but your legs are paying for the miles — holding this load through the block is the win`
-            : `Flat for ${window.length} sessions — repeat ${weight} lbs and chase one more rep before changing anything`;
+            ? `Flat at ${fmtWeight(weight)}, but your legs are paying for the miles — holding this load through the block is the win`
+            : `Flat for ${window.length} sessions — repeat ${fmtWeight(weight)} and chase one more rep before changing anything`;
         return withContext({ weight, direction: 'hold', kind: 'hold', reason: why });
       }
       return withContext({
         weight: easeBack(weight, 0.9, step),
         direction: 'down',
         kind: 'deload',
-        reason: `${window.length} sessions at ${weight} lbs with no gain in volume or strength — deload, then build back up`,
+        reason: `${window.length} sessions at ${fmtWeight(weight)} with no gain in volume or strength — deload, then build back up`,
       });
     }
   }
@@ -1042,7 +1043,7 @@ export function calculateRecommendation(
     const was = sessionRange(last)!;
     return withContext({
       weight, direction: 'hold', kind: 'hold',
-      reason: `Your rep range moved from ${was.repLow}–${was.repHigh} to ${ex.repLow}–${ex.repHigh} — same ${weight} lbs, new targets. Give it a session here before anything changes`,
+      reason: `Your rep range moved from ${was.repLow}–${was.repHigh} to ${ex.repLow}–${ex.repHigh} — same ${fmtWeight(weight)}, new targets. Give it a session here before anything changes`,
     });
   }
   if (judgedAvg < ex.repLow) {
@@ -1071,7 +1072,7 @@ export function calculateRecommendation(
       weight,
       direction: 'hold',
       kind: 'hold',
-      reason: `Short of ${ex.repLow} reps, but one session isn't a trend — repeat ${weight} lbs before dropping it`,
+      reason: `Short of ${ex.repLow} reps, but one session isn't a trend — repeat ${fmtWeight(weight)} before dropping it`,
     });
   }
 
@@ -1083,12 +1084,12 @@ export function calculateRecommendation(
     : sparseWindow
       // The stall check was skipped on purpose — say so, rather than leaving the
       // lifter wondering why a flat run of sessions produced no verdict.
-      ? `You've been away from this one — settle back in at ${weight} lbs before pushing, then a set at ${ex.repHigh} reps earns the next increase`
+      ? `You've been away from this one — settle back in at ${fmtWeight(weight)} before pushing, then a set at ${ex.repHigh} reps earns the next increase`
       : !rangeTopped
-        ? `Get one set to ${ex.repHigh} reps at ${weight} lbs — that's what earns the next increase`
+        ? `Get one set to ${ex.repHigh} reps at ${fmtWeight(weight)} — that's what earns the next increase`
         : Math.round((priorBest ?? 0) - repTotal) <= 0
-          ? `Match your best at ${weight} lbs (${Math.round(priorBest ?? 0)} reps) with a set at ${ex.repHigh} to earn the next increase`
-          : `${Math.round((priorBest ?? 0) - repTotal)} more rep${Math.round((priorBest ?? 0) - repTotal) === 1 ? '' : 's'} would match your best at ${weight} lbs (${Math.round(priorBest ?? 0)}) — that earns the next increase`;
+          ? `Match your best at ${fmtWeight(weight)} (${Math.round(priorBest ?? 0)} reps) with a set at ${ex.repHigh} to earn the next increase`
+          : `${Math.round((priorBest ?? 0) - repTotal)} more rep${Math.round((priorBest ?? 0) - repTotal) === 1 ? '' : 's'} would match your best at ${fmtWeight(weight)} (${Math.round(priorBest ?? 0)}) — that earns the next increase`;
   return withContext({ weight, direction: 'hold', kind: 'hold', reason });
 }
 
@@ -1456,7 +1457,7 @@ export function buildSetPlan(
   const toBeat = rec.weight > 0 ? bestWorkAt(freshBaseline(history), rec.weight, ex) : null;
   const holdGoal = toBeat == null
     ? `Hit every target (${planTotal} reps) — a set at ${ex.repHigh} reps earns the next increase.`
-    : `Hit every target (${planTotal} reps) — a set at ${ex.repHigh}, and ${Math.round(toBeat)}+ total at ${rec.weight} lbs, earns the next increase.`;
+    : `Hit every target (${planTotal} reps) — a set at ${ex.repHigh}, and ${Math.round(toBeat)}+ total at ${fmtWeight(rec.weight)}, earns the next increase.`;
 
   // Unloaded work: the real trigger is a set/hold at the ceiling plus beating
   // the best total here — the old line quoted `sets × repHigh`, which the
@@ -1469,12 +1470,12 @@ export function buildSetPlan(
   const goal = bodyweight
     ? countGoal
     : rec.kind === 'reanchor'
-      ? `First session at ${rec.weight} lbs — this is an estimate from your log, not a test. Around ${planTotal} reps with 1–2 in reserve, and the coach corrects from what you actually hit.`
+      ? `First session at ${fmtWeight(rec.weight)} — this is an estimate from your log, not a test. Around ${planTotal} reps with 1–2 in reserve, and the coach corrects from what you actually hit.`
       : rec.kind === 'increase'
-        ? `New load: ${rec.weight} lbs — around ${planTotal} reps today. A set at ${ex.repHigh} earns the next jump.`
+        ? `New load: ${fmtWeight(rec.weight)} — around ${planTotal} reps today. A set at ${ex.repHigh} earns the next jump.`
         : rec.kind === 'hold'
           ? holdGoal
-          : `Rebuild at ${rec.weight} lbs: ${planTotal} clean reps, then start climbing again.`;
+          : `Rebuild at ${fmtWeight(rec.weight)}: ${planTotal} clean reps, then start climbing again.`;
 
   return { rec, sets, goal };
 }
@@ -1536,12 +1537,12 @@ function topSetPlan(
   const toBeat = bestWorkAt(baseline, rec.weight, { ...ex, sets: 1 });
 
   const goal = rec.kind === 'reanchor'
-    ? `Top set re-anchored to ${rec.weight} lbs from your log — around ${topReps} reps with 1–2 in reserve, then ${count - 1} back-offs at ${backoff} lbs.`
+    ? `Top set re-anchored to ${fmtWeight(rec.weight)} from your log — around ${topReps} reps with 1–2 in reserve, then ${count - 1} back-offs at ${fmtWeight(backoff)}.`
     : rec.kind === 'increase'
-      ? `New top set: ${rec.weight} lbs × ${topReps}, then ${count - 1} back-offs at ${backoff} lbs. A top set at ${ex.repHigh} reps earns the next jump.`
+      ? `New top set: ${fmtWeight(rec.weight)} × ${topReps}, then ${count - 1} back-offs at ${fmtWeight(backoff)}. A top set at ${ex.repHigh} reps earns the next jump.`
       : rec.kind === 'hold'
-        ? `Top set ${rec.weight} lbs × ${topReps}${toBeat != null && toBeat > topReps ? ` (your best here is ${Math.round(toBeat)})` : ''}, then ${count - 1} back-offs at ${backoff} lbs. A top set at ${ex.repHigh} earns the next jump.`
-        : `Rebuild: top set ${rec.weight} lbs × ${topReps}, back-offs at ${backoff} lbs, then start climbing again.`;
+        ? `Top set ${fmtWeight(rec.weight)} × ${topReps}${toBeat != null && toBeat > topReps ? ` (your best here is ${Math.round(toBeat)})` : ''}, then ${count - 1} back-offs at ${fmtWeight(backoff)}. A top set at ${ex.repHigh} earns the next jump.`
+        : `Rebuild: top set ${fmtWeight(rec.weight)} × ${topReps}, back-offs at ${fmtWeight(backoff)}, then start climbing again.`;
 
   return { rec, sets: rows(rec.weight, topReps, backoff, offReps), goal };
 }

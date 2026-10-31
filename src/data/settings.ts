@@ -2,6 +2,8 @@
 // Owns the week-numbering anchor (managed automatically by the training
 // journey — no user-facing setting) and the default rest-timer duration.
 
+import { toLocalDateValue } from './program';
+
 const SETTINGS_KEY = 'liftlog_settings';
 // Pre-Rev-2 builds stored the rest duration under its own key; keep it so
 // existing devices don't lose their preference.
@@ -39,10 +41,7 @@ function parseLocalDate(value: string): Date | null {
   return valid ? d : null;
 }
 
-function toDateValue(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+const toDateValue = toLocalDateValue;
 
 // The week-numbering anchor. Nobody sets this by hand anymore: block
 // activation anchors it to the block's start, wrapping a block re-anchors it

@@ -210,22 +210,48 @@ export interface MuscleInvolvement {
 
 // Every muscle an exercise trains, with its fractional set weighting.
 // Precedence: user override (getExerciseMeta) → master list → name match.
-export function musclesForExercise(id: string): MuscleInvolvement[] {
-  const meta = getExerciseMeta(id);
-  let primary = meta.primaryMuscle;
-  let secondaries: (MuscleGroup | null)[] = [
-    meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3,
-  ];
+/** The classification an exercise id resolves to, with the shared precedence. */
+export interface ResolvedIdentity {
+  primaryMuscle: MuscleGroup | null;
+  secondaryMuscles: (MuscleGroup | null)[];
+  workoutType: MovementPattern | null;
+  equipment: ReturnType<typeof getExerciseMeta>['equipment'];
+  weightType: ReturnType<typeof getExerciseMeta>['weightType'];
+}
 
-  // Custom IDs with no override fall back to a name match against the master list
-  if (!primary && !EXERCISE_MAP.has(id)) {
-    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
+/**
+ * THE override → catalog → name-match resolver. getExerciseMeta already layers
+ * the user's override over the global layer over the catalog; this adds the
+ * last rung — a custom id with no classification of its own borrows the
+ * catalog entry whose NAME it matches ("Incline DB Press-1782…" is an incline
+ * dumbbell press). musclesForExercise, movementPatternFor and the substitution
+ * engine's profileFor all read through here, so the three can never disagree.
+ */
+export function resolveExerciseIdentity(id: string, fallbackName?: string): ResolvedIdentity {
+  const meta = getExerciseMeta(id);
+  const out: ResolvedIdentity = {
+    primaryMuscle: meta.primaryMuscle,
+    secondaryMuscles: [meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3],
+    workoutType: meta.workoutType,
+    equipment: meta.equipment,
+    weightType: meta.weightType,
+  };
+  if (!out.primaryMuscle && !EXERCISE_MAP.has(id)) {
+    const name = fallbackName ?? getExerciseLibrary().find(e => e.id === id)?.name;
+    const def = name ? nameToDef.get(normalizeName(name)) : undefined;
     if (def) {
-      primary = def.primaryMuscle;
-      secondaries = [...def.secondaryMuscles];
+      out.primaryMuscle = def.primaryMuscle;
+      out.secondaryMuscles = [...def.secondaryMuscles];
+      out.workoutType ??= def.workoutType;
+      out.equipment ??= def.equipment;
+      out.weightType ??= def.weightType;
     }
   }
+  return out;
+}
+
+export function musclesForExercise(id: string): MuscleInvolvement[] {
+  const { primaryMuscle: primary, secondaryMuscles: secondaries } = resolveExerciseIdentity(id);
 
   const out: MuscleInvolvement[] = [];
   if (primary) out.push({ muscle: primary, weight: 1 });
@@ -243,15 +269,7 @@ export function primaryMuscleFor(id: string): MuscleGroup | null {
 // analysis (progress.ts categoryProgress) and anything else that needs a
 // single agreed-upon pattern for an exercise id.
 export function movementPatternFor(id: string): MovementPattern | null {
-  const meta = getExerciseMeta(id);
-  let pattern = meta.workoutType;
-
-  if (!pattern && !EXERCISE_MAP.has(id)) {
-    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
-    if (def) pattern = def.workoutType;
-  }
-  return pattern;
+  return resolveExerciseIdentity(id).workoutType;
 }
 
 // ── Muscle set accumulation ───────────────────────────────────────────────────

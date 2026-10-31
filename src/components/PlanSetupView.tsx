@@ -164,6 +164,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   // Captured once at mount — the clock must not be read during render.
   const [now] = useState(() => Date.now());
   const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
 
   const advanceTimer = useRef<number | null>(null);
 
@@ -318,12 +319,19 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     if (!proposal || activating) return;
     if (days.some(d => d.exercises.length === 0)) return;
     setActivating(true);
-    saveTrainingProfile(buildProfile());
-    const outgoingRetro = activeInfo && snapshot && snapshot.sessions.length > 0
-      ? computeBlockRetrospective(activeInfo.block, snapshot)
-      : null;
-    activateProposal({ ...proposal, days }, outgoingRetro);
-    onActivated();
+    setActivateError(null);
+    try {
+      saveTrainingProfile(buildProfile());
+      const outgoingRetro = activeInfo && snapshot && snapshot.sessions.length > 0
+        ? computeBlockRetrospective(activeInfo.block, snapshot)
+        : null;
+      activateProposal({ ...proposal, days }, outgoingRetro);
+      onActivated();
+    } catch (err) {
+      // A failed activation must not leave the button stuck on "Activating…"
+      setActivating(false);
+      setActivateError(err instanceof Error ? err.message : 'Could not activate the plan');
+    }
   }
 
   function toggleNiggle(id: string) {
@@ -539,6 +547,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
         </div>
         {info.sheet}
         <div className="plan-setup-footer">
+          {activateError && <p className="setup-error" role="alert">{activateError} — nothing was changed; try again.</p>}
           <button className="setup-primary-btn" disabled={!canActivate} onClick={handleActivate}>
             {activating ? 'Activating…' : `Activate plan — starts ${startDate}`}
           </button>

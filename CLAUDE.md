@@ -121,6 +121,17 @@ Long-term milestones (roughly):
     goal was removed from `GOALS` (the `Goal` type keeps the member so stored
     plans still resolve).
 
+24. ✅ October 2026 audit action plan (`docs/action-plan-2026-10.md`, eight phases, all
+    landed): atomic session writes + serialized, visible sync + protected drafts; honest
+    progress/stall engines (easy-week exclusion, load-normalized volume, score-driven
+    deloads, rep-range memory on set logs); the journey learning the right lessons
+    (one-directional activation, coach decisions, nudge-only experience, beginner band,
+    block-growth cap); self-programming (hand-built days, slot dose editor, manual
+    progression, quick workouts); clocks on every synced document + explicit restores +
+    conditional (ETag) pull + worker hardening + SW update toast; exercise instructions;
+    strength structure (barbell anchoring, phase rep ranges, top set + back-offs) and
+    bodyweight regressions; per-exercise history, session notes, kg/lb preference, a11y.
+
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
   rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
@@ -132,7 +143,8 @@ Long-term milestones (roughly):
   enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
   seam: any generator that emits one plugs into the same review-and-activate
   flow), block-over-block comparison charts, rehab/peaking block presets.
-- Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
+- Body-weight log — so bodyweight-exercise e1RM and "total lifted" include the lifter
+  (the kg/lb preference landed in Phase 8; see `data/units.ts`).
 - Delta push — pull is conditional (ETag/304) but every push still re-upserts every session
   document. The clocks are in place; the missing piece is a per-device `lastPushedAt` and a
   payload of only the documents newer than it (decision D7 deferred this half).
@@ -233,17 +245,26 @@ No router — pure React state in `App.tsx`. The `View` discriminated union:
 ```ts
 type View =
   | { screen: 'dashboard' }
-  | { screen: 'workout'; dayId: number }
+  | { screen: 'workout'; day: WorkoutDay }        // the day is SNAPSHOTTED into the view
   | { screen: 'history' }
   | { screen: 'edit-session'; sessionId: number; dayId: number }
   | { screen: 'edit-day'; dayId: number }
+  | { screen: 'new-day'; day: WorkoutDay }
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
   | { screen: 'settings' }
+  | { screen: 'glossary' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' };
+  | { screen: 'plan-setup' }
+  | { screen: 'quick-setup' }
+  | { screen: 'quick-workout' }
+  | { screen: 'shared-preview' }
+  | { screen: 'shared-workout' };
 ```
+
+The per-exercise **history** (`ExerciseHistorySheet`) and the instruction sheet are overlays,
+not routes: they open over a workout without unmounting it.
 
 Day-scoped views (`workout`, `edit-session`, `edit-day`) look the day up with a fallback:
 if the `dayId` no longer exists (program replaced by a sync), the app renders the
@@ -398,6 +419,9 @@ src/
                                   timestamped catalog copies, null for a true custom exercise
     search.ts                  — matchesExerciseQuery()/filterExercises(): every typed word must
                                   appear in the name, any order — shared by the list and the picker
+    units.ts                   — weight unit preference (lb/kg): toDisplay()/fromDisplay()/
+                                  fmtWeight() — storage is ALWAYS lbs; only labels and inputs
+                                  convert, and every engine reason string formats through here
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
@@ -413,7 +437,8 @@ src/
   components/
     Dashboard.tsx/css          — Coach card (next day + top insight + "coach adjusted" note)
                                   + 4 day cards + icon nav row
-    DayCard.tsx/css            — single day card with Edit button
+    DayCard.tsx/css            — single day card (exercise count + ~duration from the coach's
+                                  3-min-per-set estimate) as two real buttons: start, Edit
     WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest
                                   timer + coach-plan overlay/banner + duration capture
     ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
@@ -421,7 +446,8 @@ src/
                                   editable, remaining sets previewed), ＋ Warm-up / ＋ Extra
                                   set, tap-to-edit logged sets
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
-    HistoryView.tsx/css        — all past sessions in reverse chronological order
+    HistoryView.tsx/css        — all past sessions in reverse chronological order, with the
+                                  session note; the card header is the one button
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
                                   per-exercise "Find replacement" (⇄) suggestion panel
     ExerciseListView.tsx/css   — searchable alphabetical list of all exercises (data/search.ts —
@@ -443,7 +469,14 @@ src/
                                   proposed structure (confidence, split, phases, reasons) →
                                   workout review (kept/new/replacement badges, swap ⇄ / remove)
                                   → activate
-    SettingsView.tsx/css       — program start date, rest-timer default, account/sign-out
+    SettingsView.tsx/css       — Exercises/Glossary entries, weight unit (lb/kg), rest-timer
+                                  default, account + POST sign-out, sync status + Sync now
+    ExerciseHistorySheet.tsx/css — per-exercise history overlay: bests, progress verdict + recent
+                                  PRs, est-1RM and volume trends, every session with its sets and
+                                  note. Opened from the card's "Last time" line, a Metrics
+                                  Progress row and the exercise detail screen
+    useDialog.ts               — the modal contract (Escape closes, focus moves in and is trapped,
+                                  the opener gets focus back) shared by every dialog/sheet
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart (highlightIndex / highlightMax, zero-value
                                   gap bars) and LineChart (hand-rolled CSS/SVG)
@@ -472,6 +505,7 @@ src/
 | `liftlog_exercise_merges` | `merges.ts` | Admin from→to exercise-id map (application-owned, replaced on pull; applied only when it or the pulled data changed) |
 | `liftlog_sync_status` | `syncStatus.ts` | Device-local sync visibility (`lastSuccessAt`, `lastError`, `hasUnpushed`, `authExpired`) |
 | `liftlog_sync_etag` | `sync.ts` | ETag of the last full pull — sent as `If-None-Match`; a 304 skips the merge |
+| `liftlog_weight_unit` | `units.ts` | Display/entry unit (`lb`/`kg`) — device-local; storage stays in lbs |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
 
@@ -482,7 +516,9 @@ src/
 **`sessions`** — index: `weekNumber`
 - `id` (autoincrement), `guid?` (immutable sync identity; legacy rows get `legacy-<startedAt>`
   backfilled by `ensureSessionGuids()`), `dayId`, `weekNumber`, `startedAt`, `completedAt?`,
-  `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync)
+  `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync),
+  `note?` (free-text session note; rides the session document — D1 `session_docs.note`,
+  migration `0009`; `rewriteSessionSets(…, note)` with `null` clears it)
 
 **`setLogs`** — index: `sessionId`
 - `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`, `order?`
@@ -529,8 +565,8 @@ On app mount, `App.tsx` runs this sequence (only when logged in):
 4. `migrateExerciseIds()` again — in case pull merged old IDs from the server
 5. `pushSync()` — uploads the merged union
 
-**Merge protocol (sync v2).** The unit of sync is the *session document*: a session row plus
-its set logs, identified by an immutable client-generated `guid` (pre-v2 rows derive the
+**Merge protocol (sync v2).** The unit of sync is the *session document*: a session row (with
+its optional `note`) plus its set logs, identified by an immutable client-generated `guid` (pre-v2 rows derive the
 deterministic `legacy-<startedAt>` so every device computes the same identity). On the wire
 sessions/setLogs stay flat arrays; the server stores one row per document
 (`session_docs`, `sets_json` blob) and **upserts per document — newer `updatedAt` wins** — so
@@ -700,8 +736,8 @@ caller.
 ## Progressive overload algorithm (`src/data/recommendations.ts`)
 
 Runs when opening a new (non-edit) workout. WorkoutView loads one training snapshot and, for
-each exercise, builds its recent history **across every day it appears in** (up to the last 4
-sessions containing that exercise, newest first), then calls
+each exercise, builds its recent history **across every day it appears in** (the last
+`historyDepthFor(experience)` sessions containing that exercise, newest first), then calls
 `calculateRecommendation(history, exercise, ctx)`. `ctx` is a `PrescriptionContext`
 (options bag, not positional args): `weightType`, `phase`, **`goal`** and **`experience`** —
 the engine reads the athlete and the plan, not just the lift. WorkoutView supplies
@@ -1081,7 +1117,8 @@ architecture as the coach: **pure functions of (exercise, day, TrainingSnapshot)
 storage writes, fully unit-tested (`substitution.test.ts`).
 
 - **`ExerciseProfile`** — the normalized view every candidate is ranked as: muscles
-  (override → catalog → name match, same precedence as `musclesForExercise`), movement
+  (through `resolveExerciseIdentity` in analytics.ts — THE override → catalog → name-match
+  resolver, shared with `musclesForExercise`/`movementPatternFor`), movement
   pattern (`WorkoutType`), equipment, weight type, and derived compound/isolation
   mechanics. Any future candidate source (external APIs, AI generation, coach-curated
   collections) plugs in by producing profiles; the ranker never changes.
@@ -1361,9 +1398,9 @@ only the type name and vocabulary change.
   — the one real inconsistency in an otherwise-consistent list — used to span both bench-style
   horizontal pressing and overhead-style vertical pressing. Split into **Horizontal Press** /
   **Vertical Press**. A stale stored override of the old bare `'Press'` value can't be
-  disambiguated from the string alone, so it defaults to Horizontal on read
-  (`LEGACY_WORKOUT_TYPES` in `exercises.ts`) and self-heals next time that exercise's metadata
-  is edited; the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
+  disambiguated from the string alone, so `normalizeOverride(o, id)` resolves it from the
+  exercise id (`legacyPressPlane`: the catalog entry's plane, else "overhead/military/…" in a
+  custom name, else Horizontal); the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
   earlier merge into `'Press'`) remap unambiguously since they name their plane directly.
 - **Tier 1 — MovementCategory** (`MOVEMENT_CATEGORIES`, `patternCategoryFor()` in
   `taxonomy.ts`) — a coarser layer above MovementPattern, for the same reason Region sits above
@@ -1384,7 +1421,7 @@ only the type name and vocabulary change.
 
 ## Testing
 
-`npm test` runs everything (~795 tests, ~4.5s). `npm run typecheck` runs types alone;
+`npm test` runs everything (~950 tests, ~6s). `npm run typecheck` runs types alone;
 `npm run build` runs typecheck then Vite; `npm run check` is lint + test + build (the deploy
 gate). CI (`.github/workflows/ci.yml`) runs typecheck, lint and tests on PRs and `main`.
 
@@ -1495,7 +1532,17 @@ PROGRAM references) that are otherwise only checked by hand.
   quick workout, mid-workout add) are the one `AddExercisePanel`. Finishing a quick workout
   offers to keep it as a program day. The Metrics Progress tab lists every lift trained in the
   last 60 days, not just the current program, with a show-all control.
-- **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
+- **Removing an exercise from a day never deletes it** — it stays in the library so history
+  can still resolve the name by id. Deleting happens only from the exercise detail screen,
+  which offers *Archive* (hidden from lists, history kept) or *Delete* (history wiped), records
+  a synced tombstone, and can be undone only by an explicit restore (see Cloud sync).
+- **Weights are stored in pounds, always** — `units.ts` converts for display and entry only
+  (`toDisplay`/`fromDisplay`/`fmtWeight`), the engines compute in lbs and format their reason
+  strings through `fmtWeight`, and increments stay equipment-based in lbs (shown converted).
+  A kg entry is stored to two decimals so it round-trips within display precision.
+- **Every modal is a dialog** — `useDialog` gives it Escape, focus-in, a Tab trap and focus
+  return; interactive rows are real buttons or `role="button"` with a key handler, never a
+  clickable container wrapping another button.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
 - **The week-numbering anchor is managed automatically** — the "Training block start"
   setting was removed. `getProgramStartValue()` stamps first use of the app on this device
@@ -1595,7 +1642,9 @@ PROGRAM references) that are otherwise only checked by hand.
   - Equipment `'Leg Press Machine'` → `'Machine'` (the catch-all for any exercise machine)
   - Muscles `'Front Delts'`/`'Side Delts'`/`'Rear Delts'` → `'Delts'` (duplicates created by
     the collapse are deduped — first mention wins, later ones are nulled)
-  - Workout types `'Chest Press'`/`'Overhead Press'`/`'Push Up'` → `'Press'`
+  - Movement patterns `'Chest Press'`/`'Push Up'` → `'Horizontal Press'`, `'Overhead Press'`
+    → `'Vertical Press'`, and a stale bare `'Press'` is resolved from the exercise it sits on
+    (`legacyPressPlane`: catalog plane, else the name, else Horizontal)
 - **Taxonomy option arrays are alphabetical** — `MUSCLE_GROUPS`, `WORKOUT_TYPES`,
   `EQUIPMENT_OPTIONS`, `WEIGHT_TYPES` render directly as dropdowns; keep them sorted when
   adding values.

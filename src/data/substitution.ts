@@ -30,10 +30,11 @@ import {
   normalizeName,
   sessionTimestamp,
   volumeTargetFor,
+  resolveExerciseIdentity,
 } from './analytics';
 import type { Goal } from './plan';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, DIFFICULTY_RANK, catalogDefFor, difficultyFor, getExerciseMeta, prerequisitesFor, unitFor } from './exercises';
+import { EXERCISES, EXERCISE_MAP, DIFFICULTY_RANK, catalogDefFor, difficultyFor, prerequisitesFor, unitFor } from './exercises';
 import type { ExerciseDifficulty } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
@@ -70,31 +71,15 @@ const COMPOUND_PATTERNS = new Set<MovementPattern>([
   'Leg Press', 'Lunge', 'Pull Down', 'Pull Up', 'Row', 'Squat', 'Vertical Press',
 ]);
 
-const nameToDef = new Map(EXERCISES.map(d => [normalizeName(d.name), d]));
 
 export function profileFor(id: string, fallbackName?: string): ExerciseProfile {
-  const meta = getExerciseMeta(id);
-  let primary = meta.primaryMuscle;
-  let secondaries = [meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3];
-  let workoutType = meta.workoutType;
-  let equipment = meta.equipment;
-  let weightType = meta.weightType;
-
-  // Custom IDs with no metadata fall back to a name match against the catalog
-  if (!primary && !EXERCISE_MAP.has(id)) {
-    const name = fallbackName ?? getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = name ? nameToDef.get(normalizeName(name)) : undefined;
-    if (def) {
-      primary = def.primaryMuscle;
-      secondaries = [...def.secondaryMuscles];
-      workoutType ??= def.workoutType;
-      equipment ??= def.equipment;
-      weightType ??= def.weightType;
-    }
-  }
+  // One resolver for muscles/pattern/equipment (analytics.ts) — the same
+  // override → catalog → name-match precedence every analytic uses.
+  const { primaryMuscle: primary, secondaryMuscles, workoutType, equipment, weightType } =
+    resolveExerciseIdentity(id, fallbackName);
 
   const name = EXERCISE_MAP.get(id)?.name ?? fallbackName ?? catalogDefFor(id)?.name ?? id;
-  const secs = secondaries.filter((m): m is MuscleGroup => m != null);
+  const secs = secondaryMuscles.filter((m): m is MuscleGroup => m != null);
   return {
     id,
     name,

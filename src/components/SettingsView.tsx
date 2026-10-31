@@ -3,6 +3,8 @@ import {
   getRestDuration, saveRestDuration, REST_PRESETS,
 } from '../data/settings';
 import type { SyncUser } from '../data/sync';
+import { getWeightUnit, saveWeightUnit } from '../data/units';
+import type { WeightUnit } from '../data/units';
 import { describeSyncStatus, getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
 import './SettingsView.css';
 
@@ -16,6 +18,7 @@ interface Props {
 
 export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
+  const [unit, setUnit] = useState<WeightUnit>(getWeightUnit);
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
   const [syncing, setSyncing] = useState(false);
 
@@ -56,6 +59,27 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
             </span>
             <span className="settings-nav-chevron">›</span>
           </button>
+        </section>
+
+        <section className="settings-section">
+          <span className="settings-label">Weights in</span>
+          <div className="settings-rest-presets" role="radiogroup" aria-label="Weight unit">
+            {(['lb', 'kg'] as const).map(u => (
+              <button
+                key={u}
+                className={`settings-rest-preset${unit === u ? ' active' : ''}`}
+                role="radio"
+                aria-checked={unit === u}
+                onClick={() => { setUnit(u); saveWeightUnit(u); }}
+              >
+                {u === 'lb' ? 'Pounds (lbs)' : 'Kilograms (kg)'}
+              </button>
+            ))}
+          </div>
+          <p className="settings-hint">
+            Display and entry only — every weight is stored in pounds, so switching back and forth loses nothing.
+            Plate increments stay in pounds and show converted.
+          </p>
         </section>
 
         <section className="settings-section">

@@ -6,6 +6,7 @@ import { unitFor } from '../data/exercises';
 import { unitLabel } from '../data/taxonomy';
 import type { MeasureUnit } from '../data/taxonomy';
 import { InfoButton } from './InstructionSheet';
+import { fmtWeight, fromDisplay, toDisplay, unitLabelFor } from '../data/units';
 import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
@@ -27,6 +28,8 @@ interface Props {
   regression?: ReplacementSuggestion;
   /** Accept the easier variant — WorkoutView adds it to today's session */
   onRegress?: (s: ReplacementSuggestion) => void;
+  /** Open the per-exercise history sheet (the "Last time" line is the way in) */
+  onViewHistory?: (exerciseId: string, name: string) => void;
 }
 
 /** The row the lifter is filling in right now. */
@@ -40,9 +43,9 @@ function formatLastSets(sets: ExerciseSession['sets'], unit: MeasureUnit): strin
   if (unit === 'seconds') return sets.map(s => `${s.reps}s`).join(', ');
   const uniqueWeights = new Set(sets.map(s => s.weight));
   if (uniqueWeights.size === 1) {
-    return `${sets[0].weight} lbs × ${sets.map(s => s.reps).join(', ')}`;
+    return `${fmtWeight(sets[0].weight)} × ${sets.map(s => s.reps).join(', ')}`;
   }
-  return sets.map(s => `${s.weight}×${s.reps}`).join(', ');
+  return sets.map(s => `${toDisplay(s.weight)}×${s.reps}`).join(', ');
 }
 
 function lastSessionLabel(ts: number): string {
@@ -61,7 +64,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 
 export default function ExerciseCard({
   exercise, sets, recommendation, plan, lastSession,
-  onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress,
+  onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress, onViewHistory,
 }: Props) {
   const info = useInstructionSheet();
   // A draft overrides the prescribed row — set when the lifter edits the
@@ -114,8 +117,10 @@ export default function ExerciseCard({
   const activePrescription = draft === null ? remaining[0] : undefined;
   const upcoming = activePrescription ? remaining.slice(1) : remaining;
 
+  // Prescribed loads are stored in lbs; the inputs show the user's unit.
   const prescribedWeight = (w: number | null) =>
-    workingWeight ?? (w == null ? '' : String(w));
+    workingWeight ?? (w == null ? '' : String(toDisplay(w)));
+  const weightUnit = unitLabelFor();
 
   // The active input row: the draft, else the next prescribed set, else (no
   // plan at all — e.g. editing a past session) a blank row.
@@ -140,7 +145,7 @@ export default function ExerciseCard({
 
   function handleLogSet() {
     if (!row) return;
-    const w = timed ? 0 : parseFloat(row.weight);
+    const w = timed ? 0 : fromDisplay(parseFloat(row.weight));
     const r = parseInt(row.reps, 10);
     // Weight of 0 is valid (bodyweight exercises); reps must be positive.
     if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
@@ -158,21 +163,21 @@ export default function ExerciseCard({
     const lastWork = [...sets].reverse().find(s => !s.warmup);
     setDraft({
       kind: 'work',
-      weight: workingWeight ?? (lastWork ? String(lastWork.weight) : ''),
+      weight: workingWeight ?? (lastWork ? String(toDisplay(lastWork.weight)) : ''),
       reps: lastWork ? String(lastWork.reps) : '',
     });
   }
 
   function startEdit(index: number) {
     setEditingIndex(index);
-    setEditWeight(String(sets[index].weight));
+    setEditWeight(String(toDisplay(sets[index].weight)));
     setEditReps(String(sets[index].reps));
     setEditWarmup(!!sets[index].warmup);
   }
 
   function confirmEdit() {
     if (editingIndex === null) return;
-    const w = timed ? 0 : parseFloat(editWeight);
+    const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
     const r = parseInt(editReps, 10);
     if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
       onEditSet(editingIndex, w, r, editWarmup);
@@ -225,17 +230,23 @@ export default function ExerciseCard({
             {DIRECTION_ICON[recommendation.direction]}{' '}
             {recommendation.targetReps != null
               ? `${recommendation.targetReps} ${timed ? 'sec' : 'reps'}`
-              : `${recommendation.weight} lbs`}
+              : fmtWeight(recommendation.weight)}
           </span>
           <span className="ex-rec-reason">{recommendation.reason}</span>
         </div>
       )}
 
       {lastSession && (
-        <div className="ex-last">
+        <button
+          type="button"
+          className="ex-last ex-last--btn"
+          onClick={() => onViewHistory?.(exercise.id, exercise.name)}
+          aria-label={`History for ${exercise.name}`}
+          disabled={!onViewHistory}
+        >
           <span className="ex-last-label">Last time · {lastSessionLabel(lastSession.completedAt)}</span>
-          <span className="ex-last-sets">{formatLastSets(lastSession.sets, unit)}</span>
-        </div>
+          <span className="ex-last-sets">{formatLastSets(lastSession.sets, unit)}{onViewHistory ? ' ›' : ''}</span>
+        </button>
       )}
 
       {plan && <p className="ex-goal">{plan.goal}</p>}
@@ -269,7 +280,7 @@ export default function ExerciseCard({
                       onKeyDown={handleEditKeyDown}
                       autoFocus
                     />
-                    <span className="inline-unit">lbs</span>
+                    <span className="inline-unit">{weightUnit}</span>
                   </div>
                 )}
                 <div className="inline-field">
@@ -296,9 +307,17 @@ export default function ExerciseCard({
                 <button className="edit-cancel-btn" onClick={cancelEdit}>✗</button>
               </div>
             ) : (
-              <div key={i} className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`} onClick={() => startEdit(i)}>
+              <div
+                key={i}
+                className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Edit ${setLabels[i]}`}
+                onClick={() => startEdit(i)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(i); } }}
+              >
                 <span className="set-num">{setLabels[i]}</span>
-                {!timed && <span className="set-weight">{s.weight} lbs</span>}
+                {!timed && <span className="set-weight">{fmtWeight(s.weight)}</span>}
                 <span className="set-reps">{s.reps} {countLabel}</span>
                 <button
                   className="delete-set-btn"
@@ -332,7 +351,7 @@ export default function ExerciseCard({
                   onChange={e => updateRow({ weight: e.target.value })}
                   onKeyDown={handleKeyDown}
                 />
-                <span className="input-unit">lbs</span>
+                <span className="input-unit">{weightUnit}</span>
               </div>
             )}
             <div className={`reps-wrap${timed ? ' reps-wrap--solo' : ''}`}>
@@ -370,7 +389,7 @@ export default function ExerciseCard({
               <span className="set-num">Set {p.setNumber}</span>
               {!timed && (
                 <span className="set-weight">
-                  {(workingWeight ?? (p.weight == null ? null : String(p.weight))) ?? '—'} lbs
+                  {(workingWeight ?? (p.weight == null ? null : String(toDisplay(p.weight)))) ?? '—'} {weightUnit}
                 </span>
               )}
               <span className={`set-reps${timed ? ' set-reps--solo' : ''}`}>

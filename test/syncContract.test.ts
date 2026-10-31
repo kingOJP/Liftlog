@@ -19,7 +19,7 @@ import {
   pushSync, pullSync, getLoggedInUser, getUserRole, ensureLocalDataOwner,
 } from '../src/data/sync';
 import {
-  createSession, addSetLog, completeSession, dumpIDB, clearIDB,
+  createSession, addSetLog, completeSession, dumpIDB, clearIDB, saveWorkout, rewriteSessionSets,
 } from '../src/db/database';
 import {
   getStoredProgram, saveStoredProgram, getExerciseLibrary, addToExerciseLibrary,
@@ -139,6 +139,26 @@ describe('the payload contract between this client and this worker', () => {
     const sets = (await dumpIDB()).setLogs;
     expect(sets.filter(s => s.warmup)).toHaveLength(1);
     expect(sets.every(s => s.order === 0)).toBe(true);
+  });
+
+  it('carries a session note across devices and clears it when edited away', async () => {
+    const id = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 61_000,
+      sets: [{ exerciseId: 'bench-press', setNumber: 1, weight: 135, reps: 8 }],
+      note: 'PR day — felt strong',
+    });
+    await pushSync();
+    await clearIDB();
+    await pullSync();
+    expect((await dumpIDB()).sessions[0].note).toBe('PR day — felt strong');
+
+    const local = (await dumpIDB()).sessions[0];
+    await rewriteSessionSets(local.id!, [{ exerciseId: 'bench-press', setNumber: 1, weight: 135, reps: 8 }], undefined, null);
+    await pushSync();
+    await clearIDB();
+    await pullSync();
+    expect((await dumpIDB()).sessions[0].note).toBeUndefined();
+    void id;
   });
 
   it('reports the role the server resolved', async () => {

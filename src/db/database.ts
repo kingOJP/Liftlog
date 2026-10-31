@@ -15,6 +15,8 @@ export interface Session {
   completedAt?: number;
   /** Last meaningful write — per-session conflict resolution for merge sync. */
   updatedAt?: number;
+  /** Free-text session note (how it went); synced on the session document */
+  note?: string;
 }
 
 export interface SetLog {
@@ -180,6 +182,7 @@ export async function saveWorkout(input: {
   startedAt: number;
   completedAt: number;
   sets: SetInput[];
+  note?: string;
 }): Promise<number> {
   const db = await openDB();
   const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
@@ -191,6 +194,7 @@ export async function saveWorkout(input: {
     startedAt: input.startedAt,
     completedAt: input.completedAt,
     updatedAt: now,
+    ...(input.note?.trim() ? { note: input.note.trim() } : {}),
   };
   const putReq = tx.objectStore('sessions').add(session);
   let sessionId = 0;
@@ -215,6 +219,8 @@ export async function rewriteSessionSets(
   sessionId: number,
   sets: SetInput[],
   redate?: { completedAt: number; weekNumber: number },
+  /** undefined leaves the note alone; null or '' clears it */
+  note?: string | null,
 ): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
@@ -231,6 +237,10 @@ export async function rewriteSessionSets(
       session.completedAt = redate.completedAt;
       session.startedAt = Math.min(session.startedAt, redate.completedAt);
       session.weekNumber = redate.weekNumber;
+    }
+    if (note !== undefined) {
+      if (note && note.trim()) session.note = note.trim();
+      else delete session.note;
     }
     sessions.put(session);
   };
@@ -546,6 +556,7 @@ function queueSessionDoc(tx: IDBTransaction, doc: SessionDoc, localId?: number):
     startedAt: doc.startedAt,
     completedAt: doc.completedAt,
     updatedAt: doc.updatedAt,
+    ...(doc.note ? { note: doc.note } : {}),
   };
   const putReq = tx.objectStore('sessions').put(session);
   putReq.onsuccess = () => {

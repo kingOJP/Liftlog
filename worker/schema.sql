@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS session_docs (
   completed_at INTEGER,
   updated_at   INTEGER NOT NULL,
   sets_json    TEXT    NOT NULL,
+  -- free-text session note (migrations/0009_session_notes.sql)
+  note         TEXT,
   PRIMARY KEY (user_id, guid),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

@@ -170,3 +170,9 @@
   font-size: 10.5px;
   color: var(--text-muted);
 }
+
+.hm-region:focus-visible {
+  outline: none;
+  stroke: var(--purple);
+  stroke-width: 3;
+}

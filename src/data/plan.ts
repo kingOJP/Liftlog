@@ -21,7 +21,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay } from './program';
-import { startOfWeek, addWeeks } from './program';
+import { startOfWeek, addWeeks, toLocalDateValue } from './program';
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
@@ -353,8 +353,7 @@ export function parsePlanDate(value: string): Date | null {
 }
 
 export function toPlanDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return toLocalDateValue(d);
 }
 
 /** Monday 00:00 of the week containing `date` — one definition, in program.ts. */
