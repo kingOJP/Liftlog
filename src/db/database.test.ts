@@ -234,7 +234,8 @@ describe('exercise id migrations', () => {
     const before = (await getSession(id))!.updatedAt!;
     vi.setSystemTime(Date.now() + 1000);
 
-    expect(await remapSetLogExerciseIds({ 'bench-press-1700000000000': 'bench-press' })).toBe(2);
+    expect(await remapSetLogExerciseIds({ 'bench-press-1700000000000': 'bench-press' }))
+      .toEqual({ remapped: 2, fromIds: ['bench-press-1700000000000'] });
     expect((await getSetLogsForSession(id)).every(l => l.exerciseId === 'bench-press')).toBe(true);
     // The remap must propagate as the newer document, or other devices keep the old ids.
     expect((await getSession(id))!.updatedAt!).toBeGreaterThan(before);
@@ -243,7 +244,7 @@ describe('exercise id migrations', () => {
 
   it('ignores a merge map with nothing relevant in it', async () => {
     await loggedSession();
-    expect(await remapSetLogExerciseIds({ 'something-else': 'other' })).toBe(0);
+    expect((await remapSetLogExerciseIds({ 'something-else': 'other' })).remapped).toBe(0);
   });
 });
 

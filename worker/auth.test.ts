@@ -14,9 +14,9 @@ let env: TestEnv;
 beforeEach(() => { env = createTestEnv(); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-function call(path: string, cookie?: string): Promise<Response> {
+function call(path: string, cookie?: string, method = 'GET'): Promise<Response> {
   const url = new URL(`https://liftlog.test${path}`);
-  return handleAuth(new Request(url, { headers: cookie ? { Cookie: cookie } : {} }), env, url);
+  return handleAuth(new Request(url, { method, headers: cookie ? { Cookie: cookie } : {} }), env, url);
 }
 
 /**
@@ -102,6 +102,19 @@ describe('the OAuth callback', () => {
       .toEqual([{ user_id: 'google-123' }]);
   });
 
+  it('sweeps expired sessions out of the table on sign-in', async () => {
+    stubGoogle();
+    env.raw.prepare("INSERT INTO users (id, email, name) VALUES ('old', 'old@example.com', 'Old')").run();
+    env.raw.prepare("INSERT INTO user_sessions (token, user_id, expires_at) VALUES ('stale', 'old', ?)")
+      .run(Date.now() - 1000);
+    env.raw.prepare("INSERT INTO user_sessions (token, user_id, expires_at) VALUES ('live', 'old', ?)")
+      .run(Date.now() + 1000);
+    await callback('?code=c&state=s', 'oauth_state=s');
+    const tokens = env.raw.prepare('SELECT token FROM user_sessions ORDER BY token').all() as Array<{ token: string }>;
+    expect(tokens.map(t => t.token)).not.toContain('stale');
+    expect(tokens.map(t => t.token)).toContain('live');
+  });
+
   it('sets a session cookie the browser cannot read and a user cookie it can', async () => {
     stubGoogle();
     const res = await callback('?code=c&state=s', 'oauth_state=s');
@@ -183,6 +196,13 @@ describe('getAuthenticatedUser', () => {
     expect(await getAuthenticatedUser(request(cookie), env)).toBeNull();
   });
 
+  it('resolves the role alongside the session, defaulting to user', async () => {
+    const cookie = signIn(env, 'user-1');
+    expect((await getAuthenticatedUser(request(cookie), env))?.role).toBe('user');
+    env.raw.prepare("INSERT INTO user_roles (user_id, role) VALUES ('user-1', 'admin')").run();
+    expect((await getAuthenticatedUser(request(cookie), env))?.role).toBe('admin');
+  });
+
   it('finds the session cookie among unrelated cookies', async () => {
     const cookie = signIn(env);
     expect(await getAuthenticatedUser(request(`other=1; ${cookie}; another=2`), env)).not.toBeNull();
@@ -203,21 +223,29 @@ describe('/api/auth/me and logout', () => {
 
   it('destroys the session server-side, not just the cookie', async () => {
     const cookie = signIn(env);
-    const res = await call('/api/auth/logout', cookie);
-    expect(res.status).toBe(302);
+    const res = await call('/api/auth/logout', cookie, 'POST');
+    expect(res.status).toBe(303);
     expect(env.raw.prepare('SELECT token FROM user_sessions').all()).toHaveLength(0);
     // A replayed cookie is worthless afterwards.
     expect((await call('/api/auth/me', cookie)).status).toBe(401);
   });
 
   it('expires both cookies on the way out', async () => {
-    const res = await call('/api/auth/logout', signIn(env));
+    const res = await call('/api/auth/logout', signIn(env), 'POST');
     expect(cookies(res).get('liftlog_session')).toContain('Max-Age=0');
     expect(cookies(res).get('liftlog_user')).toContain('Max-Age=0');
   });
 
   it('is harmless when called without a session', async () => {
-    expect((await call('/api/auth/logout')).status).toBe(302);
+    expect((await call('/api/auth/logout', undefined, 'POST')).status).toBe(303);
+  });
+
+  // A GET that signs the user out can be fired by a link prefetch or by any
+  // page that makes the browser navigate there (CSRF). Sign-out is a POST.
+  it('refuses to sign out on a GET', async () => {
+    const cookie = signIn(env);
+    expect((await call('/api/auth/logout', cookie)).status).toBe(405);
+    expect((await call('/api/auth/me', cookie)).status).toBe(200);
   });
 
   it('404s an unknown auth route', async () => {

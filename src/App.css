@@ -87,6 +87,55 @@
   text-decoration: none;
 }
 
+/* "Update ready" toast — bottom of the shell, above the home indicator */
+.update-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--purple);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.update-toast span {
+  flex: 1;
+}
+
+.update-toast-btn {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--purple);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.update-toast-dismiss {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* Error boundary recovery screen */
 .crash-screen {
   display: flex;

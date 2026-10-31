@@ -12,6 +12,7 @@
 // coach, recommendations, metrics — keeps reading (program, history) and
 // never needs to know blocks exist.
 
+import { isPlanDoc, mergePlanDocs } from '../../worker/planMerge';
 import type { WorkoutDay } from './program';
 import { getStoredProgram, saveStoredProgram } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
@@ -86,10 +87,15 @@ export function hasOnboarded(): boolean {
   return getPlanState().profile != null;
 }
 
+/**
+ * The profile carries its own clock and does NOT bump the document's. Bumping
+ * it meant a casual "level up" tap on an offline device outranked a newer
+ * block activation made elsewhere: the plans were rejected on merge while the
+ * program store still adopted that block's program (audit H4).
+ */
 export function saveTrainingProfile(profile: TrainingProfile, now = Date.now()): void {
   const state = getPlanState();
   state.profile = { ...profile, updatedAt: now };
-  state.updatedAt = now;
   savePlanState(state);
 }
 
@@ -580,11 +586,12 @@ export function recordCoachDecision(key: string, accepted: boolean, now = Date.n
 // Whole-document last-write-wins, same as the program. Returns true when the
 // server copy replaced local state (caller refreshes UI).
 
+// The same merge the worker applies on push (worker/planMerge.ts): the newer
+// plans document wins, the newer profile wins, independently.
 export function mergeServerPlanState(server: unknown): boolean {
-  if (server == null || typeof server !== 'object') return false;
-  const doc = server as PlanState;
-  if (doc.version !== 1 || !Array.isArray(doc.plans) || typeof doc.updatedAt !== 'number') return false;
-  if (doc.updatedAt <= getPlanState().updatedAt) return false;
+  if (!isPlanDoc(server)) return false;
+  const { doc, changed } = mergePlanDocs<PlanState>(getPlanState(), server as unknown as PlanState);
+  if (!changed) return false;
   savePlanState(doc);
   return true;
 }

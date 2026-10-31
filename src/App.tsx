@@ -8,6 +8,7 @@ import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db
 import { clearDraftSession } from './data/draftSession';
 import type { DraftSession } from './data/draftSession';
 import { getSyncStatus, subscribeSyncStatus } from './data/syncStatus';
+import { getUpdateReady, subscribeUpdateReady } from './data/appUpdate';
 import { isQuickWorkout } from './data/quickWorkout';
 import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
@@ -72,6 +73,10 @@ function App() {
   const workoutOpen = view.screen === 'workout' || view.screen === 'quick-workout' || view.screen === 'shared-workout';
   useEffect(() => { workoutOpenRef.current = workoutOpen; }, [workoutOpen]);
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
+  // A new build took over the service worker. The toast waits until no
+  // workout is open — reloading mid-set is the one thing it must never do.
+  const updateReady = useSyncExternalStore(subscribeUpdateReady, getUpdateReady, () => false);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
 
   // On mount: pull from server if logged in; if server is empty, push local data up.
   // The exercise-ID migration runs independently of pull so a sync failure can't
@@ -524,6 +529,13 @@ function App() {
         </div>
       )}
       {renderView()}
+      {updateReady && !updateDismissed && !workoutOpen && (
+        <div className="update-toast" role="status">
+          <span>A new version of LiftLog is ready.</span>
+          <button className="update-toast-btn" onClick={() => window.location.reload()}>Reload</button>
+          <button className="update-toast-dismiss" onClick={() => setUpdateDismissed(true)} aria-label="Not now">×</button>
+        </div>
+      )}
     </div>
   );
 }

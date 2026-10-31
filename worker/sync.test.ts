@@ -137,6 +137,30 @@ describe('payload validation', () => {
     }));
     expect(res.status).toBe(400);
   });
+
+  // Audit M1: these used to slip through — a non-array threw inside .map and
+  // came back as a 500, a string completedAt landed in an INTEGER column.
+  it.each([
+    ['malformed session',        { sessions: [{ id: 1, dayId: 1, weekNumber: 1, startedAt: 1, completedAt: 'noon' }] }],
+    ['exerciseMuscles must be an array', { exerciseMuscles: { exerciseId: 'x' } }],
+    ['malformed exerciseMuscles', { exerciseMuscles: [{ exerciseId: 'x', primaryMuscle: 42 }] }],
+    ['exerciseDetails must be an array', { exerciseDetails: 'nope' }],
+    ['malformed exerciseDetails', { exerciseDetails: [{ exerciseId: 'x', equipment: ['Barbell'] }] }],
+    ['program must be an array',  { program: { days: [] } }],
+    ['malformed programUpdatedAt', { programUpdatedAt: 'now' }],
+    ['restoredExerciseIds must be an array', { restoredExerciseIds: 'bench' }],
+  ])('rejects with "%s"', async (error, patch) => {
+    const res = await push(pushBody(patch));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error });
+  });
+
+  it('bounds the program document', async () => {
+    const huge = [{ id: 1, label: 'x'.repeat(600_000), muscleGroups: '', exercises: [] }];
+    const res = await push(pushBody({ program: huge, exercises: [] }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'program too large' });
+  });
 });
 
 describe('session documents merge per document', () => {
@@ -244,6 +268,20 @@ describe('the training plan document (whole-document LWW)', () => {
     expect(data.plan.plans[0].goal).toBe('strength');
   });
 
+  // The profile has its own clock inside the document: a profile edit on one
+  // device must not throw away a newer block activation from another, and
+  // vice versa (audit H4).
+  it('merges a newer profile into a newer plans document rather than picking one', async () => {
+    const planned = { version: 1, plans: [{ id: 'p1' }], profile: { experience: 'beginner', updatedAt: 100 }, updatedAt: 2000 };
+    const profiled = { version: 1, plans: [], profile: { experience: 'advanced', updatedAt: 3000 }, updatedAt: 1000 };
+    await push(pushBody({ plan: planned }));
+    await push(pushBody({ plan: profiled }));
+    const data = await (await pull()).json() as { plan: typeof planned };
+    expect(data.plan.plans).toHaveLength(1);
+    expect(data.plan.profile).toMatchObject({ experience: 'advanced', updatedAt: 3000 });
+    expect(data.plan.updatedAt).toBe(2000);
+  });
+
   it('returns null when the user has never planned', async () => {
     const data = await (await pull()).json() as { plan: unknown };
     expect(data.plan).toBeNull();
@@ -319,5 +357,118 @@ describe('the program and its metadata', () => {
   it('reports the caller\'s role, defaulting to user', async () => {
     const data = await (await pull()).json() as { role: string };
     expect(data.role).toBe('user');
+  });
+
+  // Audit H4: the program used to be clock-less — whichever device pushed
+  // last won, including a device pushing a stale copy over a fresh edit.
+  it('keeps the newer program when an older stamped copy is pushed afterwards', async () => {
+    const lib = [{ id: 'bench', name: 'Bench' }];
+    const fresh = [{ ...program[0], label: 'Edited later' }];
+    await push(pushBody({ program: fresh, programUpdatedAt: 2000, exercises: lib }));
+    await push(pushBody({ program, programUpdatedAt: 1000, exercises: lib }));
+    const data = await (await pull()).json() as { program: typeof program; programUpdatedAt: number };
+    expect(data.program[0].label).toBe('Edited later');
+    expect(data.programUpdatedAt).toBe(2000);
+  });
+
+  it('lets an unstamped push (older client) replace only an unstamped row', async () => {
+    const lib = [{ id: 'bench', name: 'Bench' }];
+    await push(pushBody({ program, exercises: lib }));
+    const legacyEdit = [{ ...program[0], label: 'From an old build' }];
+    await push(pushBody({ program: legacyEdit, exercises: lib }));
+    let data = await (await pull()).json() as { program: typeof program };
+    expect(data.program[0].label).toBe('From an old build');
+
+    await push(pushBody({ program, programUpdatedAt: 5, exercises: lib }));
+    await push(pushBody({ program: legacyEdit, exercises: lib }));
+    data = await (await pull()).json() as { program: typeof program };
+    expect(data.program[0].label).toBe('Day 1');
+  });
+
+  // The last day IS deletable now: a stamped empty program is a decision,
+  // an unstamped one is still treated as the wipe it used to be.
+  it('stores a stamped empty program so the last day can be removed', async () => {
+    const lib = [{ id: 'bench', name: 'Bench' }];
+    await push(pushBody({ program, programUpdatedAt: 1000, exercises: lib }));
+    await push(pushBody({ program: [], programUpdatedAt: 2000, exercises: lib }));
+    const data = await (await pull()).json() as { program: unknown[] };
+    expect(data.program).toEqual([]);
+  });
+
+  it('keeps the newer library entry and metadata row per exercise', async () => {
+    await push(pushBody({
+      exercises: [{ id: 'rows', name: 'Chest-Supported Rows', updatedAt: 2000 }],
+      exerciseMuscles: [{ exerciseId: 'rows', primaryMuscle: 'Lats', secondaryMuscle1: null, secondaryMuscle2: null, secondaryMuscle3: null }],
+      exerciseDetails: [{ exerciseId: 'rows', workoutType: 'Row', equipment: 'Machine', weightType: 'Total', updatedAt: 2000 }],
+    }));
+    await push(pushBody({
+      exercises: [{ id: 'rows', name: 'Rows', updatedAt: 1000 }],
+      exerciseMuscles: [{ exerciseId: 'rows', primaryMuscle: 'Upper Back', secondaryMuscle1: null, secondaryMuscle2: null, secondaryMuscle3: null }],
+      exerciseDetails: [{ exerciseId: 'rows', workoutType: 'Row', equipment: 'Barbell', weightType: 'Total', updatedAt: 1000 }],
+    }));
+    const data = await (await pull()).json() as {
+      exercises: Array<{ id: string; name: string; updatedAt?: number }>;
+      exerciseMuscles: Array<{ exerciseId: string; primaryMuscle: string }>;
+      exerciseDetails: Array<{ exerciseId: string; equipment: string; updatedAt?: number }>;
+    };
+    expect(data.exercises.find(e => e.id === 'rows')).toMatchObject({ name: 'Chest-Supported Rows', updatedAt: 2000 });
+    expect(data.exerciseMuscles.find(m => m.exerciseId === 'rows')?.primaryMuscle).toBe('Lats');
+    expect(data.exerciseDetails.find(d => d.exerciseId === 'rows')).toMatchObject({ equipment: 'Machine', updatedAt: 2000 });
+  });
+
+  it('lifts a tombstone the user explicitly restored, and only that one', async () => {
+    await push(pushBody({ deletedExerciseIds: ['bench', 'squat'] }));
+    await push(pushBody({
+      exercises: [{ id: 'bench', name: 'Bench' }],
+      restoredExerciseIds: ['bench'],
+    }));
+    const data = await (await pull()).json() as { deletedExerciseIds: string[]; exercises: Array<{ id: string }> };
+    expect(data.deletedExerciseIds).toEqual(['squat']);
+    expect(data.exercises.map(e => e.id)).toContain('bench');
+  });
+});
+
+describe('conditional pull (ETag)', () => {
+  const pullWith = (etag: string) =>
+    handleSync(new Request('https://liftlog.test/api/sync', {
+      headers: { Cookie: cookie, 'If-None-Match': etag },
+    }), env);
+
+  it('answers an unchanged account with a 304 and no body', async () => {
+    await push(doc('g1', 1000));
+    const first = await pull();
+    const etag = first.headers.get('ETag')!;
+    expect(etag).toBeTruthy();
+    const again = await pullWith(etag);
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe('');
+  });
+
+  it('serves a full response once anything changed', async () => {
+    const etag = (await pull()).headers.get('ETag')!;
+    await push(doc('g1', 1000));
+    const res = await pullWith(etag);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).not.toBe(etag);
+  });
+
+  it('changes when a session is deleted, not only when one is added', async () => {
+    await push(doc('g1', 1000));
+    const etag = (await pull()).headers.get('ETag')!;
+    await push(pushBody({ deletedSessionGuids: ['g1'] }));
+    expect((await pullWith(etag)).status).toBe(200);
+  });
+
+  it('changes when the role changes', async () => {
+    const etag = (await pull()).headers.get('ETag')!;
+    env.raw.prepare("INSERT INTO user_roles (user_id, role) VALUES ('user-1', 'tester')").run();
+    expect((await pullWith(etag)).status).toBe(200);
+  });
+
+  it('is per user', async () => {
+    const other = signIn(env, 'user-2', 'b@example.com');
+    const mine = (await pull()).headers.get('ETag')!;
+    const theirs = (await pull(other)).headers.get('ETag')!;
+    expect(mine).not.toBe(theirs);
   });
 });

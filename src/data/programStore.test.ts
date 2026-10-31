@@ -5,7 +5,8 @@ import {
   deleteExerciseFromLibrary, addToExerciseLibrary,
   getDeletedExerciseIds, addDeletedExerciseIds,
   mergeExerciseLibrary, ensureProgramExercisesInLibrary, getExerciseName,
-  findExerciseByName,
+  findExerciseByName, getRestoredExerciseIds, clearRestoredExerciseIds,
+  saveStoredProgram, clearStoredProgram, getProgramUpdatedAt,
 } from './programStore';
 import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta } from './exercises';
 import type { WorkoutDay } from './program';
@@ -108,6 +109,22 @@ describe('deleted-exercise tombstones', () => {
     expect(getExerciseLibrary().some(e => e.id === 'face-pulls')).toBe(false);
   });
 
+  it('re-adding a deleted exercise records a restore for the server, cleared once it agrees', () => {
+    deleteExerciseFromLibrary('face-pulls');
+    addToExerciseLibrary({ id: 'face-pulls', name: 'Face Pulls' });
+    expect(getRestoredExerciseIds()).toEqual(new Set(['face-pulls']));
+    clearRestoredExerciseIds(['face-pulls']);
+    expect(getRestoredExerciseIds().size).toBe(0);
+  });
+
+  it('stamps the program clock on every save and clears it with the program', () => {
+    expect(getProgramUpdatedAt()).toBe(0);
+    saveStoredProgram([], 4242);
+    expect(getProgramUpdatedAt()).toBe(4242);
+    clearStoredProgram();
+    expect(getProgramUpdatedAt()).toBe(0);
+  });
+
   it('explicitly re-adding an exercise lifts its tombstone', () => {
     deleteExerciseFromLibrary('face-pulls');
     addToExerciseLibrary({ id: 'face-pulls', name: 'Face Pulls', sets: 3, repLow: 15, repHigh: 20 });
@@ -127,10 +144,24 @@ describe('mergeExerciseLibrary — pull merge keeps local-only exercises', () =>
     expect(getExerciseLibrary().some(e => e.id === custom.id)).toBe(true);
   });
 
-  it('lets the incoming copy win per id', () => {
-    addToExerciseLibrary(custom);
-    mergeExerciseLibrary([{ ...custom, sets: 5 }]);
-    expect(getExerciseLibrary().find(e => e.id === custom.id)?.sets).toBe(5);
+  it('lets a newer incoming copy win per id', () => {
+    addToExerciseLibrary(custom, 1000);
+    mergeExerciseLibrary([{ ...custom, name: 'Renamed elsewhere', updatedAt: 2000 }]);
+    expect(getExerciseLibrary().find(e => e.id === custom.id)?.name).toBe('Renamed elsewhere');
+  });
+
+  // Audit H4: the library was clock-less, so a pull carrying a stale copy
+  // silently undid a rename made on this device.
+  it('keeps a local entry that is newer than the incoming copy', () => {
+    addToExerciseLibrary({ ...custom, name: 'Renamed here' }, 3000);
+    mergeExerciseLibrary([{ ...custom, name: 'Stale server copy', updatedAt: 2000 }]);
+    expect(getExerciseLibrary().find(e => e.id === custom.id)?.name).toBe('Renamed here');
+  });
+
+  it('lets an incoming copy win over an unstamped local one (pre-clock behaviour)', () => {
+    localStorage.setItem('liftlog_exercises', JSON.stringify([custom]));
+    mergeExerciseLibrary([{ ...custom, name: 'Server copy' }]);
+    expect(getExerciseLibrary().find(e => e.id === custom.id)?.name).toBe('Server copy');
   });
 
   it('adds server-only exercises', () => {

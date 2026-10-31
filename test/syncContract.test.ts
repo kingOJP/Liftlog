@@ -21,8 +21,11 @@ import {
 import {
   createSession, addSetLog, completeSession, dumpIDB, clearIDB,
 } from '../src/db/database';
-import { getStoredProgram, saveStoredProgram, getExerciseLibrary, addToExerciseLibrary } from '../src/data/programStore';
-import { getPlanState, saveTrainingProfile } from '../src/data/planStore';
+import {
+  getStoredProgram, saveStoredProgram, getExerciseLibrary, addToExerciseLibrary,
+  deleteExerciseFromLibrary, getDeletedExerciseIds, getRestoredExerciseIds, getProgramUpdatedAt,
+} from '../src/data/programStore';
+import { getPlanState, saveTrainingProfile, getTrainingProfile } from '../src/data/planStore';
 import { defaultTrainingProfile } from '../src/data/plan';
 import { saveExerciseMeta, getExerciseMeta } from '../src/data/exercises';
 import type { WorkoutDay } from '../src/data/program';
@@ -186,6 +189,83 @@ describe('merging, not replacing', () => {
     expect(getExerciseLibrary().find(e => e.id === 'garage-lift-1700000000000')).toBeTruthy();
   });
 
+  // Audit H4 — the two-device edit race. Program, library and metadata were
+  // clock-less: a pull adopted whatever the server had, so the device that
+  // pulled last lost its edit.
+  it('keeps a day edit made here over an older copy the server still holds', async () => {
+    saveStoredProgram([day(1)], 1_000);
+    addToExerciseLibrary({ id: 'bench-press', name: 'Bench Press' });
+    await pushSync();
+
+    // Edited locally, newer than the server's copy; a background pull lands
+    // before the push gets to go.
+    saveStoredProgram([{ ...day(1), label: 'Push A' }], 2_000);
+    await pullSync();
+    expect(getStoredProgram()[0].label).toBe('Push A');
+    expect(getProgramUpdatedAt()).toBe(2_000);
+
+    // The push then wins on the server, and the other device adopts it.
+    await pushSync();
+    localStorage.clear();
+    await pullSync();
+    expect(getStoredProgram()[0].label).toBe('Push A');
+    expect(getProgramUpdatedAt()).toBe(2_000);
+  });
+
+  it('adopts a newer program from another device, including an empty one', async () => {
+    saveStoredProgram([day(1)], 1_000);
+    addToExerciseLibrary({ id: 'bench-press', name: 'Bench Press' });
+    await pushSync();
+
+    // The other device removed the last day, later.
+    env.raw.prepare('UPDATE user_programs SET program_json = ?, updated_at = ? WHERE user_id = ?')
+      .run('[]', 5_000, 'user-a@example.com');
+    expect(await pullSync()).toBe(true);
+    expect(getStoredProgram()).toEqual([]);
+  });
+
+  it('never adopts an unstamped empty program (the wipe guard)', async () => {
+    saveStoredProgram([day(1)]);
+    addToExerciseLibrary({ id: 'bench-press', name: 'Bench Press' });
+    await pushSync();
+    env.raw.prepare('UPDATE user_programs SET program_json = ?, updated_at = 0 WHERE user_id = ?')
+      .run('[]', 'user-a@example.com');
+    await pullSync();
+    expect(getStoredProgram()).toHaveLength(1);
+  });
+
+  it('keeps a metadata edit made here over an older server row', async () => {
+    const id = 'my-lift-1700000000000';
+    addToExerciseLibrary({ id, name: 'My Lift' });
+    saveExerciseMeta(id, { ...getExerciseMeta(id), primaryMuscle: 'Lats' }, 1_000);
+    await pushSync();
+    saveExerciseMeta(id, { ...getExerciseMeta(id), primaryMuscle: 'Upper Back' }, 2_000);
+    await pullSync();
+    expect(getExerciseMeta(id).primaryMuscle).toBe('Upper Back');
+    await pushSync();
+    expect(env.raw.prepare('SELECT primary_muscle FROM exercise_metadata WHERE exercise_id = ?').get(id))
+      .toMatchObject({ primary_muscle: 'Upper Back' });
+  });
+
+  it('merges a profile edit and a plan edit made on different devices', async () => {
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'beginner' }, 1_000);
+    await pushSync();
+    // Another device pushed a newer plans document carrying the old profile.
+    const local = getPlanState();
+    env.raw.prepare('UPDATE training_plans SET plan_json = ?, updated_at = ? WHERE user_id = ?')
+      .run(JSON.stringify({ ...local, plans: [{ id: 'p1', status: 'completed', blocks: [] }], updatedAt: 5_000 }), 5_000, 'user-a@example.com');
+    // Meanwhile this device levelled up.
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'intermediate' }, 6_000);
+
+    await pullSync();
+    expect(getPlanState().plans).toHaveLength(1);
+    expect(getTrainingProfile()?.experience).toBe('intermediate');
+    await pushSync();
+    const stored = JSON.parse(env.raw.prepare('SELECT plan_json FROM training_plans').get()!.plan_json as string);
+    expect(stored.plans).toHaveLength(1);
+    expect(stored.profile.experience).toBe('intermediate');
+  });
+
   it('does not resurrect a deleted session', async () => {
     await createSession(1, 1, 3_000); // a ghost: no sets
     await logWorkout(1_000);
@@ -200,6 +280,66 @@ describe('merging, not replacing', () => {
       clock.mockRestore();
     }
     expect((await dumpIDB()).sessions).toHaveLength(1);
+  });
+});
+
+describe('conditional pull', () => {
+  beforeEach(() => signInBrowser('a@example.com'));
+
+  it('is answered with a 304 when nothing changed, and skips the merge', async () => {
+    await logWorkout(1_000);
+    await pushSync();
+    await pullSync();
+    const statuses: number[] = [];
+    const inner = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await inner(input, init);
+      statuses.push(res.status);
+      return res;
+    });
+    expect(await pullSync()).toBe(false);
+    expect(statuses).toEqual([304]);
+  });
+
+  it('fetches in full again once the server changed', async () => {
+    await pullSync();
+    env.raw.prepare(
+      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json)
+       VALUES ('user-a@example.com', 'elsewhere', 1, 1, 1000, 2000, 2000, ?)`,
+    ).run(JSON.stringify([{ exerciseId: 'bench-press', setNumber: 1, weight: 100, reps: 5 }]));
+    expect(await pullSync()).toBe(true);
+    expect((await dumpIDB()).sessions).toHaveLength(1);
+  });
+});
+
+describe('admin merges, end to end', () => {
+  beforeEach(() => signInBrowser('a@example.com'));
+
+  const CUSTOM = 'incline-dumbbell-press-1700000000000';
+
+  // Audit H3: the survivor the user had deleted comes back, stays back
+  // through the next pull, and the server drops its tombstone.
+  it('revives a tombstoned survivor and makes the restore stick on the server', async () => {
+    deleteExerciseFromLibrary('incline-dumbbell-press');
+    addToExerciseLibrary({ id: CUSTOM, name: 'Incline DB Press' });
+    saveStoredProgram([{ id: 1, label: 'Push', muscleGroups: 'Chest',
+      exercises: [{ id: CUSTOM, name: 'Incline DB Press', sets: 3, repLow: 8, repHigh: 12 }] }]);
+    await pushSync();
+
+    env.raw.prepare(
+      "INSERT INTO exercise_merges (from_id, to_id, merged_by, merged_at) VALUES (?, 'incline-dumbbell-press', 'admin', 1)",
+    ).run(CUSTOM);
+    await pullSync();
+    expect(getStoredProgram()[0].exercises[0].id).toBe('incline-dumbbell-press');
+    expect(getDeletedExerciseIds().has('incline-dumbbell-press')).toBe(false);
+
+    await pushSync();
+    expect(env.raw.prepare("SELECT exercise_id FROM user_deleted_exercises WHERE exercise_id = 'incline-dumbbell-press'").all())
+      .toHaveLength(0);
+    await pullSync();
+    expect(getDeletedExerciseIds().has('incline-dumbbell-press')).toBe(false);
+    expect(getRestoredExerciseIds().size).toBe(0);
+    expect(getStoredProgram()[0].exercises[0].id).toBe('incline-dumbbell-press');
   });
 });
 

@@ -59,6 +59,13 @@ export interface LibraryExercise {
   id: string;
   name: string;
   archived?: boolean;
+  /**
+   * Clock of the last local edit (rename, archive, creation). Sync keeps the
+   * newer copy per entry on both ends; absent/0 means "unstamped" (a default
+   * library entry, or one from before clocks existed) and yields to any
+   * stamped copy.
+   */
+  updatedAt?: number;
   /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
   sets?: number;
   /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
@@ -215,9 +222,19 @@ export function weeksBetween(a: number, b: number): number {
   return Math.round((b - a) / (7 * 86_400_000));
 }
 
+// One formatter, built once. toLocaleDateString constructs a new
+// Intl.DateTimeFormat per call — on two years of history that was most of
+// the metrics screen's render time (audit M17).
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' });
+
+/** "7/27" — month/day of a timestamp, the label every chart axis uses. */
+export function shortDateLabel(ts: number): string {
+  return SHORT_DATE.format(ts);
+}
+
 /** "7/27" — the Monday that starts the week, how the volume chart labels bars. */
 export function weekStartLabel(weekStart: number): string {
-  return new Date(weekStart).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+  return shortDateLabel(weekStart);
 }
 
 // Program week numbering is anchored to the training-block start date (managed

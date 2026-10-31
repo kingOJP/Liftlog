@@ -439,13 +439,15 @@ export async function migrateExerciseIds(): Promise<number> {
 // Same mechanics as migrateExerciseIds, but the map is dynamic (pulled from
 // the server) and every affected session gets its updatedAt bumped so the
 // remapped copy propagates through merge sync as the newer document.
-export async function remapSetLogExerciseIds(map: Record<string, string>): Promise<number> {
+export async function remapSetLogExerciseIds(
+  map: Record<string, string>,
+): Promise<{ remapped: number; fromIds: string[] }> {
   const db = await openDB();
   const logs = await idbReq<SetLog[]>(
     db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
   );
   const toFix = logs.filter(l => map[l.exerciseId]);
-  if (toFix.length === 0) return 0;
+  if (toFix.length === 0) return { remapped: 0, fromIds: [] };
 
   const tx = db.transaction('setLogs', 'readwrite');
   const store = tx.objectStore('setLogs');
@@ -457,7 +459,7 @@ export async function remapSetLogExerciseIds(map: Record<string, string>): Promi
   for (const sessionId of new Set(toFix.map(l => l.sessionId))) {
     await touchSession(sessionId);
   }
-  return toFix.length;
+  return { remapped: toFix.length, fromIds: [...new Set(toFix.map(l => l.exerciseId))] };
 }
 
 // Wipes every store. Used when a different account signs in on this device so

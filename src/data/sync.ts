@@ -5,10 +5,11 @@ import type { SessionDoc } from './syncMerge';
 import { getSessionTombstones, addSessionTombstones, clearSessionTombstones } from './sessionTombstones';
 import { clearDraftSession } from './draftSession';
 import {
-  getStoredProgram, saveStoredProgram, clearStoredProgram,
+  getStoredProgram, saveStoredProgram, clearStoredProgram, getProgramUpdatedAt,
   getExerciseLibrary, saveExerciseLibrary, mergeExerciseLibrary,
   ensureProgramExercisesInLibrary, clearExerciseLibraryData,
   getDeletedExerciseIds, addDeletedExerciseIds,
+  getRestoredExerciseIds, clearRestoredExerciseIds,
 } from './programStore';
 import {
   getAllExerciseMeta, mergeExerciseMeta, deleteExerciseMeta,
@@ -23,7 +24,7 @@ import type { PlanState } from './planStore';
 import { syncLock } from './syncLock';
 import {
   markAuthExpired, markPullSucceeded, markPushStarted, markPushSucceeded, markSyncFailed,
-  clearSyncStatus,
+  clearSyncStatus, getSyncStatus,
 } from './syncStatus';
 
 export interface SyncUser {
@@ -45,6 +46,8 @@ interface ExerciseDetailsRow {
   workoutType: string | null;
   equipment: string | null;
   weightType: string | null;
+  /** the override's clock — one per exercise, carried on the details row */
+  updatedAt?: number;
 }
 
 // Wire shape: sessions and set logs travel as flat arrays (setLogs reference
@@ -72,7 +75,11 @@ interface SyncPayload {
   exerciseMuscles:     ExerciseMusclesRow[];
   exerciseDetails:     ExerciseDetailsRow[];
   deletedExerciseIds:  string[];
-  /** the training journey (plans + blocks) — whole-document LWW by updatedAt */
+  /** tombstones this device knowingly lifted (re-added by hand / merge survivor) */
+  restoredExerciseIds: string[];
+  /** clock of the program's last local edit (0 = unstamped) */
+  programUpdatedAt:    number;
+  /** the training journey (plans + blocks) — plans LWW by updatedAt, profile by its own clock */
   plan:                PlanState | null;
 }
 
@@ -95,6 +102,7 @@ function splitMeta(meta: Record<string, ExerciseMetaOverride>): {
       workoutType: m.workoutType,
       equipment:   m.equipment,
       weightType:  m.weightType,
+      ...(m.updatedAt ? { updatedAt: m.updatedAt } : {}),
     });
   }
   return { exerciseMuscles, exerciseDetails };
@@ -132,6 +140,11 @@ export function getUserRole(): UserRole {
 // workouts — and worse, the startup push uploads them into the new account.
 const OWNER_KEY = 'liftlog_data_owner';
 
+// The ETag of the last full pull. Sent back as If-None-Match; a 304 means the
+// server has nothing this device hasn't merged, and the pull costs one small
+// request instead of the whole history (audit M2). Device-local.
+const ETAG_KEY = 'liftlog_sync_etag';
+
 export async function ensureLocalDataOwner(): Promise<void> {
   const user = getLoggedInUser();
   if (!user) return;
@@ -151,6 +164,7 @@ export async function ensureLocalDataOwner(): Promise<void> {
     clearExerciseMeta();
     clearSyncStatus();
     localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(ETAG_KEY);
   }
   localStorage.setItem(OWNER_KEY, user.email);
 }
@@ -216,8 +230,10 @@ async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
     exerciseLogs:        [],
     deletedSessionGuids: [...getSessionTombstones()],
     program:             getStoredProgram(),
+    programUpdatedAt:    getProgramUpdatedAt(),
     exercises:           getExerciseLibrary(),
     deletedExerciseIds:  [...deletedExercises],
+    restoredExerciseIds: [...getRestoredExerciseIds()],
     // Send the journey document when there's anything to sync — plans OR just
     // the onboarding profile (a user can onboard before activating a plan).
     plan:                (() => { const s = getPlanState(); return s.plans.length > 0 || s.profile ? s : null; })(),
@@ -236,8 +252,11 @@ async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
 }
 
 async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
-  const res = await fetch('/api/sync');
+  const etag = localStorage.getItem(ETAG_KEY);
+  const res = await fetch('/api/sync', etag ? { headers: { 'If-None-Match': etag } } : undefined);
   if (res.status === 401) return 'unauthorized';
+  // Nothing changed on the server since this device last merged it.
+  if (res.status === 304) return false;
   if (!res.ok) throw new Error(`Sync pull failed: ${res.status}`);
   // Guard against non-API responses served with a 200 (dev server fallback,
   // captive portals, misbehaving proxies) — never parse HTML as sync data.
@@ -250,6 +269,7 @@ async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
     setLogs:             SetLog[];
     deletedSessionGuids: string[]             | null;
     program:             WorkoutDay[]         | null;
+    programUpdatedAt?:   number               | null;
     exercises:           LibraryExercise[]    | null;
     exerciseMuscles:     ExerciseMusclesRow[] | null;
     exerciseDetails:     ExerciseDetailsRow[] | null;
@@ -280,22 +300,28 @@ async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
     ));
   }
 
-  // Exercise deletions are permanent and app-wide: merge the server's
-  // tombstones, then scrub any local trace of the deleted exercises so a stale
-  // copy on this device can't resurrect them (or be pushed back up).
-  addDeletedExerciseIds(data.deletedExerciseIds ?? []);
+  // Exercise deletions are permanent: merge the server's tombstones, then
+  // scrub any local trace of the deleted exercises so a stale copy on this
+  // device can't resurrect them (or be pushed back up). The exception is a
+  // tombstone this device knowingly lifted (re-added by hand, or made the
+  // survivor of an admin merge) and hasn't told the server about yet — the
+  // server drops it on the next push, and once it stops reporting the id
+  // deleted there is nothing left to tell.
+  const serverDeleted = new Set(data.deletedExerciseIds ?? []);
+  const restored = getRestoredExerciseIds();
+  addDeletedExerciseIds([...serverDeleted].filter(id => !restored.has(id)));
+  clearRestoredExerciseIds([...restored].filter(id => !serverDeleted.has(id)));
   const deleted = getDeletedExerciseIds();
   if (deleted.size > 0) {
     for (const id of deleted) deleteExerciseMeta(id);
     saveExerciseLibrary(getExerciseLibrary()); // getter filters tombstones
   }
 
-  // The exercise library and its metadata are app-wide — apply them even when
-  // this account has no workout history yet. Metadata is merged so unsynced
-  // local edits survive; both are filtered through the tombstones. The library
-  // is MERGED, never replaced: a local-only exercise (added on this device,
-  // not yet pushed) must survive a pull, or a background pull racing the push
-  // silently deletes it (only tombstones delete).
+  // The exercise library and its metadata apply even when this account has
+  // no workout history yet. Both are MERGED per exercise by clock, never
+  // replaced: a local-only exercise (added on this device, not yet pushed)
+  // must survive a pull, and a local edit newer than the server's copy keeps
+  // it (only tombstones delete).
   const incomingMeta = recombineMeta(data.exerciseMuscles, data.exerciseDetails);
   for (const id of deleted) delete incomingMeta[id];
   mergeExerciseMeta(incomingMeta);
@@ -313,25 +339,33 @@ async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
   let changed = await mergeServerSessions(docs, getSessionTombstones());
   if (await purgeEmptySessions() > 0) changed = true;
 
-  // Training journey: whole-document LWW — a newer server copy replaces local
-  // (an older server copy is ignored; the next push uploads ours).
+  // Training journey: the newer plans document wins and the newer profile
+  // wins, independently (planMerge.ts — the worker applies the same rule).
   if (mergeServerPlanState(data.plan ?? null)) changed = true;
 
-  // SAFEGUARD: an empty incoming program must never overwrite a non-empty
-  // local one. An empty array is a legitimate state only for a brand-new
-  // account; for an existing account it means data loss (a bug, a bad push, a
-  // corrupted server row). Applying it would wipe the user's workouts on every
-  // pull. So we only adopt the server program when it actually has days — or
-  // when the local program is itself empty (a genuinely new device adopting a
-  // real program still works, since that program is non-empty).
-  if (data.program && data.program.length > 0) {
+  // The program: adopt the server's copy when its clock is newer than this
+  // device's. An UNSTAMPED local program (never edited since clocks arrived)
+  // yields to a non-empty server copy as it always did — unless this device
+  // still owes the server a push, in which case the local copy may be the
+  // edit that push is carrying, and it waits. An unstamped EMPTY server
+  // program is still treated as the wipe it used to be (a bug, a bad push, a
+  // corrupted row) and never adopted; a stamped empty one is the user
+  // deleting their last day, and is.
+  const serverClock = data.programUpdatedAt ?? 0;
+  const localClock = getProgramUpdatedAt();
+  const holdUnstamped = localClock === 0 && getSyncStatus().hasUnpushed;
+  const adoptProgram = data.program != null && (
+    serverClock > localClock ||
+    (localClock === 0 && data.program.length > 0 && !holdUnstamped)
+  );
+  if (data.program && adoptProgram) {
     const incomingProgram = data.program.map(d => ({
       ...d,
       exercises: d.exercises.filter(e => !deleted.has(e.id)),
     }));
     const next = JSON.stringify(incomingProgram);
-    if (next !== JSON.stringify(getStoredProgram())) {
-      saveStoredProgram(incomingProgram);
+    if (next !== JSON.stringify(getStoredProgram()) || serverClock !== localClock) {
+      saveStoredProgram(incomingProgram, serverClock);
       changed = true;
     }
   } else if (deleted.size > 0) {
@@ -351,20 +385,30 @@ async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
   // like the global metadata layer), then apply it to everything local — set
   // logs, program, library. Runs after the session merge so server documents
   // that still carry a merged-away id get remapped too; the touched sessions
-  // upload on the next push, converging the server copy.
+  // upload on the next push, converging the server copy. Applying means a
+  // full read of the set logs, so it only runs when the map changed or this
+  // pull brought something new (audit M17) — never on a quiet tick.
+  let mapChanged = false;
   if (data.exerciseMerges) {
     const map: MergeMap = {};
     for (const m of data.exerciseMerges) {
       if (m.fromId && m.toId && m.fromId !== m.toId) map[m.fromId] = m.toId;
     }
-    saveExerciseMerges(map);
+    mapChanged = saveExerciseMerges(map);
   }
-  if (await applyExerciseMerges()) changed = true;
+  if ((mapChanged || changed) && await applyExerciseMerges()) changed = true;
 
   // Repair pass: an exercise the program references but the library lost (the
   // old replace-on-pull sync could gut it) is rebuilt from the program slot so
   // history and the Exercises screen resolve its name again.
   ensureProgramExercisesInLibrary(getStoredProgram());
+
+  // Remember what we merged — but only once every part of it was taken. A
+  // pull that held the program back (unpushed local state) must come back
+  // in full next time, or the server copy would never be adopted.
+  const tag = res.headers.get('ETag');
+  if (tag && !holdUnstamped) localStorage.setItem(ETAG_KEY, tag);
+  else localStorage.removeItem(ETAG_KEY);
 
   return changed;
 }
@@ -420,6 +464,7 @@ function recombineMeta(
     o.workoutType = d.workoutType as ExerciseMetaOverride['workoutType'];
     o.equipment   = d.equipment   as ExerciseMetaOverride['equipment'];
     o.weightType  = d.weightType  as ExerciseMetaOverride['weightType'];
+    if (typeof d.updatedAt === 'number' && d.updatedAt > 0) o.updatedAt = d.updatedAt;
     map[d.exerciseId] = o;
   }
   return map;

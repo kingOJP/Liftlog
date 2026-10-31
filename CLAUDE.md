@@ -133,6 +133,9 @@ Long-term milestones (roughly):
   seam: any generator that emits one plugs into the same review-and-activate
   flow), block-over-block comparison charts, rehab/peaking block presets.
 - Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
+- Delta push — pull is conditional (ETag/304) but every push still re-upserts every session
+  document. The clocks are in place; the missing piece is a per-device `lastPushedAt` and a
+  payload of only the documents newer than it (decision D7 deferred this half).
 - Planner v2 — effort-aware volume decisions, automatic exercise substitution (the planner
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
   suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
@@ -214,9 +217,12 @@ All inputs use `font-size: 16px` to prevent iOS Safari zoom-on-focus.
 The app requires Google OAuth login. No content is shown until the user is authenticated.
 
 - Login: `/api/auth/google` (Google OAuth redirect)
-- Logout: `/api/auth/logout`
+- Logout: `POST /api/auth/logout` (a form submit from Settings; GET is 405 — a GET sign-out can
+  be fired by a link prefetch or a hostile page)
 - Current user: `getLoggedInUser()` in `src/data/sync.ts` — reads from a cookie set by the server
 - `LoginView` is shown when `getLoggedInUser()` returns null
+- Server side, `getAuthenticatedUser()` resolves session + account + role in **one** query
+  (`User.role`); sign-in also sweeps expired `user_sessions` rows
 
 ---
 
@@ -380,7 +386,13 @@ src/
                                   detection, weekly muscle volume, next-workout suggestion, and
                                   the coach plan (embeds computeProgramPlan)
     sync.ts                    — pushSync(), pullSync(), getLoggedInUser(), ensureLocalDataOwner()
-                                  — merge-based cloud sync via /api/sync (see Cloud sync section)
+                                  — merge-based cloud sync via /api/sync, clock-compared on
+                                  every document, conditional (ETag) pull (see Cloud sync)
+    merges.ts                  — admin exercise merges: stored from→to map, pure remap helpers,
+                                  applyExerciseMerges() (set logs + program + library + metadata,
+                                  reviving a tombstoned survivor)
+    appUpdate.ts               — "new build ready" flag from the service worker's controllerchange;
+                                  App renders the reload toast outside workouts
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
@@ -445,6 +457,11 @@ src/
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
 | `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
+| `liftlog_program_updated` | `programStore.ts` | Clock of the program's last local edit (0 = unstamped); compared on both ends of sync |
+| `liftlog_restored_exercises` | `programStore.ts` | Tombstones this device knowingly lifted (re-added by hand / merge survivor), pushed as `restoredExerciseIds` until the server stops reporting them deleted |
+| `liftlog_exercise_merges` | `merges.ts` | Admin from→to exercise-id map (application-owned, replaced on pull; applied only when it or the pulled data changed) |
+| `liftlog_sync_status` | `syncStatus.ts` | Device-local sync visibility (`lastSuccessAt`, `lastError`, `hasUnpushed`, `authExpired`) |
+| `liftlog_sync_etag` | `sync.ts` | ETag of the last full pull — sent as `If-None-Match`; a 304 skips the merge |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
 
@@ -519,13 +536,76 @@ Legacy `workout_sessions`/`set_logs` tables are a read-only pull fallback until 
 first v2 push; `exerciseLogs` (removed difficulty feature) is no longer synced.
 
 Sync payload also includes: program, exercise library, exercise metadata
-(muscle/equipment/weight-type overrides), deleted-exercise tombstones, and the **training
-journey document** (`plan` — all plans/blocks/retrospectives as one JSON doc, per-user D1
-`training_plans` table, whole-document LWW by `updatedAt` on both ends: the server upserts
-only a newer copy, the client replaces local only with a newer copy). On pull, metadata
-is *merged* into local (server wins per exercise; unsynced local edits survive).
-`pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
-resurrect through sync (the server additionally refuses to store empty session docs).
+(muscle/equipment/weight-type overrides), deleted-exercise tombstones, restored-exercise ids,
+and the **training journey document** (`plan` — all plans/blocks/retrospectives as one JSON
+doc, per-user D1 `training_plans` table). `pushSync()`/`pullSync()` also run
+`purgeEmptySessions()` so ghost/empty workouts can't resurrect through sync (the server
+additionally refuses to store empty session docs).
+
+**Everything carries a clock; the newer copy wins on both ends.** Sessions and the journey
+always did; the program, library entries and metadata overrides were clock-less, so pull
+adopted whatever the server had and a background pull landing after a day edit silently
+reverted it (audit H4). Now: `saveStoredProgram(program, now)` stamps
+`liftlog_program_updated` (a pull adopting the server copy passes the *server's* clock so
+devices agree), `LibraryExercise.updatedAt` and `ExerciseMetaOverride.updatedAt` stamp per
+row (`addToExerciseLibrary`/`archiveExercise`/`saveExerciseMeta`), the wire carries
+`programUpdatedAt`, `exercises[].updatedAt` and `exerciseDetails[].updatedAt`, and D1 has
+`updated_at` on `user_programs`/`user_exercises`/`exercise_metadata` (migration `0008`). The
+worker upserts `WHERE excluded.updated_at >= stored`; the client (`mergeExerciseLibrary`,
+`mergeExerciseMeta`, the program branch of `pullSyncUnlocked`) keeps a local row that is
+strictly newer. **0 means unstamped** (rows from before clocks, default library entries): two
+unstamped copies behave exactly as before (incoming wins), so older clients keep working, and
+the first stamped edit from any device wins over them. An unstamped local program yields to a
+non-empty server copy unless `hasUnpushed` is set (the local copy may be the edit that push
+carries); an **unstamped empty** server program is still the wipe guard and is never adopted,
+while a **stamped empty** one is the user deleting their last day — so the last day is
+deletable now (the worker stores a stamped empty program).
+
+**The journey document merges in two parts** (`worker/planMerge.ts`, shared by the worker's
+push and the client's `mergeServerPlanState`): plans/blocks/pending activation LWW by
+`updatedAt`, the athlete `profile` LWW by **its own** `profile.updatedAt` — independently.
+`saveTrainingProfile` no longer bumps the document clock; before, a "level up" tap on an
+offline device outranked a newer block activation made elsewhere while the program store
+still adopted that block's program. The worker reads the current row and writes the merged
+document (`updated_at = max(both clocks)`).
+
+**Deletions are permanent until explicitly restored.** The server keeps a user's tombstones
+forever (so no stale device resurrects a deletion), which also means lifting a tombstone
+locally used to be undone by the next pull. A restore is now told to the server:
+`liftExerciseTombstones()` (used by `addToExerciseLibrary` and by admin merges whose survivor
+the user had deleted — audit H3) records the id in `liftlog_restored_exercises`, push sends
+`restoredExerciseIds`, the worker deletes those per-user tombstones, and pull neither
+re-applies a tombstone this device knowingly lifted nor keeps the restore once the server
+stops reporting the id deleted. Legacy app-wide tombstones (`deleted_exercises`) cannot be
+lifted per user.
+
+**Pull is conditional** (audit M2, decision D7). The worker computes a per-user weak ETag from
+the clocks and row counts of everything a pull serves (session docs, session tombstones,
+program, library, metadata, exercise tombstones, plan, the global audit clock, merges, role),
+**before** reading the data (so a concurrent push can only make the tag stale, never the
+data), answers a matching `If-None-Match` with 304, and sends `Cache-Control: no-store` so the
+browser cache stays out of it. The client stores the tag (`liftlog_sync_etag`) only after a
+pull it merged in full and returns `false` on 304 — the 60 s tick costs one small request when
+nothing changed. Any successful push changes the server state, so the next pull is a full one.
+Delta **push** (only documents newer than the last push) is deliberately not built; see Future
+milestones.
+
+**Admin merges** (`merges.ts`) run only when the map changed or the pull brought new data —
+not on every tick — and when applied they also carry a merged exercise's metadata override
+onto a survivor that has none (audit M12). `normalizeOverride(o, id)` takes the exercise id,
+so a stale bare `'Press'` resolves from the catalog entry it sits on (or the name of a custom
+exercise) instead of always defaulting to Horizontal.
+
+**Worker hardening** (audit M1): 500 bodies are generic (the stack goes to `console.error`
+only); `validatePush` checks `exerciseMuscles`/`exerciseDetails` shapes, `completedAt`,
+`programUpdatedAt`, `restoredExerciseIds` and bounds the program document
+(`MAX_PROGRAM_BYTES`); the push is applied as one atomic batch (chunked at `BATCH_MAX` only if
+it ever outgrows one, with every upsert ordered before anything destructive); tombstone
+`DELETE`s are issued once, when a tombstone is first learned, not for every tombstone on every
+push. Worker tests cover each on the `node:sqlite` testkit. D1 schema changes are numbered
+files in `worker/migrations/` recorded in `schema_migrations` — see
+`worker/migrations/README.md` for the apply step and the rule that `schema.sql` must change
+with them.
 
 **Sync is serialized and visible.** Every entry point runs through `syncLock` (`syncLock.ts`,
 a promise chain) so the 60 s tick, the focus handler, startup and the post-workout push never
@@ -535,6 +615,12 @@ that failed after Finish is retried by the next background tick, not the next co
 `authExpired` (a 401 from either direction). Surfaced as a Settings line + "Sync now", a quiet
 Dashboard badge when failing, and an app-wide "sign in again" banner when the session expired.
 `App` is wrapped in an `ErrorBoundary` whose recovery screen notes that the draft survived.
+
+**A new build announces itself.** The service worker is `registerType: 'autoUpdate'`, which
+used to swap the SW silently and leave a resident iOS PWA running stale JS against a newer
+worker for days (audit M15). `data/appUpdate.ts` listens for `controllerchange` (only a
+*change* of controller — the first install isn't an update) and `App` shows an "Update ready —
+Reload" toast, never while a workout is open (it appears once the workout closes).
 
 **Ownership on the server (D1)** — full design in `docs/ownership-architecture.md`.
 Exercises live in three owned layers. **Layer 1 (application-owned):** the compiled-in
@@ -552,8 +638,8 @@ The pre-ownership app-wide tables (`app_exercises`/`app_exercise_metadata`/
 on pull, the startup push then snapshots their copy per-user, and legacy global tombstones
 stay honored for everyone. **Library and metadata sync remain merge-based, never replace**:
 the worker upserts per exercise per user on push and the client merges on pull
-(`mergeExerciseLibrary` — incoming wins per id, local-only entries survive); only tombstones
-delete. `ensureProgramExercisesInLibrary` (end of every pull) rebuilds any library entry the
+(`mergeExerciseLibrary` — the newer copy wins per id, local-only entries survive); only
+tombstones delete, and only an explicit restore un-deletes (see above). `ensureProgramExercisesInLibrary` (end of every pull) rebuilds any library entry the
 program references but the library lost, and `getExerciseName` humanizes orphaned timestamped
 ids as a last-resort display fallback. **Lifecycle:** custom exercises (timestamped ids) are
 queued into `pending_exercises` on push; admins review via `/api/admin/pending`, and approval
@@ -1422,6 +1508,14 @@ PROGRAM references) that are otherwise only checked by hand.
   `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions
   from older builds have duration ≈ 0 and are filtered by `sessionDurationMs()`'s validity
   window (10 min – 4 h).
+- **Metadata reads are cached by raw string** — `getExerciseMeta()` is called per set log by
+  the analytics; it used to re-parse and re-normalize the whole override blob every call
+  (1.7 s on two years of history, audit M17). `exercises.ts` keeps the parsed map as long as
+  `localStorage.getItem` returns the same string (so writes from anywhere, other tabs and
+  `localStorage.clear()` in tests all invalidate it), hands out copies, and every writer goes
+  through `writeMetaOverrides`. The same audit replaced `toLocaleDateString` with one cached
+  `Intl.DateTimeFormat` (`shortDateLabel` in program.ts) and made `headSetTotals` resolve each
+  exercise once.
 - **Taxonomy merges are normalized on read** — `normalizeOverride()` in `exercises.ts`
   remaps merged-away values from stored overrides (localStorage or a server pull) on every
   read so old data keeps resolving in the dropdowns:

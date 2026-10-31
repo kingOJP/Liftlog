@@ -81,7 +81,10 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
               <span className="settings-account-name">{user.name}</span>
               <span className="settings-account-email">{user.email}</span>
             </div>
-            <a href="/api/auth/logout" className="settings-logout">Sign out</a>
+            {/* POST, not a link: a GET sign-out can be fired by a prefetch or a hostile page */}
+            <form method="post" action="/api/auth/logout" className="settings-logout-form">
+              <button type="submit" className="settings-logout">Sign out</button>
+            </form>
           </div>
           <div className="settings-sync">
             <span className={`settings-sync-status${syncStatus.authExpired || (syncStatus.lastError && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt)) ? ' settings-sync-status--error' : ''}`}>

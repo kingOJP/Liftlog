@@ -1,8 +1,9 @@
-import { deleteExerciseMeta } from './exercises';
+import { deleteExerciseMeta, getAllExerciseMeta, saveExerciseMeta } from './exercises';
 import type { Exercise, LibraryExercise, WorkoutDay } from './program';
 import {
   getExerciseLibrary, saveExerciseLibrary,
   getStoredProgram, saveStoredProgram, getExerciseName,
+  getDeletedExerciseIds, liftExerciseTombstones,
 } from './programStore';
 import { remapSetLogExerciseIds } from '../db/database';
 
@@ -30,8 +31,12 @@ export function getExerciseMerges(): MergeMap {
   }
 }
 
-export function saveExerciseMerges(map: MergeMap): void {
-  localStorage.setItem(MERGES_KEY, JSON.stringify(map));
+/** Store the server's map; true when it differs from what was stored. */
+export function saveExerciseMerges(map: MergeMap): boolean {
+  const next = JSON.stringify(map);
+  if (localStorage.getItem(MERGES_KEY) === next) return false;
+  localStorage.setItem(MERGES_KEY, next);
+  return true;
 }
 
 /** Follow the merge chain to the surviving id (cycle-guarded). */
@@ -121,9 +126,36 @@ export async function applyExerciseMerges(): Promise<boolean> {
   const flat = flattenMerges(getExerciseMerges());
   if (Object.keys(flat).length === 0) return false;
 
-  let changed = (await remapSetLogExerciseIds(flat)) > 0;
+  const logs = await remapSetLogExerciseIds(flat);
+  let changed = logs.remapped > 0;
 
-  const prog = mergeProgramIds(getStoredProgram(), flat, getExerciseName);
+  const program = getStoredProgram();
+  const library = getExerciseLibrary();
+
+  // The merged-from ids this device actually holds data under. Only those
+  // merges touch anything here; the rest of the map is for other accounts.
+  const inUse = new Set(logs.fromIds);
+  for (const day of program) for (const ex of day.exercises) if (flat[ex.id]) inUse.add(ex.id);
+  for (const e of library) if (flat[e.id]) inUse.add(e.id);
+
+  // Audit H3: the likeliest duplicate is "deleted the catalog exercise, made
+  // my own". Remapping onto a tombstoned survivor left the program slot
+  // pointing at an id every read filtered out and the next pull scrubbed it
+  // from the day. The survivor comes back to life when data moves onto it.
+  const deleted = getDeletedExerciseIds();
+  const revive = [...new Set([...inUse].map(from => flat[from]))].filter(to => deleted.has(to));
+  if (revive.length > 0) { liftExerciseTombstones(revive); changed = true; }
+
+  // Audit M12: a survivor with no override of its own inherits the merged
+  // exercise's — otherwise a classified custom lift merged into an
+  // unclassified one came out unclassified.
+  const overrides = getAllExerciseMeta();
+  for (const from of inUse) {
+    const to = flat[from];
+    if (overrides[from] && !overrides[to]) { saveExerciseMeta(to, overrides[from]); changed = true; }
+  }
+
+  const prog = mergeProgramIds(program, flat, getExerciseName);
   if (prog.changed) { saveStoredProgram(prog.program); changed = true; }
 
   const lib = mergeLibraryIds(getExerciseLibrary(), flat, getExerciseName);

@@ -323,13 +323,23 @@ export function headSetTotals(
 ): MuscleHeadTotals {
   const byHead = new Map<string, number>();
   const unspecified = new Map<MuscleGroup, number>();
+  // Resolve each exercise once, not once per set — the metadata lookup
+  // behind primaryMuscleFor is the expensive part (audit M17).
+  const resolved = new Map<string, { primary: MuscleGroup | null; heads: ReturnType<typeof headsFor> }>();
+  const resolve = (id: string) => {
+    let r = resolved.get(id);
+    if (!r) {
+      r = { primary: primaryMuscleFor(id), heads: headsFor(id) };
+      resolved.set(id, r);
+    }
+    return r;
+  };
 
   for (const session of snapshot.sessions) {
     if (!include(session)) continue;
     for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
-      const primary = primaryMuscleFor(log.exerciseId);
+      const { primary, heads } = resolve(log.exerciseId);
       if (!primary) continue;
-      const heads = headsFor(log.exerciseId);
       if (heads.length === 0) {
         unspecified.set(primary, (unspecified.get(primary) ?? 0) + 1);
         continue;

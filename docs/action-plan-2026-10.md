@@ -78,7 +78,7 @@ Closes the "ready-made `catalog.test.ts`" gap; sets up the nets for everything e
 
 ---
 
-## 3. Phase 1 — Stop losing workouts
+## 3. Phase 1 — Stop losing workouts — ✅ landed on `claude/action-plan-2026-10`
 
 **1.1 Atomic session-document writes.** (C2a, C2e) `writeSessionDoc` writes the session row and
 all its set logs in one `readwrite` transaction over both stores (chain the `add`s in the `put`
@@ -126,7 +126,7 @@ files this phase rewrites.
 
 ---
 
-## 4. Phase 2 — Engines tell the truth
+## 4. Phase 2 — Engines tell the truth — ✅ landed on `claude/action-plan-2026-10`
 
 **2.1 Phase-aware progress, insights and retrospectives.** (F1, F8 part, F14 part)
 `assessSnapshot`/`assessExercise` take a `phaseOf(session)` resolver built from the journey's
@@ -191,7 +191,7 @@ Advanced profile simulation ends its block at or above its starting loads.
 
 ---
 
-## 5. Phase 3 — The journey learns the right lessons
+## 5. Phase 3 — The journey learns the right lessons — ✅ landed on `claude/action-plan-2026-10`
 
 **3.1 Block completion provenance + pending rules.** (H2, M16) Blocks record
 `completedBy: 'activation' | 'user'`; `deferActiveBlockToNextWeek` only reverses a block closed
@@ -265,7 +265,7 @@ Also here: `blockSimulation.test.ts` gains a replan-against-existing-program-and
 
 ---
 
-## 6. Phase 4 — Programming for yourself
+## 6. Phase 4 — Programming for yourself — ✅ landed on `claude/action-plan-2026-10`
 
 **4.1 No plan means no plan.** (F2, F17 part) `ensureJourneyMigrated` marks what it creates
 (`origin: 'migrated'`) and gives quick-workout-only history **no goal**; `getPlannedGoal()`
@@ -300,41 +300,43 @@ for a fixed range instead of "5 × 5–5".
 
 ---
 
-## 7. Phase 5 — Sync and server integrity
+## 7. Phase 5 — Sync and server integrity — ✅ landed on `claude/action-plan-2026-10`
 
-**5.1 Merges respect tombstones and metadata.** (H3, M12) `applyExerciseMerges` lifts the
+**5.1 Merges respect tombstones and metadata.** ✅ (H3, M12) `applyExerciseMerges` lifts the
 tombstone on `toId` before remapping; a merge copies the from-override onto a survivor that has
 none; `normalizeOverride` takes the id so a stale bare `'Press'` on an overhead press resolves
 Vertical. End-to-end test through `pullSync` with an in-memory worker.
 
-**5.2 Clocks on program, library and metadata.** (H4) `updatedAt` on the program document,
+**5.2 Clocks on program, library and metadata.** ✅ (H4) _Landed as designed, plus the piece
+H3 turned out to need: a tombstone lifted locally was re-applied by the next pull, so restores
+are now explicit (`restoredExerciseIds`)._ `updatedAt` on the program document,
 per-row `updatedAt` on library entries and metadata overrides (migration `0008`), compared on
 both ends before writing; `profile` gets its own clock inside `PlanState`; pull never adopts
 server program/library/metadata while `hasUnpushed` is set (from 1.6); the worker accepts an
 empty program so the last day is deletable. Extend `test/syncContract.test.ts` with the
 two-device edit race.
 
-**5.3 Worker hardening.** (M1) Generic 500 bodies (stack to logs only); validate
+**5.3 Worker hardening.** ✅ (M1) Generic 500 bodies (stack to logs only); validate
 `exerciseMuscles`, `exerciseDetails`, `completedAt` type, program byte bound; push applied as
 one batch where D1 allows, otherwise ordered so tombstones and deletes land in the *last*
 chunk; tombstone `DELETE`s issued only for ids present in the push. Tests on the `node:sqlite`
 testkit.
 
-**5.4 Conditional pull.** (M2) Per **[D7]**, only the pull half ships now: the worker computes a
+**5.4 Conditional pull.** ✅ (M2) Per **[D7]**, only the pull half ships now: the worker computes a
 per-user ETag from `max(updated_at)` across session docs, plan, program, library and metadata
 (the clocks from 5.2 make this possible), honours `If-None-Match` with a 304, and the client
 skips the merge entirely on 304. The 60 s tick then costs one small request when nothing
 changed. Delta push (send only documents with `updatedAt > lastPushedAt`) is recorded in
 CLAUDE.md's Future milestones, not built here.
 
-**5.5 Service-worker updates.** (M15) Listen for `controllerchange`; show an "Update ready —
+**5.5 Service-worker updates.** ✅ (M15) Listen for `controllerchange`; show an "Update ready —
 reload" toast, suppressed while a workout is open.
 
-**5.6 Analytics performance.** (M17) One cached `Intl.DateTimeFormat`; `getExerciseMeta` reads
+**5.6 Analytics performance.** ✅ (M17) One cached `Intl.DateTimeFormat`; `getExerciseMeta` reads
 a memoized parsed override map invalidated on write; `headSetTotals` resolves meta once per
 exercise; `applyExerciseMerges` runs once per merge version, not every tick.
 
-**5.7 Ops LOWs.** `schema_migrations` tracking table + a documented apply step; expired
+**5.7 Ops LOWs.** ✅ `schema_migrations` tracking table + a documented apply step; expired
 `user_sessions` purge; `/api/auth/logout` becomes POST; one auth query resolves user + role.
 
 ---

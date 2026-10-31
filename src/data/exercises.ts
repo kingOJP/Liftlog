@@ -449,6 +449,12 @@ export interface ExerciseMetaOverride {
   workoutType: MovementPattern | null;
   equipment: Equipment | null;
   weightType: WeightType | null;
+  /**
+   * Clock of the user's last edit to this override. Sync keeps the newer row
+   * per exercise on both ends; absent/0 is "unstamped" and yields to any
+   * stamped copy. Catalog/global entries never carry one.
+   */
+  updatedAt?: number;
 }
 
 // Taxonomy values that were merged away — stored overrides (local edits or a
@@ -459,16 +465,31 @@ const LEGACY_MUSCLES: Record<string, MuscleGroup> = {
 // 'Overhead Press' and 'Push Up' predate an even older merge into 'Press' —
 // they unambiguously say which side of the later Horizontal/Vertical split
 // they meant, so they remap straight there. A bare 'Press' (the more recent,
-// now-legacy merged value) can't be disambiguated from the string alone;
-// it defaults to the more common case and self-heals next time the user
-// edits that exercise's metadata.
+// now-legacy merged value) can't be disambiguated from the string alone, so
+// it is resolved from the exercise it sits on (legacyPressPlane).
 const LEGACY_WORKOUT_TYPES: Record<string, MovementPattern> = {
   'Chest Press': 'Horizontal Press', 'Push Up': 'Horizontal Press',
   'Overhead Press': 'Vertical Press',
-  Press: 'Horizontal Press',
 };
 
-function normalizeOverride(o: ExerciseMetaOverride): void {
+// Names (and id slugs) that mean overhead pressing when the stored pattern
+// is the ambiguous bare 'Press' and the catalog has no entry to consult.
+const VERTICAL_PRESS_WORDS = /overhead|shoulder-press|military|arnold|push-press|z-press|landmine-press|viking|behind-the-neck/;
+
+/**
+ * Which plane a stored bare 'Press' meant. The catalog knows for its own
+ * exercises (and for timestamped copies of them); a custom exercise is read
+ * off its id; anything else defaults to the more common horizontal case.
+ * (Audit M12: a stale 'Press' on a catalog overhead press used to resolve to
+ * Horizontal because normalization never saw the id.)
+ */
+function legacyPressPlane(id: string): MovementPattern {
+  const def = catalogDefFor(id);
+  if (def?.workoutType === 'Vertical Press' || def?.workoutType === 'Horizontal Press') return def.workoutType;
+  return VERTICAL_PRESS_WORDS.test(id.toLowerCase()) ? 'Vertical Press' : 'Horizontal Press';
+}
+
+function normalizeOverride(o: ExerciseMetaOverride, id: string): void {
   const muscle = (m: MuscleGroup | null): MuscleGroup | null =>
     m ? (LEGACY_MUSCLES[m as string] ?? m) : null;
   o.primaryMuscle    = muscle(o.primaryMuscle);
@@ -485,19 +506,45 @@ function normalizeOverride(o: ExerciseMetaOverride): void {
     if (seen.has(m)) o[key] = null;
     else seen.add(m);
   }
-  if (o.workoutType) o.workoutType = LEGACY_WORKOUT_TYPES[o.workoutType as string] ?? o.workoutType;
+  if ((o.workoutType as string) === 'Press') o.workoutType = legacyPressPlane(id);
+  else if (o.workoutType) o.workoutType = LEGACY_WORKOUT_TYPES[o.workoutType as string] ?? o.workoutType;
   if ((o.equipment as string) === 'Leg Press Machine') o.equipment = 'Machine';
 }
 
-function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
+// Parsed-and-normalized view of a stored override map, kept as long as the
+// stored string is unchanged. getExerciseMeta is called per set log by the
+// analytics (thousands of times per screen on a long history) and used to
+// re-parse and re-normalize the whole blob every time (audit M17). The raw
+// string is still read on every call — that is what makes the cache safe
+// against writes from anywhere, including other tabs and tests that clear
+// storage — but a string compare is nothing next to JSON.parse.
+interface MetaCache { raw: string | null; map: Record<string, ExerciseMetaOverride> }
+
+function readMetaMap(key: string, cache: MetaCache | null): MetaCache {
+  const raw = localStorage.getItem(key);
+  if (cache && cache.raw === raw) return cache;
+  let map: Record<string, ExerciseMetaOverride>;
   try {
-    const raw = localStorage.getItem(META_KEY);
-    const overrides = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
-    for (const o of Object.values(overrides)) normalizeOverride(o);
-    return overrides;
+    map = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
+    for (const [id, o] of Object.entries(map)) normalizeOverride(o, id);
   } catch {
-    return {};
+    map = {};
   }
+  return { raw, map };
+}
+
+let overridesCache: MetaCache | null = null;
+let globalCache: MetaCache | null = null;
+
+function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
+  overridesCache = readMetaMap(META_KEY, overridesCache);
+  return overridesCache.map;
+}
+
+function writeMetaOverrides(map: Record<string, ExerciseMetaOverride>): void {
+  const raw = JSON.stringify(map);
+  localStorage.setItem(META_KEY, raw);
+  overridesCache = { raw, map };
 }
 
 // ── Layer 1: admin-curated global metadata (read-only, replaced on pull) ─────
@@ -509,14 +556,8 @@ function loadMetaOverrides(): Record<string, ExerciseMetaOverride> {
 const GLOBAL_META_KEY = 'liftlog_global_meta';
 
 function loadGlobalMeta(): Record<string, ExerciseMetaOverride> {
-  try {
-    const raw = localStorage.getItem(GLOBAL_META_KEY);
-    const meta = raw ? JSON.parse(raw) as Record<string, ExerciseMetaOverride> : {};
-    for (const o of Object.values(meta)) normalizeOverride(o);
-    return meta;
-  } catch {
-    return {};
-  }
+  globalCache = readMetaMap(GLOBAL_META_KEY, globalCache);
+  return globalCache.map;
 }
 
 // The server is authoritative for the global layer — whole-document replace.
@@ -525,11 +566,12 @@ export function saveGlobalExerciseMeta(meta: Record<string, ExerciseMetaOverride
 }
 
 export function getExerciseMeta(id: string): ExerciseMetaOverride {
+  // Copies, so a caller that edits the result can't poison the cache.
   const overrides = loadMetaOverrides();
-  if (overrides[id]) return overrides[id];
+  if (overrides[id]) return { ...overrides[id] };
 
   const globalMeta = loadGlobalMeta();
-  if (globalMeta[id]) return globalMeta[id];
+  if (globalMeta[id]) return { ...globalMeta[id] };
 
   // Fall back to the catalog def, recognising timestamped custom ids whose
   // slug is a catalog exercise (back-extensions-1782… → back-extensions).
@@ -545,10 +587,11 @@ export function getExerciseMeta(id: string): ExerciseMetaOverride {
   };
 }
 
-export function saveExerciseMeta(id: string, meta: ExerciseMetaOverride): void {
-  const overrides = loadMetaOverrides();
-  overrides[id] = meta;
-  localStorage.setItem(META_KEY, JSON.stringify(overrides));
+/** Save a user edit; stamps the row's clock so sync knows it is the newer copy. */
+export function saveExerciseMeta(id: string, meta: ExerciseMetaOverride, now = Date.now()): void {
+  const overrides = { ...loadMetaOverrides() };
+  overrides[id] = { ...meta, updatedAt: now };
+  writeMetaOverrides(overrides);
 }
 
 // Drops an exercise's metadata override — part of deleting the exercise, so a
@@ -556,22 +599,31 @@ export function saveExerciseMeta(id: string, meta: ExerciseMetaOverride): void {
 export function deleteExerciseMeta(id: string): void {
   const overrides = loadMetaOverrides();
   if (!(id in overrides)) return;
-  delete overrides[id];
-  localStorage.setItem(META_KEY, JSON.stringify(overrides));
+  const next = { ...overrides };
+  delete next[id];
+  writeMetaOverrides(next);
 }
 
 // All user-edited metadata overrides — used by cloud sync so muscle/equipment
 // info the user enters survives on other devices and after a re-pull.
 export function getAllExerciseMeta(): Record<string, ExerciseMetaOverride> {
-  return loadMetaOverrides();
+  return { ...loadMetaOverrides() };
 }
 
-// Merge server-provided overrides into the local set (server wins per exercise;
-// local-only edits not yet pushed are preserved so a pull can't drop them).
+// Merge server-provided overrides into the local set. Per exercise the newer
+// row wins (unstamped rows carry 0 and yield to a stamped one; two unstamped
+// rows let the incoming one win, as before clocks); local-only edits are
+// preserved so a pull can't drop them.
 export function mergeExerciseMeta(incoming: Record<string, ExerciseMetaOverride>): void {
   if (Object.keys(incoming).length === 0) return;
-  const merged = { ...loadMetaOverrides(), ...incoming };
-  localStorage.setItem(META_KEY, JSON.stringify(merged));
+  const local = loadMetaOverrides();
+  const merged = { ...local };
+  for (const [id, inc] of Object.entries(incoming)) {
+    const loc = local[id];
+    if (loc && (loc.updatedAt ?? 0) > (inc.updatedAt ?? 0)) continue;
+    merged[id] = inc;
+  }
+  writeMetaOverrides(merged);
 }
 
 // Account switch: metadata overrides are user-owned — wipe them so one

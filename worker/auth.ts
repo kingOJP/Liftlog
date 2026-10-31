@@ -1,4 +1,5 @@
 import type { Env, User } from './types';
+import { normalizeRole } from './roles';
 
 const COOKIE_SESSION = 'liftlog_session';
 const COOKIE_USER = 'liftlog_user';
@@ -92,13 +93,20 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
      ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name`,
   ).bind(gUser.sub, gUser.email, gUser.name).run();
 
-  // Create session
+  // Create session — and sweep out expired ones while we're here. Sign-in is
+  // the one event every account produces regularly, so it doubles as the
+  // purge schedule without a cron trigger (nothing reads an expired row; this
+  // only keeps the table from growing forever).
   const token     = crypto.randomUUID();
-  const expiresAt = Date.now() + SESSION_SECONDS * 1000;
+  const now       = Date.now();
+  const expiresAt = now + SESSION_SECONDS * 1000;
 
-  await env.DB.prepare(
-    `INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
-  ).bind(token, gUser.sub, expiresAt).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
+    ).bind(token, gUser.sub, expiresAt),
+    env.DB.prepare(`DELETE FROM user_sessions WHERE expires_at < ?`).bind(now),
+  ]);
 
   // Non-sensitive user info readable by JS (no passwords, no session token)
   const userJson = encodeURIComponent(JSON.stringify({ email: gUser.email, name: gUser.name }));
@@ -120,7 +128,13 @@ async function getMe(request: Request, env: Env): Promise<Response> {
   return Response.json({ id: user.id, email: user.email, name: user.name });
 }
 
+// POST only: a GET that signs the user out can be triggered by a prefetch, a
+// link preview or any page that can make the browser navigate (CSRF). The
+// Settings screen submits a form; the 303 turns the POST into a GET of "/".
 async function logout(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
+  }
   const token = parseCookies(request.headers.get('Cookie') ?? '')[COOKIE_SESSION];
   if (token) {
     await env.DB.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(token).run();
@@ -132,21 +146,25 @@ async function logout(request: Request, env: Env): Promise<Response> {
   headers.append('Set-Cookie',
     `${COOKIE_USER}=; Secure; SameSite=Lax; Max-Age=0; Path=/`);
 
-  return new Response(null, { status: 302, headers });
+  return new Response(null, { status: 303, headers });
 }
 
 export async function getAuthenticatedUser(request: Request, env: Env): Promise<User | null> {
   const token = parseCookies(request.headers.get('Cookie') ?? '')[COOKIE_SESSION];
   if (!token) return null;
 
+  // One query resolves the session, the account and its role — every API
+  // request goes through here, and the role used to cost a second round trip.
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name
+    `SELECT u.id, u.email, u.name, r.role
      FROM user_sessions s
      JOIN users u ON s.user_id = u.id
+     LEFT JOIN user_roles r ON r.user_id = u.id
      WHERE s.token = ? AND s.expires_at > ?`,
-  ).bind(token, Date.now()).first<User>();
+  ).bind(token, Date.now()).first<{ id: string; email: string; name: string | null; role: string | null }>();
 
-  return row ?? null;
+  if (!row) return null;
+  return { id: row.id, email: row.email, name: row.name, role: normalizeRole(row.role) };
 }
 
 function parseCookies(header: string): Record<string, string> {

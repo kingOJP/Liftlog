@@ -289,8 +289,29 @@ describe('training profile persistence', () => {
     expect(stored.equipment).toBe('home-rack');
     expect(stored.priorityMuscles).toEqual(['Chest']);
     expect(stored.updatedAt).toBe(5000);
-    // bumps the document clock so it syncs
-    expect(getPlanState().updatedAt).toBe(5000);
+    // The profile has its own clock and leaves the document's alone — a
+    // profile tap must not outrank a block activation made elsewhere (H4).
+    expect(getPlanState().updatedAt).toBe(0);
+  });
+
+  it('merges a newer server profile into a newer local plans document, and vice versa', () => {
+    activateProposal(makeProposal(), null, JUL6);
+    const local = getPlanState();
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'beginner' }, 100);
+
+    // Another device edited only the profile, later, on an older plans doc.
+    const profileOnly = { ...local, plans: [], updatedAt: local.updatedAt - 1,
+      profile: { ...defaultTrainingProfile(), experience: 'advanced' as const, updatedAt: 200 } };
+    expect(mergeServerPlanState(profileOnly)).toBe(true);
+    expect(getPlanState().plans).toHaveLength(1);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
+
+    // And a newer plans doc carrying an older profile keeps the local profile.
+    const plansOnly = { ...getPlanState(), plans: [], updatedAt: local.updatedAt + 1,
+      profile: { ...defaultTrainingProfile(), experience: 'beginner' as const, updatedAt: 50 } };
+    expect(mergeServerPlanState(plansOnly)).toBe(true);
+    expect(getPlanState().plans).toHaveLength(0);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
   });
 
   it('survives round-trips through the whole-document sync merge', () => {

@@ -65,6 +65,9 @@ describe('error handling', () => {
       broken,
     );
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ error: 'Internal server error' });
+    // The stack trace goes to the log, never to the client (audit M1).
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toEqual({ error: 'Internal server error' });
+    expect(JSON.stringify(body)).not.toContain('D1 unavailable');
   });
 });
