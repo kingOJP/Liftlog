@@ -3,7 +3,7 @@ import { buildSetPlan, calculateRecommendation } from './recommendations';
 import type { ExerciseSession, PrescriptionContext } from './recommendations';
 import type { Exercise } from './program';
 
-type Slot = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>;
+type Slot = Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>;
 
 const exercise = { sets: 3, repLow: 8, repHigh: 12 };
 
