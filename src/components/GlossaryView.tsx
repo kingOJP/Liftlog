@@ -58,6 +58,18 @@ const GROUPS: Group[] = [
         def: 'An estimate of the most you could lift for a single rep, calculated from the weight and reps you actually logged. A rising e1RM means you’re getting stronger, even if you never max out.',
       },
       {
+        term: 'One-rep max (1RM)',
+        def: 'The most you can lift once. Enter yours under Settings → 1RMs & goals (or from a lift’s chart in Metrics) and the coach treats it as a measurement: it prescribes your working weights as a percentage of it, gives a brand-new lift a real starting weight, and re-anchors a lift when you enter a fresh test.',
+      },
+      {
+        term: '% of 1RM',
+        def: 'A working weight expressed as a share of your max. A rep range maps onto a percentage band — 8–12 reps is roughly 68–75% — so the same prescription means a different weight for every lifter. Shown on the exercise card once you’ve entered a 1RM.',
+      },
+      {
+        term: '1RM goal',
+        def: 'A target max for a lift. The coach estimates how long it will take from your recent pace on that lift (or the typical rate for your training age), with a range rather than a single date, and can design a block around the lift.',
+      },
+      {
         term: 'Volume load',
         def: 'Total weight moved in a session: weight × reps, added up. Also called tonnage. Rising volume load is progress even when your top weight hasn’t changed.',
       },

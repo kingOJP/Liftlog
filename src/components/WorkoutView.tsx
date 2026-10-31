@@ -15,7 +15,7 @@ import type { TrainingSnapshot } from '../data/analytics';
 import { buildSetPlan, historyDepthFor, needsRegression } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
 import { getExerciseMeta, unitFor } from '../data/exercises';
-import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal, getCoachDecisions, recordCoachDecision } from '../data/planStore';
+import { getActivePhase, getPhaseResolver, getProfileOrDefault, getTrainingGoal, getCoachDecisions, recordCoachDecision, getOneRepMax } from '../data/planStore';
 import { effectiveExperience } from '../data/experience';
 import { PHASE_INFO, isEasyPhase } from '../data/plan';
 import { snapshotPositions } from '../data/progress';
@@ -46,6 +46,8 @@ interface Props {
   onComplete: () => void;
   /** the user chose to resume a different day's unfinished workout instead */
   onResumeDraft?: (draft: DraftSession) => void;
+  /** open the Strength screen for a lift (the in-progress workout is drafted and restored on return) */
+  onSetMax?: (exerciseId: string) => void;
 }
 
 type SetEntry = { weight: number; reps: number; warmup?: boolean };
@@ -79,7 +81,7 @@ function contextForExercise(
   snapshot: TrainingSnapshot,
   positions: ReturnType<typeof snapshotPositions>,
   ctx: PrescriptionContext,
-): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession; history: ExerciseSession[] } {
+): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession; history: ExerciseSession[]; oneRepMax?: number } {
   const history: ExerciseSession[] = [];
   // Enough sessions for the athlete's stall window plus a dropped late-slot
   // one — a flat cap of four switched stall detection off for advanced lifters.
@@ -102,6 +104,9 @@ function contextForExercise(
     if (history.length >= depth) break;
   }
   const weightType = getExerciseMeta(ex.id).weightType;
+  // A known 1RM anchors the load where the log can't: a first session, or a
+  // max entered since the last one.
+  const max = getOneRepMax(ex.id);
   const plan = buildSetPlan(history, ex, {
     ...ctx,
     weightType,
@@ -109,12 +114,13 @@ function contextForExercise(
     unit: unitFor(ex.id),
     // A strength block's main lifts: one top set, judged, plus back-offs.
     scheme: topSetScheme(ex, ctx.goal, ctx.experience, weightType) ? 'top-set' : 'straight',
+    oneRepMax: max ? { weight: max.weight, updatedAt: max.updatedAt } : null,
   });
-  return { plan, last: history[0], rec: plan.rec ?? undefined, history };
+  return { plan, last: history[0], rec: plan.rec ?? undefined, history, oneRepMax: max?.weight };
 }
 
 export default function WorkoutView({
-  day: dayProp, program: programProp, existingSessionId, origin = 'program', onBack, onComplete, onResumeDraft,
+  day: dayProp, program: programProp, existingSessionId, origin = 'program', onBack, onComplete, onResumeDraft, onSetMax,
 }: Props) {
   const isEditMode = existingSessionId !== undefined;
   // The day and program are FROZEN for the lifetime of the workout. A
@@ -292,11 +298,12 @@ export default function WorkoutView({
   // Recommendations + "last time" context for every rendered exercise (the
   // day's plus any added mid-workout), derived from the snapshot. Recomputes
   // when an exercise is added so a newcomer gets its history-driven rec too.
-  const { recommendations, lastSessions, setPlans, regressions } = useMemo(() => {
+  const { recommendations, lastSessions, setPlans, regressions, maxes } = useMemo(() => {
     const recs: Record<string, WeightRec> = {};
     const lasts: Record<string, ExerciseSession> = {};
     const plans: Record<string, SetPlan> = {};
     const easier: Record<string, ReplacementSuggestion> = {};
+    const maxes: Record<string, number> = {};
     if (snapshot) {
       const positions = snapshotPositions(snapshot);
       // The prescription reads the athlete as well as the lift: the plan's goal
@@ -310,10 +317,11 @@ export default function WorkoutView({
       };
       const present = new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id));
       for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
-        const { plan, rec, last, history } = contextForExercise(ex, snapshot, positions, ctx);
+        const { plan, rec, last, history, oneRepMax } = contextForExercise(ex, snapshot, positions, ctx);
         plans[ex.id] = plan;
         if (last) lasts[ex.id] = last;
         if (rec) recs[ex.id] = rec;
+        if (oneRepMax) maxes[ex.id] = oneRepMax;
         // Three sessions under the range on unloaded work: offer an easier
         // way to train the same muscle (audit F11) — unless it's already here.
         if (!isEditMode && needsRegression(history, ex)) {
@@ -322,7 +330,7 @@ export default function WorkoutView({
         }
       }
     }
-    return { recommendations: recs, lastSessions: lasts, setPlans: plans, regressions: easier };
+    return { recommendations: recs, lastSessions: lasts, setPlans: plans, regressions: easier, maxes };
   }, [snapshot, effectiveDay, addedExercises, phase, isEditMode, sessionStart]);
 
   useEffect(() => {
@@ -606,6 +614,8 @@ export default function WorkoutView({
             regression={regressions[ex.id]}
             onRegress={s => handleAddExercise(slotFor(s.exercise.id, s.exercise.name, { snapshot }))}
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
+            oneRepMax={maxes[ex.id]}
+            onSetMax={onSetMax && !isEditMode ? () => onSetMax(ex.id) : undefined}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
@@ -620,6 +630,8 @@ export default function WorkoutView({
             plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
+            oneRepMax={maxes[ex.id]}
+            onSetMax={onSetMax && !isEditMode ? () => onSetMax(ex.id) : undefined}
             onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
             onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}

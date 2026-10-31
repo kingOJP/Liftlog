@@ -5,14 +5,23 @@ import {
   PHASE_INFO, blockEndTs, blockEnded, blockWeekIndex, currentPhase, goalLabel,
 } from '../data/plan';
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
-import { canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState, getTrainingProfile, saveTrainingProfile, startPendingActivation, planHasChosenGoal } from '../data/planStore';
+import {
+  canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState,
+  getProfileOrDefault, getStrengthState, getTrainingGoal, getTrainingProfile,
+  saveTrainingProfile, startPendingActivation, planHasChosenGoal,
+} from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
-import { experienceSuggestion, experienceSuggestionText } from '../data/experience';
+import { effectiveExperience, experienceSuggestion, experienceSuggestionText } from '../data/experience';
+import { bestLoggedMax, currentMax, etaLabel, goalProgress, projectGoal, strengthTrend } from '../data/strength';
+import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { fmtWeight, toDisplay } from '../data/units';
 import './JourneyView.css';
 
 interface Props {
   onBack: () => void;
   onPlanNew: () => void;
+  /** open the Strength screen (1RMs + goals), optionally on one lift */
+  onViewStrength: (exerciseId?: string) => void;
   /** called after any stored change (so the app can push a sync) */
   onChanged: () => void;
 }
@@ -68,7 +77,7 @@ function Retro({ retro }: { retro: BlockRetrospective }) {
   );
 }
 
-export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
+export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChanged }: Props) {
   const [refresh, setRefresh] = useState(0);
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -142,6 +151,31 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
   const ended = activeBlock ? blockEnded(activeBlock) : false;
   const phase = activeBlock ? currentPhase(activeBlock) : null;
   const week = activeBlock ? Math.max(0, blockWeekIndex(activeBlock)) + 1 : 0;
+
+  // Strength targets: every 1RM goal with where the lifter stands against it.
+  const strength = useMemo(() => getStrengthState(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const targets = useMemo(() => {
+    const experience = effectiveExperience(getProfileOrDefault(), snapshot);
+    const trainingGoal = getTrainingGoal();
+    return strength.goals.map(goal => {
+      const stored = strength.maxes.find(m => m.exerciseId === goal.exerciseId) ?? null;
+      const logged = snapshot ? bestLoggedMax(snapshot, goal.exerciseId) : null;
+      const current = currentMax(stored, logged);
+      const projection = current
+        ? projectGoal({
+            current: current.value, target: goal.targetWeight, experience, goal: trainingGoal,
+            trend: snapshot ? strengthTrend(snapshot, goal.exerciseId) : null,
+          })
+        : null;
+      return {
+        goal,
+        name: getExerciseLibrary().find(e => e.id === goal.exerciseId)?.name ?? getExerciseName(goal.exerciseId),
+        current,
+        projection,
+        progress: current ? goalProgress(stored?.weight ?? current.value, current.value, goal.targetWeight) : 0,
+      };
+    });
+  }, [strength, snapshot]);
 
   return (
     <div className="journey-view">
@@ -275,6 +309,42 @@ export default function JourneyView({ onBack, onPlanNew, onChanged }: Props) {
             </button>
           </section>
         )}
+
+        <section className="journey-section">
+          <span className="journey-label">Strength targets</span>
+          {targets.length > 0 ? (
+            <div className="journey-targets">
+              {targets.map(t => (
+                <button className="journey-target" key={t.goal.exerciseId} onClick={() => onViewStrength(t.goal.exerciseId)}>
+                  <div className="journey-target-head">
+                    <span className="journey-target-name">{t.name}</span>
+                    <span className="journey-target-nums">
+                      {t.current ? `${toDisplay(t.current.value)} → ` : ''}{fmtWeight(t.goal.targetWeight)}
+                    </span>
+                  </div>
+                  <div className="journey-target-track">
+                    <div className="journey-target-fill" style={{ width: `${Math.round(t.progress * 100)}%` }} />
+                  </div>
+                  <span className="journey-target-eta">
+                    {t.projection
+                      ? t.projection.feasibility === 'reached'
+                        ? 'Reached — test it and log the single'
+                        : `${etaLabel(t.projection)} at ${t.projection.basis === 'observed' ? 'your recent pace' : 'a typical pace'}`
+                      : 'Enter a 1RM to get an estimate'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="journey-hint">
+              Know your maxes? Enter a 1RM and the coach prescribes your working weights as a percentage of
+              it. Set a target and it estimates how long the climb will take.
+            </p>
+          )}
+          <button className="journey-secondary-btn" onClick={() => onViewStrength()}>
+            {targets.length > 0 || strength.maxes.length > 0 ? '1RMs & goals' : 'Enter a 1RM or set a goal'}
+          </button>
+        </section>
 
         {completedBlocks.length > 0 && (
           <section className="journey-section">

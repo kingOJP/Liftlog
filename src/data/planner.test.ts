@@ -516,3 +516,58 @@ describe('strength anchoring (audit F9)', () => {
     expect(ids(fresh)).not.toContain('weighted-pull-ups');
   });
 });
+
+describe('a block designed around a goal lift', () => {
+  // A 1RM goal names the lift the block exists to move. It has to land as a
+  // main lift on a day that trains its muscle — whatever else selection says.
+  it('places the goal lift as a main slot on a day for its muscle', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, focusExerciseIds: ['barbell-back-squat'] }), [], null);
+    const slots = p.days.flatMap(d => d.exercises.map(e => ({ day: d, e })));
+    const squat = slots.filter(s => s.e.id === 'barbell-back-squat');
+    expect(squat).toHaveLength(1);
+    expect(squat[0].day.muscleGroups).toMatch(/Lower|Legs|Full/);
+    // Dosed as the day's heavy anchor for a hypertrophy goal: 3 × 6–10 is the
+    // main-compound dose, 3 × 5–8 the heavy-axial one — never an accessory 8–12.
+    expect(squat[0].e.repHigh!).toBeLessThanOrEqual(10);
+    const decision = p.decisions.find(d => d.exerciseId === 'barbell-back-squat')!;
+    expect(decision.reason).toMatch(/goal lift/i);
+    expect(p.guidanceNotes.some(n => /Designed around your Barbell Back Squat goal/.test(n))).toBe(true);
+  });
+
+  it('clears the beginner skill gate for a lift the athlete named', () => {
+    // Without the focus, a beginner never gets the deadlift (advanced, ungated)
+    const plain = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 3 }), [], null);
+    expect(plain.days.flatMap(d => d.exercises).some(e => e.id === 'conventional-deadlift')).toBe(false);
+    const focused = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 3, focusExerciseIds: ['conventional-deadlift'] }), [], null);
+    const dl = focused.days.flatMap(d => d.exercises).filter(e => e.id === 'conventional-deadlift');
+    expect(dl).toHaveLength(1);
+    // ...but still dosed like a beginner: no sub-8 reps while learning it
+    expect(dl[0].repLow!).toBeGreaterThanOrEqual(8);
+  });
+
+  it('adds a slot when no day trains the goal lift\'s muscle', () => {
+    // Two full-body days have no Chest/Fly or Traps slot — a trap goal gets one added
+    const p = buildPlanProposal(input({ daysPerWeek: 2, focusExerciseIds: ['barbell-shrugs'] }), [], null);
+    const all = p.days.flatMap(d => d.exercises);
+    expect(all.filter(e => e.id === 'barbell-shrugs')).toHaveLength(1);
+  });
+
+  it('warns, but still programs, a goal lift that clashes with the athlete\'s constraints', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, equipmentAccess: 'dumbbells-only', focusExerciseIds: ['barbell-back-squat'] }), [], null);
+    expect(p.days.flatMap(d => d.exercises).some(e => e.id === 'barbell-back-squat')).toBe(true);
+    expect(p.warnings.some(w => /goal lift/.test(w) && /constraints/.test(w))).toBe(true);
+  });
+
+  it('gives two goal lifts for the same muscle different slots', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, focusExerciseIds: ['barbell-back-squat', 'leg-press'] }), [], null);
+    const all = p.days.flatMap(d => d.exercises.map(e => e.id));
+    expect(all).toContain('barbell-back-squat');
+    expect(all).toContain('leg-press');
+  });
+
+  it('does not change a plan with no goal lifts', () => {
+    const a = buildPlanProposal(input({ daysPerWeek: 4 }), [], null);
+    const b = buildPlanProposal(input({ daysPerWeek: 4, focusExerciseIds: [] }), [], null);
+    expect(b.days).toEqual(a.days);
+  });
+});

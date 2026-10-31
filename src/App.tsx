@@ -24,6 +24,8 @@ import JourneyView from './components/JourneyView';
 import PlanSetupView from './components/PlanSetupView';
 import QuickWorkoutView from './components/QuickWorkoutView';
 import SharedWorkoutView from './components/SharedWorkoutView';
+import StrengthView from './components/StrengthView';
+import type { PlanSeed } from './components/PlanSetupView';
 import {
   captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
   acceptSharedWorkout, SHARED_DAY_ID,
@@ -47,7 +49,10 @@ type View =
   | { screen: 'settings' }
   | { screen: 'glossary' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' }
+  | { screen: 'plan-setup'; seed?: PlanSeed }
+  // 1RMs + goals. Reachable from several places (journey, metrics, a workout
+  // card), so it remembers where to return to.
+  | { screen: 'strength'; exerciseId?: string; back: View }
   | { screen: 'quick-setup' }
   | { screen: 'quick-workout' }
   | { screen: 'shared-preview' }
@@ -281,6 +286,7 @@ function App() {
             onBack={() => setView({ screen: 'dashboard' })}
             onComplete={() => { setView({ screen: 'dashboard' }); sync(); }}
             onResumeDraft={handleResumeDraft}
+            onSetMax={exerciseId => setView({ screen: 'strength', exerciseId, back: view })}
           />
         );
       }
@@ -370,7 +376,26 @@ function App() {
           />
         );
       case 'metrics':
-        return <MetricsView program={program} onBack={() => setView({ screen: 'dashboard' })} />;
+        return (
+          <MetricsView
+            program={program}
+            onBack={() => setView({ screen: 'dashboard' })}
+            onViewStrength={exerciseId => setView({ screen: 'strength', exerciseId, back: view })}
+          />
+        );
+      case 'strength':
+        return (
+          <StrengthView
+            program={program}
+            exerciseId={view.exerciseId}
+            onBack={() => setView(view.back)}
+            onChanged={sync}
+            onPlanAround={exerciseId => setView({
+              screen: 'plan-setup',
+              seed: { goal: 'strength', focusExerciseIds: [exerciseId] },
+            })}
+          />
+        );
       case 'settings':
         return (
           <SettingsView
@@ -386,6 +411,7 @@ function App() {
             }}
             onViewExercises={() => setView({ screen: 'exercise-list' })}
             onViewGlossary={() => setView({ screen: 'glossary' })}
+            onViewStrength={() => setView({ screen: 'strength', back: view })}
           />
         );
       case 'glossary':
@@ -395,6 +421,7 @@ function App() {
           <JourneyView
             onBack={() => setView({ screen: 'dashboard' })}
             onPlanNew={() => setView({ screen: 'plan-setup' })}
+            onViewStrength={exerciseId => setView({ screen: 'strength', exerciseId, back: view })}
             onChanged={() => { setProgram(getStoredProgram()); sync(); }}
           />
         );
@@ -402,6 +429,7 @@ function App() {
         return (
           <PlanSetupView
             program={program}
+            seed={view.seed}
             onBack={() => setView({ screen: 'journey' })}
             onActivated={() => {
               // The activated block's program is now the live program
@@ -438,6 +466,7 @@ function App() {
               sync();
             }}
             onResumeDraft={handleResumeDraft}
+            onSetMax={exerciseId => setView({ screen: 'strength', exerciseId, back: view })}
           />
         );
       }

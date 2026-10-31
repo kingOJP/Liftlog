@@ -19,11 +19,19 @@ import {
   getLatestRetrospective,
   getPendingActivation,
   getPlanState,
+  getOneRepMax,
   getProfileOrDefault,
+  getStrengthGoal,
+  getStrengthState,
   getTrainingProfile,
   hasOnboarded,
   mergeServerPlanState,
+  planStateHasContent,
   reconcileActiveProgram,
+  removeOneRepMax,
+  removeStrengthGoal,
+  saveOneRepMax,
+  saveStrengthGoal,
   saveTrainingProfile,
   startPendingActivation, getPlannedGoal, getTrainingGoal, ensureJourneyMigrated,
 } from './planStore';
@@ -442,5 +450,46 @@ describe('a goal nobody chose is not a prescription source (audit F2)', () => {
     expect(await ensureJourneyMigrated()).toBe(true);
     expect(getActivePlan()?.goal).toBe('general');
     expect(getPlannedGoal()).toBeNull();
+  });
+});
+
+describe('strength records (1RMs + goals)', () => {
+  it('starts empty and reports nothing to sync', () => {
+    expect(getStrengthState()).toEqual({ maxes: [], goals: [] });
+    expect(getOneRepMax('bench')).toBeNull();
+    expect(planStateHasContent(getPlanState())).toBe(false);
+  });
+
+  it('stores one max per exercise and bumps the document clock so it syncs', () => {
+    const before = getPlanState().updatedAt;
+    saveOneRepMax({ exerciseId: 'bench', weight: 225, source: 'tested', date: '2026-06-01' }, JUN1);
+    expect(getOneRepMax('bench')).toMatchObject({ weight: 225, source: 'tested', updatedAt: JUN1 });
+    expect(getPlanState().updatedAt).toBeGreaterThan(before);
+    expect(planStateHasContent(getPlanState())).toBe(true);
+
+    // a re-entry replaces, never duplicates
+    saveOneRepMax({ exerciseId: 'bench', weight: 235, source: 'estimated', date: '2026-07-06' }, JUL6);
+    expect(getStrengthState().maxes).toHaveLength(1);
+    expect(getOneRepMax('bench')!.weight).toBe(235);
+
+    removeOneRepMax('bench');
+    expect(getOneRepMax('bench')).toBeNull();
+  });
+
+  it('keeps a goal\'s creation date across retargets', () => {
+    saveStrengthGoal('bench', 275, JUN1);
+    saveStrengthGoal('bench', 300, JUL6);
+    expect(getStrengthGoal('bench')).toEqual({ exerciseId: 'bench', targetWeight: 300, createdAt: JUN1 });
+    expect(getStrengthState().goals).toHaveLength(1);
+    removeStrengthGoal('bench');
+    expect(getStrengthGoal('bench')).toBeNull();
+  });
+
+  it('rides the LWW document merge like the profile does', () => {
+    saveOneRepMax({ exerciseId: 'bench', weight: 225, source: 'tested', date: '2026-06-01' }, JUN1);
+    const server = { ...getPlanState(), strength: { maxes: [], goals: [{ exerciseId: 'squat', targetWeight: 405, createdAt: JUL6 }] }, updatedAt: JUL6 };
+    expect(mergeServerPlanState(server)).toBe(true);
+    expect(getOneRepMax('bench')).toBeNull();
+    expect(getStrengthGoal('squat')!.targetWeight).toBe(405);
   });
 });

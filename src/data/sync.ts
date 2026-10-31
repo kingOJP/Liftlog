@@ -17,7 +17,7 @@ import {
 } from './exercises';
 import type { ExerciseMetaOverride } from './exercises';
 import type { WorkoutDay, LibraryExercise } from './program';
-import { getPlanState, mergeServerPlanState, clearPlanState } from './planStore';
+import { getPlanState, mergeServerPlanState, clearPlanState, planStateHasContent } from './planStore';
 import { saveExerciseMerges, applyExerciseMerges } from './merges';
 import type { MergeMap } from './merges';
 import type { PlanState } from './planStore';
@@ -236,9 +236,10 @@ async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
     exercises:           getExerciseLibrary(),
     deletedExerciseIds:  [...deletedExercises],
     restoredExerciseIds: [...getRestoredExerciseIds()],
-    // Send the journey document when there's anything to sync — plans OR just
-    // the onboarding profile (a user can onboard before activating a plan).
-    plan:                (() => { const s = getPlanState(); return s.plans.length > 0 || s.profile ? s : null; })(),
+    // Send the journey document when there's anything to sync — plans, the
+    // onboarding profile (a user can onboard before activating a plan), or
+    // strength records (a 1RM can be entered before any of those).
+    plan:                (() => { const s = getPlanState(); return planStateHasContent(s) ? s : null; })(),
     ...splitMeta(meta),
   };
 
