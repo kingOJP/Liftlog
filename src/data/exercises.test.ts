@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  getExerciseMeta, headsFor, MUSCLE_HEADS, EXERCISES, EXERCISE_MAP,
+  getExerciseMeta, saveExerciseMeta, mergeExerciseMeta, headsFor, MUSCLE_HEADS, EXERCISES, EXERCISE_MAP,
   difficultyFor, prerequisitesFor,
 } from './exercises';
 
@@ -31,6 +31,50 @@ describe('exercise metadata — legacy value normalization', () => {
     }));
     const meta = getExerciseMeta('my-bench');
     expect(meta.workoutType).toBe('Horizontal Press');
+  });
+
+  // Audit M12: the id is consulted — the catalog knows an overhead press is
+  // vertical, and a custom exercise says so in its name.
+  it('resolves a bare legacy Press from the exercise it sits on', () => {
+    const press = (id: string) => [id, {
+      primaryMuscle: 'Delts', secondaryMuscle1: null, secondaryMuscle2: null, secondaryMuscle3: null,
+      workoutType: 'Press', equipment: 'Barbell', weightType: 'Barbell',
+    }];
+    localStorage.setItem('liftlog_exercise_meta', JSON.stringify(Object.fromEntries([
+      press('overhead-press'),
+      press('overhead-press-1700000000000'),
+      press('seated-military-press-1700000000000'),
+      press('bench-press'),
+    ])));
+    expect(getExerciseMeta('overhead-press').workoutType).toBe('Vertical Press');
+    expect(getExerciseMeta('overhead-press-1700000000000').workoutType).toBe('Vertical Press');
+    expect(getExerciseMeta('seated-military-press-1700000000000').workoutType).toBe('Vertical Press');
+    expect(getExerciseMeta('bench-press').workoutType).toBe('Horizontal Press');
+  });
+
+  it('serves fresh data after storage changes underneath the cache', () => {
+    localStorage.setItem('liftlog_exercise_meta', JSON.stringify({
+      'my-lift': { primaryMuscle: 'Lats', secondaryMuscle1: null, secondaryMuscle2: null, secondaryMuscle3: null, workoutType: null, equipment: null, weightType: null },
+    }));
+    expect(getExerciseMeta('my-lift').primaryMuscle).toBe('Lats');
+    localStorage.clear();
+    expect(getExerciseMeta('my-lift').primaryMuscle).toBeNull();
+  });
+
+  it('hands out copies — editing a result never leaks into the next read', () => {
+    saveExerciseMeta('my-lift', { ...getExerciseMeta('my-lift'), primaryMuscle: 'Lats' });
+    const meta = getExerciseMeta('my-lift');
+    meta.primaryMuscle = 'Chest';
+    expect(getExerciseMeta('my-lift').primaryMuscle).toBe('Lats');
+  });
+
+  it('stamps a saved override and keeps the newer row on merge', () => {
+    saveExerciseMeta('my-lift', { ...getExerciseMeta('my-lift'), primaryMuscle: 'Lats' }, 3000);
+    expect(getExerciseMeta('my-lift').updatedAt).toBe(3000);
+    mergeExerciseMeta({ 'my-lift': { ...getExerciseMeta('my-lift'), primaryMuscle: 'Chest', updatedAt: 2000 } });
+    expect(getExerciseMeta('my-lift').primaryMuscle).toBe('Lats');
+    mergeExerciseMeta({ 'my-lift': { ...getExerciseMeta('my-lift'), primaryMuscle: 'Chest', updatedAt: 4000 } });
+    expect(getExerciseMeta('my-lift').primaryMuscle).toBe('Chest');
   });
 
   it('dedupes muscles that collapse into the same group', () => {

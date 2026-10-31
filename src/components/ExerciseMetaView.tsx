@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MUSCLE_GROUPS, MOVEMENT_PATTERNS, EQUIPMENT_OPTIONS, WEIGHT_TYPES,
   type MuscleGroup, type MovementPattern, type Equipment, type WeightType,
@@ -8,6 +8,10 @@ import { archiveExercise, deleteExerciseFromLibrary, getExerciseLibrary } from '
 import { hasSetLogsForExercise, deleteSetLogsByExerciseId } from '../db/database';
 import { getUserRole } from '../data/sync';
 import { getExerciseMerges, saveExerciseMerges, applyExerciseMerges } from '../data/merges';
+import { instructionsFor } from '../data/instructions';
+import { useInstructionSheet } from './useInstructionSheet';
+import { useDialog } from './useDialog';
+import ExerciseHistorySheet from './ExerciseHistorySheet';
 import './ExerciseMetaView.css';
 
 interface Props {
@@ -34,6 +38,16 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
   const [saved, setSaved] = useState(false);
   const [modal, setModal] = useState<Modal | null>(null);
   const [working, setWorking] = useState(false);
+  const info = useInstructionSheet();
+  const hasInstructions = instructionsFor(exerciseId) != null;
+  const [showHistory, setShowHistory] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // The "Saved!" flash timer is cleared on unmount — it used to fire setState
+  // on an unmounted screen when the user navigated away inside two seconds.
+  const savedTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (savedTimer.current != null) window.clearTimeout(savedTimer.current); }, []);
+  const closeModal = () => setModal(null);
+  const dialogRef = useDialog<HTMLDivElement>(closeModal);
 
   // Admin-only: merge this exercise into another. The server records the
   // from→to mapping (audited) and serves it to every client on pull; each
@@ -91,7 +105,8 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
     setSaving(false);
     setSaved(true);
     onSaved?.();
-    setTimeout(() => setSaved(false), 2000);
+    if (savedTimer.current != null) window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
   }
 
   async function handleDeletePressed() {
@@ -99,17 +114,31 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
     setModal(hasHistory ? 'confirm-history' : 'confirm-delete');
   }
 
+  // Each destructive action clears its busy flag on failure instead of
+  // leaving the modal stuck on "…" with no way out.
   async function handleArchive() {
     setWorking(true);
-    archiveExercise(exerciseId);
-    onDeleted?.();
+    setActionError(null);
+    try {
+      archiveExercise(exerciseId);
+      onDeleted?.();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not archive');
+      setWorking(false);
+    }
   }
 
   async function handleDelete() {
     setWorking(true);
-    await deleteSetLogsByExerciseId(exerciseId);
-    deleteExerciseFromLibrary(exerciseId);
-    onDeleted?.();
+    setActionError(null);
+    try {
+      await deleteSetLogsByExerciseId(exerciseId);
+      deleteExerciseFromLibrary(exerciseId);
+      onDeleted?.();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not delete');
+      setWorking(false);
+    }
   }
 
   return (
@@ -123,9 +152,27 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
       </header>
 
       <div className="exercise-meta-body">
+        <button className="meta-howto" onClick={() => info.open(exerciseId, exerciseName)}>
+          <span className="meta-howto-text">
+            <span className="meta-howto-title">How to do it</span>
+            <span className="meta-howto-sub">
+              {hasInstructions ? 'Setup, cues and the faults to watch for' : 'No instructions yet for this custom exercise'}
+            </span>
+          </span>
+          <span className="meta-howto-chevron">›</span>
+        </button>
+        <button className="meta-howto meta-howto--history" onClick={() => setShowHistory(true)}>
+          <span className="meta-howto-text">
+            <span className="meta-howto-title">History</span>
+            <span className="meta-howto-sub">Every session, your bests, and how it is trending</span>
+          </span>
+          <span className="meta-howto-chevron">›</span>
+        </button>
+
         <section className="meta-section">
-          <span className="meta-label">Movement Pattern</span>
+          <label className="meta-label" htmlFor="meta-pattern">Movement Pattern</label>
           <select
+            id="meta-pattern"
             className="meta-select"
             value={workoutType}
             onChange={e => setWorkoutType(e.target.value as MovementPattern | '')}
@@ -136,8 +183,9 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
         </section>
 
         <section className="meta-section">
-          <span className="meta-label">Equipment</span>
+          <label className="meta-label" htmlFor="meta-equipment">Equipment</label>
           <select
+            id="meta-equipment"
             className="meta-select"
             value={equipment}
             onChange={e => setEquipment(e.target.value as Equipment | '')}
@@ -148,8 +196,9 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
         </section>
 
         <section className="meta-section">
-          <span className="meta-label">Weight Type</span>
+          <label className="meta-label" htmlFor="meta-weight-type">Weight Type</label>
           <select
+            id="meta-weight-type"
             className="meta-select"
             value={weightType}
             onChange={e => setWeightType(e.target.value as WeightType | '')}
@@ -160,8 +209,9 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
         </section>
 
         <section className="meta-section">
-          <span className="meta-label">Primary Muscle</span>
+          <label className="meta-label" htmlFor="meta-primary">Primary Muscle</label>
           <select
+            id="meta-primary"
             className="meta-select"
             value={primaryMuscle}
             onChange={e => setPrimaryMuscle(e.target.value as MuscleGroup | '')}
@@ -172,10 +222,11 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
         </section>
 
         <section className="meta-section">
-          <span className="meta-label">Secondary Muscles</span>
+          <span className="meta-label" id="meta-secondary-label">Secondary Muscles</span>
           <div className="secondary-muscles">
             <select
               className="meta-select"
+              aria-label="Secondary muscle 1"
               value={secondary1}
               onChange={e => setSecondary1(e.target.value as MuscleGroup | '')}
             >
@@ -184,6 +235,7 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
             </select>
             <select
               className="meta-select"
+              aria-label="Secondary muscle 2"
               value={secondary2}
               onChange={e => setSecondary2(e.target.value as MuscleGroup | '')}
             >
@@ -192,6 +244,7 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
             </select>
             <select
               className="meta-select"
+              aria-label="Secondary muscle 3"
               value={secondary3}
               onChange={e => setSecondary3(e.target.value as MuscleGroup | '')}
             >
@@ -251,10 +304,11 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
 
       {/* ── First confirmation (no history) ── */}
       {modal === 'confirm-delete' && (
-        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
-          <div className="meta-modal" onClick={e => e.stopPropagation()}>
-            <p className="meta-modal-title">Delete "{exerciseName}"?</p>
+        <div className="meta-modal-overlay" onClick={closeModal}>
+          <div className="meta-modal" role="dialog" aria-modal="true" aria-labelledby="meta-modal-title" ref={dialogRef} tabIndex={-1} onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title" id="meta-modal-title">Delete "{exerciseName}"?</p>
             <p className="meta-modal-body">This exercise will be permanently removed.</p>
+            {actionError && <p className="meta-modal-error" role="alert">{actionError}</p>}
             <div className="meta-modal-actions">
               <button className="meta-modal-cancel" onClick={() => setModal(null)}>Cancel</button>
               <button className="meta-modal-danger" onClick={handleDelete} disabled={working}>
@@ -267,9 +321,9 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
 
       {/* ── Merge confirmation (admin) ── */}
       {modal === 'confirm-merge' && mergeTarget && (
-        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
-          <div className="meta-modal" onClick={e => e.stopPropagation()}>
-            <p className="meta-modal-title">Merge "{exerciseName}" into "{mergeTarget.name}"?</p>
+        <div className="meta-modal-overlay" onClick={closeModal}>
+          <div className="meta-modal" role="dialog" aria-modal="true" aria-labelledby="meta-modal-title" ref={dialogRef} tabIndex={-1} onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title" id="meta-modal-title">Merge "{exerciseName}" into "{mergeTarget.name}"?</p>
             <p className="meta-modal-body">
               All history logged under "{exerciseName}" — for every user — will count
               as "{mergeTarget.name}" from now on. This cannot be undone.
@@ -286,13 +340,14 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
 
       {/* ── Second confirmation (has history) ── */}
       {modal === 'confirm-history' && (
-        <div className="meta-modal-overlay" onClick={() => setModal(null)}>
-          <div className="meta-modal" onClick={e => e.stopPropagation()}>
-            <p className="meta-modal-title">"{exerciseName}" has workout history</p>
+        <div className="meta-modal-overlay" onClick={closeModal}>
+          <div className="meta-modal" role="dialog" aria-modal="true" aria-labelledby="meta-modal-title" ref={dialogRef} tabIndex={-1} onClick={e => e.stopPropagation()}>
+            <p className="meta-modal-title" id="meta-modal-title">"{exerciseName}" has workout history</p>
             <p className="meta-modal-body">
               <strong>Archive</strong> keeps it in your history but hides it from the exercise list.<br /><br />
               <strong>Delete</strong> permanently removes it and all associated history.
             </p>
+            {actionError && <p className="meta-modal-error" role="alert">{actionError}</p>}
             <div className="meta-modal-actions meta-modal-actions--three">
               <button className="meta-modal-cancel" onClick={() => setModal(null)} disabled={working}>Cancel</button>
               <button className="meta-modal-archive" onClick={handleArchive} disabled={working}>
@@ -304,6 +359,10 @@ export default function ExerciseMetaView({ exerciseId, exerciseName, onBack, onS
             </div>
           </div>
         </div>
+      )}
+      {info.sheet}
+      {showHistory && (
+        <ExerciseHistorySheet exerciseId={exerciseId} exerciseName={exerciseName} onClose={() => setShowHistory(false)} />
       )}
     </div>
   );

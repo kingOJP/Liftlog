@@ -78,6 +78,7 @@ export function slotFor(
     id: exerciseId,
     name,
     sets: dose?.sets ?? 3,
-    ...(dose ? { repLow: dose.repLow, repHigh: dose.repHigh } : {}),
+    ...(dose && dose.repLow != null && dose.repHigh != null ? { repLow: dose.repLow, repHigh: dose.repHigh } : {}),
+    ...(dose?.source ? { rangeSource: dose.source } : {}),
   };
 }

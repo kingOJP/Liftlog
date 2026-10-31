@@ -8,7 +8,7 @@ import { dumpIDB } from '../db/database';
 import type { Session, SetLog } from '../db/database';
 import type { MuscleGroup, MovementPattern } from './taxonomy';
 import { startOfWeek } from './program';
-import type { Goal } from './plan';
+import type { Goal, ExperienceLevel } from './plan';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
 import { getExerciseLibrary } from './programStore';
 
@@ -44,9 +44,21 @@ export const DEFAULT_VOLUME_TARGET: VolumeTarget = { low: SETS_TARGET_LOW, high:
  * fatigue that lands on the next endurance session rather than adaptation.
  * Every other goal keeps the 10–20 band unchanged.
  */
-export function volumeTargetFor(goal: Goal | null | undefined): VolumeTarget {
-  return goal === 'sport-support' ? { low: 4, high: 10 } : DEFAULT_VOLUME_TARGET;
+export function volumeTargetFor(
+  goal: Goal | null | undefined,
+  experience: ExperienceLevel | null | undefined = null,
+): VolumeTarget {
+  if (goal === 'sport-support') return { low: 4, high: 10 };
+  // A novice's dose is lower by design — the beginner templates prescribe ~5–8
+  // weekly sets per muscle because recovery, not stimulus, is the early
+  // limiter. Judging that against 10–20 made the coach add a set at every
+  // workout, the metrics call every muscle "low", and the retrospective carry
+  // "0 of 12 muscles in band" into a block-2 that jumped 60–70% in volume.
+  if (experience === 'beginner') return BEGINNER_VOLUME_TARGET;
+  return DEFAULT_VOLUME_TARGET;
 }
+
+export const BEGINNER_VOLUME_TARGET: VolumeTarget = { low: 6, high: 12 };
 
 // ── Training snapshot ─────────────────────────────────────────────────────────
 
@@ -198,22 +210,48 @@ export interface MuscleInvolvement {
 
 // Every muscle an exercise trains, with its fractional set weighting.
 // Precedence: user override (getExerciseMeta) → master list → name match.
-export function musclesForExercise(id: string): MuscleInvolvement[] {
-  const meta = getExerciseMeta(id);
-  let primary = meta.primaryMuscle;
-  let secondaries: (MuscleGroup | null)[] = [
-    meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3,
-  ];
+/** The classification an exercise id resolves to, with the shared precedence. */
+export interface ResolvedIdentity {
+  primaryMuscle: MuscleGroup | null;
+  secondaryMuscles: (MuscleGroup | null)[];
+  workoutType: MovementPattern | null;
+  equipment: ReturnType<typeof getExerciseMeta>['equipment'];
+  weightType: ReturnType<typeof getExerciseMeta>['weightType'];
+}
 
-  // Custom IDs with no override fall back to a name match against the master list
-  if (!primary && !EXERCISE_MAP.has(id)) {
-    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
+/**
+ * THE override → catalog → name-match resolver. getExerciseMeta already layers
+ * the user's override over the global layer over the catalog; this adds the
+ * last rung — a custom id with no classification of its own borrows the
+ * catalog entry whose NAME it matches ("Incline DB Press-1782…" is an incline
+ * dumbbell press). musclesForExercise, movementPatternFor and the substitution
+ * engine's profileFor all read through here, so the three can never disagree.
+ */
+export function resolveExerciseIdentity(id: string, fallbackName?: string): ResolvedIdentity {
+  const meta = getExerciseMeta(id);
+  const out: ResolvedIdentity = {
+    primaryMuscle: meta.primaryMuscle,
+    secondaryMuscles: [meta.secondaryMuscle1, meta.secondaryMuscle2, meta.secondaryMuscle3],
+    workoutType: meta.workoutType,
+    equipment: meta.equipment,
+    weightType: meta.weightType,
+  };
+  if (!out.primaryMuscle && !EXERCISE_MAP.has(id)) {
+    const name = fallbackName ?? getExerciseLibrary().find(e => e.id === id)?.name;
+    const def = name ? nameToDef.get(normalizeName(name)) : undefined;
     if (def) {
-      primary = def.primaryMuscle;
-      secondaries = [...def.secondaryMuscles];
+      out.primaryMuscle = def.primaryMuscle;
+      out.secondaryMuscles = [...def.secondaryMuscles];
+      out.workoutType ??= def.workoutType;
+      out.equipment ??= def.equipment;
+      out.weightType ??= def.weightType;
     }
   }
+  return out;
+}
+
+export function musclesForExercise(id: string): MuscleInvolvement[] {
+  const { primaryMuscle: primary, secondaryMuscles: secondaries } = resolveExerciseIdentity(id);
 
   const out: MuscleInvolvement[] = [];
   if (primary) out.push({ muscle: primary, weight: 1 });
@@ -231,15 +269,7 @@ export function primaryMuscleFor(id: string): MuscleGroup | null {
 // analysis (progress.ts categoryProgress) and anything else that needs a
 // single agreed-upon pattern for an exercise id.
 export function movementPatternFor(id: string): MovementPattern | null {
-  const meta = getExerciseMeta(id);
-  let pattern = meta.workoutType;
-
-  if (!pattern && !EXERCISE_MAP.has(id)) {
-    const libName = getExerciseLibrary().find(e => e.id === id)?.name;
-    const def = libName ? nameToDef.get(normalizeName(libName)) : undefined;
-    if (def) pattern = def.workoutType;
-  }
-  return pattern;
+  return resolveExerciseIdentity(id).workoutType;
 }
 
 // ── Muscle set accumulation ───────────────────────────────────────────────────
@@ -311,13 +341,23 @@ export function headSetTotals(
 ): MuscleHeadTotals {
   const byHead = new Map<string, number>();
   const unspecified = new Map<MuscleGroup, number>();
+  // Resolve each exercise once, not once per set — the metadata lookup
+  // behind primaryMuscleFor is the expensive part (audit M17).
+  const resolved = new Map<string, { primary: MuscleGroup | null; heads: ReturnType<typeof headsFor> }>();
+  const resolve = (id: string) => {
+    let r = resolved.get(id);
+    if (!r) {
+      r = { primary: primaryMuscleFor(id), heads: headsFor(id) };
+      resolved.set(id, r);
+    }
+    return r;
+  };
 
   for (const session of snapshot.sessions) {
     if (!include(session)) continue;
     for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
-      const primary = primaryMuscleFor(log.exerciseId);
+      const { primary, heads } = resolve(log.exerciseId);
       if (!primary) continue;
-      const heads = headsFor(log.exerciseId);
       if (heads.length === 0) {
         unspecified.set(primary, (unspecified.get(primary) ?? 0) + 1);
         continue;

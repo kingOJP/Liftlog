@@ -1,4 +1,3 @@
-import { EXERCISE_MAP } from './exercises';
 import { getProgramStart } from './settings';
 import type { PhaseKind } from './plan';
 
@@ -19,6 +18,26 @@ export interface Exercise {
    */
   repLow?: number;
   repHigh?: number;
+  /**
+   * The day's heavy anchor (set by the planner from its slot template). Main
+   * lifts are protected: the volume caps trim them last and never below three
+   * sets, and a strength plan never rotates one for a lighter variant.
+   */
+  main?: boolean;
+  /**
+   * Where the rep range came from: the plan's dosage, the user's own numbers,
+   * or the lifter's logged history. The prescription engine only re-anchors a
+   * load to a range that was CHOSEN (plan or user) — re-anchoring to a range
+   * read off the lifter's own log is circular, and it is how a 5×5 lifter was
+   * told to drop 20% every session for months.
+   */
+  rangeSource?: 'plan' | 'user' | 'history';
+  /**
+   * 'manual' switches the coach off for this slot: no recommendation chip, no
+   * rep targets, the weight pre-filled from last time and nothing else. For
+   * lifters who run their own progression.
+   */
+  progression?: 'coach' | 'manual';
   archived?: boolean;
 }
 
@@ -39,6 +58,13 @@ export interface LibraryExercise {
   id: string;
   name: string;
   archived?: boolean;
+  /**
+   * Clock of the last local edit (rename, archive, creation). Sync keeps the
+   * newer copy per entry on both ends; absent/0 means "unstamped" (a default
+   * library entry, or one from before clocks existed) and yields to any
+   * stamped copy.
+   */
+  updatedAt?: number;
   /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
   sets?: number;
   /** @deprecated wire-compatibility only — never read; see data/dosage.ts */
@@ -135,10 +161,6 @@ export const PROGRAM: WorkoutDay[] = [
   },
 ];
 
-export function getExerciseName(id: string): string {
-  return EXERCISE_MAP.get(id)?.name ?? id;
-}
-
 /**
  * "3 × 8–12", or "3 sets" when the slot carries no rep range. Every surface
  * that shows a slot's dose goes through here, so an unprescribed exercise never
@@ -146,16 +168,22 @@ export function getExerciseName(id: string): string {
  */
 export function prescriptionLabel(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
   return ex.repLow != null && ex.repHigh != null
-    ? `${ex.sets} × ${ex.repLow}–${ex.repHigh}`
+    ? `${ex.sets} × ${rangeLabel(ex.repLow, ex.repHigh)}`
     : `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
 }
 
+/** "8–12", or "5" when the range is a single number (never "5–5"). */
+export function rangeLabel(repLow: number, repHigh: number): string {
+  return repLow === repHigh ? `${repLow}` : `${repLow}–${repHigh}`;
+}
+
 /** "3 sets · 8–12 reps", or "3 sets" when unprescribed — the long form. */
-export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>): string {
+export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'progression'>): string {
   const sets = `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
-  return ex.repLow != null && ex.repHigh != null
-    ? `${sets} · ${ex.repLow}–${ex.repHigh} reps`
+  const base = ex.repLow != null && ex.repHigh != null
+    ? `${sets} · ${rangeLabel(ex.repLow, ex.repHigh)} reps`
     : sets;
+  return ex.progression === 'manual' ? `${base} · your own progression` : base;
 }
 
 // ── Calendar weeks (Monday-anchored) ─────────────────────────────────────────
@@ -169,10 +197,12 @@ export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHi
 /** Monday 00:00 local time of the week containing `date`, as a timestamp. */
 export function startOfWeek(date: Date | number): number {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
   const day = d.getDay();
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d.getTime();
+  // Construct the Monday directly rather than via setHours + setDate: in a
+  // zone whose DST transition falls at 00:00 (Santiago, Havana, Beirut),
+  // setHours(0) on the spring-forward day yields 01:00 and the subsequent
+  // setDate lands on Monday 01:00 — a different key from the rest of the week.
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - (day === 0 ? 6 : day - 1)).getTime();
 }
 
 /** `n` weeks after a week-start timestamp — calendar math, so DST can't drift it. */
@@ -187,9 +217,26 @@ export function weeksBetween(a: number, b: number): number {
   return Math.round((b - a) / (7 * 86_400_000));
 }
 
+// One formatter, built once. toLocaleDateString constructs a new
+// Intl.DateTimeFormat per call — on two years of history that was most of
+// the metrics screen's render time (audit M17).
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' });
+
+/** "2026-07-27" — a LOCAL calendar date as the yyyy-mm-dd the date inputs and the plan use. */
+export function toLocalDateValue(d: Date | number): string {
+  const date = typeof d === 'number' ? new Date(d) : d;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** "7/27" — month/day of a timestamp, the label every chart axis uses. */
+export function shortDateLabel(ts: number): string {
+  return SHORT_DATE.format(ts);
+}
+
 /** "7/27" — the Monday that starts the week, how the volume chart labels bars. */
 export function weekStartLabel(weekStart: number): string {
-  return new Date(weekStart).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+  return shortDateLabel(weekStart);
 }
 
 // Program week numbering is anchored to the training-block start date (managed

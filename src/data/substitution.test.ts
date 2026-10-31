@@ -207,3 +207,26 @@ describe('profileFor', () => {
     expect(profileFor('leg-press').mechanics).toBe('compound');
   });
 });
+
+describe('regression mode (audit F11)', () => {
+  const pullDay: WorkoutDay = {
+    id: 2, label: 'Pull', muscleGroups: 'Back',
+    exercises: [
+      { id: 'chin-ups', name: 'Chin Ups', sets: 3, repLow: 8, repHigh: 12 },
+      { id: 'barbell-rows', name: 'Barbell Rows', sets: 3, repLow: 8, repHigh: 12 },
+    ],
+  };
+
+  it('offers a loadable, no-harder way to train the same muscle', () => {
+    const [best] = suggestReplacements(pullDay.exercises[0], pullDay, null, 3, NOW, null, { regression: true });
+    expect(best).toBeDefined();
+    expect(best.exercise.id).toBe('lat-pull-down');
+    expect(best.exercise.weightType).not.toBe('Bodyweight');
+    expect(best.reasons.join(' ')).toMatch(/start below bodyweight/);
+  });
+
+  it('never regresses onto a harder lift', () => {
+    const all = suggestReplacements(pullDay.exercises[0], pullDay, null, 5, NOW, null, { regression: true });
+    expect(all.map(s => s.exercise.id)).not.toContain('weighted-pull-ups');
+  });
+});

@@ -60,8 +60,14 @@ export interface Slot {
   muscle: MuscleGroup;
   patterns?: MovementPattern[];
   mechanics?: 'compound' | 'isolation';
-  /** the day's heavy anchor — more sets, lower reps */
+  /** the day's anchor — protected from trimming (floor 3 sets), never rotated */
   main?: boolean;
+  /** takes the event's main-lift rep range (bilateral squat/hinge only — a
+   *  step-up or chin-up is a main slot but not a 4×4–6 lift) */
+  heavy?: boolean;
+  /** may repeat an exercise already programmed on ANOTHER day (full-body
+   *  A/B alternation of the big compounds); never twice in one day */
+  reuse?: boolean;
   /** preferred exercise ids, best first — a strong bonus, never a hard filter */
   preferIds?: string[];
   /** overrides the goal's dosage for this slot */
@@ -82,7 +88,11 @@ export interface DayTemplate {
 // Phase sets used by the sport-support taper. Day A runs every week of the
 // block; the second session steps out for the taper and race week; the short
 // power session belongs to the build weeks only.
-const BUILD_PHASES: PhaseKind[] = ['recovery', 'accumulation', 'intensification', 'peak'];
+// 'intro' is a build-side week: the point of an introductory week is a first,
+// easy exposure to EVERY movement in the block — leaving the unilateral,
+// durability and power days out of it meant their first exposure came in week
+// 3 at full load, which is the soreness the intro week exists to spend early.
+const BUILD_PHASES: PhaseKind[] = ['intro', 'recovery', 'accumulation', 'intensification', 'peak'];
 const THROUGH_MAINTENANCE: PhaseKind[] = [...BUILD_PHASES, 'maintenance'];
 
 // ── Niggles ───────────────────────────────────────────────────────────────────
@@ -426,14 +436,14 @@ const TRI_STRENGTH_DAY = (): DayTemplate => ({
   title: 'Max Strength — legs, trunk',
   slots: [
     {
-      muscle: 'Quads', main: true, mechanics: 'compound',
+      muscle: 'Quads', main: true, heavy: true, mechanics: 'compound',
       patterns: ['Squat', 'Leg Press'],
       preferIds: ['barbell-back-squat', 'hack-squat', 'leg-press', 'goblet-squat'],
       dose: { sets: 4, repLow: 4, repHigh: 6 },
       why: 'Peak hip and knee extension force — the strength that shows up as sustainable power on the bike and a cheaper stride on the run.',
     },
     {
-      muscle: 'Hamstrings', main: true,
+      muscle: 'Hamstrings', main: true, heavy: true,
       patterns: ['Hip Hinge'],
       preferIds: ['romanian-deadlifts', 'dumbbell-rdl', 'cable-pull-through'],
       dose: { sets: 3, repLow: 6, repHigh: 8 },
@@ -544,14 +554,14 @@ const RUN_STRENGTH_DAY = (): DayTemplate => ({
   title: 'Max Strength — legs, trunk',
   slots: [
     {
-      muscle: 'Quads', main: true, mechanics: 'compound',
+      muscle: 'Quads', main: true, heavy: true, mechanics: 'compound',
       patterns: ['Squat', 'Leg Press'],
       preferIds: ['barbell-back-squat', 'hack-squat', 'leg-press', 'goblet-squat'],
       dose: { sets: 4, repLow: 4, repHigh: 6 },
       why: 'Heavy bilateral squatting is the most reliable route to better running economy — more force per stride means each one costs a smaller share of your ceiling.',
     },
     {
-      muscle: 'Hamstrings', main: true,
+      muscle: 'Hamstrings', main: true, heavy: true,
       patterns: ['Hip Hinge'],
       preferIds: ['romanian-deadlifts', 'dumbbell-rdl', 'cable-pull-through'],
       dose: { sets: 3, repLow: 6, repHigh: 8 },
@@ -780,10 +790,12 @@ export function buildSportPlan(
     .filter(d => (d.minLiftDays ?? 0) <= budget.days)
     .slice(0, budget.days);
 
-  // Distance sets the main lifts' rep range.
+  // Distance sets the HEAVY lifts' rep range — the bilateral squat and hinge.
+  // `main` alone used to select it, which handed the step-up and the chin-up
+  // 4×4–6 on sprint and 5k plans where the template promises 3×6–8 / 3×6–10.
   for (const day of days) {
     for (const slot of day.slots) {
-      if (!slot.main || !slot.dose) continue;
+      if (!slot.heavy || !slot.dose) continue;
       slot.dose = { ...slot.dose, repLow: profile.mainReps[0], repHigh: profile.mainReps[1] };
     }
   }

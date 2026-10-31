@@ -1,43 +1,57 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { WorkoutDay, Exercise, LibraryExercise } from '../data/program';
+import type { WorkoutDay, Exercise } from '../data/program';
 import { prescriptionDetail } from '../data/program';
-import { addToExerciseLibrary, findExerciseByName, generateExerciseId, getExerciseLibrary } from '../data/programStore';
-import { getExerciseMeta } from '../data/exercises';
+import { addToExerciseLibrary } from '../data/programStore';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import { suggestReplacements, profileFor } from '../data/substitution';
-import { prescribeFor, slotFor } from '../data/prescribe';
+import { prescribeFor } from '../data/prescribe';
 import { getTrainingGoal } from '../data/planStore';
 import type { ReplacementSuggestion } from '../data/substitution';
+import AddExercisePanel from './AddExercisePanel';
+import SlotDoseEditor from './SlotDoseEditor';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './DayEditView.css';
 
 interface Props {
   day: WorkoutDay;
+  /** a day being created — nothing exists until Save */
+  isNew?: boolean;
+  /** position controls, when the day is part of a program with neighbours */
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMove?: (dir: -1 | 1) => void;
+  onDelete?: () => void;
   onBack: () => void;
   onSave: (updated: WorkoutDay) => void;
 }
 
-export default function DayEditView({ day, onBack, onSave }: Props) {
+/**
+ * Edit one program day: its name and muscle-group line, its exercises (add,
+ * remove, reorder, swap with explained suggestions), and — new — each slot's
+ * sets × rep range and who drives its progression. Together with "Add a day"
+ * on the dashboard this is how a lifter builds a program by hand instead of
+ * only through the wizard.
+ */
+export default function DayEditView({
+  day, isNew = false, canMoveUp = false, canMoveDown = false, onMove, onDelete, onBack, onSave,
+}: Props) {
+  const [label, setLabel] = useState(day.label);
   const [muscleGroups, setMuscleGroups] = useState(day.muscleGroups);
   const [exercises, setExercises] = useState<Exercise[]>(day.exercises);
-
-  // Add-exercise flow: a search box filters the existing library first; only
-  // when nothing matches does the user fall through to creating a new exercise.
   const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [library, setLibrary] = useState<LibraryExercise[]>([]);
-  // The create-exercise form is pre-filled with the dose the coach would
-  // prescribe for this goal and athlete, not a hardcoded 3 × 8–12. The user can
-  // still override it — an explicit choice is a prescription; a constant isn't.
-  const [newSets, setNewSets] = useState('3');
-  const [newRepLow, setNewRepLow] = useState('');
-  const [newRepHigh, setNewRepHigh] = useState('');
+  /** the slot whose dose editor is open */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const info = useInstructionSheet();
 
   // Replacement suggestions personalize on training history (familiarity,
   // strength trends, weekly volume balance) — loaded once, used lazily.
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  // "Now" is captured once at mount: reading the clock during render makes
+  // the memoized suggestions drift across renders (react-hooks/purity).
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     loadTrainingSnapshot().then(setSnapshot).catch(() => {});
@@ -46,39 +60,18 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
   const swapTarget = exercises.find(e => e.id === swapTargetId) ?? null;
   const suggestions = useMemo<ReplacementSuggestion[]>(() => {
     if (!swapTarget) return [];
-    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot, 3, Date.now(), getTrainingGoal());
-  }, [swapTarget, exercises, snapshot, day]);
+    return suggestReplacements(swapTarget, { ...day, exercises }, snapshot, 3, now, getTrainingGoal());
+  }, [swapTarget, exercises, snapshot, day, now]);
   const swapTargetHasMeta =
     swapTarget != null && profileFor(swapTarget.id, swapTarget.name).primaryMuscle != null;
 
   // Exercises already in this day can't be added again (id is the row key).
   const dayExerciseIds = useMemo(() => new Set(exercises.map(e => e.id)), [exercises]);
 
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return library
-      .filter(e => !e.archived && !dayExerciseIds.has(e.id))
-      .filter(e => q === '' || e.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [library, dayExerciseIds, search]);
-
-  // Only offer "create new" when the typed name isn't already a library entry
-  // (regardless of day membership), so we never spawn a duplicate name.
-  const exactMatch = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return q !== '' && library.some(e => e.name.trim().toLowerCase() === q);
-  }, [library, search]);
-
   function handleReplace(oldEx: Exercise, s: ReplacementSuggestion) {
     // The accepted exercise becomes first-class: it joins the library (lifting
     // any tombstone) so history, metrics and metadata editing all resolve it.
-    addToExerciseLibrary({
-      id: s.exercise.id,
-      name: s.exercise.name,
-      sets: oldEx.sets,
-      repLow: oldEx.repLow,
-      repHigh: oldEx.repHigh,
-    });
+    addToExerciseLibrary({ id: s.exercise.id, name: s.exercise.name });
     // Swap in place, preserving the slot's programming (sets, rep range, order)
     setExercises(prev => prev.map(e =>
       e.id === oldEx.id ? { ...e, id: s.exercise.id, name: s.exercise.name } : e,
@@ -102,63 +95,23 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
     setExercises(prev => prev.filter(e => e.id !== id));
   }
 
-  function openAdd() {
-    setLibrary(getExerciseLibrary());
-    setSearch('');
-    setCreating(false);
-    setShowAdd(true);
+  function handlePatch(id: string, patch: Partial<Exercise>) {
+    setExercises(prev => prev.map(e => (e.id === id ? { ...e, ...patch } : e)));
   }
 
-  function closeAdd() {
+  function handleAdd(ex: Exercise) {
+    setExercises(prev => (prev.some(e => e.id === ex.id) ? prev : [...prev, ex]));
     setShowAdd(false);
-    setSearch('');
-    setCreating(false);
-    setNewSets('3');
-    setNewRepLow('');
-    setNewRepHigh('');
-  }
-
-  // Pick an existing library exercise: reuse its id (so history resolves) and
-  // dose it for the active plan. The library carries no rep range of its own —
-  // the prescription is resolved here, at the point of use.
-  function handleAddFromLibrary(ex: LibraryExercise) {
-    addToExerciseLibrary(ex);
-    setExercises(prev => [...prev, slotFor(ex.id, ex.name, { snapshot })]);
-    closeAdd();
-  }
-
-  function handleCreateExercise() {
-    const trimmed = search.trim();
-    if (!trimmed) return;
-
-    // Never mint a new id for a name that already exists (library or catalog,
-    // slug-compared) — reusing the existing id keeps history in one place
-    // instead of spawning a duplicate exercise.
-    const existing = findExerciseByName(trimmed);
-    if (existing) {
-      if (!dayExerciseIds.has(existing.id)) handleAddFromLibrary(existing);
-      else closeAdd();
-      return;
-    }
-
-    const id = generateExerciseId(trimmed);
-    // The library stores identity only; the day slot carries the prescription.
-    addToExerciseLibrary({ id, name: trimmed });
-
-    const suggested = prescribeFor(id, { name: trimmed, snapshot });
-    const repLow = Number(newRepLow) || suggested?.repLow;
-    const repHigh = Number(newRepHigh) || suggested?.repHigh;
-    setExercises(prev => [...prev, {
-      id,
-      name: trimmed,
-      sets: Number(newSets) || suggested?.sets || 3,
-      ...(repLow != null && repHigh != null ? { repLow, repHigh } : {}),
-    }]);
-    closeAdd();
   }
 
   function handleSave() {
-    onSave({ ...day, muscleGroups, exercises });
+    onSave({ ...day, label: label.trim() || day.label, muscleGroups, exercises });
+  }
+
+  function handleDelete() {
+    if (!onDelete) return;
+    if (!window.confirm(`Remove ${day.label} from your program? Logged workouts are kept.`)) return;
+    onDelete();
   }
 
   return (
@@ -166,12 +119,24 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
       <header className="day-edit-header">
         <button className="back-btn" onClick={onBack} aria-label="Back">&#8592;</button>
         <div className="day-edit-title">
-          <span className="day-edit-label">{day.label}</span>
-          <span className="day-edit-heading">Edit Day</span>
+          <span className="day-edit-label">{isNew ? 'New day' : day.label}</span>
+          <span className="day-edit-heading">{isNew ? 'Build a workout' : 'Edit Day'}</span>
         </div>
       </header>
 
       <div className="day-edit-body">
+        <section className="day-edit-section">
+          <label className="day-edit-field-label" htmlFor="label-input">Name</label>
+          <input
+            id="label-input"
+            className="day-edit-text-input"
+            type="text"
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            placeholder="e.g. Day 1, Push, Heavy lower"
+          />
+        </section>
+
         <section className="day-edit-section">
           <label className="day-edit-field-label" htmlFor="muscle-input">Muscle Group</label>
           <input
@@ -186,15 +151,22 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
 
         <section className="day-edit-section">
           <span className="day-edit-field-label">Exercises</span>
+          <p className="slot-dose-hint">Tap a line like “3 sets · 8–12 reps” to change the sets, the rep range, or to run your own progression.</p>
           <div className="exercise-edit-list">
             {exercises.map((ex, idx) => (
               <div key={ex.id} className="exercise-edit-block">
                 <div className="exercise-edit-item">
                   <div className="exercise-edit-row">
-                    <div className="exercise-edit-info">
-                      <span className="exercise-edit-name">{ex.name}</span>
-                      <span className="exercise-edit-meta">{prescriptionDetail(ex)}</span>
-                    </div>
+                    <button
+                      className="exercise-edit-info exercise-edit-info--btn"
+                      onClick={() => setEditingId(prev => (prev === ex.id ? null : ex.id))}
+                      aria-expanded={editingId === ex.id}
+                      aria-label={`Edit sets and reps for ${ex.name}`}
+                    >
+                      <span className="exercise-edit-name">{ex.name}{ex.main ? <span className="exercise-main-tag">main</span> : null}</span>
+                      <span className="exercise-edit-meta">{prescriptionDetail(ex)} ✎</span>
+                    </button>
+                    <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                     <button
                       className={`exercise-swap-btn${swapTargetId === ex.id ? ' active' : ''}`}
                       onClick={() => setSwapTargetId(prev => (prev === ex.id ? null : ex.id))}
@@ -226,6 +198,15 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                   </div>
                 </div>
 
+                {editingId === ex.id && (
+                  <SlotDoseEditor
+                    key={ex.id}
+                    exercise={ex}
+                    suggested={prescribeFor(ex.id, { name: ex.name, snapshot })}
+                    onChange={patch => handlePatch(ex.id, patch)}
+                  />
+                )}
+
                 {swapTargetId === ex.id && (
                   <div className="swap-panel">
                     <span className="swap-panel-title">Replacements for {ex.name}</span>
@@ -247,6 +228,7 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
                                 .join(' · ')}
                             </span>
                           </div>
+                          <InfoButton name={s.exercise.name} onClick={() => info.open(s.exercise.id, s.exercise.name)} />
                           <button className="swap-card-btn" onClick={() => handleReplace(ex, s)}>
                             Swap in
                           </button>
@@ -271,126 +253,48 @@ export default function DayEditView({ day, onBack, onSave }: Props) {
           </div>
 
           {!showAdd && (
-            <button className="add-exercise-trigger" onClick={openAdd}>
+            <button className="add-exercise-trigger" onClick={() => setShowAdd(true)}>
               + Add Exercise
             </button>
           )}
 
           {showAdd && (
-            <div className="add-exercise-panel">
-              <input
-                className="day-edit-text-input"
-                type="text"
-                placeholder="Search exercises…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                autoFocus
-              />
-
-              {!creating && (
-                <>
-                  <div className="add-search-results">
-                    {searchResults.map(ex => {
-                      const muscle = getExerciseMeta(ex.id).primaryMuscle;
-                      return (
-                        <button
-                          key={ex.id}
-                          className="add-search-result"
-                          onClick={() => handleAddFromLibrary(ex)}
-                        >
-                          <span className="add-search-name">{ex.name}</span>
-                          <span className="add-search-meta">
-                            {[muscle]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {searchResults.length === 0 && (
-                      <p className="add-search-empty">
-                        {search.trim()
-                          ? 'No matching exercise in your library.'
-                          : 'Type to search, or create a new exercise below.'}
-                      </p>
-                    )}
-                  </div>
-
-                  {search.trim() && !exactMatch && (
-                    <button className="add-create-trigger" onClick={() => setCreating(true)}>
-                      + Create “{search.trim()}”
-                    </button>
-                  )}
-
-                  <button className="add-panel-cancel" onClick={closeAdd}>
-                    Cancel
-                  </button>
-                </>
-              )}
-
-              {creating && (
-                <>
-                  <span className="add-create-name">New exercise: {search.trim()}</span>
-                  <div className="add-exercise-nums">
-                    <label className="num-label">
-                      <span>Sets</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newSets}
-                        onChange={e => setNewSets(e.target.value)}
-                      />
-                    </label>
-                    <label className="num-label">
-                      <span>Rep Low</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newRepLow}
-                        onChange={e => setNewRepLow(e.target.value)}
-                      />
-                    </label>
-                    <label className="num-label">
-                      <span>Rep High</span>
-                      <input
-                        className="day-edit-num-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        value={newRepHigh}
-                        onChange={e => setNewRepHigh(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="add-exercise-actions">
-                    <button
-                      className="add-ex-confirm-btn"
-                      onClick={handleCreateExercise}
-                      disabled={!search.trim()}
-                    >
-                      Add to Day
-                    </button>
-                    <button
-                      className="add-ex-cancel-btn"
-                      onClick={() => setCreating(false)}
-                    >
-                      Back
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <AddExercisePanel
+              excludeIds={dayExerciseIds}
+              snapshot={snapshot}
+              onAdd={handleAdd}
+              onClose={() => setShowAdd(false)}
+              addLabel="Add to Day"
+            />
           )}
         </section>
+
+        {!isNew && (onMove || onDelete) && (
+          <section className="day-edit-section day-actions">
+            <span className="day-edit-field-label">This day</span>
+            <div className="day-actions-row">
+              {onMove && (
+                <>
+                  <button className="day-action-btn" onClick={() => onMove(-1)} disabled={!canMoveUp}>▲ Move earlier</button>
+                  <button className="day-action-btn" onClick={() => onMove(1)} disabled={!canMoveDown}>▼ Move later</button>
+                </>
+              )}
+              {onDelete && (
+                <button className="day-action-btn day-action-btn--danger" onClick={handleDelete}>Remove day</button>
+              )}
+            </div>
+          </section>
+        )}
       </div>
 
+      {info.sheet}
       <div className="day-edit-footer">
-        <button className="day-edit-save-btn" onClick={handleSave}>
-          Save Changes
+        <button
+          className="day-edit-save-btn"
+          onClick={handleSave}
+          disabled={isNew && exercises.length === 0}
+        >
+          {isNew ? (exercises.length === 0 ? 'Add an exercise to save' : 'Add to program') : 'Save Changes'}
         </button>
       </div>
     </div>

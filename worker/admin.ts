@@ -1,6 +1,5 @@
 import type { Env } from './types';
 import { getAuthenticatedUser } from './auth';
-import { getUserRole } from './roles';
 
 // Admin API — custodianship of the Layer 1 (application-owned) exercise
 // library. Every route requires the 'admin' role; every write lands an audit
@@ -51,7 +50,7 @@ interface GlobalEditBody {
 export async function handleAdmin(request: Request, env: Env, url: URL): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  if (await getUserRole(user.id, env) !== 'admin') {
+  if (user.role !== 'admin') {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
 

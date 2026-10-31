@@ -12,8 +12,8 @@
 //                     the plan's changes carry their own plain-language reasons.
 
 import type { MuscleGroup } from './taxonomy';
-import type { Goal, PhaseKind } from './plan';
-import { addWeeks, startOfWeek, weekStartLabel } from './program';
+import type { Goal, PhaseKind, PhaseResolver, ExperienceLevel, CoachDecision } from './plan';
+import { addWeeks, startOfWeek, weekStartLabel, dayInPhase } from './program';
 import type { WorkoutDay } from './program';
 import type { TrainingSnapshot } from './analytics';
 import {
@@ -96,19 +96,28 @@ export function computeCoaching(
   now = Date.now(),
   phase: PhaseKind | null = null,
   goal: Goal = 'general',
+  /** which planned phase governed each past session (planStore.getPhaseResolver) */
+  phaseOf: PhaseResolver | null = null,
+  /** the athlete's level — a beginner is judged against the beginner band */
+  experience: ExperienceLevel | null = null,
+  /** the user's answers to this block's coach adjustments */
+  decisions: CoachDecision[] = [],
 ): Coaching {
   const { sessions, setsBySession } = snapshot;
-  const plan = computeProgramPlan(program, snapshot, now, phase, goal);
+  const plan = computeProgramPlan(program, snapshot, now, phase, goal, phaseOf, experience, decisions);
   const currentWeekStart = startOfWeek(now);
-  // The weekly set band is a property of the goal, not a constant: a
-  // sport-support athlete measured against a hypertrophy dose reads as
-  // permanently under-trained.
-  const band = volumeTargetFor(goal);
+  // The weekly set band is a property of the goal and the athlete, not a
+  // constant: a sport-support athlete measured against a hypertrophy dose
+  // reads as permanently under-trained, and so does a beginner on a
+  // beginner template.
+  const band = volumeTargetFor(goal, experience);
+  // Only the days this phase actually schedules can be "next up"
+  const scheduled = program.filter(d => dayInPhase(d, phase));
 
   const empty: Coaching = {
     hasData: false,
     weekLabel: '',
-    nextDay: nextDayFromProgram(program, sessions),
+    nextDay: nextDayFromProgram(scheduled, sessions),
     muscleVolume: [],
     progress: [],
     highlights: [],
@@ -145,7 +154,7 @@ export function computeCoaching(
   // ── Per-exercise progress: the multi-signal assessment (progress.ts) ──
   // e1RM trend + volume-load trend + weight/rep PRs, blended with
   // goal-dependent weights, with exercise-order freshness discounting.
-  const assessments = assessSnapshot(snapshot, goal);
+  const assessments = assessSnapshot(snapshot, goal, () => true, phaseOf);
   const progress = [...assessments.values()]
     .sort((a, b) => b.totalSessions - a.totalSessions || a.name.localeCompare(b.name));
 
@@ -198,9 +207,10 @@ export function computeCoaching(
     });
   }
 
-  // Consistency: sessions in the trailing 7 days
+  // Consistency: sessions in the trailing 7 days (never a highlight on an
+  // empty program — "0 workouts in the last 7 days" is not praise)
   const recentCount = sessions.filter(s => now - sessionTimestamp(s) <= 7 * DAY_MS).length;
-  if (recentCount >= Math.min(program.length, 3)) {
+  if (recentCount > 0 && recentCount >= Math.min(program.length, 3)) {
     highlights.push({
       kind: 'consistency',
       priority: 50,
@@ -258,7 +268,7 @@ export function computeCoaching(
   return {
     hasData: true,
     weekLabel,
-    nextDay: nextDayFromProgram(program, sessions),
+    nextDay: nextDayFromProgram(scheduled, sessions),
     muscleVolume,
     progress,
     highlights: highlights.slice(0, MAX_HIGHLIGHTS),

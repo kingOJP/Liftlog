@@ -6,24 +6,26 @@ import type { MuscleGroup } from '../data/taxonomy';
 import {
   GOALS, PHASE_INFO, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS,
   ENDURANCE_LOADS, DISCIPLINES, RACE_PROXIMITY, defaultSportContext,
-  nextMonday, parsePlanDate, experienceLabel,
+  nextMonday, parsePlanDate, experienceLabel, INJURY_AREAS, blockEnded,
 } from '../data/plan';
 import type {
   Goal, ExperienceLevel, EquipmentAccess, TrainingProfile,
-  SportId, SportEvent, EnduranceLoad, Discipline, SportContext, RaceProximity,
+  SportId, SportEvent, EnduranceLoad, Discipline, SportContext, RaceProximity, InjuryArea,
 } from '../data/plan';
 import { SPORTS, sportLabel, eventsFor, defaultEventFor, nigglesFor } from '../data/sports';
 import { buildPlanProposal, defaultBlockWeeks } from '../data/planner';
 import type { PlannerInput, PlanProposal, ExerciseDecision } from '../data/planner';
 import {
   activateProposal, getActiveBlockInfo, getLatestRetrospective,
-  getProfileOrDefault, getActivePlan, saveTrainingProfile,
+  getProfileOrDefault, saveTrainingProfile, getPhaseResolver, getLatestCompletedBlock, getPlannedGoal,
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { suggestReplacements } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
+import { InfoButton } from './InstructionSheet';
+import { useInstructionSheet } from './useInstructionSheet';
 import './PlanSetupView.css';
 
 interface Props {
@@ -102,13 +104,17 @@ const PRIORITY_OPTIONS: { label: string; muscles: MuscleGroup[] }[] = [
 ];
 
 export default function PlanSetupView({ program, onBack, onActivated }: Props) {
+  const info = useInstructionSheet();
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [snapshotReady, setSnapshotReady] = useState(false);
 
   // Pre-fill from the saved profile (repeat plans breeze through) and the
   // active plan's goal.
   const saved = useMemo(() => getProfileOrDefault(), []);
-  const activeGoal = useMemo(() => getActivePlan()?.goal, []);
+  // Only a goal the user actually chose pre-fills (and counts as "changed
+  // goal" for the intro-week rule) — a migrated Foundation plan's placeholder
+  // goal is not something they picked.
+  const activeGoal = useMemo(() => getPlannedGoal() ?? undefined, []);
 
   const [stage, setStage] = useState<Stage>('questions');
   const [qIndex, setQIndex] = useState(0);
@@ -121,9 +127,14 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [daysPerWeek, setDaysPerWeek] = useState(saved.daysPerWeek);
   const [equipment, setEquipment] = useState<EquipmentAccess>(saved.equipment);
   const [injuries, setInjuries] = useState(saved.injuries);
+  const [injuryAreas, setInjuryAreas] = useState<InjuryArea[]>(saved.injuryAreas ?? []);
   const [priorityMuscles, setPriorityMuscles] = useState<MuscleGroup[]>(saved.priorityMuscles);
   const [weeks, setWeeks] = useState(defaultBlockWeeks());
   const [includeDeload, setIncludeDeload] = useState(saved.experience !== 'beginner');
+  // The deload default follows the experience answered in THIS run of the
+  // wizard (an advanced lifter's first block arrived with it unchecked because
+  // the default read the not-yet-saved profile) — until the user touches it.
+  const deloadTouched = useRef(false);
   const [startDate, setStartDate] = useState(nextMonday());
 
   // Sport-support answers
@@ -150,7 +161,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [decisions, setDecisions] = useState<Map<string, ExerciseDecision>>(new Map());
   const [swapTarget, setSwapTarget] = useState<{ dayId: number; exerciseId: string } | null>(null);
+  // Captured once at mount — the clock must not be read during render.
+  const [now] = useState(() => Date.now());
   const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
 
   const advanceTimer = useRef<number | null>(null);
 
@@ -177,8 +191,18 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   }, [activeInfo, snapshot]);
 
   const [openWithRecovery] = useState(() => {
+    // A recovery opener follows a block that just ENDED. A mid-block replan
+    // (the user re-planning while a block is still running) is a continuation,
+    // not a return from a break.
     const latest = getLatestRetrospective();
-    return latest != null && Date.now() - latest.to < 21 * 86_400_000;
+    const running = getActiveBlockInfo();
+    const midBlock = running != null && !blockEnded(running.block) && !running.block.openEnded;
+    // ...and not when the block just closed ON its deload: a recovery week
+    // right after a deload week is two easy weeks back to back, each backing
+    // off from the last — 20% off by the time training resumes.
+    const previous = running?.block ?? getLatestCompletedBlock();
+    const endedOnDeload = previous?.phases.at(-1) === 'deload';
+    return !midBlock && !endedOnDeload && latest != null && Date.now() - latest.to < 21 * 86_400_000;
   });
 
   const startDateValid = parsePlanDate(startDate) != null;
@@ -224,6 +248,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
   function buildProfile(): TrainingProfile {
     return {
       injuries: injuries.trim(),
+      injuryAreas,
       equipment,
       daysPerWeek,
       experience,
@@ -248,11 +273,12 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       equipmentAccess: equipment,
       priorityMuscles,
       injuries: injuries.trim(),
+      injuryAreas,
       // A goal change is one of the things that earns an introductory week.
       previousGoal: activeGoal ?? null,
       ...(goal === 'sport-support' ? { sport: sportContext() } : {}),
     };
-    const p = buildPlanProposal(input, program, snapshot, plannerRetro);
+    const p = buildPlanProposal(input, program, snapshot, plannerRetro, getPhaseResolver());
     setProposal(p);
     setDays(p.days.map(d => ({ ...d, exercises: [...d.exercises] })));
     setDecisions(new Map(p.decisions.map(d => [`${d.dayId}:${d.exerciseId}`, d])));
@@ -293,24 +319,35 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
     if (!proposal || activating) return;
     if (days.some(d => d.exercises.length === 0)) return;
     setActivating(true);
-    saveTrainingProfile(buildProfile());
-    const outgoingRetro = activeInfo && snapshot && snapshot.sessions.length > 0
-      ? computeBlockRetrospective(activeInfo.block, snapshot)
-      : null;
-    activateProposal({ ...proposal, days }, outgoingRetro);
-    onActivated();
+    setActivateError(null);
+    try {
+      saveTrainingProfile(buildProfile());
+      const outgoingRetro = activeInfo && snapshot && snapshot.sessions.length > 0
+        ? computeBlockRetrospective(activeInfo.block, snapshot)
+        : null;
+      activateProposal({ ...proposal, days }, outgoingRetro);
+      onActivated();
+    } catch (err) {
+      // A failed activation must not leave the button stuck on "Activating…"
+      setActivating(false);
+      setActivateError(err instanceof Error ? err.message : 'Could not activate the plan');
+    }
   }
 
   function toggleNiggle(id: string) {
     setNiggles(prev => (prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]));
   }
 
-  const allIds = useMemo(() => new Set(days.flatMap(d => d.exercises.map(e => e.id))), [days]);
-  function suggestionsFor(dayId: number, ex: Exercise): ReplacementSuggestion[] {
-    const day = days.find(d => d.id === dayId);
-    if (!day) return [];
-    return suggestReplacements(ex, day, snapshot, 5, Date.now(), goal).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
-  }
+  // Only one slot can be open for swapping at a time, so rank once for it
+  // instead of running the full substitution ranking per exercise per render.
+  const swapSuggestions = useMemo<ReplacementSuggestion[]>(() => {
+    if (!swapTarget) return [];
+    const day = days.find(d => d.id === swapTarget.dayId);
+    const ex = day?.exercises.find(e => e.id === swapTarget.exerciseId);
+    if (!day || !ex) return [];
+    const allIds = new Set(days.flatMap(d => d.exercises.map(e => e.id)));
+    return suggestReplacements(ex, day, snapshot, 5, now, goal).filter(s => !allIds.has(s.exercise.id)).slice(0, 3);
+  }, [swapTarget, days, snapshot, now, goal]);
 
   function togglePriority(muscles: MuscleGroup[]) {
     setPriorityMuscles(prev => {
@@ -467,6 +504,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                           </span>
                         </div>
                         <div className="review-ex-actions">
+                          <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                           <button className="review-ex-btn" aria-label={`Replace ${ex.name}`}
                             onClick={() => setSwapTarget(isSwapping ? null : { dayId: day.id, exerciseId: ex.id })}>⇄</button>
                           <button className="review-ex-btn review-ex-btn--danger" aria-label={`Remove ${ex.name}`}
@@ -483,13 +521,16 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
                       )}
                       {isSwapping && (
                         <div className="review-swaps">
-                          {suggestionsFor(day.id, ex).map(s => (
+                          {swapSuggestions.map(s => (
                             <button className="review-swap" key={s.exercise.id} onClick={() => replaceExercise(day.id, ex, s)}>
-                              <span className="review-swap-name">{s.exercise.name}</span>
+                              <span className="review-swap-head">
+                                <span className="review-swap-name">{s.exercise.name}</span>
+                                <InfoButton name={s.exercise.name} onClick={() => info.open(s.exercise.id, s.exercise.name)} />
+                              </span>
                               {s.reasons[0] && <span className="review-swap-reason">{s.reasons[0]}</span>}
                             </button>
                           ))}
-                          {suggestionsFor(day.id, ex).length === 0 && (
+                          {swapSuggestions.length === 0 && (
                             <p className="setup-hint">No good alternative found for this slot.</p>
                           )}
                         </div>
@@ -504,7 +545,9 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
             </section>
           ))}
         </div>
+        {info.sheet}
         <div className="plan-setup-footer">
+          {activateError && <p className="setup-error" role="alert">{activateError} — nothing was changed; try again.</p>}
           <button className="setup-primary-btn" disabled={!canActivate} onClick={handleActivate}>
             {activating ? 'Activating…' : `Activate plan — starts ${startDate}`}
           </button>
@@ -523,9 +566,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
       || id === 'sportWeeks';
   }
   function canContinue(): boolean {
-    if (qId === 'startDate') return startDateValid && snapshotReady;
-    if (qId === 'schedule') return true;
-    return true;
+    return qId !== 'startDate' || (startDateValid && snapshotReady);
   }
 
   function renderQuestion() {
@@ -548,7 +589,10 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
             <div className="opt-list">
               {EXPERIENCE_LEVELS.map(x => (
                 <OptionCard key={x.id} active={experience === x.id} label={x.label} blurb={x.blurb}
-                  onClick={() => pick(setExperience, x.id)} />
+                  onClick={() => {
+                    if (!deloadTouched.current) setIncludeDeload(x.id !== 'beginner');
+                    pick(setExperience, x.id);
+                  }} />
               ))}
             </div>
             {inferred && experienceRank(inferred.level) > experienceRank(experience) && (
@@ -604,16 +648,36 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
 
       case 'injuries':
         return (
-          <Question title="Any injuries or movements to avoid?" subtitle="Tell the coach in plain words — it'll route around them." optional>
+          <Question title="Any injuries or movements to avoid?" subtitle="Tap what's bothering you — each one routes the plan around it. Add detail below if it helps." optional>
+            <div className="chip-grid">
+              {INJURY_AREAS.map(a => {
+                const active = injuryAreas.includes(a.id);
+                return (
+                  <button key={a.id}
+                    className={`setup-chip${active ? ' setup-chip--active' : ''}`}
+                    title={a.blurb}
+                    aria-pressed={active}
+                    onClick={() => setInjuryAreas(prev => (active ? prev.filter(x => x !== a.id) : [...prev, a.id]))}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+            {injuryAreas.length > 0 && (
+              <ul className="setup-constraints">
+                {INJURY_AREAS.filter(a => injuryAreas.includes(a.id)).map(a => (
+                  <li key={a.id}><strong>{a.label}:</strong> {a.blurb}</li>
+                ))}
+              </ul>
+            )}
             <textarea
               className="setup-notes wizard-textarea"
-              rows={4}
-              placeholder="e.g. “left knee pain on squats”, “bad lower back”, “sore right shoulder overhead”…"
+              rows={3}
+              placeholder="Anything else, in your own words — e.g. “left knee only on deep squats”…"
               value={injuries}
               onChange={e => setInjuries(e.target.value)}
-              autoFocus
             />
-            <p className="setup-hint">Leave blank if nothing's bothering you.</p>
+            <p className="setup-hint">Leave this empty if nothing's bothering you.</p>
           </Question>
         );
 
@@ -648,7 +712,7 @@ export default function PlanSetupView({ program, onBack, onActivated }: Props) {
               ))}
             </div>
             <label className="setup-toggle">
-              <input type="checkbox" checked={includeDeload} onChange={e => setIncludeDeload(e.target.checked)} />
+              <input type="checkbox" checked={includeDeload} onChange={e => { deloadTouched.current = true; setIncludeDeload(e.target.checked); }} />
               <span>End with a deload (recovery) week</span>
             </label>
             {experience === 'beginner' && (

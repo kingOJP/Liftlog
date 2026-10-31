@@ -446,3 +446,24 @@ describe('the full proposal for a sprint triathlon 8 weeks out', () => {
     expect(total(withPriority.days)).toBe(total(without.days));
   });
 });
+
+
+describe('main vs heavy slots (audit M8)', () => {
+  it('gives the event rep range only to the bilateral squat and hinge', () => {
+    const plan = buildSportPlan({ sport: 'triathlon', event: 'tri-sprint', proximity: 'mid', load: 'moderate', weakLink: 'even', niggles: [] }, 3);
+    const slots = plan.days.flatMap(d => d.slots);
+    const stepUp = slots.find(s => s.preferIds?.includes('dumbbell-step-up'))!;
+    const chin = slots.find(s => s.preferIds?.includes('chin-ups'))!;
+    const squat = slots.find(s => s.preferIds?.includes('barbell-back-squat'))!;
+    expect(stepUp.dose!.repLow).toBeGreaterThanOrEqual(6);
+    expect(chin.dose!.repLow).toBeGreaterThanOrEqual(6);
+    expect(squat.dose!.repHigh).toBeLessThanOrEqual(6);
+  });
+
+  it('schedules every build-side day in an intro week', () => {
+    const plan = buildSportPlan({ sport: 'triathlon', event: 'tri-sprint', proximity: 'far', load: 'moderate', weakLink: 'even', niggles: [] }, 3);
+    for (const d of plan.days) {
+      if (d.phases) expect(d.phases).toContain('intro');
+    }
+  });
+});

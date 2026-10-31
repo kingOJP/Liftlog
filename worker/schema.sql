@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS exercise_metadata (
   workout_type      TEXT,
   equipment         TEXT,
   weight_type       TEXT,
+  -- per-row clock: a push only replaces an override with a newer one
+  updated_at        INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (exercise_id, user_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -77,6 +79,8 @@ CREATE TABLE IF NOT EXISTS session_docs (
   completed_at INTEGER,
   updated_at   INTEGER NOT NULL,
   sets_json    TEXT    NOT NULL,
+  -- free-text session note (migrations/0009_session_notes.sql)
+  note         TEXT,
   PRIMARY KEY (user_id, guid),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -126,10 +130,15 @@ CREATE TABLE IF NOT EXISTS deleted_exercises (
   deleted_at  INTEGER NOT NULL
 );
 
+-- The live program as one document. updated_at is the client's clock for its
+-- last edit; a push only replaces the row with a copy at least as new (see
+-- migrations/0008_sync_clocks.sql — the program, the library and the metadata
+-- used to be clock-less, so whichever device synced last silently won).
 CREATE TABLE IF NOT EXISTS user_programs (
   user_id        TEXT PRIMARY KEY,
   program_json   TEXT NOT NULL,
   exercises_json TEXT NOT NULL,
+  updated_at     INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -160,13 +169,15 @@ CREATE TABLE IF NOT EXISTS user_roles (
 -- Layer 2: the user's own exercise library. Upserted per exercise on push,
 -- never delete-and-replace; deletion only via user_deleted_exercises.
 CREATE TABLE IF NOT EXISTS user_exercises (
-  user_id  TEXT    NOT NULL,
-  id       TEXT    NOT NULL,
-  name     TEXT    NOT NULL,
-  sets     INTEGER NOT NULL,
-  rep_low  INTEGER NOT NULL,
-  rep_high INTEGER NOT NULL,
-  archived INTEGER NOT NULL DEFAULT 0,
+  user_id    TEXT    NOT NULL,
+  id         TEXT    NOT NULL,
+  name       TEXT    NOT NULL,
+  sets       INTEGER NOT NULL,
+  rep_low    INTEGER NOT NULL,
+  rep_high   INTEGER NOT NULL,
+  archived   INTEGER NOT NULL DEFAULT 0,
+  -- per-row clock: a push only replaces an entry with a newer one
+  updated_at INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -243,4 +254,13 @@ CREATE TABLE IF NOT EXISTS pending_exercises (
   reviewed_by   TEXT,
   reviewed_at   INTEGER,
   review_note   TEXT
+);
+
+-- Which migration files have been applied to this database. Every file in
+-- worker/migrations/ records itself here; see worker/migrations/README.md
+-- for the apply step. Rows for 0002–0007 are back-filled by 0008 (they
+-- predate the table; a database with these tables has run them).
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version    TEXT    PRIMARY KEY,
+  applied_at INTEGER NOT NULL
 );

@@ -19,18 +19,18 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { WorkoutDay, Exercise } from './program';
-import type { Goal, PhaseKind } from './plan';
+import type { Goal, PhaseKind, PhaseResolver, ExperienceLevel, CoachDecision } from './plan';
 import { isEasyPhase } from './plan';
 import type { TrainingSnapshot } from './analytics';
 import {
   avgDurationByDay,
-  e1rmSeries,
   muscleSetTotals,
   musclesForExercise,
   sessionTimestamp,
   volumeTargetFor,
 } from './analytics';
-import { EXERCISES } from './exercises';
+import { EXERCISES, difficultyFor } from './exercises';
+import { assessSnapshot, progressDirections } from './progress';
 
 // ── Tunables ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +44,12 @@ const MIN_DAY_SESSIONS = 2;          // recent sessions required before touching
 const HIGH_VOLUME_BUFFER = 2;        // sets past the ceiling before we trim
 const SUGGEST_GAP = 3;               // weekly-set gap that earns an add-exercise suggestion
 export const MINUTES_PER_SET = 3;    // set + rest, for duration projections
+
+/** "~45 min" for a day card — the same 3-minutes-a-set estimate the coach budgets with, to the nearest 5. */
+export function estimatedMinutesFor(day: { exercises: Array<{ sets: number }> }): number {
+  const sets = day.exercises.reduce((n, e) => n + Math.max(1, e.sets), 0);
+  return Math.round((sets * MINUTES_PER_SET) / 5) * 5;
+}
 const DURATION_TOLERANCE = 0.15;     // keep days within ±15% of their average
 
 const DAY_MS = 86_400_000;
@@ -51,6 +57,8 @@ const DAY_MS = 86_400_000;
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PlanChange {
+  /** stable identity for the user's accept/decline memory (planStore) */
+  key: string;
   dayId: number;
   dayLabel: string;
   exerciseId: string;
@@ -95,14 +103,20 @@ export function computeProgramPlan(
   now = Date.now(),
   phase: PhaseKind | null = null,
   goal: Goal | null = null,
+  phaseOf: PhaseResolver | null = null,
+  /** the athlete's level — sets the volume band and gates gap suggestions */
+  experience: ExperienceLevel | null = null,
+  /** the user's earlier answers to this block's adjustments (planStore.getCoachDecisions) */
+  decisions: CoachDecision[] = [],
 ): ProgramPlan {
+  const declined = new Set(decisions.filter(d => !d.accepted).map(d => d.key));
   const { sessions } = snapshot;
   // A planned deload/recovery/race week is deliberately lighter — adding or
   // trimming sets there would fight the block's design.
   if (isEasyPhase(phase)) return EMPTY_PLAN;
   if (sessions.length < MIN_SESSIONS_TO_ADAPT || program.length === 0) return EMPTY_PLAN;
 
-  const band = volumeTargetFor(goal);
+  const band = volumeTargetFor(goal, experience);
   // When lifting exists to serve another sport, the planner is allowed to trim
   // but never to add. Volume creep is the specific failure mode of concurrent
   // training: every set the coach bolts on is recovery taken from a session it
@@ -129,14 +143,11 @@ export function computeProgramPlan(
     [...windowSets].map(([m, sets]) => [m, sets / weeks]),
   );
 
-  // Exercises whose e1RM is trending down — don't pile volume onto a
-  // struggling lift.
-  const declining = new Set<string>();
-  for (const [exerciseId, pts] of e1rmSeries(snapshot)) {
-    if (pts.length < 3) continue;
-    const win = pts.slice(-3);
-    if (win[win.length - 1].value < win[0].value * 0.97) declining.add(exerciseId);
-  }
+  // Exercises trending down — don't pile volume onto a struggling lift. Read
+  // from THE progress engine (goal-weighted, easy-week- and order-aware)
+  // rather than a private raw-e1RM rule, so the coach can't call a lift
+  // declining that the Metrics screen calls steady.
+  const declining = progressDirections(assessSnapshot(snapshot, goal ?? 'general', () => true, phaseOf)).down;
 
   const avgDuration = avgDurationByDay(snapshot);
 
@@ -220,6 +231,8 @@ export function computeProgramPlan(
         if (!inv) continue;
         if (ex.sets >= MAX_EXERCISE_SETS) continue;
         if (changedExercises.has(`${day.id}:${ex.id}`)) continue;
+        // The user said "not this one" earlier in the block — don't re-propose it
+        if (declined.has(`${day.id}:${ex.id}:add-set`)) continue;
 
         // Direct work beats secondary spillover
         let score = inv.weight;
@@ -250,7 +263,12 @@ export function computeProgramPlan(
       // exercise instead of silently ignoring it (or nagging the user).
       if (band.low - rate >= SUGGEST_GAP) {
         const inProgram = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
-        const pick = EXERCISES.find(e => e.primaryMuscle === muscle && !inProgram.has(e.id));
+        // Same skill gate as the planner: a beginner is never pointed at an
+        // advanced lift (the gap suggestion once offered a hanging leg raise
+        // to a newcomer), and a beginner-tagged option wins when there is one.
+        const pool = EXERCISES.filter(e => e.primaryMuscle === muscle && !inProgram.has(e.id)
+          && (experience !== 'beginner' || difficultyFor(e.id) !== 'advanced'));
+        const pick = (experience === 'beginner' ? pool.find(e => difficultyFor(e.id) === 'beginner') : undefined) ?? pool[0];
         if (pick) {
           const shortestDay = [...program].sort(
             (a, b) => a.exercises.reduce((s, e) => s + e.sets, 0) - b.exercises.reduce((s, e) => s + e.sets, 0),
@@ -267,6 +285,7 @@ export function computeProgramPlan(
       ? `it trains ${muscle} directly with little extra fatigue`
       : `it works ${muscle} alongside its main target, so the set does double duty`;
     changes.push({
+      key: `${best.day.id}:${best.ex.id}:add-set`,
       dayId: best.day.id,
       dayLabel: best.day.label,
       exerciseId: best.ex.id,
@@ -299,6 +318,7 @@ export function computeProgramPlan(
       for (const ex of day.exercises) {
         if (ex.sets <= MIN_EXERCISE_SETS) continue;
         if (changedExercises.has(`${day.id}:${ex.id}`)) continue;
+        if (declined.has(`${day.id}:${ex.id}:remove-set`)) continue;
         const primary = musclesForExercise(ex.id).find(m => m.weight === 1);
         if (primary?.muscle !== muscle) continue;
         if (!best || ex.sets > best.ex.sets) best = { day, ex };
@@ -307,6 +327,7 @@ export function computeProgramPlan(
     if (!best) continue;
 
     changes.push({
+      key: `${best.day.id}:${best.ex.id}:remove-set`,
       dayId: best.day.id,
       dayLabel: best.day.label,
       exerciseId: best.ex.id,

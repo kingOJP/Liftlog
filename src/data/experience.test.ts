@@ -62,20 +62,46 @@ describe('inferExperience', () => {
     expect(inferExperience(snap, NOW).level).toBe('beginner');
   });
 
-  it('reaches intermediate with consistent training over time', () => {
-    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 14 }], 10);
+  it('stays beginner through a first quarter, whatever the lifts are tagged', () => {
+    // Ten weeks of hip thrusts and dumbbell pressing used to read as
+    // intermediate ("consistently training compound lifts"). Training age
+    // gates it now: a newcomer is a newcomer for about six months.
+    const snap = history([
+      { exerciseId: 'dumbbell-bench-press', sessions: 14 },
+      { exerciseId: 'hip-thrusts', sessions: 14 },
+    ], 10);
+    expect(inferExperience(snap, NOW).level).toBe('beginner');
+  });
+
+  it('reaches intermediate after about six months of consistent training', () => {
+    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 44 }], 28);
     expect(inferExperience(snap, NOW).level).toBe('intermediate');
   });
 
-  it('reaches advanced when consistently handling multiple advanced lifts', () => {
+  it('does not call a ten-week squatter and deadlifter advanced', () => {
     const snap = history([
-      { exerciseId: 'conventional-deadlift', sessions: 32 },
-      { exerciseId: 'barbell-back-squat', sessions: 32 },
-      { exerciseId: 'dumbbell-bench-press', sessions: 32 },
-    ], 26);
+      { exerciseId: 'conventional-deadlift', sessions: 12 },
+      { exerciseId: 'barbell-back-squat', sessions: 12 },
+      { exerciseId: 'dumbbell-bench-press', sessions: 12 },
+    ], 10);
+    expect(inferExperience(snap, NOW).level).toBe('beginner');
+  });
+
+  it('reaches advanced after a year-plus of consistently handling advanced lifts', () => {
+    const snap = history([
+      { exerciseId: 'conventional-deadlift', sessions: 100 },
+      { exerciseId: 'barbell-back-squat', sessions: 100 },
+      { exerciseId: 'good-mornings', sessions: 100 },
+    ], 80);
     const inf = inferExperience(snap, NOW);
-    expect(inf.masteredAdvanced).toBeGreaterThanOrEqual(2);
+    expect(inf.masteredAdvanced).toBeGreaterThanOrEqual(3);
     expect(inf.level).toBe('advanced');
+  });
+
+  it('counts only catalog-classified lifts as evidence (a custom exercise is not a compound lift)', () => {
+    const snap = history([{ exerciseId: 'my-weird-band-thing-1782000000000', sessions: 40 }], 28);
+    const inf = inferExperience(snap, NOW);
+    expect(inf.masteredAdvanced).toBe(0);
   });
 });
 
@@ -86,16 +112,18 @@ describe('effectiveExperience + suggestion', () => {
     expect(effectiveExperience(profile({ experience: 'advanced' }), snap)).toBe('advanced');
   });
 
-  it('upgrades a self-reported beginner whose data says intermediate', () => {
-    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 14 }], 10);
-    expect(effectiveExperience(profile({ experience: 'beginner' }), snap)).toBe('intermediate');
+  it('offers the nudge to a self-reported beginner whose data says intermediate — but plans with what they said', () => {
+    // Inference drives the Journey's "level up" card only. The engines keep
+    // the stored level until the user accepts it (audit F5).
+    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 44 }], 28);
+    expect(effectiveExperience(profile({ experience: 'beginner' }), snap)).toBe('beginner');
     const s = experienceSuggestion(profile({ experience: 'beginner' }), snap, NOW);
     expect(s).not.toBeNull();
     expect(s!.to).toBe('intermediate');
   });
 
   it('offers no suggestion when the profile already matches the data', () => {
-    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 14 }], 10);
+    const snap = history([{ exerciseId: 'dumbbell-bench-press', sessions: 44 }], 28);
     expect(experienceSuggestion(profile({ experience: 'intermediate' }), snap, NOW)).toBeNull();
   });
 });

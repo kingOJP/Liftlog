@@ -1,4 +1,4 @@
-import { addWeeks, startOfWeek, weekStartLabel, weeksBetween } from './program';
+import { addWeeks, shortDateLabel, startOfWeek, weekStartLabel, weeksBetween } from './program';
 import { getExerciseName } from './programStore';
 import type { TrainingSnapshot } from './analytics';
 import { e1rmSeries, muscleSetTotals, sessionTimestamp, sessionWeekStart } from './analytics';
@@ -56,9 +56,7 @@ export interface Metrics {
   unclassifiedExercises: string[]; // logged exercises with no primary muscle (the "Other" bucket)
 }
 
-function shortDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-}
+const shortDate = shortDateLabel;
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 

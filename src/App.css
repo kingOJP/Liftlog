@@ -62,3 +62,120 @@
 .back-btn:active {
   background: var(--bg-card);
 }
+
+/* Expired sign-in: local logging still works, syncing does not */
+.auth-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: #3a2a10;
+  border-bottom: 1px solid #6b4d14;
+}
+
+.auth-banner-link {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--purple);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* "Update ready" toast — bottom of the shell, above the home indicator */
+.update-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--purple);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.update-toast span {
+  flex: 1;
+}
+
+.update-toast-btn {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--purple);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.update-toast-dismiss {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Error boundary recovery screen */
+.crash-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(32px + env(safe-area-inset-top)) 20px 32px;
+}
+
+.crash-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.crash-detail {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.crash-message {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.crash-btn {
+  margin-top: 8px;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--purple);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}

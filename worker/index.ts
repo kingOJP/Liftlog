@@ -18,9 +18,11 @@ export default {
         return await handleAdmin(request, env, url);
       }
     } catch (err) {
+      // The stack goes to the logs (wrangler tail / the dashboard), never to
+      // the client: a 500 body used to carry the message and stack trace.
       const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
       console.error('Worker error:', message);
-      return Response.json({ error: 'Internal server error', detail: message }, { status: 500 });
+      return Response.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return env.ASSETS.fetch(request);

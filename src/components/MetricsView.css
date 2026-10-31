@@ -414,3 +414,24 @@
   margin: 10px 0 0;
   color: var(--text-muted);
 }
+
+.metric-link-btn {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--purple);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.progress-row--link {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.progress-row--link:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}

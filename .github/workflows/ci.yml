@@ -1,0 +1,23 @@
+# Runs the same checks a contributor runs locally. `npm run check` is the
+# superset the Cloudflare Pages build command should use so a commit that
+# fails lint or tests never deploys (see docs/action-plan-2026-10.md §11).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test

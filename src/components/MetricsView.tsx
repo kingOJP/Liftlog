@@ -7,10 +7,12 @@ import type { Metrics } from '../data/metrics';
 import { computeCoaching } from '../data/insights';
 import { volumeTargetFor } from '../data/analytics';
 import type { Coaching, Insight } from '../data/insights';
-import { getActivePhase, getTrainingGoal } from '../data/planStore';
+import { getActivePhase, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions } from '../data/planStore';
 import { STATUS_INFO } from '../data/progress';
 import { goalLabel } from '../data/plan';
 import { BarChart, LineChart } from './charts';
+import { toDisplay, unitLabelFor } from '../data/units';
+import ExerciseHistorySheet from './ExerciseHistorySheet';
 import MuscleHeatmap from './MuscleHeatmap';
 import './MetricsView.css';
 
@@ -26,6 +28,11 @@ function formatVolume(v: number): string {
 type CoachTab = 'coach' | 'progress' | 'prs';
 
 export default function MetricsView({ program, onBack }: Props) {
+  const [showAllProgress, setShowAllProgress] = useState(false);
+  // Per-exercise history sheet, opened from a Progress row
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
+  // Captured once at mount — the clock must not be read during render.
+  const [now] = useState(() => Date.now());
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
@@ -40,7 +47,7 @@ export default function MetricsView({ program, onBack }: Props) {
       setMetrics(m);
       setSnapshot(snap);
       if (m.exercises.length > 0) setSelectedExercise(m.exercises[0].exerciseId);
-      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal()));
+      setCoaching(computeCoaching(program, snap, Date.now(), getActivePhase(), getTrainingGoal(), getPhaseResolver(), getProfileOrDefault().experience, getCoachDecisions()));
     });
     return () => { cancelled = true; };
   }, [program]);
@@ -48,20 +55,26 @@ export default function MetricsView({ program, onBack }: Props) {
   const selected = metrics?.exercises.find(e => e.exerciseId === selectedExercise);
   const goal = getTrainingGoal();
   // The weekly set band the charts judge against belongs to the active goal.
-  const band = volumeTargetFor(goal);
+  const band = volumeTargetFor(goal, getProfileOrDefault().experience);
   const maxMuscleSets = Math.max(...(metrics?.muscleSets.map(m => m.sets) ?? [0]), band.high);
 
   // Progress report: current-program exercises with enough data, attention
   // items (declining, stalled) first so the page leads with what needs action.
   // Capped at 5 so the list stays scannable — the top of the sort is the part
   // that needs attention.
+  // Every lift trained recently, not just the current program's: a quick-
+  // workout lifter has no program, and a lift the last replan rotated out is
+  // exactly the one worth comparing. Program lifts sort first within a status.
   const programIds = new Set(program.flatMap(d => d.exercises.map(e => e.id)));
   const statusRank = { declining: 0, stalled: 1, progressing: 2, steady: 3 } as const;
   const PROGRESS_LIMIT = 5;
+  const PROGRESS_WINDOW_MS = 60 * 86_400_000;
   const progressAll = (coaching?.progress ?? [])
-    .filter(p => programIds.has(p.exerciseId))
-    .sort((a, b) => statusRank[a.status] - statusRank[b.status] || b.totalSessions - a.totalSessions);
-  const progressReport = progressAll.slice(0, PROGRESS_LIMIT);
+    .filter(p => programIds.has(p.exerciseId) || now - p.lastTs <= PROGRESS_WINDOW_MS)
+    .sort((a, b) => statusRank[a.status] - statusRank[b.status]
+      || Number(programIds.has(b.exerciseId)) - Number(programIds.has(a.exerciseId))
+      || b.totalSessions - a.totalSessions);
+  const progressReport = showAllProgress ? progressAll : progressAll.slice(0, PROGRESS_LIMIT);
 
   // PR timeline: every PR event in the recent assessment windows, newest first,
   // capped to the 5 most recent.
@@ -160,9 +173,17 @@ export default function MetricsView({ program, onBack }: Props) {
                     </p>
                     <div className="progress-list">
                       {progressReport.map(p => (
-                        <div className="progress-row" key={p.exerciseId}>
+                        <div
+                          className="progress-row progress-row--link"
+                          key={p.exerciseId}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`History for ${p.name}`}
+                          onClick={() => setHistoryFor({ id: p.exerciseId, name: p.name })}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHistoryFor({ id: p.exerciseId, name: p.name }); } }}
+                        >
                           <div className="progress-row-head">
-                            <span className="progress-name">{p.name}</span>
+                            <span className="progress-name">{p.name} ›</span>
                             <span className={`progress-badge progress-badge--${p.status}`}>
                               {STATUS_INFO[p.status].label}
                             </span>
@@ -182,10 +203,10 @@ export default function MetricsView({ program, onBack }: Props) {
                         </div>
                       ))}
                     </div>
-                    {progressAll.length > PROGRESS_LIMIT && (
-                      <p className="metric-sub">
-                        Showing the {PROGRESS_LIMIT} lifts that need attention most, of {progressAll.length} tracked.
-                      </p>
+                    {progressAll.length > PROGRESS_LIMIT && !showAllProgress && (
+                      <button className="metric-link-btn" onClick={() => setShowAllProgress(true)}>
+                        Showing the {PROGRESS_LIMIT} lifts that need attention most — show all {progressAll.length}
+                      </button>
                     )}
                   </div>
                 )}
@@ -227,12 +248,12 @@ export default function MetricsView({ program, onBack }: Props) {
                 <span className="stat-label">Workouts</span>
               </div>
               <div className="stat-card">
-                <span className="stat-value">{formatVolume(metrics.summary.totalVolume)}</span>
-                <span className="stat-label">Total lbs lifted</span>
+                <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.totalVolume)))}</span>
+                <span className="stat-label">Total {unitLabelFor()} lifted</span>
               </div>
               <div className="stat-card">
-                <span className="stat-value">{formatVolume(metrics.summary.thisWeekVolume)}</span>
-                <span className="stat-label">This week (lbs)</span>
+                <span className="stat-value">{formatVolume(Math.round(toDisplay(metrics.summary.thisWeekVolume)))}</span>
+                <span className="stat-label">This week ({unitLabelFor()})</span>
               </div>
               <div className="stat-card">
                 <span className={`stat-value ${deltaClass(metrics.summary.deltaPct)}`}>
@@ -291,11 +312,11 @@ export default function MetricsView({ program, onBack }: Props) {
               {selected && selected.points.length >= 2 ? (
                 <>
                   <h3 className="chart-subhead">Estimated 1RM</h3>
-                  <LineChart data={selected.points} unit="lbs" />
+                  <LineChart data={selected.points.map(pt => ({ ...pt, value: Math.round(toDisplay(pt.value)) }))} unit={unitLabelFor()} />
                   {selected.volumePoints.length >= 2 && selected.volumePoints.some(p => p.value > 0) && (
                     <>
                       <h3 className="chart-subhead">Volume load per session</h3>
-                      <LineChart data={selected.volumePoints} unit="lbs" />
+                      <LineChart data={selected.volumePoints.map(pt => ({ ...pt, value: Math.round(toDisplay(pt.value)) }))} unit={unitLabelFor()} />
                     </>
                   )}
                 </>
@@ -333,6 +354,9 @@ export default function MetricsView({ program, onBack }: Props) {
           );
         })()}
       </div>
+      {historyFor && (
+        <ExerciseHistorySheet exerciseId={historyFor.id} exerciseName={historyFor.name} onClose={() => setHistoryFor(null)} />
+      )}
     </div>
   );
 }

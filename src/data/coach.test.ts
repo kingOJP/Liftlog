@@ -155,3 +155,20 @@ describe('applyPlanToDay', () => {
     expect(applyPlanToDay(legDay, plan)).toBe(legDay);
   });
 });
+
+
+describe('coach decisions (audit F6/F15)', () => {
+  it('stops proposing an adjustment the user declined for this block', () => {
+    // Re-run the under-target case with the slot declined: no add-set lands on it.
+    const { sessions, setLogs } = makeSessions(6, 'leg-extension', 2);
+    const snapshot = buildSnapshot(sessions, setLogs);
+    const first = computeProgramPlan([legDay], snapshot, NOW, null, 'hypertrophy');
+    const add = first.changes.find(c => c.kind === 'add-set');
+    expect(add).toBeDefined();
+    const again = computeProgramPlan(
+      [legDay], snapshot, NOW, null, 'hypertrophy', null, null,
+      [{ key: add!.key, accepted: false, at: NOW }],
+    );
+    expect(again.changes.find(c => c.key === add!.key)).toBeUndefined();
+  });
+});

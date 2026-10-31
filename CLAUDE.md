@@ -121,6 +121,17 @@ Long-term milestones (roughly):
     goal was removed from `GOALS` (the `Goal` type keeps the member so stored
     plans still resolve).
 
+24. ✅ October 2026 audit action plan (`docs/action-plan-2026-10.md`, eight phases, all
+    landed): atomic session writes + serialized, visible sync + protected drafts; honest
+    progress/stall engines (easy-week exclusion, load-normalized volume, score-driven
+    deloads, rep-range memory on set logs); the journey learning the right lessons
+    (one-directional activation, coach decisions, nudge-only experience, beginner band,
+    block-growth cap); self-programming (hand-built days, slot dose editor, manual
+    progression, quick workouts); clocks on every synced document + explicit restores +
+    conditional (ETag) pull + worker hardening + SW update toast; exercise instructions;
+    strength structure (barbell anchoring, phase rep ranges, top set + back-offs) and
+    bodyweight regressions; per-exercise history, session notes, kg/lb preference, a11y.
+
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
   rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
@@ -132,7 +143,11 @@ Long-term milestones (roughly):
   enforces the constraints), LLM-backed proposal source (`PlanProposal` is the
   seam: any generator that emits one plugs into the same review-and-activate
   flow), block-over-block comparison charts, rehab/peaking block presets.
-- Unit preference (kg/lb) and worker-side tests with vitest-pool-workers.
+- Body-weight log — so bodyweight-exercise e1RM and "total lifted" include the lifter
+  (the kg/lb preference landed in Phase 8; see `data/units.ts`).
+- Delta push — pull is conditional (ETag/304) but every push still re-upserts every session
+  document. The clocks are in place; the missing piece is a per-device `lastPushedAt` and a
+  payload of only the documents newer than it (decision D7 deferred this half).
 - Planner v2 — effort-aware volume decisions, automatic exercise substitution (the planner
   currently only *suggests* adding an exercise when no slot fits; it could now rank that
   suggestion through `substitution.ts`), and per-exercise rep-range adjustments in
@@ -154,7 +169,10 @@ Long-term milestones (roughly):
 ## Stack
 
 - **React + Vite + TypeScript** — `npm run dev` to start, `npm run build` to build
-- **Vitest** — `npm test` (or `npm run test:watch`); `npm run typecheck` for types alone.
+- **Vitest** — `npm test` (or `npm run test:watch`); `npm run typecheck` for types alone;
+  `npm run lint` for ESLint; `npm run check` runs lint + tests + build and is what the
+  Cloudflare Pages build command should run so a red commit never deploys.
+  `.github/workflows/ci.yml` runs typecheck + lint + tests on every PR and push to `main`.
   Tests live next to the modules they cover (`src/data/*.test.ts`, `src/db/*.test.ts`,
   `worker/*.test.ts`), plus `test/` for tests that span the client/worker boundary.
   See the Testing section below for the environment, the D1/IDB harnesses and the
@@ -211,9 +229,12 @@ All inputs use `font-size: 16px` to prevent iOS Safari zoom-on-focus.
 The app requires Google OAuth login. No content is shown until the user is authenticated.
 
 - Login: `/api/auth/google` (Google OAuth redirect)
-- Logout: `/api/auth/logout`
+- Logout: `POST /api/auth/logout` (a form submit from Settings; GET is 405 — a GET sign-out can
+  be fired by a link prefetch or a hostile page)
 - Current user: `getLoggedInUser()` in `src/data/sync.ts` — reads from a cookie set by the server
 - `LoginView` is shown when `getLoggedInUser()` returns null
+- Server side, `getAuthenticatedUser()` resolves session + account + role in **one** query
+  (`User.role`); sign-in also sweeps expired `user_sessions` rows
 
 ---
 
@@ -224,17 +245,26 @@ No router — pure React state in `App.tsx`. The `View` discriminated union:
 ```ts
 type View =
   | { screen: 'dashboard' }
-  | { screen: 'workout'; dayId: number }
+  | { screen: 'workout'; day: WorkoutDay }        // the day is SNAPSHOTTED into the view
   | { screen: 'history' }
   | { screen: 'edit-session'; sessionId: number; dayId: number }
   | { screen: 'edit-day'; dayId: number }
+  | { screen: 'new-day'; day: WorkoutDay }
   | { screen: 'exercise-list' }
   | { screen: 'exercise-meta'; exerciseId: string; exerciseName: string }
   | { screen: 'metrics' }
   | { screen: 'settings' }
+  | { screen: 'glossary' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' };
+  | { screen: 'plan-setup' }
+  | { screen: 'quick-setup' }
+  | { screen: 'quick-workout' }
+  | { screen: 'shared-preview' }
+  | { screen: 'shared-workout' };
 ```
+
+The per-exercise **history** (`ExerciseHistorySheet`) and the instruction sheet are overlays,
+not routes: they open over a workout without unmounting it.
 
 Day-scoped views (`workout`, `edit-session`, `edit-day`) look the day up with a fallback:
 if the `dayId` no longer exists (program replaced by a sync), the app renders the
@@ -377,7 +407,21 @@ src/
                                   detection, weekly muscle volume, next-workout suggestion, and
                                   the coach plan (embeds computeProgramPlan)
     sync.ts                    — pushSync(), pullSync(), getLoggedInUser(), ensureLocalDataOwner()
-                                  — merge-based cloud sync via /api/sync (see Cloud sync section)
+                                  — merge-based cloud sync via /api/sync, clock-compared on
+                                  every document, conditional (ETag) pull (see Cloud sync)
+    merges.ts                  — admin exercise merges: stored from→to map, pure remap helpers,
+                                  applyExerciseMerges() (set logs + program + library + metadata,
+                                  reviving a tombstoned survivor)
+    appUpdate.ts               — "new build ready" flag from the service worker's controllerchange;
+                                  App renders the reload toast outside workouts
+    instructions.ts            — compiled, app-owned exercise instructions (setup, 3–5 cues,
+                                  faults) for every catalog exercise; instructionsFor(id) resolves
+                                  timestamped catalog copies, null for a true custom exercise
+    search.ts                  — matchesExerciseQuery()/filterExercises(): every typed word must
+                                  appear in the name, any order — shared by the list and the picker
+    units.ts                   — weight unit preference (lb/kg): toDisplay()/fromDisplay()/
+                                  fmtWeight() — storage is ALWAYS lbs; only labels and inputs
+                                  convert, and every engine reason string formats through here
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
@@ -393,7 +437,8 @@ src/
   components/
     Dashboard.tsx/css          — Coach card (next day + top insight + "coach adjusted" note)
                                   + 4 day cards + icon nav row
-    DayCard.tsx/css            — single day card with Edit button
+    DayCard.tsx/css            — single day card (exercise count + ~duration from the coach's
+                                  3-min-per-set estimate) as two real buttons: start, Edit
     WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest
                                   timer + coach-plan overlay/banner + duration capture
     ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
@@ -401,11 +446,17 @@ src/
                                   editable, remaining sets previewed), ＋ Warm-up / ＋ Extra
                                   set, tap-to-edit logged sets
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
-    HistoryView.tsx/css        — all past sessions in reverse chronological order
+    HistoryView.tsx/css        — all past sessions in reverse chronological order, with the
+                                  session note; the card header is the one button
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
                                   per-exercise "Find replacement" (⇄) suggestion panel
-    ExerciseListView.tsx/css   — alphabetical list of all exercises, taps into ExerciseMetaView
-    ExerciseMetaView.tsx/css   — edit an exercise's muscle groups, equipment, weight type
+    ExerciseListView.tsx/css   — searchable alphabetical list of all exercises (data/search.ts —
+                                  the same matcher as the picker), taps into ExerciseMetaView
+    ExerciseMetaView.tsx/css   — "How to do it" entry + edit an exercise's muscle groups,
+                                  equipment, weight type
+    InstructionSheet.tsx/css   — the bottom sheet with an exercise's setup / cues / faults and the
+                                  ⓘ InfoButton every surface uses; useInstructionSheet.tsx is the
+                                  per-screen state hook (open(id, name) + the rendered sheet)
     MetricsView.tsx/css        — metrics dashboard: Coach section (highlights, opportunities,
                                   program adjustments), muscle heatmap, volume summary, weekly
                                   chart, e1RM chart, muscle sets chart, unclassified banner
@@ -418,7 +469,14 @@ src/
                                   proposed structure (confidence, split, phases, reasons) →
                                   workout review (kept/new/replacement badges, swap ⇄ / remove)
                                   → activate
-    SettingsView.tsx/css       — program start date, rest-timer default, account/sign-out
+    SettingsView.tsx/css       — Exercises/Glossary entries, weight unit (lb/kg), rest-timer
+                                  default, account + POST sign-out, sync status + Sync now
+    ExerciseHistorySheet.tsx/css — per-exercise history overlay: bests, progress verdict + recent
+                                  PRs, est-1RM and volume trends, every session with its sets and
+                                  note. Opened from the card's "Last time" line, a Metrics
+                                  Progress row and the exercise detail screen
+    useDialog.ts               — the modal contract (Escape closes, focus moves in and is trapped,
+                                  the opener gets focus back) shared by every dialog/sheet
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart (highlightIndex / highlightMax, zero-value
                                   gap bars) and LineChart (hand-rolled CSS/SVG)
@@ -442,6 +500,12 @@ src/
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
 | `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
+| `liftlog_program_updated` | `programStore.ts` | Clock of the program's last local edit (0 = unstamped); compared on both ends of sync |
+| `liftlog_restored_exercises` | `programStore.ts` | Tombstones this device knowingly lifted (re-added by hand / merge survivor), pushed as `restoredExerciseIds` until the server stops reporting them deleted |
+| `liftlog_exercise_merges` | `merges.ts` | Admin from→to exercise-id map (application-owned, replaced on pull; applied only when it or the pulled data changed) |
+| `liftlog_sync_status` | `syncStatus.ts` | Device-local sync visibility (`lastSuccessAt`, `lastError`, `hasUnpushed`, `authExpired`) |
+| `liftlog_sync_etag` | `sync.ts` | ETag of the last full pull — sent as `If-None-Match`; a 304 skips the merge |
+| `liftlog_weight_unit` | `units.ts` | Display/entry unit (`lb`/`kg`) — device-local; storage stays in lbs |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
 | `liftlog_library_v3` | `programStore.ts` | Migration flag — deduplication pass 2 (current) |
 
@@ -452,7 +516,9 @@ src/
 **`sessions`** — index: `weekNumber`
 - `id` (autoincrement), `guid?` (immutable sync identity; legacy rows get `legacy-<startedAt>`
   backfilled by `ensureSessionGuids()`), `dayId`, `weekNumber`, `startedAt`, `completedAt?`,
-  `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync)
+  `updatedAt?` (last meaningful write — per-session conflict resolution for merge sync),
+  `note?` (free-text session note; rides the session document — D1 `session_docs.note`,
+  migration `0009`; `rewriteSessionSets(…, note)` with `null` clears it)
 
 **`setLogs`** — index: `sessionId`
 - `id`, `sessionId`, `exerciseId`, `setNumber`, `weight`, `reps`, `order?`
@@ -468,7 +534,18 @@ src/
 v2 added `exerciseMuscles` + `exerciseDetails` stores; v3 deleted them (metadata moved to localStorage).
 `guid`/`updatedAt` needed no version bump — IDB records are schemaless; only stores/indexes are versioned.
 
-Key exported functions: `createSession`, `completeSession`, `touchSession`, `ensureSessionGuids`, `addSetLog`, `getSession`, `updateSessionDate`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `mergeServerSessions`, `clearIDB`.
+Key exported functions: `saveWorkout`, `rewriteSessionSets`, `createSession`, `completeSession`, `touchSession`, `ensureSessionGuids`, `addSetLog`, `getSession`, `updateSessionDate`, `getSetLogsForSession`, `deleteSetLogsForSession`, `deleteSetLogsByExerciseId`, `hasSetLogsForExercise`, `migrateExerciseIds`, `purgeEmptySessions`, `dumpIDB`, `mergeServerSessions`, `clearIDB`.
+
+**Session writes are atomic.** A session row must never exist without its sets, because
+`purgeEmptySessions()` tombstones empty sessions *app-wide*. So the three write paths each run
+as ONE `readwrite` transaction over `sessions` + `setLogs`: `saveWorkout()` (Finish — the row's
+`add` success callback queues every set on the same transaction), `rewriteSessionSets()`
+(edit-session — old keys deleted, new rows inserted, `updatedAt` bumped, optional re-date, one
+commit; aborts if the session is gone) and `applySessionMergePlan` (the whole pull plan in one
+transaction). `createSession`/`addSetLog`/`completeSession` survive for tests and tooling but
+WorkoutView no longer uses them. Belt and braces: the purge skips any empty session younger
+than `PURGE_GRACE_MS` (1 h) — a ghost is old by definition — and `completeSession` tolerates a
+missing row.
 
 Anything that *analyzes* history (dashboard, metrics, coaching, recommendations, history list) goes through `loadTrainingSnapshot()` in `data/analytics.ts` — one `dumpIDB()` read per screen, never per-session queries.
 
@@ -488,8 +565,8 @@ On app mount, `App.tsx` runs this sequence (only when logged in):
 4. `migrateExerciseIds()` again — in case pull merged old IDs from the server
 5. `pushSync()` — uploads the merged union
 
-**Merge protocol (sync v2).** The unit of sync is the *session document*: a session row plus
-its set logs, identified by an immutable client-generated `guid` (pre-v2 rows derive the
+**Merge protocol (sync v2).** The unit of sync is the *session document*: a session row (with
+its optional `note`) plus its set logs, identified by an immutable client-generated `guid` (pre-v2 rows derive the
 deterministic `legacy-<startedAt>` so every device computes the same identity). On the wire
 sessions/setLogs stay flat arrays; the server stores one row per document
 (`session_docs`, `sets_json` blob) and **upserts per document — newer `updatedAt` wins** — so
@@ -505,13 +582,91 @@ Legacy `workout_sessions`/`set_logs` tables are a read-only pull fallback until 
 first v2 push; `exerciseLogs` (removed difficulty feature) is no longer synced.
 
 Sync payload also includes: program, exercise library, exercise metadata
-(muscle/equipment/weight-type overrides), deleted-exercise tombstones, and the **training
-journey document** (`plan` — all plans/blocks/retrospectives as one JSON doc, per-user D1
-`training_plans` table, whole-document LWW by `updatedAt` on both ends: the server upserts
-only a newer copy, the client replaces local only with a newer copy). On pull, metadata
-is *merged* into local (server wins per exercise; unsynced local edits survive).
-`pushSync()`/`pullSync()` also run `purgeEmptySessions()` so ghost/empty workouts can't
-resurrect through sync (the server additionally refuses to store empty session docs).
+(muscle/equipment/weight-type overrides), deleted-exercise tombstones, restored-exercise ids,
+and the **training journey document** (`plan` — all plans/blocks/retrospectives as one JSON
+doc, per-user D1 `training_plans` table). `pushSync()`/`pullSync()` also run
+`purgeEmptySessions()` so ghost/empty workouts can't resurrect through sync (the server
+additionally refuses to store empty session docs).
+
+**Everything carries a clock; the newer copy wins on both ends.** Sessions and the journey
+always did; the program, library entries and metadata overrides were clock-less, so pull
+adopted whatever the server had and a background pull landing after a day edit silently
+reverted it (audit H4). Now: `saveStoredProgram(program, now)` stamps
+`liftlog_program_updated` (a pull adopting the server copy passes the *server's* clock so
+devices agree), `LibraryExercise.updatedAt` and `ExerciseMetaOverride.updatedAt` stamp per
+row (`addToExerciseLibrary`/`archiveExercise`/`saveExerciseMeta`), the wire carries
+`programUpdatedAt`, `exercises[].updatedAt` and `exerciseDetails[].updatedAt`, and D1 has
+`updated_at` on `user_programs`/`user_exercises`/`exercise_metadata` (migration `0008`). The
+worker upserts `WHERE excluded.updated_at >= stored`; the client (`mergeExerciseLibrary`,
+`mergeExerciseMeta`, the program branch of `pullSyncUnlocked`) keeps a local row that is
+strictly newer. **0 means unstamped** (rows from before clocks, default library entries): two
+unstamped copies behave exactly as before (incoming wins), so older clients keep working, and
+the first stamped edit from any device wins over them. An unstamped local program yields to a
+non-empty server copy unless `hasUnpushed` is set (the local copy may be the edit that push
+carries); an **unstamped empty** server program is still the wipe guard and is never adopted,
+while a **stamped empty** one is the user deleting their last day — so the last day is
+deletable now (the worker stores a stamped empty program).
+
+**The journey document merges in two parts** (`worker/planMerge.ts`, shared by the worker's
+push and the client's `mergeServerPlanState`): plans/blocks/pending activation LWW by
+`updatedAt`, the athlete `profile` LWW by **its own** `profile.updatedAt` — independently.
+`saveTrainingProfile` no longer bumps the document clock; before, a "level up" tap on an
+offline device outranked a newer block activation made elsewhere while the program store
+still adopted that block's program. The worker reads the current row and writes the merged
+document (`updated_at = max(both clocks)`).
+
+**Deletions are permanent until explicitly restored.** The server keeps a user's tombstones
+forever (so no stale device resurrects a deletion), which also means lifting a tombstone
+locally used to be undone by the next pull. A restore is now told to the server:
+`liftExerciseTombstones()` (used by `addToExerciseLibrary` and by admin merges whose survivor
+the user had deleted — audit H3) records the id in `liftlog_restored_exercises`, push sends
+`restoredExerciseIds`, the worker deletes those per-user tombstones, and pull neither
+re-applies a tombstone this device knowingly lifted nor keeps the restore once the server
+stops reporting the id deleted. Legacy app-wide tombstones (`deleted_exercises`) cannot be
+lifted per user.
+
+**Pull is conditional** (audit M2, decision D7). The worker computes a per-user weak ETag from
+the clocks and row counts of everything a pull serves (session docs, session tombstones,
+program, library, metadata, exercise tombstones, plan, the global audit clock, merges, role),
+**before** reading the data (so a concurrent push can only make the tag stale, never the
+data), answers a matching `If-None-Match` with 304, and sends `Cache-Control: no-store` so the
+browser cache stays out of it. The client stores the tag (`liftlog_sync_etag`) only after a
+pull it merged in full and returns `false` on 304 — the 60 s tick costs one small request when
+nothing changed. Any successful push changes the server state, so the next pull is a full one.
+Delta **push** (only documents newer than the last push) is deliberately not built; see Future
+milestones.
+
+**Admin merges** (`merges.ts`) run only when the map changed or the pull brought new data —
+not on every tick — and when applied they also carry a merged exercise's metadata override
+onto a survivor that has none (audit M12). `normalizeOverride(o, id)` takes the exercise id,
+so a stale bare `'Press'` resolves from the catalog entry it sits on (or the name of a custom
+exercise) instead of always defaulting to Horizontal.
+
+**Worker hardening** (audit M1): 500 bodies are generic (the stack goes to `console.error`
+only); `validatePush` checks `exerciseMuscles`/`exerciseDetails` shapes, `completedAt`,
+`programUpdatedAt`, `restoredExerciseIds` and bounds the program document
+(`MAX_PROGRAM_BYTES`); the push is applied as one atomic batch (chunked at `BATCH_MAX` only if
+it ever outgrows one, with every upsert ordered before anything destructive); tombstone
+`DELETE`s are issued once, when a tombstone is first learned, not for every tombstone on every
+push. Worker tests cover each on the `node:sqlite` testkit. D1 schema changes are numbered
+files in `worker/migrations/` recorded in `schema_migrations` — see
+`worker/migrations/README.md` for the apply step and the rule that `schema.sql` must change
+with them.
+
+**Sync is serialized and visible.** Every entry point runs through `syncLock` (`syncLock.ts`,
+a promise chain) so the 60 s tick, the focus handler, startup and the post-workout push never
+interleave. `syncStatus.ts` (device-local, `liftlog_sync_status`) records `lastSuccessAt`,
+`lastError`, `hasUnpushed` (set when a push starts, cleared only when one succeeds — so a push
+that failed after Finish is retried by the next background tick, not the next cold start) and
+`authExpired` (a 401 from either direction). Surfaced as a Settings line + "Sync now", a quiet
+Dashboard badge when failing, and an app-wide "sign in again" banner when the session expired.
+`App` is wrapped in an `ErrorBoundary` whose recovery screen notes that the draft survived.
+
+**A new build announces itself.** The service worker is `registerType: 'autoUpdate'`, which
+used to swap the SW silently and leave a resident iOS PWA running stale JS against a newer
+worker for days (audit M15). `data/appUpdate.ts` listens for `controllerchange` (only a
+*change* of controller — the first install isn't an update) and `App` shows an "Update ready —
+Reload" toast, never while a workout is open (it appears once the workout closes).
 
 **Ownership on the server (D1)** — full design in `docs/ownership-architecture.md`.
 Exercises live in three owned layers. **Layer 1 (application-owned):** the compiled-in
@@ -529,8 +684,8 @@ The pre-ownership app-wide tables (`app_exercises`/`app_exercise_metadata`/
 on pull, the startup push then snapshots their copy per-user, and legacy global tombstones
 stay honored for everyone. **Library and metadata sync remain merge-based, never replace**:
 the worker upserts per exercise per user on push and the client merges on pull
-(`mergeExerciseLibrary` — incoming wins per id, local-only entries survive); only tombstones
-delete. `ensureProgramExercisesInLibrary` (end of every pull) rebuilds any library entry the
+(`mergeExerciseLibrary` — the newer copy wins per id, local-only entries survive); only
+tombstones delete, and only an explicit restore un-deletes (see above). `ensureProgramExercisesInLibrary` (end of every pull) rebuilds any library entry the
 program references but the library lost, and `getExerciseName` humanizes orphaned timestamped
 ids as a last-resort display fallback. **Lifecycle:** custom exercises (timestamped ids) are
 queued into `pending_exercises` on push; admins review via `/api/admin/pending`, and approval
@@ -555,6 +710,17 @@ context), so `assessExercise` / `assessSnapshot(snapshot, goal)` blend four sign
   latest session ran ≥2 slots later than the exercise's usual position (median), it's excluded
   as a trend endpoint: "benched 4th because the racks were taken" is fatigue, not weakness.
 
+Three validity rules keep the signals honest, all shared with the prescription engine:
+**planned easy weeks are never endpoints** — each point carries `easy` (from a `PhaseResolver`,
+`planStore.getPhaseResolver()` app-wide or `blockPhaseResolver(block)` inside a retrospective)
+and deload/recovery/intro sessions are excluded from the trend and can never be PRs, so a block
+that ends on its deload is judged to its last hard week; **volume is load-normalized**
+(`normalizedReps`: reps at the first session's working weight, ~1 rep per 3% of load) so a
+successful load increase can't read as lost volume, and both signals pass through `deadband()`;
+**e1RM is only read from sets of ≤12 reps** (`validE1rm`). A verdict needs three *hard*
+sessions; rep PRs compare a session's bests against sessions before it (set 2 beating set 1 is
+not a PR).
+
 The signals combine into a −1…+1 composite with **goal-dependent weights**
 (`GOAL_SIGNAL_WEIGHTS` in `progression.ts`, shared with the prescription engine):
 strength leans on e1RM, hypertrophy/fat-loss on volume, and where adding strength isn't the
@@ -570,12 +736,19 @@ caller.
 ## Progressive overload algorithm (`src/data/recommendations.ts`)
 
 Runs when opening a new (non-edit) workout. WorkoutView loads one training snapshot and, for
-each exercise, builds its recent history **across every day it appears in** (up to the last 4
-sessions containing that exercise, newest first), then calls
+each exercise, builds its recent history **across every day it appears in** (the last
+`historyDepthFor(experience)` sessions containing that exercise, newest first), then calls
 `calculateRecommendation(history, exercise, ctx)`. `ctx` is a `PrescriptionContext`
 (options bag, not positional args): `weightType`, `phase`, **`goal`** and **`experience`** —
 the engine reads the athlete and the plan, not just the lift. WorkoutView supplies
 `getTrainingGoal()` and `effectiveExperience(getProfileOrDefault(), snapshot)`.
+
+`ctx.phase` and `ctx.goal` come from the plan; the history depth WorkoutView passes is
+`historyDepthFor(experience)` (the stall window + 2), not a flat four. Every set log records the
+rep range in force (`repLow`/`repHigh`, Stage 0 of the adaptive-engine roadmap), so the engine
+can tell a range that changed between blocks from a missed session: under the new range it
+**holds** with "your rep range moved" instead of easing back, and the weekly cap anchors only to
+same-era sessions so a re-anchor never reads as "already went up this week".
 
 Branches, evaluated in order:
 
@@ -588,8 +761,9 @@ Branches, evaluated in order:
    `repHigh − 1`+, and best e1RM up ≥3% across them → move up now rather than waiting for a
    perfect rep total. Skipped on high-rep work (see the e1RM validity note below).
 3. **Deload** — a window of sessions at the same weight whose **goal-weighted composite**
-   (`progression.ts`) shows no progress → drop ~10% and build back up. Window length and who
-   gets a cut at all depend on training age and goal (see below).
+   (`progression.ts`) scores under `STALL_SCORE` → drop ~10% and build back up. The score
+   *decides* (it is no longer gated on "no PR events", which made it irrelevant); window
+   length (3, or 6 for advanced) and who gets a cut at all depend on training age and goal.
 4. **Decrease** — reps under `repLow`, **confirmed** (see below) → ease back ~5%.
 5. **Hold** (double progression) — reps in range → keep the weight, chase reps. The reason
    names the exact gap ("2 more reps than last time (36 total) earns the next increase").
@@ -613,8 +787,8 @@ a bar a 4×4–6 prescription cannot clear by design. The **stall** verdict is
 `compositeScore()` — the same goal-weighted blend of e1RM trend, volume trend and PR events
 the Metrics screen reports, so the app can no longer call a lift steady and deload it in the
 next workout. `deadband()` (3%) keeps ordinary session-to-session noise out of the decision,
-`stallWindowFor()` gives advanced lifters 4 sessions instead of 3 (they progress across a
-block, not session to session), and `holdsInsteadOfDeload()` decides who repeats the weight
+`stallWindowFor()` gives advanced lifters 6 sessions instead of 3 (they progress across a
+block, not session to session, and their honest rate sits inside the noise floor), and `holdsInsteadOfDeload()` decides who repeats the weight
 rather than cutting it: `fat-loss`, `sport-support`, and **beginners** (whose path is linear
 progression — a novice who stopped adding reps needs another rep, not a lighter bar).
 Full marks scale with training age (`fullMarksFor`, same 2×/1×/0.5× ratios as the weekly load
@@ -711,15 +885,17 @@ fresh-slot sessions, so a lift that dipped because it ran last doesn't get ratch
 falsely flagged as stalled. The reason string says so. Falls back to all sessions when none
 are fresh-slot.
 
-**Bodyweight exercises progress by reps, not load.** When the exercise's `weightType` is
-`Bodyweight` *and* the last session's working weight was 0 lbs, the engine switches to rep
-progression (`repProgression()` in the same file): the recommendation carries a `targetReps`
-per-set goal, total session reps replace e1RM as the stall metric, and the four branches mirror
-the weight engine (beat the range → +1 rep goal; stalled 3 sessions → reset to `repLow`, or
-*hold the standard* on a fat-loss goal; under range → build back to `repLow`; in range → chase
-one more rep). If external load *was* logged
-(e.g. weighted pull-ups with a belt), the normal weight engine applies. ExerciseCard shows
-"↑ N reps" instead of a weight when `targetReps` is set.
+**Unloaded work progresses by count, not load.** Any session whose working weight is 0 lbs —
+bodyweight, timed holds, or a loaded exercise logged unloaded — switches to count progression
+(`repProgression()` in the same file), with the SAME rules as the loaded engine read through
+`credit()`/`countedSets()`: increase when the best set reaches `repHigh` **and** the credited
+total matches the best ever here (`bestCountAt`; the set-1 target then goes *past* the ceiling,
+since there is no heavier bar), stall is best-of-window vs the anchor (one bad day never
+deloads; a failed bonus set is ignored), beginners/fat-loss/sport-support hold the standard
+instead of resetting, under-range needs a confirming session or a clear miss, and the in-range
+target is set 1 + 1. The old rule (every set at `repHigh`) was unreachable against the plan's
+descending targets and deloaded a compliant lifter forever (audit C1). ExerciseCard shows
+"↑ N reps" (or "N sec") instead of a weight when `targetReps` is set.
 
 Returns `{ weight, targetReps?, direction, kind, reason }`
 (`kind`: `increase`/`hold`/`decrease`/`deload`/`reanchor`). ExerciseCard colours the chip by
@@ -751,6 +927,38 @@ plain-language `goal` line stating what this session must do to earn the next in
   addition shows up as a real prescribed row.
 - Targets and the fatigue fit both read the **fresh-slot baseline**, so a late-slot session
   can't skew the plan any more than it can skew the recommendation.
+
+**A strength block's main lifts are one top set plus back-offs** (decision D4, audit F9).
+`dosage.topSetScheme(slot, goal, experience, weightType)` gates it — a `strength` plan, a
+`main` slot dosed by the plan in the strength tier (ceiling ≤ 6), not a beginner, a loadable
+implement — and WorkoutView passes `scheme: 'top-set'` on the `PrescriptionContext`.
+`topSetPlan()` then computes the recommendation on the **top set alone** (`topSetView`: each
+past session reduced to its heaviest sets, judged as a one-set prescription), so "a top set at
+the ceiling earns the next jump" is literally what the engine checks — the weekly cap, the
+stall window and the re-anchor all read that set. Set 1 is the top set at the recommended
+load; sets 2…n sit at `backoffFactor(phase)` of it (90%, 85% in a peak week), snapped to the
+increment, with the rep target the load–rep relationship predicts at the lighter weight. A
+planned easy week flattens everything to `repLow` at the backed-off load. With no loaded
+history it falls through to the straight layout.
+
+**The main lifts' rep range tightens by phase** in a strength block (`dosage.phaseRange` /
+`applyPhaseRanges`, the same gate minus experience): build weeks keep the dosed range (4–6,
+3–5 for heavy axial), push weeks sit one rep lower, peak weeks two (floor 1). WorkoutView
+applies it to `effectiveDay` after the coach overlay, so the card, the recorded `repLow`/
+`repHigh` on the set logs and the engine all see this week's range — and because the logs
+carry the range, the move into a tighter range reads as a **range change** (hold with "your
+rep range moved"), never as a miss. Typed (`rangeSource: 'user'`) and history-derived ranges
+never shift; easy weeks keep the base range at a backed-off load.
+
+**Unloaded work can be told to build UP to its range** (audit F11). The under-range branch of
+`repProgression` sets `targetReps` to one more than what was managed, capped at `repLow`
+("build to it: 6 clean reps per set this time") instead of demanding the floor forever, and
+`buildSetPlan` lets the row targets sit below `repLow` on the way back. After
+`REGRESSION_MISSES` (3) consecutive unloaded sessions under the range (`needsRegression`),
+WorkoutView asks the substitution engine for a **regression** (`{ regression: true }`: no
+harder than the target, strong preference for a loadable implement) and the card offers "Add
+X today" — a lat pull-down for a chin-up — through the ordinary mid-workout add path; making
+it permanent is a day-editor decision.
 
 `recommendations.test.ts` covers each branch plus a **loop-level simulation**: 12 weeks of a
 lifter who hits their targets must climb monotonically, never trip a deload, and never exceed
@@ -806,10 +1014,20 @@ Now:
 | Ad-hoc, no plan, has history | `rangeFromHistory()` — median reps ± 2, median set count |
 | Ad-hoc, no plan, never trained | **null** — no targets, weight still prefilled from last time |
 
-`getPlannedGoal()` (planStore) returns `null` when there's no plan, which is what makes step 3
-reachable; `getTrainingGoal()` keeps its `'general'` fallback for analytics that just need *a*
-goal to weight signals. Note that `ensureJourneyMigrated()` gives legacy users a Foundation
-plan with a real goal, so in practice most accounts resolve at step 2.
+`getPlannedGoal()` (planStore) returns `null` when there's no plan **or when the active plan's
+goal was never chosen** (`planHasChosenGoal`: `origin === 'planned'`, or any non-open-ended block
+— i.e. a wizard block — in it), which is what makes step 3 reachable; `getTrainingGoal()` keeps
+its `'general'` fallback for analytics that just need *a* goal to weight signals.
+`ensureJourneyMigrated()` wraps pre-journey or quick-workout-only history in a Foundation plan
+with a **placeholder `general` goal that is not a prescription source**; the rule applies at
+read time, so existing accounts' migrated plans (goal hypertrophy, origin migrated) are covered
+without a data migration, and a migrated plan that later received a wizard block keeps its goal
+because that activation was the choice. Every prescription records its provenance on the slot:
+`Exercise.rangeSource` is `'plan'` (dosed from a goal), `'user'` (typed) or `'history'` (read off
+the log). **The engine only re-anchors a load to a chosen range** — re-anchoring to a
+history-derived one is circular, and it is how a 5×5 lifter was told to drop 20% every session.
+`Exercise.progression: 'manual'` switches the coach off for a slot (no chip, no targets, last
+weights pre-filled). `parseDose()` (dosage.ts) is the one validator for typed sets × reps.
 
 **Heavy axial work has its own tier.** `isHeavyAxial()` = barbell **and** Hip Hinge or Squat
 pattern — so conventional/Romanian deadlifts and back squats qualify, while cable pull-throughs,
@@ -899,7 +1117,8 @@ architecture as the coach: **pure functions of (exercise, day, TrainingSnapshot)
 storage writes, fully unit-tested (`substitution.test.ts`).
 
 - **`ExerciseProfile`** — the normalized view every candidate is ranked as: muscles
-  (override → catalog → name match, same precedence as `musclesForExercise`), movement
+  (through `resolveExerciseIdentity` in analytics.ts — THE override → catalog → name-match
+  resolver, shared with `musclesForExercise`/`movementPatternFor`), movement
   pattern (`WorkoutType`), equipment, weight type, and derived compound/isolation
   mechanics. Any future candidate source (external APIs, AI generation, coach-curated
   collections) plugs in by producing profiles; the ranker never changes.
@@ -924,6 +1143,10 @@ storage writes, fully unit-tested (`substitution.test.ts`).
   updated program automatically — on every device, once it syncs.
 - Without history (`snapshot: null`) the engine still works on structural factors; the
   history-driven factors simply contribute nothing.
+- **Regression mode** (`suggestReplacements(…, { regression: true })`) is the "easier way
+  to train this" variant WorkoutView asks for after three unloaded misses: candidates no
+  harder than the target (`DIFFICULTY_RANK`), +16 for a loadable implement ("start below
+  bodyweight"), −10 for another bodyweight lift.
 
 ---
 
@@ -968,7 +1191,25 @@ The planning layer above individual workouts. Two domain levels, deliberately no
 - **Phase-aware engines:** `getActivePhase()` (planStore) resolves this week's phase;
   during `deload`/`recovery` weeks `calculateRecommendation(…, phase)` prescribes ~10%
   off (rep-goal floor for bodyweight) and `computeProgramPlan(…, phase)` returns the
-  empty plan (no set fiddling in a planned easy week). WorkoutView shows a phase banner.
+  empty plan (no set fiddling in a planned easy week). WorkoutView shows a phase banner
+  for every easy phase, intro included. Intro and recovery weeks back off from the
+  heaviest *recent* working weight (a recovery week after a deload must not compound);
+  a deload backs off from the last session. A lift whose only session was logged in the
+  current intro week is **repeated**, not backed off (`ctx.phaseOf`) — the first session
+  was the easy exposure. The wizard never opens with a recovery week after a block that
+  ended on its deload, nor on a mid-block replan.
+- **Activation is one-directional.** A block whose start Monday is ahead is *always*
+  queued as a `pendingActivation`, whether or not something is running. Blocks record how
+  they closed (`completedBy: 'activation' | 'user'`), what they replaced
+  (`replacedBlockId`) and the *live* program at that moment (`replacedProgram`);
+  `deferActiveBlockToNextWeek()` only undoes an activation-close, refuses while another
+  block is queued, and restores the live program (edits included) rather than the replaced
+  block's snapshot. A block also records the `experience` it was planned at.
+- **Coach decisions are the overlay's memory.** The in-block coach stays a pure overlay,
+  but each adjustment has a `key` and the WorkoutView banner offers "Keep it for this
+  block" / "Not this block". Answers live on the active block (`coachDecisions`, synced
+  with the journey): accepted ones keep applying quietly, declined ones are no longer
+  proposed, and the banner only shows open ones.
 - **Deload guardrails** (`validatePhases`): recovery only as the opener, one deload max,
   deload closes the block, ≥3 productive weeks before it. `buildPhases` auto-drops an
   unearned deload and says why.
@@ -999,9 +1240,13 @@ The coach designs around **the person**, not just the goal. A `TrainingProfile` 
 inside `PlanState`, so it rides the existing `liftlog_plan` LWW sync with no backend change)
 holds two tiers, collected by the onboarding wizard:
 
-- **Tier 1 — hard constraints** (gate exercise selection): injuries/limitations (free text,
-  parsed by `parseGuidance`), `EquipmentAccess` (full-gym / home-rack / dumbbells-only /
-  minimal → banned weight/equipment sets), days per week.
+- **Tier 1 — hard constraints** (gate exercise selection): injuries as structured
+  **`injuryAreas`** chips (knee / shoulder / lower-back / hip / elbow / wrist →
+  `applyInjuryArea`, the one place each area's bans live) plus free text parsed by
+  `parseGuidance` — clause by clause, with negation ("no knee problems", "fully recovered",
+  "years ago"), lift names stripped first ("back squat" is not a back) and the complaint
+  vocabulary people use ("sore", "tight", "niggle"); `EquipmentAccess` (full-gym / home-rack /
+  dumbbells-only / minimal → banned weight/equipment sets), days per week.
 - **Tier 2 — calibration:** `ExperienceLevel` (+ training age), `priorityMuscles`
   (weak points).
 
@@ -1021,15 +1266,34 @@ level):
   hidden unless the athlete has logged the lift itself or a prerequisite (train the RDL
   before the pull deadlift). Advanced profiles get a nudge toward the barbell compounds.
 - **Priority muscles** get +1 set each (same guardrails as the retro under-muscle bump).
+- **A strength block anchors on the barbell lifts** (audit F9, `anchorStrengthMains`): the
+  main chest / squat / hinge slots carry `preferIds` (bench, back squat, conventional
+  deadlift → RDL), the vertical-press slot becomes a `main` preferring the barbell overhead
+  press, a slot's preferred lifts join its candidate pool even when filed under a
+  neighbouring muscle (the deadlift is Glutes-primary; the hamstring slot still wants it),
+  and the current program's `main` lifts are removed from the rotation set — a stalled squat
+  is kept and deloaded, never swapped for a goblet squat. Sport templates already name their
+  movements and are untouched.
+- **One heavy axial lift per session** (`pickForSlot`): once a day holds a barbell squat or
+  hinge, later slots filter out `isHeavyAxial` candidates when anything else fits — a squat
+  day gets a leg curl, a deadlift day gets a hack squat. A sport template's `heavy` slot is
+  an explicit prescription and is exempt.
+- **Any lift with prerequisites is gated for a beginner**, not only advanced ones:
+  `chin-ups` is listed as intermediate with `lat-pull-down`/`straight-arm-pulldowns` as
+  prerequisites, so a novice is handed the pull-down first (audit F11).
 - **Copy** — beginners get concrete starting-weight/effort guidance and a linear-progression
   framing; the deload defaults off for them.
 
-**Experience is inferred, and only ratchets up** (`experience.ts`): `inferExperience(snapshot)`
-reads training age (weeks spanned), consistency (session count), and difficulty mastered
-(advanced lifts trained ≥3 sessions). `effectiveExperience()` = max(self-reported, inferred),
-so a beginner whose data says otherwise still gets the better plan; the wizard plans with the
-effective level and JourneyView shows a **"level up" nudge** (`experienceSuggestion`) to bump
-the stored profile. Never downgrades.
+**Experience is inferred, but only the nudge changes anything** (`experience.ts`):
+`inferExperience(snapshot, now)` is gated on training *age* — intermediate at ≥26 weeks and
+≥40 sessions, advanced at ≥78 weeks and ≥120 sessions (or ≥3 catalog-classified advanced lifts
+mastered across ≥52 weeks / ≥80 sessions). Only ids with explicit catalog difficulty count as
+evidence (`hasCatalogDifficulty`); a custom exercise defaults to intermediate for *selection*
+but says nothing about the athlete. `effectiveExperience()` now simply returns the stored
+level: every engine plans and prescribes with what the athlete said until they accept the
+Journey's **"level up" nudge** (`experienceSuggestion`). The old max(self-report, inferred)
+rule promoted a newcomer to intermediate in week four on the strength of a hip-thrust tag and
+took away the beginner protections with it.
 
 **The wizard** (`PlanSetupView`) is **one question per screen** with a slide animation
 (`prefers-reduced-motion` respected), a progress bar, single-select auto-advance, Skip on
@@ -1059,6 +1323,14 @@ program, not before):
   lifts. Compiled-in catalog data (a `DIFFICULTY`/`PREREQUISITES` map + `DIFFICULTY_RANK`),
   **not** user metadata — never synced. Drives beginner-safe selection + skill-gating in the
   planner; also on `ExerciseProfile`.
+- `instructionsFor(id)` (`instructions.ts`) — how to do the movement: a setup line, 3–5 cues
+  in coaching order and the common faults, for every catalog exercise (`catalog.test.ts`
+  enforces coverage and the cue count). Compiled, app-owned, never synced — the same footing
+  as difficulty. **Text only, by decision (D3):** no links or media to rot, works offline.
+  Surfaced by the ⓘ `InfoButton` → `InstructionSheet` on the workout card, every picker row,
+  the day editor and its replacement cards, the quick-workout builder, the plan review (rows
+  and swap suggestions) and as the "How to do it" entry on the exercise detail screen. A
+  custom exercise with no catalog namesake gets "No instructions yet", never an empty sheet.
 - `unitFor(id)` / `isTimedExercise(id)` — whether a set counts reps or seconds
   (`ExerciseDef.unit`, absent = reps). Intrinsic catalog data like difficulty: app-owned,
   never synced, never a user override. Timed exercises (planks, carries) show **no weight
@@ -1126,9 +1398,9 @@ only the type name and vocabulary change.
   — the one real inconsistency in an otherwise-consistent list — used to span both bench-style
   horizontal pressing and overhead-style vertical pressing. Split into **Horizontal Press** /
   **Vertical Press**. A stale stored override of the old bare `'Press'` value can't be
-  disambiguated from the string alone, so it defaults to Horizontal on read
-  (`LEGACY_WORKOUT_TYPES` in `exercises.ts`) and self-heals next time that exercise's metadata
-  is edited; the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
+  disambiguated from the string alone, so `normalizeOverride(o, id)` resolves it from the
+  exercise id (`legacyPressPlane`: the catalog entry's plane, else "overhead/military/…" in a
+  custom name, else Horizontal); the older synonyms `'Overhead Press'` and `'Chest Press'`/`'Push Up'` (from an even
   earlier merge into `'Press'`) remap unambiguously since they name their plane directly.
 - **Tier 1 — MovementCategory** (`MOVEMENT_CATEGORIES`, `patternCategoryFor()` in
   `taxonomy.ts`) — a coarser layer above MovementPattern, for the same reason Region sits above
@@ -1149,8 +1421,9 @@ only the type name and vocabulary change.
 
 ## Testing
 
-`npm test` runs everything (~740 tests, ~4.5s). `npm run typecheck` runs types alone;
-`npm run build` runs typecheck then Vite.
+`npm test` runs everything (~950 tests, ~6s). `npm run typecheck` runs types alone;
+`npm run build` runs typecheck then Vite; `npm run check` is lint + test + build (the deploy
+gate). CI (`.github/workflows/ci.yml`) runs typecheck, lint and tests on PRs and `main`.
 
 **Where tests live.** Beside what they cover — `src/data/*.test.ts`, `src/db/*.test.ts`,
 `worker/*.test.ts` — with one exception: `test/` holds tests that span the client/worker
@@ -1203,6 +1476,22 @@ is the integration tier: it designs a block per athlete profile and *trains* it 
 week, catching composition bugs no unit test can see. Its `simulate()` calls run at
 collection time, so hoist them to the `describe` body rather than repeating them per `it`.
 
+**Known defects are pinned with `it.fails`, not skipped.** `profileSimulation.test.ts`
+(five user profiles trained for a quarter by a synthetic *human* athlete — noisy, fatiguing,
+skipping sessions — through the real planner, planStore, prescription, coach, retrospective
+and replan loop), the bodyweight/timed loop in `recommendations.test.ts`, and any future
+reproduction of an audit finding are written as `it.fails(...)` with a comment naming the
+phase of `docs/action-plan-2026-10.md` that fixes them. (As of Phase 7 every pinned finding
+has flipped to a plain `it`; the convention stays for the next audit.) The synthetic athlete
+in `profileSimulation.test.ts` answers the coach the way a compliant one does — every open
+adjustment is accepted the first time it is shown — so the "same adjustment every workout"
+check measures what a real user who taps *Keep it* would see. vitest reports an `it.fails` test
+that starts passing as a failure, so fixing the bug *forces* the test to flip to a plain
+`it` in the same PR — the reproduction becomes the regression test with no step forgotten.
+`catalog.test.ts` pins the catalog invariants (unique ids/names, vocabulary membership,
+prerequisites that resolve to easier lifts, heads from the right muscle, legacy-id and
+PROGRAM references) that are otherwise only checked by hand.
+
 ---
 
 ## Decisions & things to keep in mind
@@ -1211,13 +1500,49 @@ collection time, so hoist them to the `describe` body rather than repeating them
   inline editing/deletion free (no DB rollback needed). A localStorage draft
   (`draftSession.ts`) shadows the state on every set change so an app kill mid-workout loses
   nothing: reopening the same day within 12 h auto-restores it (with a Discard button); the
-  draft is cleared at Finish. Edit-session mode never drafts.
-- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`. On save it deletes all old set logs for that session, re-writes them, and calls `touchSession()` so merge sync propagates the edit.
+  draft is cleared at Finish. Edit-session mode never drafts. Finish is wrapped in
+  try/catch: a failed save shows an error above the button, keeps the sets and the draft, and
+  re-enables the button.
+- **The draft slot is protected and self-describing.** One slot, but a draft that holds logged
+  sets is never overwritten by opening another day: WorkoutView asks `conflictingDraft()` first
+  and shows a sheet (resume it / discard it and start this one). The draft carries the
+  `WorkoutDay` snapshot, its `origin` (`program`/`quick`/`shared`) and mid-workout additions,
+  so quick and shared workouts resume after a kill like program days, via the Dashboard's
+  "Resume unfinished workout" card (`getUnfinishedWorkout()` → `App.handleResumeDraft`). Back
+  with logged sets asks for confirmation (the draft survives either way).
+- **An open workout is frozen.** `App` snapshots the day into the view (`{ screen: 'workout';
+  day }`) and WorkoutView freezes `day`/`program` in state, so a background pull that replaces
+  the program can neither unmount the workout nor change its exercises mid-set; the tick also
+  skips `startPendingActivation()` while a workout is open. WorkoutView instances are keyed by
+  day/session id so resuming a different day mounts fresh state.
+- **Edit session flow** — "Edit Session" in history opens WorkoutView with `existingSessionId`.
+  On save `rewriteSessionSets()` replaces the set logs and bumps `updatedAt` in one transaction
+  so merge sync propagates the edit. The loader effect depends on `existingSessionId` only (the
+  day is frozen), so a program refresh can't wipe unsaved edits. A quick/shared session, or one
+  whose day the program no longer has, is edited from a placeholder day — WorkoutView renders
+  every logged exercise the day doesn't list.
 - **New accounts get no default program** — `getStoredProgram()` falls back to `[]`, not
   `PROGRAM`. The dashboard shows an empty state + plan CTA; the wizard builds the first
   program. Existing accounts are unaffected (their program is in localStorage and in the
   per-user `user_programs` server row, restored by pull on any device).
-- **Exercise library never deletes** — removing an exercise from a day keeps it in the localStorage library so history can still resolve the name by ID.
+- **A program can be built by hand.** Dashboard "＋ Add a day" / "Build my own program" opens
+  `DayEditView` with `isNew` (nothing is stored until saved with an exercise); the editor
+  renames a day, edits each slot's sets × rep range and coach/manual progression through the
+  shared `SlotDoseEditor`, reorders and removes days, and all three pickers (day editor,
+  quick workout, mid-workout add) are the one `AddExercisePanel`. Finishing a quick workout
+  offers to keep it as a program day. The Metrics Progress tab lists every lift trained in the
+  last 60 days, not just the current program, with a show-all control.
+- **Removing an exercise from a day never deletes it** — it stays in the library so history
+  can still resolve the name by id. Deleting happens only from the exercise detail screen,
+  which offers *Archive* (hidden from lists, history kept) or *Delete* (history wiped), records
+  a synced tombstone, and can be undone only by an explicit restore (see Cloud sync).
+- **Weights are stored in pounds, always** — `units.ts` converts for display and entry only
+  (`toDisplay`/`fromDisplay`/`fmtWeight`), the engines compute in lbs and format their reason
+  strings through `fmtWeight`, and increments stay equipment-based in lbs (shown converted).
+  A kg entry is stored to two decimals so it round-trips within display precision.
+- **Every modal is a dialog** — `useDialog` gives it Escape, focus-in, a Tab trap and focus
+  return; interactive rows are real buttons or `role="button"` with a key handler, never a
+  clickable container wrapping another button.
 - **Difficulty rating was removed** — the Easy/Medium/Hard buttons were removed. The `exerciseLogs` IDB store still exists but nothing writes to it.
 - **The week-numbering anchor is managed automatically** — the "Training block start"
   setting was removed. `getProgramStartValue()` stamps first use of the app on this device
@@ -1269,12 +1594,25 @@ collection time, so hoist them to the `describe` body rather than repeating them
 - **Timed work is progressed by time** — a set of an exercise with
   `unit: 'seconds'` logs at 0 lbs with no weight input, and `repProgression`
   drives the hold through the same four branches as a bodyweight rep count.
-  Count progression is gated on `weight === 0 && (bodyweight || timed)`, so
-  editing a plank's weight-type metadata can't flip it onto the load engine.
-  The unit travels on `PrescriptionContext` so every reason string reads right.
-- **The weekly set band belongs to the goal, not the app** — every engine takes a
-  `VolumeTarget` from `volumeTargetFor(goal)` instead of importing `SETS_TARGET_LOW/HIGH`.
-  A new goal that needs a different dose changes one function. On `sport-support` the coach
+  Count progression is gated on `weight === 0` alone, so neither editing a
+  plank's weight-type metadata nor logging a machine unloaded can put a zero
+  on the load engine ("go to 2.5 lbs" is not advice). `dosage()` checks the
+  unit before any pattern rule. The unit travels on `PrescriptionContext` so
+  every reason string reads right.
+- **The weekly set band belongs to the goal and the athlete, not the app** — every engine
+  takes a `VolumeTarget` from `volumeTargetFor(goal, experience)` instead of importing
+  `SETS_TARGET_LOW/HIGH`: 4–10 on sport-support, **6–12 for a beginner**
+  (`BEGINNER_VOLUME_TARGET` — the beginner templates prescribe ~5–8 sets a muscle by
+  design; judging that against 10–20 made the coach add a set at every workout and the
+  retrospective report "0 of 12 muscles in band"), 10–20 otherwise. The planner also caps
+  block-over-block growth (`MAX_BLOCK_GROWTH`, +25% weekly sets; retro bumps come back off
+  first) and limits retro +1s to three muscles, holds each split to the session length its
+  own copy promises (`sessionBudgetFor`), lets full-body day C **reuse** day A's big
+  compounds (`Slot.reuse` — the movement that matters most is trained twice a week), marks
+  template anchors `main` on the generated slots (trimmed last, floor 3 sets), and runs its
+  trend read through the phase resolver so a block that climbed to its deload is not rotated.
+  On the sport templates `heavy` (bilateral squat/hinge) takes the event rep range and `main`
+  only protects, and `intro` is a build-side phase so every day gets its easy first exposure. On `sport-support` the coach
   planner may **trim but never add** sets (also true in any `maintenance` week): volume
   creep is the specific failure mode of concurrent training, and the coach cannot see the
   swim/bike/run sessions its extra set would cost.
@@ -1290,13 +1628,23 @@ collection time, so hoist them to the `describe` body rather than repeating them
   `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions
   from older builds have duration ≈ 0 and are filtered by `sessionDurationMs()`'s validity
   window (10 min – 4 h).
+- **Metadata reads are cached by raw string** — `getExerciseMeta()` is called per set log by
+  the analytics; it used to re-parse and re-normalize the whole override blob every call
+  (1.7 s on two years of history, audit M17). `exercises.ts` keeps the parsed map as long as
+  `localStorage.getItem` returns the same string (so writes from anywhere, other tabs and
+  `localStorage.clear()` in tests all invalidate it), hands out copies, and every writer goes
+  through `writeMetaOverrides`. The same audit replaced `toLocaleDateString` with one cached
+  `Intl.DateTimeFormat` (`shortDateLabel` in program.ts) and made `headSetTotals` resolve each
+  exercise once.
 - **Taxonomy merges are normalized on read** — `normalizeOverride()` in `exercises.ts`
   remaps merged-away values from stored overrides (localStorage or a server pull) on every
   read so old data keeps resolving in the dropdowns:
   - Equipment `'Leg Press Machine'` → `'Machine'` (the catch-all for any exercise machine)
   - Muscles `'Front Delts'`/`'Side Delts'`/`'Rear Delts'` → `'Delts'` (duplicates created by
     the collapse are deduped — first mention wins, later ones are nulled)
-  - Workout types `'Chest Press'`/`'Overhead Press'`/`'Push Up'` → `'Press'`
+  - Movement patterns `'Chest Press'`/`'Push Up'` → `'Horizontal Press'`, `'Overhead Press'`
+    → `'Vertical Press'`, and a stale bare `'Press'` is resolved from the exercise it sits on
+    (`legacyPressPlane`: catalog plane, else the name, else Horizontal)
 - **Taxonomy option arrays are alphabetical** — `MUSCLE_GROUPS`, `WORKOUT_TYPES`,
   `EQUIPMENT_OPTIONS`, `WEIGHT_TYPES` render directly as dropdowns; keep them sorted when
   adding values.

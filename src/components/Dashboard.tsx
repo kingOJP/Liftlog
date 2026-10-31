@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from '../data/program';
+import { getUnfinishedWorkout, draftSetCount } from '../data/draftSession';
+import type { DraftSession } from '../data/draftSession';
+import { getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
 import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
-import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal } from '../data/planStore';
+import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
@@ -20,6 +23,8 @@ interface Props {
   onViewJourney: () => void;
   onPlanSetup: () => void;
   onQuickWorkout: () => void;
+  onResumeWorkout: (draft: DraftSession) => void;
+  onAddDay: () => void;
 }
 
 function startLabel(startDate: string): string {
@@ -36,9 +41,15 @@ function lastTrainedLabel(ts: number | null): string {
 
 export default function Dashboard({
   program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup, onQuickWorkout,
+  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay,
 }: Props) {
   const weekNumber = getWeekNumber();
+  // An interrupted or abandoned-for-now workout, offered for resumption. Read
+  // on every render (cheap localStorage) so finishing or discarding it updates.
+  const unfinished = getUnfinishedWorkout();
+  const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
+  const syncTrouble = !syncStatus.authExpired && syncStatus.lastError != null
+    && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt);
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
 
@@ -68,7 +79,7 @@ export default function Dashboard({
       setCompletedDayIds(new Set(
         snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
       ));
-      setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal));
+      setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal, getPhaseResolver(), getProfileOrDefault().experience, getCoachDecisions()));
     });
     return () => { cancelled = true; };
   }, [program, weekNumber, phase, goal]);
@@ -87,10 +98,13 @@ export default function Dashboard({
     const ended = blockEnded(block);
     const phaseLabel = phase ? PHASE_INFO[phase].label : null;
     // Block names already carry the goal ("Block 2 · Strength") — only prefix
-    // the goal when the name doesn't say it.
-    const eyebrow = block.name.includes(goalLabel(plan.goal))
-      ? block.name
-      : `${goalLabel(plan.goal)} · ${block.name}`;
+    // the goal when the name doesn't say it. A migrated plan whose goal the
+    // user never chose is "your training so far", not "Muscle Growth".
+    const eyebrow = !planHasChosenGoal(plan)
+      ? 'Your training so far'
+      : block.name.includes(goalLabel(plan.goal))
+        ? block.name
+        : `${goalLabel(plan.goal)} · ${block.name}`;
     journeyCard = (
       <button className="journey-card" onClick={onViewJourney}>
         <div className="journey-eyebrow">{eyebrow}</div>
@@ -165,7 +179,25 @@ export default function Dashboard({
         )}
       </div>
 
+      {unfinished && (
+        <button className="resume-card" onClick={() => onResumeWorkout(unfinished)}>
+          <div className="resume-eyebrow">Unfinished workout</div>
+          <div className="resume-title">
+            Resume {unfinished.day?.label ?? (unfinished.dayId < 0 ? 'quick workout' : `Day ${unfinished.dayId}`)} ›
+          </div>
+          <div className="resume-detail">
+            {draftSetCount(unfinished)} set{draftSetCount(unfinished) === 1 ? '' : 's'} logged · started {lastTrainedLabel(unfinished.startedAt).replace('trained ', '')}
+          </div>
+        </button>
+      )}
+
       {journeyCard}
+
+      {syncTrouble && (
+        <p className="sync-badge" role="status">
+          Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
+        </p>
+      )}
 
       {nextDay && (
         <button className="coach-card" onClick={() => onStartWorkout(nextDay.dayId)}>
@@ -194,11 +226,14 @@ export default function Dashboard({
           </span>
           <div className="empty-quick-cta">
             <span className="empty-quick-or">or</span>
+            <button className="quick-workout-btn" onClick={onAddDay}>
+              ＋ Build my own program
+            </button>
             <button className="quick-workout-btn" onClick={onQuickWorkout}>
               ＋ Log a quick workout
             </button>
             <span className="empty-quick-hint">
-              Just want to train today? Log a one-off session — no plan required.
+              Know what you want to run? Add your own days and sets. Just want to train today? Log a one-off session.
             </span>
           </div>
         </div>
@@ -221,9 +256,14 @@ export default function Dashboard({
               {' '}{PHASE_INFO[phase].blurb}.
             </p>
           )}
-          <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
-            ＋ Log a one-off workout
-          </button>
+          <div className="day-list-actions">
+            <button className="quick-workout-btn quick-workout-btn--inline" onClick={onAddDay}>
+              ＋ Add a day
+            </button>
+            <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
+              ＋ Log a one-off workout
+            </button>
+          </div>
         </>
       )}
 

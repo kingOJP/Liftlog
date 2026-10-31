@@ -18,12 +18,46 @@
 // context, which keeps this testable and free of import cycles with planStore.
 
 import type { Exercise } from './program';
-import type { Goal, ExperienceLevel } from './plan';
+import type { Goal, ExperienceLevel, PhaseKind } from './plan';
+import type { WeightType } from './taxonomy';
 import type { MovementPattern } from './taxonomy';
 import type { ExerciseProfile } from './substitution';
 
 /** sets × rep range — the prescription, without the exercise it belongs to. */
-export type RepPrescription = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>;
+export type RepPrescription = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'> & {
+  /** where the numbers came from (recorded on the slot as `rangeSource`) */
+  source?: 'plan' | 'history';
+};
+
+/**
+ * THE validator for user-typed sets × reps. Three screens used to apply their
+ * own `Number(x) || fallback || 3`, which accepted -3, 2.5 and a low above the
+ * high. Whole numbers ≥ 1; a half-entered range falls back to the suggestion;
+ * a reversed range is put the right way round.
+ */
+export function parseDose(
+  sets: string | number,
+  repLow: string | number,
+  repHigh: string | number,
+  fallback: RepPrescription | null,
+): RepPrescription {
+  const int = (v: string | number): number | null => {
+    const n = typeof v === 'number' ? v : Number(String(v).trim());
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  };
+  const s = int(sets) ?? fallback?.sets ?? 3;
+  let lo = int(repLow);
+  let hi = int(repHigh);
+  if (lo == null && hi == null) {
+    return fallback?.repLow != null && fallback.repHigh != null
+      ? { sets: Math.min(MAX_SETS, s), repLow: fallback.repLow, repHigh: fallback.repHigh }
+      : { sets: Math.min(MAX_SETS, s) };
+  }
+  lo ??= hi!;
+  hi ??= lo;
+  if (lo > hi) [lo, hi] = [hi, lo];
+  return { sets: Math.min(MAX_SETS, s), repLow: lo, repHigh: hi };
+}
 
 /** The parts of a program slot that change the dose. */
 export interface DosageSlot {
@@ -68,23 +102,23 @@ export function dosage(
   profile: ExerciseProfile,
   experience: ExperienceLevel,
 ): RepPrescription {
-  if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
-    return experience === 'beginner'
-      ? { sets: 2, repLow: 12, repHigh: 20 }
-      : { sets: 3, repLow: 12, repHigh: 20 };
-  }
-  const compound = profile.mechanics === 'compound';
-
   // Timed work — planks, carries, dead hangs — is prescribed in SECONDS, and
-  // the numbers below are durations, not repetitions. It sits ahead of the
-  // beginner branch because a hold is a hold whoever is doing it; only the
-  // duration moves. See exercises.ts `unit`.
+  // the numbers below are durations, not repetitions. It sits ahead of EVERY
+  // other branch because a hold is a hold whoever is doing it and whatever
+  // pattern it has been filed under: a plank whose metadata was edited onto a
+  // high-rep pattern must still read "30–45 seconds", not "12–20 seconds".
   if (profile.unit === 'seconds') {
     if (experience === 'beginner') return { sets: 2, repLow: 20, repHigh: 30 };
     return goal === 'sport-support'
       ? { sets: 2, repLow: 30, repHigh: 45 }
       : { sets: 3, repLow: 30, repHigh: 45 };
   }
+  if (profile.workoutType && HIGH_REP_PATTERNS.has(profile.workoutType)) {
+    return experience === 'beginner'
+      ? { sets: 2, repLow: 12, repHigh: 20 }
+      : { sets: 3, repLow: 12, repHigh: 20 };
+  }
+  const compound = profile.mechanics === 'compound';
 
   // Lifting in service of another sport. The dose is maximal-strength work at
   // low volume: heavy multi-joint lifts in the 4–6 region, accessories kept
@@ -178,6 +212,7 @@ export function rangeFromHistory(history: DosageHistorySession[]): RepPrescripti
     sets: Math.min(MAX_SETS, Math.max(MIN_SETS, Math.round(typicalSets))),
     repLow: Math.max(1, typicalReps - DERIVED_RANGE_SPREAD),
     repHigh: typicalReps + DERIVED_RANGE_SPREAD,
+    source: 'history',
   };
 }
 
@@ -207,7 +242,87 @@ export interface PrescriptionInput {
  */
 export function resolvePrescription(input: PrescriptionInput): RepPrescription | null {
   if (input.goal) {
-    return dosage(input.goal, input.slot ?? {}, input.profile, input.experience);
+    return { ...dosage(input.goal, input.slot ?? {}, input.profile, input.experience), source: 'plan' };
   }
   return rangeFromHistory(input.history ?? []);
+}
+
+// ── Strength intensity structure (audit F9, decision D4) ─────────────────────
+// A strength block promises that "reps drop and loads climb" across build →
+// push → peak. Before this, the phase tags changed nothing the engine could
+// see: a 4×4–6 main lift stayed 4×4–6 for the whole block. Two layers now
+// enforce it, both keyed off the same gate (`strengthMainSlot`): the rep range
+// of a main lift tightens by phase, and its sets are laid out as one top set
+// plus back-offs. Neither needs a 1RM input or an RPE — the engine still reads
+// what was lifted, and the top set is what it judges.
+
+/** How many reps the main-lift range tightens by in each strength phase. */
+export const STRENGTH_PHASE_SHIFT: Partial<Record<PhaseKind, number>> = {
+  intensification: 1,
+  peak: 2,
+};
+
+/** Back-off sets as a fraction of the top set, by phase (0.9 outside a peak). */
+export const BACKOFF_PCT: Partial<Record<PhaseKind, number>> = {
+  peak: 0.85,
+};
+export const DEFAULT_BACKOFF_PCT = 0.9;
+
+export function backoffFactor(phase: PhaseKind | null | undefined): number {
+  return (phase && BACKOFF_PCT[phase]) ?? DEFAULT_BACKOFF_PCT;
+}
+
+type SlotLike = Pick<Exercise, 'main' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>;
+
+/**
+ * Is this a strength block's main lift, dosed by the plan in the strength tier
+ * (ceiling ≤ 6)? Beginners never qualify — their main work is 8–12 by the
+ * beginner floor — and a range the lifter typed themselves is theirs to keep.
+ */
+export function strengthMainSlot(slot: SlotLike, goal: Goal | null | undefined): boolean {
+  return goal === 'strength' && slot.main === true && slot.progression !== 'manual' &&
+    slot.repLow != null && slot.repHigh != null && slot.repHigh <= 6 &&
+    slot.rangeSource !== 'user' && slot.rangeSource !== 'history';
+}
+
+/**
+ * The rep range in force for a slot THIS week. Only a strength block's main
+ * lifts move: build weeks keep the dosed range (4–6 / 3–5), push weeks sit one
+ * rep lower (3–5 / 2–4), peak weeks two (2–4 / 1–3). Easy weeks keep the base
+ * range at a backed-off load. Everything else returns the slot untouched.
+ */
+export function phaseRange(
+  slot: SlotLike, goal: Goal | null | undefined, phase: PhaseKind | null | undefined,
+): { repLow: number; repHigh: number } | null {
+  if (!strengthMainSlot(slot, goal)) return null;
+  const shift = (phase && STRENGTH_PHASE_SHIFT[phase]) ?? 0;
+  if (shift === 0) return null;
+  const repLow = Math.max(1, slot.repLow! - shift);
+  const repHigh = Math.max(repLow + 1, slot.repHigh! - shift);
+  return { repLow, repHigh };
+}
+
+/** Apply `phaseRange` to every slot of a day — the overlay WorkoutView trains against. */
+export function applyPhaseRanges<T extends { exercises: Exercise[] }>(
+  day: T, goal: Goal | null | undefined, phase: PhaseKind | null | undefined,
+): T {
+  let changed = false;
+  const exercises = day.exercises.map(ex => {
+    const r = phaseRange(ex, goal, phase);
+    if (!r) return ex;
+    changed = true;
+    return { ...ex, ...r };
+  });
+  return changed ? { ...day, exercises } : day;
+}
+
+/**
+ * Should this slot be prescribed as a top set plus back-offs? The strength
+ * main lifts, for anyone past the beginner floor, on a loadable implement.
+ */
+export function topSetScheme(
+  slot: SlotLike, goal: Goal | null | undefined, experience: ExperienceLevel | undefined,
+  weightType: WeightType | null | undefined,
+): boolean {
+  return strengthMainSlot(slot, goal) && experience !== 'beginner' && weightType !== 'Bodyweight';
 }

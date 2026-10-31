@@ -1,6 +1,8 @@
 import type { Env } from './types';
 import { getAuthenticatedUser } from './auth';
-import { getUserRole } from './roles';
+import type { Role } from './roles';
+import { isPlanDoc, mergePlanDocs, planDocClock } from './planMerge';
+import type { PlanDocLike } from './planMerge';
 
 // Custom exercises are stamped `${slug}-${Date.now()}` by the client
 // (generateExerciseId) — a trailing 10+ digit timestamp marks user-created
@@ -11,13 +13,13 @@ export async function handleSync(request: Request, env: Env): Promise<Response> 
   const user = await getAuthenticatedUser(request, env);
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (request.method === 'GET')  return pull(user.id, env);
+  if (request.method === 'GET')  return pull(request, user.id, user.role, env);
   if (request.method === 'POST') return push(request, user.id, env);
   return new Response('Method Not Allowed', { status: 405 });
 }
 
 const META_COLUMNS = `exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2,
-                      secondary_muscle3, workout_type, equipment, weight_type`;
+                      secondary_muscle3, workout_type, equipment, weight_type, updated_at`;
 
 interface SetEntry {
   exerciseId: string;
@@ -26,6 +28,8 @@ interface SetEntry {
   reps: number;
   /** 0-based exercise position within the workout (absent on legacy rows) */
   order?: number;
+  repLow?: number;
+  repHigh?: number;
   /** Warm-up set — logged but excluded from the client's analytics (absent on working sets) */
   warmup?: boolean;
 }
@@ -37,6 +41,8 @@ interface SessionDoc {
   startedAt: number;
   completedAt: number | null;
   updatedAt: number;
+  /** free-text session note (absent/null when none) */
+  note?: string | null;
   sets: SetEntry[];
 }
 
@@ -46,7 +52,7 @@ interface SessionDoc {
 // so both sides agree on identity. Empty sessions (ghosts) are dropped.
 async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> {
   const docs = await env.DB.prepare(
-    'SELECT guid, day_id, week_number, started_at, completed_at, updated_at, sets_json FROM session_docs WHERE user_id = ?',
+    'SELECT guid, day_id, week_number, started_at, completed_at, updated_at, sets_json, note FROM session_docs WHERE user_id = ?',
   ).bind(userId).all();
 
   if (docs.results.length > 0) {
@@ -57,6 +63,7 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
       startedAt:   r.started_at as number,
       completedAt: (r.completed_at as number | null) ?? null,
       updatedAt:   r.updated_at as number,
+      note:        (r.note as string | null) ?? null,
       sets:        JSON.parse(r.sets_json as string) as SetEntry[],
     }));
   }
@@ -95,17 +102,56 @@ async function loadSessionDocs(userId: string, env: Env): Promise<SessionDoc[]> 
     .filter(d => d.sets.length > 0);
 }
 
-async function pull(userId: string, env: Env): Promise<Response> {
+// ── Conditional pull ────────────────────────────────────────────────────────
+// The client pulls every 60 s while open. Almost every one of those pulls
+// finds nothing new, yet used to download the whole history. The ETag is a
+// fingerprint of everything a pull serves — per-user clocks and row counts
+// (a count catches a delete that no clock records), the global layers'
+// audit clock, the merge table, the role — so an unchanged account costs one
+// small 304. It is computed BEFORE the data is read: if a push lands in
+// between, the data is newer than the tag and the next pull re-fetches,
+// never the other way round.
+async function computeEtag(userId: string, env: Env): Promise<string> {
+  const row = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*)        FROM session_docs           WHERE user_id = ?1) AS docs,
+       (SELECT MAX(updated_at) FROM session_docs           WHERE user_id = ?1) AS docs_at,
+       (SELECT MAX(deleted_at) FROM deleted_sessions       WHERE user_id = ?1) AS dead_at,
+       (SELECT updated_at      FROM user_programs          WHERE user_id = ?1) AS prog_at,
+       (SELECT COUNT(*)        FROM user_exercises         WHERE user_id = ?1) AS lib,
+       (SELECT MAX(updated_at) FROM user_exercises         WHERE user_id = ?1) AS lib_at,
+       (SELECT COUNT(*)        FROM exercise_metadata      WHERE user_id = ?1) AS meta,
+       (SELECT MAX(updated_at) FROM exercise_metadata      WHERE user_id = ?1) AS meta_at,
+       (SELECT COUNT(*)        FROM user_deleted_exercises WHERE user_id = ?1) AS tombs,
+       (SELECT MAX(deleted_at) FROM user_deleted_exercises WHERE user_id = ?1) AS tombs_at,
+       (SELECT updated_at      FROM training_plans         WHERE user_id = ?1) AS plan_at,
+       (SELECT MAX(changed_at) FROM global_exercise_audit)                     AS global_at,
+       (SELECT COUNT(*)        FROM global_exercises)                          AS globals,
+       (SELECT COUNT(*)        FROM exercise_merges)                           AS merges,
+       (SELECT role            FROM user_roles             WHERE user_id = ?1) AS role`,
+  ).bind(userId).first<Record<string, unknown>>();
+  const parts = Object.values(row ?? {}).map(v => (v == null ? '0' : String(v)));
+  // The account is part of the tag so a tag can never validate across users.
+  return `W/"${userId}.${parts.join('.')}"`;
+}
+
+async function pull(request: Request, userId: string, role: Role, env: Env): Promise<Response> {
+  const etag = await computeEtag(userId, env);
+  const headers = { ETag: etag, 'Cache-Control': 'no-store' };
+  if (request.headers.get('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers });
+  }
+
   const [sessionDocs, sessionTombstones, program, userExercises, userMeta,
-         userTombstones, legacyTombstones, globalExercises, globalMeta, role, planRow,
+         userTombstones, legacyTombstones, globalExercises, globalMeta, planRow,
          mergeRows] = await Promise.all([
     loadSessionDocs(userId, env),
     env.DB.prepare('SELECT guid FROM deleted_sessions WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare(
-      'SELECT program_json, exercises_json FROM user_programs WHERE user_id = ?',
-    ).bind(userId).first<{ program_json: string; exercises_json: string }>(),
+      'SELECT program_json, exercises_json, updated_at FROM user_programs WHERE user_id = ?',
+    ).bind(userId).first<{ program_json: string; exercises_json: string; updated_at: number }>(),
     env.DB.prepare(
-      'SELECT id, name, sets, rep_low, rep_high, archived FROM user_exercises WHERE user_id = ?',
+      'SELECT id, name, sets, rep_low, rep_high, archived, updated_at FROM user_exercises WHERE user_id = ?',
     ).bind(userId).all(),
     env.DB.prepare(
       `SELECT ${META_COLUMNS} FROM exercise_metadata WHERE user_id = ?`,
@@ -116,8 +162,10 @@ async function pull(userId: string, env: Env): Promise<Response> {
     env.DB.prepare(
       'SELECT id, name, sets, rep_low, rep_high, archived FROM global_exercises',
     ).all(),
-    env.DB.prepare(`SELECT ${META_COLUMNS} FROM global_exercise_metadata`).all(),
-    getUserRole(userId, env),
+    env.DB.prepare(
+      `SELECT exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2,
+              secondary_muscle3, workout_type, equipment, weight_type FROM global_exercise_metadata`,
+    ).all(),
     env.DB.prepare(
       'SELECT plan_json FROM training_plans WHERE user_id = ?',
     ).bind(userId).first<{ plan_json: string }>(),
@@ -142,6 +190,7 @@ async function pull(userId: string, env: Env): Promise<Response> {
       startedAt:   d.startedAt,
       completedAt: d.completedAt ?? undefined,
       updatedAt:   d.updatedAt,
+      ...(d.note ? { note: d.note } : {}),
     });
     for (const s of d.sets) {
       wireSetLogs.push({ id: nextLogId++, sessionId: id, ...s });
@@ -161,7 +210,9 @@ async function pull(userId: string, env: Env): Promise<Response> {
   let metaRows = userMeta.results;
   if (metaRows.length === 0) {
     metaRows = (await env.DB.prepare(
-      `SELECT ${META_COLUMNS} FROM app_exercise_metadata`,
+      `SELECT exercise_id, primary_muscle, secondary_muscle1, secondary_muscle2,
+              secondary_muscle3, workout_type, equipment, weight_type, 0 AS updated_at
+       FROM app_exercise_metadata`,
     ).all()).results;
   }
   metaRows = metaRows.filter(r => !deletedIds.has(r.exercise_id as string));
@@ -173,6 +224,7 @@ async function pull(userId: string, env: Env): Promise<Response> {
     repLow:  r.rep_low,
     repHigh: r.rep_high,
     ...(r.archived ? { archived: true } : {}),
+    ...(typeof r.updated_at === 'number' && r.updated_at > 0 ? { updatedAt: r.updated_at } : {}),
   });
 
   // Layer 2 (user-owned) library, with the same one-time adoption fallback
@@ -224,9 +276,12 @@ async function pull(userId: string, env: Env): Promise<Response> {
       workoutType: r.workout_type ?? null,
       equipment:   r.equipment    ?? null,
       weightType:  r.weight_type  ?? null,
+      // the override's clock rides on the details row (one clock per exercise)
+      ...(typeof r.updated_at === 'number' && r.updated_at > 0 ? { updatedAt: r.updated_at } : {}),
     })),
     deletedExerciseIds: [...deletedIds],
     program:   program?.program_json ? JSON.parse(program.program_json) : null,
+    programUpdatedAt: program?.updated_at ?? 0,
     exercises,
     plan:      planRow?.plan_json ? JSON.parse(planRow.plan_json) : null,
     // Layer 1 metadata (admin-curated), kept separate from the user's own
@@ -249,40 +304,63 @@ async function pull(userId: string, env: Env): Promise<Response> {
       toId:   r.to_id as string,
     })),
     role,
-  });
+  }, { headers });
 }
 
 interface PushExercise {
   id: string; name: string; archived?: boolean;
+  /** clock of the last local edit — a push only replaces an older server copy */
+  updatedAt?: number;
   /** @deprecated wire-compatibility only — older clients still send these */
   sets?: number; repLow?: number; repHigh?: number;
+}
+
+interface PushMuscles {
+  exerciseId: string;
+  primaryMuscle: string | null; secondaryMuscle1: string | null;
+  secondaryMuscle2: string | null; secondaryMuscle3: string | null;
+}
+interface PushDetails {
+  exerciseId: string;
+  workoutType: string | null; equipment: string | null; weightType: string | null;
+  /** the override's clock (one per exercise, carried on the details row) */
+  updatedAt?: number;
 }
 
 interface PushPayload {
   // guid/updatedAt are absent from stale cached clients — the server derives
   // the same deterministic fallbacks the client would (legacy-<startedAt>,
   // completedAt) so identities agree across versions.
-  sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number; updatedAt?: number }>;
-  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean }>;
+  sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number | null; updatedAt?: number; note?: string | null }>;
+  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean; repLow?: number; repHigh?: number }>;
   /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
   exerciseLogs:  unknown[];
   deletedSessionGuids?: string[];
-  exerciseMuscles?: Array<{ exerciseId: string; primaryMuscle: string | null; secondaryMuscle1: string | null; secondaryMuscle2: string | null; secondaryMuscle3: string | null }>;
-  exerciseDetails?: Array<{ exerciseId: string; workoutType: string | null; equipment: string | null; weightType: string | null }>;
+  exerciseMuscles?: PushMuscles[];
+  exerciseDetails?: PushDetails[];
   deletedExerciseIds?: string[];
-  program:   unknown;
+  /** exercises the user explicitly brought back after deleting — lifts their tombstones */
+  restoredExerciseIds?: string[];
+  program?:  unknown[] | null;
+  /** clock of the program's last local edit; absent from older clients */
+  programUpdatedAt?: number;
   exercises: PushExercise[] | null;
-  /** training journey document — whole-document LWW by updatedAt */
-  plan?: { version: number; plans: unknown[]; updatedAt: number } | null;
+  /** training journey document — plans LWW by updatedAt, profile by its own clock */
+  plan?: PlanDocLike | null;
 }
 
 // Sanity limits — a personal training log is nowhere near these; anything
 // beyond them is a bug or abuse, and rejecting beats writing garbage.
-const MAX_SESSIONS  = 20_000;
-const MAX_SET_LOGS  = 200_000;
-const MAX_EXERCISES = 10_000;
+const MAX_SESSIONS   = 20_000;
+const MAX_SET_LOGS   = 200_000;
+const MAX_EXERCISES  = 10_000;
 const MAX_PLANS      = 200;
 const MAX_PLAN_BYTES = 1_000_000;
+const MAX_PROGRAM_BYTES = 512_000;
+const MAX_NOTE_CHARS = 2_000;
+
+const isOptString = (v: unknown) => v === undefined || v === null || typeof v === 'string';
+const isOptNumber = (v: unknown) => v === undefined || typeof v === 'number';
 
 function validatePush(data: PushPayload): string | null {
   if (typeof data !== 'object' || data === null) return 'payload must be an object';
@@ -296,22 +374,26 @@ function validatePush(data: PushPayload): string | null {
   for (const s of data.sessions) {
     if (typeof s.id !== 'number' || typeof s.dayId !== 'number' ||
         typeof s.weekNumber !== 'number' || typeof s.startedAt !== 'number' ||
+        (s.completedAt != null && typeof s.completedAt !== 'number') ||
         (s.guid !== undefined && typeof s.guid !== 'string') ||
-        (s.updatedAt !== undefined && typeof s.updatedAt !== 'number')) {
+        !isOptNumber(s.updatedAt) || !isOptString(s.note)) {
       return 'malformed session';
     }
+    if (typeof s.note === 'string' && s.note.length > MAX_NOTE_CHARS) return 'session note too long';
   }
-  if (data.deletedSessionGuids != null) {
-    if (!Array.isArray(data.deletedSessionGuids)) return 'deletedSessionGuids must be an array';
-    if (data.deletedSessionGuids.length > MAX_SESSIONS) return 'too many deleted session guids';
-    if (data.deletedSessionGuids.some(g => typeof g !== 'string')) return 'malformed deleted session guid';
+  for (const [key, list] of [['deletedSessionGuids', data.deletedSessionGuids]] as const) {
+    if (list == null) continue;
+    if (!Array.isArray(list)) return `${key} must be an array`;
+    if (list.length > MAX_SESSIONS) return 'too many deleted session guids';
+    if (list.some(g => typeof g !== 'string')) return 'malformed deleted session guid';
   }
   for (const s of data.setLogs) {
     if (typeof s.id !== 'number' || typeof s.sessionId !== 'number' ||
         typeof s.exerciseId !== 'string' || typeof s.setNumber !== 'number' ||
         typeof s.weight !== 'number' || typeof s.reps !== 'number' ||
-        (s.order !== undefined && typeof s.order !== 'number') ||
-        (s.warmup !== undefined && typeof s.warmup !== 'boolean')) {
+        !isOptNumber(s.order) ||
+        (s.warmup !== undefined && typeof s.warmup !== 'boolean') ||
+        !isOptNumber(s.repLow) || !isOptNumber(s.repHigh)) {
       return 'malformed set log';
     }
   }
@@ -324,29 +406,63 @@ function validatePush(data: PushPayload): string | null {
       // them here rejected every push those clients made. They stay accepted
       // and stored for older clients that still read the columns.
       if (typeof e.id !== 'string' || typeof e.name !== 'string' ||
-          (e.sets    !== undefined && typeof e.sets    !== 'number') ||
-          (e.repLow  !== undefined && typeof e.repLow  !== 'number') ||
-          (e.repHigh !== undefined && typeof e.repHigh !== 'number')) {
+          !isOptNumber(e.sets) || !isOptNumber(e.repLow) || !isOptNumber(e.repHigh) ||
+          !isOptNumber(e.updatedAt)) {
         return 'malformed exercise';
       }
     }
   }
-  if (data.deletedExerciseIds != null) {
-    if (!Array.isArray(data.deletedExerciseIds)) return 'deletedExerciseIds must be an array';
-    if (data.deletedExerciseIds.length > MAX_EXERCISES) return 'too many deleted exercise ids';
-    if (data.deletedExerciseIds.some(id => typeof id !== 'string')) return 'malformed deleted exercise id';
+  for (const [key, list] of [
+    ['deletedExerciseIds', data.deletedExerciseIds],
+    ['restoredExerciseIds', data.restoredExerciseIds],
+  ] as const) {
+    if (list == null) continue;
+    if (!Array.isArray(list)) return `${key} must be an array`;
+    if (list.length > MAX_EXERCISES) return `too many ${key}`;
+    if (list.some(id => typeof id !== 'string')) return `malformed ${key.replace('Ids', ' id')}`;
   }
-  if (data.plan != null) {
-    if (typeof data.plan !== 'object') return 'malformed plan';
-    if (data.plan.version !== 1 || !Array.isArray(data.plan.plans) ||
-        typeof data.plan.updatedAt !== 'number') {
-      return 'malformed plan';
+  // Metadata rows used to be unvalidated: a non-array value threw inside
+  // .map and surfaced as a 500, a non-string field landed in a TEXT column.
+  if (data.exerciseMuscles != null) {
+    if (!Array.isArray(data.exerciseMuscles)) return 'exerciseMuscles must be an array';
+    if (data.exerciseMuscles.length > MAX_EXERCISES) return 'too many exerciseMuscles';
+    for (const m of data.exerciseMuscles) {
+      if (typeof m !== 'object' || m === null || typeof m.exerciseId !== 'string' ||
+          !isOptString(m.primaryMuscle) || !isOptString(m.secondaryMuscle1) ||
+          !isOptString(m.secondaryMuscle2) || !isOptString(m.secondaryMuscle3)) {
+        return 'malformed exerciseMuscles';
+      }
     }
+  }
+  if (data.exerciseDetails != null) {
+    if (!Array.isArray(data.exerciseDetails)) return 'exerciseDetails must be an array';
+    if (data.exerciseDetails.length > MAX_EXERCISES) return 'too many exerciseDetails';
+    for (const d of data.exerciseDetails) {
+      if (typeof d !== 'object' || d === null || typeof d.exerciseId !== 'string' ||
+          !isOptString(d.workoutType) || !isOptString(d.equipment) || !isOptString(d.weightType) ||
+          !isOptNumber(d.updatedAt)) {
+        return 'malformed exerciseDetails';
+      }
+    }
+  }
+  if (data.program != null) {
+    if (!Array.isArray(data.program)) return 'program must be an array';
+    if (JSON.stringify(data.program).length > MAX_PROGRAM_BYTES) return 'program too large';
+  }
+  if (!isOptNumber(data.programUpdatedAt)) return 'malformed programUpdatedAt';
+  if (data.plan != null) {
+    if (!isPlanDoc(data.plan)) return 'malformed plan';
     if (data.plan.plans.length > MAX_PLANS) return 'too many plans';
     if (JSON.stringify(data.plan).length > MAX_PLAN_BYTES) return 'plan too large';
   }
   return null;
 }
+
+// D1 batches are atomic, but a request this size is best kept in one. If a
+// push ever outgrows a single batch, the chunks are ordered so every upsert
+// lands before anything destructive: a failure mid-way leaves extra data,
+// never a tombstone without the merge that accompanied it.
+const BATCH_MAX = 500;
 
 async function push(request: Request, userId: string, env: Env): Promise<Response> {
   let data: PushPayload;
@@ -362,16 +478,28 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   // Exercise deletions are permanent but scoped to this user: union the
   // client's tombstones with the user's own (plus the read-only legacy
   // app-wide set), so no stale copy from another device can resurrect a
-  // deleted exercise — and no user's deletion touches anyone else.
-  const [existingUser, existingLegacy] = await Promise.all([
+  // deleted exercise — and no user's deletion touches anyone else. The one
+  // way back is explicit: an exercise the user re-added by hand (or that an
+  // admin merge made the survivor) arrives in restoredExerciseIds and has
+  // its per-user tombstone lifted. Legacy app-wide tombstones cannot be
+  // lifted per user and stay in force.
+  const [existingUser, existingLegacy, existingPlan] = await Promise.all([
     env.DB.prepare('SELECT exercise_id FROM user_deleted_exercises WHERE user_id = ?').bind(userId).all(),
     env.DB.prepare('SELECT exercise_id FROM deleted_exercises').all(),
+    env.DB.prepare('SELECT plan_json FROM training_plans WHERE user_id = ?').bind(userId)
+      .first<{ plan_json: string }>(),
   ]);
+  const clientDeleted = new Set(data.deletedExerciseIds ?? []);
+  const restored = new Set((data.restoredExerciseIds ?? []).filter(id => !clientDeleted.has(id)));
+  const userTombs = new Set(existingUser.results.map(r => r.exercise_id as string));
+  const liftedTombs = [...restored].filter(id => userTombs.has(id));
+  for (const id of liftedTombs) userTombs.delete(id);
+
   const tombstoned = new Set([
-    ...existingUser.results.map(r => r.exercise_id as string),
+    ...userTombs,
     ...existingLegacy.results.map(r => r.exercise_id as string),
   ]);
-  const newTombstones = (data.deletedExerciseIds ?? []).filter(id => !tombstoned.has(id));
+  const newTombstones = [...clientDeleted].filter(id => !tombstoned.has(id));
   for (const id of newTombstones) tombstoned.add(id);
 
   // Session tombstones follow the same rule, per user.
@@ -382,19 +510,29 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const newSessionTombs = (data.deletedSessionGuids ?? []).filter(g => !deadSessions.has(g));
   for (const g of newSessionTombs) deadSessions.add(g);
 
-  const stmts: D1PreparedStatement[] = [];
+  const upserts: D1PreparedStatement[] = [];
+  const destructive: D1PreparedStatement[] = [];
   const now = Date.now();
 
+  for (const id of liftedTombs) {
+    destructive.push(env.DB.prepare(
+      'DELETE FROM user_deleted_exercises WHERE user_id = ? AND exercise_id = ?',
+    ).bind(userId, id));
+  }
   for (const id of newTombstones) {
-    stmts.push(env.DB.prepare(
+    destructive.push(env.DB.prepare(
       'INSERT OR IGNORE INTO user_deleted_exercises (user_id, exercise_id, deleted_at) VALUES (?, ?, ?)',
     ).bind(userId, id, now));
+    // Rows written before the tombstone existed — scrubbed once, here, rather
+    // than re-issuing a DELETE for every tombstone on every push.
+    destructive.push(env.DB.prepare('DELETE FROM user_exercises WHERE user_id = ? AND id = ?').bind(userId, id));
+    destructive.push(env.DB.prepare('DELETE FROM exercise_metadata WHERE exercise_id = ? AND user_id = ?').bind(id, userId));
   }
   for (const g of newSessionTombs) {
-    stmts.push(env.DB.prepare(
+    destructive.push(env.DB.prepare(
       'INSERT OR IGNORE INTO deleted_sessions (user_id, guid, deleted_at) VALUES (?, ?, ?)',
     ).bind(userId, g, now));
-    stmts.push(env.DB.prepare(
+    destructive.push(env.DB.prepare(
       'DELETE FROM session_docs WHERE user_id = ? AND guid = ?',
     ).bind(userId, g));
   }
@@ -407,7 +545,7 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   for (const s of data.setLogs) {
     const arr = setsBySession.get(s.sessionId) ?? [];
     // undefined order/warmup are dropped by JSON.stringify, keeping legacy docs unchanged
-    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order, warmup: s.warmup });
+    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order, warmup: s.warmup, repLow: s.repLow, repHigh: s.repHigh });
     setsBySession.set(s.sessionId, arr);
   }
 
@@ -417,18 +555,19 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     const sets = setsBySession.get(s.id) ?? [];
     if (sets.length === 0) continue; // ghost/empty session — never store
     const updatedAt = s.updatedAt ?? s.completedAt ?? s.startedAt;
-    stmts.push(env.DB.prepare(
-      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    upserts.push(env.DB.prepare(
+      `INSERT INTO session_docs (user_id, guid, day_id, week_number, started_at, completed_at, updated_at, sets_json, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, guid) DO UPDATE SET
          day_id       = excluded.day_id,
          week_number  = excluded.week_number,
          started_at   = excluded.started_at,
          completed_at = excluded.completed_at,
          updated_at   = excluded.updated_at,
-         sets_json    = excluded.sets_json
+         sets_json    = excluded.sets_json,
+         note         = excluded.note
        WHERE excluded.updated_at > session_docs.updated_at`,
-    ).bind(userId, guid, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null, updatedAt, JSON.stringify(sets)));
+    ).bind(userId, guid, s.dayId, s.weekNumber, s.startedAt, s.completedAt ?? null, updatedAt, JSON.stringify(sets), s.note?.trim() ? s.note.trim() : null));
   }
 
   // The legacy per-row tables (workout_sessions/set_logs/exercise_logs) are
@@ -441,26 +580,25 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   // user, never delete-and-replace — a client whose local library is missing
   // an exercise another of this user's devices just added must not erase it.
   // Deletion happens exclusively through tombstones, which every read filters.
+  // Per row, a copy only replaces one that is not newer (unstamped rows carry
+  // 0 on both sides, so legacy clients keep their last-push-wins behaviour).
   if (data.exercises) {
     for (const e of data.exercises) {
       if (tombstoned.has(e.id)) continue;
-      stmts.push(env.DB.prepare(
-        `INSERT INTO user_exercises (user_id, id, name, sets, rep_low, rep_high, archived) VALUES (?, ?, ?, ?, ?, ?, ?)
+      upserts.push(env.DB.prepare(
+        `INSERT INTO user_exercises (user_id, id, name, sets, rep_low, rep_high, archived, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, id) DO UPDATE SET
-           name     = excluded.name,
-           sets     = excluded.sets,
-           rep_low  = excluded.rep_low,
-           rep_high = excluded.rep_high,
-           archived = excluded.archived`,
+           name       = excluded.name,
+           sets       = excluded.sets,
+           rep_low    = excluded.rep_low,
+           rep_high   = excluded.rep_high,
+           archived   = excluded.archived,
+           updated_at = excluded.updated_at
+         WHERE excluded.updated_at >= user_exercises.updated_at`,
       // The rep columns are NOT NULL and only an older client reads them, so
       // an identity-only entry stores the same 3 × 8–12 the pre-dosage library
       // used as its fallback. Nothing on a current client reads these back.
-      ).bind(userId, e.id, e.name, e.sets ?? 3, e.repLow ?? 8, e.repHigh ?? 12, e.archived ? 1 : 0));
-    }
-    // Tombstoned rows may still exist from before this push carried the
-    // tombstone — scrub them (reads already filter, this is hygiene).
-    for (const id of tombstoned) {
-      stmts.push(env.DB.prepare('DELETE FROM user_exercises WHERE user_id = ? AND id = ?').bind(userId, id));
+      ).bind(userId, e.id, e.name, e.sets ?? 3, e.repLow ?? 8, e.repHigh ?? 12, e.archived ? 1 : 0, e.updatedAt ?? 0));
     }
 
     // Exercise lifecycle: a custom exercise (timestamped id) enters the review
@@ -470,8 +608,9 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
     const detailsById = new Map((data.exerciseDetails ?? []).map(d => [d.exerciseId, d]));
     for (const e of data.exercises) {
       if (tombstoned.has(e.id) || !CUSTOM_ID_RE.test(e.id)) continue;
-      const meta = { ...musclesById.get(e.id), ...detailsById.get(e.id) };
-      stmts.push(env.DB.prepare(
+      const meta: Record<string, unknown> = { ...musclesById.get(e.id), ...detailsById.get(e.id) };
+      delete meta.updatedAt;
+      upserts.push(env.DB.prepare(
         `INSERT OR IGNORE INTO pending_exercises (id, name, submitted_by, source, metadata_json, status, created_at)
          VALUES (?, ?, ?, 'user', ?, 'pending', ?)`,
       ).bind(e.id, e.name, userId, Object.keys(meta).length > 1 ? JSON.stringify(meta) : null, now));
@@ -490,14 +629,14 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   }
   // Same rule as the library: upsert per exercise, never delete-and-replace,
   // so a push from a device that hasn't pulled another device's fresh metadata
-  // yet can't erase it. Tombstoned rows are scrubbed explicitly below.
+  // yet can't erase it — and a row only yields to one at least as new.
   for (const [exId, m] of metaMap) {
     if (tombstoned.has(exId)) continue;
-    stmts.push(env.DB.prepare(
+    upserts.push(env.DB.prepare(
       `INSERT INTO exercise_metadata
          (exercise_id, user_id, primary_muscle, secondary_muscle1, secondary_muscle2, secondary_muscle3,
-          workout_type, equipment, weight_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          workout_type, equipment, weight_type, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(exercise_id, user_id) DO UPDATE SET
          primary_muscle    = excluded.primary_muscle,
          secondary_muscle1 = excluded.secondary_muscle1,
@@ -505,7 +644,9 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
          secondary_muscle3 = excluded.secondary_muscle3,
          workout_type      = excluded.workout_type,
          equipment         = excluded.equipment,
-         weight_type       = excluded.weight_type`,
+         weight_type       = excluded.weight_type,
+         updated_at        = excluded.updated_at
+       WHERE excluded.updated_at >= exercise_metadata.updated_at`,
     ).bind(
       exId,
       userId,
@@ -516,44 +657,57 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
       (m.workoutType      as string | null) ?? null,
       (m.equipment        as string | null) ?? null,
       (m.weightType       as string | null) ?? null,
+      typeof m.updatedAt === 'number' ? m.updatedAt : 0,
     ));
   }
-  for (const id of tombstoned) {
-    stmts.push(env.DB.prepare('DELETE FROM exercise_metadata WHERE exercise_id = ? AND user_id = ?').bind(id, userId));
-  }
 
-  // SAFEGUARD: never let an empty program overwrite a stored one. An empty
-  // array is truthy in JS, so the old `if (data.program)` happily persisted a
-  // wiped program into user_programs, from where every device re-pulled it.
-  // A program with zero days is only valid for a brand-new account that has
-  // never stored one — and that case writes nothing here anyway (no data to
-  // lose). Requiring at least one day makes a bad/empty push a no-op instead
-  // of destroying the server's copy. The library still persists via the
-  // per-row user_exercises upserts above, independent of this row.
-  if (Array.isArray(data.program) && data.program.length > 0 && data.exercises) {
-    stmts.push(env.DB.prepare(
-      `INSERT INTO user_programs (user_id, program_json, exercises_json) VALUES (?, ?, ?)
+  // The program document. Two guards:
+  //  • A copy only replaces one that is not newer (clock >= stored). Unstamped
+  //    pushes (older clients, never-edited programs) carry 0 and keep their
+  //    last-push-wins behaviour against an unstamped row, but can no longer
+  //    overwrite an edit a current client made.
+  //  • An UNSTAMPED empty program is a wipe, not a decision: an empty array is
+  //    truthy, and `if (data.program)` once persisted a wiped program that every
+  //    device then re-pulled. A stamped empty program is the user deleting
+  //    their last day on purpose, and is stored like any other edit.
+  if (Array.isArray(data.program) && data.exercises &&
+      (data.program.length > 0 || data.programUpdatedAt != null)) {
+    upserts.push(env.DB.prepare(
+      `INSERT INTO user_programs (user_id, program_json, exercises_json, updated_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET
          program_json   = excluded.program_json,
-         exercises_json = excluded.exercises_json`,
-    ).bind(userId, JSON.stringify(data.program), JSON.stringify(data.exercises)));
+         exercises_json = excluded.exercises_json,
+         updated_at     = excluded.updated_at
+       WHERE excluded.updated_at >= user_programs.updated_at`,
+    ).bind(userId, JSON.stringify(data.program), JSON.stringify(data.exercises), data.programUpdatedAt ?? 0));
   }
 
-  // Training journey: upsert only when the pushed document is newer — the
-  // same last-write-wins the client applies on pull, enforced on both ends.
+  // Training journey: the same merge the client applies on pull (planMerge.ts)
+  // — the newer plans document wins, the newer profile wins — then the merged
+  // document is stored. Reading the current row first means the decision is
+  // made in one place rather than approximated with a WHERE clause.
   if (data.plan) {
-    stmts.push(env.DB.prepare(
-      `INSERT INTO training_plans (user_id, plan_json, updated_at) VALUES (?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET
-         plan_json  = excluded.plan_json,
-         updated_at = excluded.updated_at
-       WHERE excluded.updated_at > training_plans.updated_at`,
-    ).bind(userId, JSON.stringify(data.plan), data.plan.updatedAt));
+    let current: PlanDocLike | null = null;
+    if (existingPlan?.plan_json) {
+      try {
+        const parsed: unknown = JSON.parse(existingPlan.plan_json);
+        if (isPlanDoc(parsed)) current = parsed;
+      } catch { /* an unreadable row is replaced */ }
+    }
+    const { doc, changed } = mergePlanDocs(current, data.plan);
+    if (changed) {
+      upserts.push(env.DB.prepare(
+        `INSERT INTO training_plans (user_id, plan_json, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           plan_json  = excluded.plan_json,
+           updated_at = excluded.updated_at`,
+      ).bind(userId, JSON.stringify(doc), planDocClock(doc)));
+    }
   }
 
-  // D1 batch limit is 1000 statements; chunk to be safe
-  for (let i = 0; i < stmts.length; i += 100) {
-    await env.DB.batch(stmts.slice(i, i + 100));
+  const stmts = [...upserts, ...destructive];
+  for (let i = 0; i < stmts.length; i += BATCH_MAX) {
+    await env.DB.batch(stmts.slice(i, i + BATCH_MAX));
   }
 
   return Response.json({ ok: true });

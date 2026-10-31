@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildSetPlan, calculateRecommendation } from './recommendations';
+import { buildSetPlan, calculateRecommendation, needsRegression } from './recommendations';
 import type { ExerciseSession, PrescriptionContext } from './recommendations';
 import type { Exercise } from './program';
 
-type Slot = Pick<Exercise, 'sets' | 'repLow' | 'repHigh'>;
+type Slot = Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'rangeSource' | 'progression'>;
 
 const exercise = { sets: 3, repLow: 8, repHigh: 12 };
 
@@ -308,18 +308,50 @@ describe('calculateRecommendation — bodyweight (rep progression)', () => {
     expect(rec).toMatchObject({ weight: 0, targetReps: 13, direction: 'up', kind: 'increase' });
   });
 
-  it('chases one more rep while inside the range', () => {
+  it('chases one more rep on set 1 while inside the range', () => {
+    // The target is set 1 + 1 — the same rule the loaded plan uses — not the
+    // weakest set + 1, which asked a 10/9/8 lifter for 9s.
     const rec = advise([session([[0, 10], [0, 9], [0, 8]])], exercise, bw);
-    expect(rec).toMatchObject({ weight: 0, targetReps: 9, direction: 'hold', kind: 'hold' });
+    expect(rec).toMatchObject({ weight: 0, targetReps: 11, direction: 'hold', kind: 'hold' });
   });
 
-  it('caps the in-range rep goal at the top of the range', () => {
-    expect(advise([session([[0, 12], [0, 12], [0, 11]])], exercise, bw)!.targetReps).toBe(12);
+  it('a first session at the ceiling earns the increase, like loaded work', () => {
+    const rec = advise([session([[0, 12], [0, 12], [0, 11]])], exercise, bw);
+    expect(rec).toMatchObject({ kind: 'increase', targetReps: 13 });
   });
 
-  it('resets to the bottom of the range when reps fall under it', () => {
+  it('never deloads a lifter over one bad day (best-of-window, like loaded work)', () => {
+    const history = [
+      session([[0, 10], [0, 10], [0, 10]], 1),   // the off day
+      session([[0, 11], [0, 11], [0, 11]], 2),   // the high-water mark
+      session([[0, 10], [0, 10], [0, 10]], 3),
+    ];
+    expect(advise(history, exercise, bw)!.kind).not.toBe('deload');
+  });
+
+  it('ignores a failed bonus set instead of lowering the target to it', () => {
+    const rec = advise([session([[0, 12], [0, 12], [0, 12], [0, 4]])], exercise, bw);
+    expect(rec).toMatchObject({ kind: 'increase', targetReps: 13 });
+  });
+
+  // Audit F11: "build back into 8–12" told a lifter doing fives to do eight,
+  // forever. The target is one more than they managed, walking up to the floor.
+  it('sets a target just above what was managed when reps fall under the range', () => {
     const rec = advise([session([[0, 6], [0, 6], [0, 5]])], exercise, bw);
-    expect(rec).toMatchObject({ targetReps: 8, direction: 'down', kind: 'decrease' });
+    expect(rec).toMatchObject({ targetReps: 7, direction: 'down', kind: 'decrease' });
+    expect(rec!.reason).toContain('build to it');
+  });
+
+  it('builds up from below the range even when the stall branch fires first', () => {
+    const history = [session([[0, 5], [0, 5], [0, 5]], 1), session([[0, 5], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)];
+    const rec = advise(history, exercise, { ...bw, experience: 'intermediate' });
+    expect(rec).toMatchObject({ kind: 'deload', targetReps: 6 });
+    expect(rec!.reason).toContain('build to it');
+  });
+
+  it('never sets the build-up target above the floor of the range', () => {
+    const rec = advise([session([[0, 7], [0, 7], [0, 7]]), session([[0, 7], [0, 7], [0, 6]])], exercise, bw);
+    expect(rec).toMatchObject({ targetReps: 8, kind: 'decrease' });
   });
 
   it('suggests a rep deload after 3 sessions with no total-rep progress', () => {
@@ -337,7 +369,7 @@ describe('calculateRecommendation — bodyweight (rep progression)', () => {
       session([[0, 10], [0, 9], [0, 9]], 2),
       session([[0, 9], [0, 9], [0, 8]], 3),
     ];
-    expect(advise(history, exercise, bw)).toMatchObject({ kind: 'hold', targetReps: 11 });
+    expect(advise(history, exercise, bw)).toMatchObject({ kind: 'hold', targetReps: 12 });
   });
 });
 
@@ -427,11 +459,26 @@ describe('the stall verdict — goal- and experience-weighted', () => {
   });
 
   it('gives an advanced lifter a longer window before calling it', () => {
-    // Advanced lifters progress across a block, not session to session — three
-    // flat sessions is a normal fortnight, not a plateau.
+    // Advanced lifters progress across a block, not session to session — their
+    // honest rate (~1% a month) sits inside the noise floor, so four flat
+    // sessions is a normal fortnight. Six is a plateau.
     expect(advise(flat, exercise, { experience: 'advanced' })!.kind).not.toBe('deload');
     const fourth = [...flat, session([[100, 9], [100, 9], [100, 8]], 4)];
-    expect(advise(fourth, exercise, { experience: 'advanced' })).toMatchObject({ kind: 'deload' });
+    expect(advise(fourth, exercise, { experience: 'advanced' })!.kind).not.toBe('deload');
+    const sixth = [...fourth, session([[100, 9], [100, 9], [100, 8]], 5), session([[100, 9], [100, 9], [100, 8]], 6)];
+    expect(advise(sixth, exercise, { experience: 'advanced' })).toMatchObject({ kind: 'deload' });
+  });
+
+  it('lets the composite call a stall that a lone rep PR used to veto', () => {
+    // Volume down 23% across the window, est. 1RM flat, one 11-rep set that
+    // technically beats the anchor's best. Gating the verdict on "no PR events"
+    // made that single set veto the deload; the goal-weighted score does not.
+    const history = [
+      session([[100, 11], [100, 6], [100, 6]], 1),
+      session([[100, 9], [100, 9], [100, 9]], 2),
+      session([[100, 10], [100, 10], [100, 10]], 3),
+    ];
+    expect(advise(history, exercise, { goal: 'hypertrophy' })).toMatchObject({ kind: 'deload' });
   });
 
   it('repeats the weight for a beginner instead of cutting it', () => {
@@ -827,7 +874,7 @@ describe('timed exercises progress by seconds', () => {
     expect(rec!.kind).toBe('increase');
     expect(rec!.targetReps).toBe(47);
     expect(rec!.weight).toBe(0);
-    expect(rec!.reason).toMatch(/holds hit/i);
+    expect(rec!.reason).toMatch(/hold at 45s/i);
     expect(rec!.reason).not.toMatch(/\breps\b/);
   });
 
@@ -847,7 +894,8 @@ describe('timed exercises progress by seconds', () => {
   it('chases one more second per set while in range', () => {
     const rec = calculateRecommendation(held([34, 33, 33]), plank, { unit: 'seconds' });
     expect(rec!.kind).toBe('hold');
-    expect(rec!.reason).toMatch(/34s\+/);
+    expect(rec!.targetReps).toBe(35);
+    expect(rec!.reason).toMatch(/35s/);
   });
 
   it('says the same things in reps when the exercise is not timed', () => {
@@ -862,7 +910,8 @@ describe('timed exercises progress by seconds', () => {
       expect(s.weight).toBe(0);
       expect(s.targetReps).toBeGreaterThanOrEqual(plank.repLow);
     }
-    expect(plan.goal).toMatch(/total seconds/);
+    expect(plan.goal).toMatch(/s total\)/);
+    expect(plan.goal).not.toMatch(/\breps\b/);
   });
 
   it('backs the hold off in an easy week', () => {
@@ -984,5 +1033,205 @@ describe('a lifter coming back from time off', () => {
     const sparse = calculateRecommendation([bw(5, 10), bw(30, 10), bw(70, 10)], ex, ctx)!;
     expect(sparse.kind).toBe('hold');
     expect(sparse.reason).toMatch(/been away/i);
+  });
+});
+
+describe('week over week — the whole loop, bodyweight and timed', () => {
+  /**
+   * The rep-progression twin of the loop above. The loaded engine was fixed
+   * to judge progress as volume at a fixed load; the bodyweight engine kept
+   * the old rule (every set at repHigh) that buildSetPlan's descending
+   * targets can never satisfy, so a compliant lifter is deloaded forever
+   * (audit C1). These two cases reproduced it; Phase 2.2 fixed it, and they
+   * now stand as the regression tests.
+   */
+  function run(weeks: number, ex: Slot, ctx: PrescriptionContext, startReps: number[]) {
+    const start = new Date(2026, 0, 5).getTime();
+    // The opening session carries a real set-to-set drop-off: buildSetPlan
+    // fits its targets to it, which is what makes "every set at repHigh"
+    // unreachable. A flat 8/8/8 start would hide the bug.
+    let history: ExerciseSession[] = [
+      { completedAt: start, position: 0, sets: startReps.map(reps => ({ weight: 0, reps })) },
+    ];
+    const log: { kind: string; reps: number[]; total: number }[] = [];
+    for (let w = 1; w <= weeks; w++) {
+      const now = start + w * WEEK;
+      const p = buildSetPlan(history, ex, { ...ctx, now });
+      const reps = p.sets.map(s => s.targetReps!);
+      log.push({ kind: p.rec!.kind, reps, total: reps.reduce((a, b) => a + b, 0) });
+      history = [
+        { completedAt: now, position: 0, sets: reps.map(r => ({ weight: 0, reps: r })) },
+        ...history,
+      ].slice(0, 4);
+    }
+    return log;
+  }
+
+  it('climbs the rep total for a bodyweight lifter who hits every target', () => {
+    const log = run(10, exercise, { weightType: 'Bodyweight' }, [10, 9, 8]);
+    expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+    expect(log[log.length - 1].total).toBeGreaterThan(log[0].total);
+    for (let i = 1; i < log.length; i++) {
+      expect(log[i].total, `week ${i + 1}`).toBeGreaterThanOrEqual(log[i - 1].total);
+    }
+  });
+
+  it('climbs the hold for a timed exercise the same way', () => {
+    // 16 weeks: the hold climbs a second a week until the clamp at 45 s, then
+    // the same flat-session deload fires. A wider range would merely delay it.
+    const log = run(16, { sets: 3, repLow: 30, repHigh: 45 }, { weightType: 'Bodyweight', unit: 'seconds' }, [36, 33, 30]);
+    expect(log.some(l => l.kind === 'deload' || l.kind === 'decrease')).toBe(false);
+    expect(log[log.length - 1].total).toBeGreaterThan(log[0].total);
+  });
+});
+
+
+describe('the weekly cap at the boundary (audit M5)', () => {
+  it('holds a beginner at exactly one jump a week — 100 × 1.1 is not 110 in floating point', () => {
+    // 100 → 110 three days ago, then the range topped again at 110. The cap is
+    // 10%: 110 is AT the ceiling, so the answer is hold — not 115, which the
+    // old `weight >= ceiling` let through because 100 × 1.1 === 110.00000000000001.
+    const history = [
+      session([[110, 12], [110, 12], [110, 12]], 1 / 7),
+      session([[100, 12], [100, 12], [100, 12]], 4 / 7),
+    ];
+    const rec = advise(history, exercise, { experience: 'beginner' });
+    expect(rec).toMatchObject({ kind: 'hold', weight: 110 });
+    expect(rec!.reason).toMatch(/already went up this week/i);
+  });
+});
+
+describe('a rep range that changed under the lifter (audit F12)', () => {
+  it('holds at the same load instead of reading the old range as a miss', () => {
+    // 10–15 last session, 12–15 now: 11/10/10 was a fine session then and is
+    // "under range" now. The recorded prescription says which.
+    const last: ExerciseSession = {
+      completedAt: NOW - WEEK,
+      sets: [11, 10, 10].map(reps => ({ weight: 60, reps, repLow: 10, repHigh: 15 })),
+    };
+    const rec = advise([last], { sets: 3, repLow: 12, repHigh: 15 });
+    expect(rec).toMatchObject({ kind: 'hold', weight: 60 });
+    expect(rec!.reason).toMatch(/range moved from 10–15 to 12–15/);
+  });
+
+  it('does not count a re-anchored session as the week\'s increase already spent', () => {
+    // 185 × 9s was a 10–12 load; the slot is now 4 × 4–6 and the engine
+    // re-anchored to 205. The next session at 205 tops the range — the weekly
+    // cap must anchor to the 205 session, not treat 185 → 205 as the climb.
+    const history = [
+      session([[205, 6], [205, 6], [205, 6], [205, 6]], 1 / 7),
+      session([[185, 9], [185, 9], [185, 8], [185, 8]], 5 / 7),
+    ];
+    const rec = advise(history, { sets: 4, repLow: 4, repHigh: 6 });
+    expect(rec!.kind).toBe('increase');
+  });
+});
+
+describe('unloaded work on a loaded exercise (audit LOW)', () => {
+  it('progresses by count rather than prescribing 2.5 lbs', () => {
+    const rec = advise([session([[0, 10], [0, 10], [0, 10]])], exercise, { weightType: 'Machine' });
+    expect(rec!.weight).toBe(0);
+    expect(rec!.targetReps).toBe(11);
+  });
+
+  it('a slot with zero programmed sets is treated as one, never NaN', () => {
+    const rec = advise([session([[100, 10], [100, 10]])], { sets: 0, repLow: 8, repHigh: 12 });
+    expect(Number.isFinite(rec!.weight)).toBe(true);
+    expect(rec!.reason).not.toMatch(/NaN/);
+  });
+
+  it('backs an unprescribed slot off in a planned easy week', () => {
+    const rec = advise([session([[100, 10], [100, 10]])], { sets: 3 }, { phase: 'deload' });
+    expect(rec).toMatchObject({ kind: 'deload' });
+    expect(rec!.weight).toBeLessThan(100);
+  });
+});
+
+
+describe('slots the lifter owns (Phase 4)', () => {
+  it('never re-anchors a range that was read off the lifter\'s own log', () => {
+    // 5 × 5 at 185 is what they do; a history-derived 3–7 range must not pull
+    // the load toward "8–12" or anywhere else — there is nothing to match.
+    const history = [session([[185, 5], [185, 5], [185, 5], [185, 5], [185, 5]])];
+    const rec = advise(history, { sets: 5, repLow: 8, repHigh: 12, rangeSource: 'history' });
+    expect(rec!.kind).not.toBe('reanchor');
+  });
+
+  it('still re-anchors to a range the plan or the lifter chose', () => {
+    const history = [session([[185, 5], [185, 5], [185, 5]]), session([[185, 5], [185, 5], [185, 5]], 2)];
+    expect(advise(history, { sets: 3, repLow: 10, repHigh: 12, rangeSource: 'plan' })!.kind).toBe('reanchor');
+  });
+
+  it('a manual slot gets no chip and no targets — just last time\'s weights', () => {
+    const p = plan([session([[225, 5], [225, 5], [225, 4]])], { sets: 3, repLow: 5, repHigh: 5, progression: 'manual' });
+    expect(p.rec).toBeNull();
+    expect(p.sets.map(s => s.weight)).toEqual([225, 225, 225]);
+    expect(p.sets.every(s => s.targetReps === null)).toBe(true);
+    expect(p.goal).toMatch(/own progression/i);
+  });
+});
+
+describe('top set + back-offs (strength main lifts, decision D4)', () => {
+  const main = { sets: 4, repLow: 4, repHigh: 6, main: true, rangeSource: 'plan' as const };
+  const top = (w: number, reps: number, weeksAgo = 1, off = 0.9) =>
+    session([[w, reps], [Math.round(w * off / 5) * 5, reps + 1], [Math.round(w * off / 5) * 5, reps + 1], [Math.round(w * off / 5) * 5, reps]], weeksAgo);
+  const ctx = { scheme: 'top-set' as const, goal: 'strength' as const, experience: 'advanced' as const, weightType: 'Barbell' as const, now: NOW };
+
+  it('lays out set 1 as the top set and the rest at the back-off load', () => {
+    const plan = buildSetPlan([top(300, 5)], main, ctx);
+    expect(plan.sets).toHaveLength(4);
+    expect(plan.sets[0].weight).toBe(300);
+    for (const s of plan.sets.slice(1)) expect(s.weight).toBe(270);
+    expect(plan.sets[0].weight!).toBeGreaterThan(plan.sets[1].weight!);
+    expect(plan.goal).toContain('Top set');
+  });
+
+  it('judges the top set, not the back-offs: a top set at the ceiling earns the jump', () => {
+    const plan = buildSetPlan([top(300, 6)], main, ctx);
+    expect(plan.rec?.kind).toBe('increase');
+    expect(plan.sets[0].weight!).toBeGreaterThan(300);
+    expect(plan.sets[1].weight!).toBeLessThan(plan.sets[0].weight!);
+  });
+
+  it('is never lighter on the top set than the back-offs, in any phase', () => {
+    for (const phase of ['accumulation', 'intensification', 'peak'] as const) {
+      const plan = buildSetPlan([top(300, 5)], main, { ...ctx, phase });
+      expect(plan.sets[0].weight!).toBeGreaterThanOrEqual(plan.sets[1].weight!);
+    }
+    // 85% in a peak week (snapped to the bar's increment), lighter than the 90% build back-off
+    const build = buildSetPlan([top(300, 5)], main, { ...ctx, phase: 'accumulation' });
+    const peak = buildSetPlan([top(300, 5)], main, { ...ctx, phase: 'peak' });
+    expect(peak.sets[1].weight!).toBeLessThan(build.sets[1].weight!);
+    expect(peak.sets[1].weight!).toBeLessThanOrEqual(260);
+  });
+
+  it('falls back to the straight layout with no loaded history', () => {
+    const plan = buildSetPlan([], main, ctx);
+    expect(plan.rec).toBeNull();
+    expect(plan.sets.every(s => s.weight === null)).toBe(true);
+  });
+
+  it('keeps straight sets when the scheme is not asked for', () => {
+    const plan = buildSetPlan([top(300, 5)], main, { ...ctx, scheme: 'straight' });
+    expect(new Set(plan.sets.map(s => s.weight)).size).toBe(1);
+  });
+});
+
+describe('needsRegression (audit F11)', () => {
+  const chins = { sets: 3, repLow: 8, repHigh: 12 };
+  it('fires after three unloaded sessions under the range', () => {
+    const history = [session([[0, 5], [0, 5], [0, 4]], 1), session([[0, 6], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)];
+    expect(needsRegression(history, chins)).toBe(true);
+  });
+  it('does not fire on two misses, on loaded work, or once a session reaches the range', () => {
+    expect(needsRegression([session([[0, 5], [0, 5], [0, 4]], 1), session([[0, 5], [0, 5], [0, 5]], 2)], chins)).toBe(false);
+    expect(needsRegression([session([[100, 5], [100, 5], [100, 4]], 1), session([[100, 5], [100, 5], [100, 5]], 2), session([[100, 5], [100, 5], [100, 5]], 3)], chins)).toBe(false);
+    expect(needsRegression([session([[0, 8], [0, 8], [0, 8]], 1), session([[0, 5], [0, 5], [0, 5]], 2), session([[0, 5], [0, 5], [0, 5]], 3)], chins)).toBe(false);
+  });
+  it('lets the plan carry a target under the range on the way back up', () => {
+    const plan = buildSetPlan([session([[0, 5], [0, 5], [0, 5]], 1), session([[0, 5], [0, 5], [0, 4]], 2)], chins, { weightType: 'Bodyweight' });
+    expect(plan.rec?.kind).toBe('decrease');
+    expect(plan.sets[0].targetReps).toBe(6);
+    expect(plan.sets.every(s => (s.targetReps ?? 0) < 8)).toBe(true);
   });
 });

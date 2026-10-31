@@ -25,9 +25,11 @@ import {
   mergeServerPlanState,
   reconcileActiveProgram,
   saveTrainingProfile,
-  startPendingActivation,
+  startPendingActivation, getPlannedGoal, getTrainingGoal, ensureJourneyMigrated,
 } from './planStore';
 import { defaultTrainingProfile } from './plan';
+import 'fake-indexeddb/auto';
+import { createSession, addSetLog, completeSession, clearIDB } from '../db/database';
 
 beforeEach(() => localStorage.clear());
 
@@ -218,10 +220,12 @@ describe('completeActiveBlock', () => {
 
 describe('mergeServerPlanState', () => {
   it('takes a newer server document and ignores an older one', () => {
-    activateProposal(makeProposal(), null, 1000);
+    // Activation now happens at a clock AFTER the block's start date — a
+    // future-dated block waits as a pending activation (audit M16).
+    activateProposal(makeProposal(), null, JUL6);
     const local = getPlanState();
 
-    const older = { ...local, updatedAt: 500, plans: [] };
+    const older = { ...local, updatedAt: local.updatedAt - 1, plans: [] };
     expect(mergeServerPlanState(older)).toBe(false);
     expect(getPlanState().plans).toHaveLength(1);
 
@@ -285,8 +289,29 @@ describe('training profile persistence', () => {
     expect(stored.equipment).toBe('home-rack');
     expect(stored.priorityMuscles).toEqual(['Chest']);
     expect(stored.updatedAt).toBe(5000);
-    // bumps the document clock so it syncs
-    expect(getPlanState().updatedAt).toBe(5000);
+    // The profile has its own clock and leaves the document's alone — a
+    // profile tap must not outrank a block activation made elsewhere (H4).
+    expect(getPlanState().updatedAt).toBe(0);
+  });
+
+  it('merges a newer server profile into a newer local plans document, and vice versa', () => {
+    activateProposal(makeProposal(), null, JUL6);
+    const local = getPlanState();
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'beginner' }, 100);
+
+    // Another device edited only the profile, later, on an older plans doc.
+    const profileOnly = { ...local, plans: [], updatedAt: local.updatedAt - 1,
+      profile: { ...defaultTrainingProfile(), experience: 'advanced' as const, updatedAt: 200 } };
+    expect(mergeServerPlanState(profileOnly)).toBe(true);
+    expect(getPlanState().plans).toHaveLength(1);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
+
+    // And a newer plans doc carrying an older profile keeps the local profile.
+    const plansOnly = { ...getPlanState(), plans: [], updatedAt: local.updatedAt + 1,
+      profile: { ...defaultTrainingProfile(), experience: 'beginner' as const, updatedAt: 50 } };
+    expect(mergeServerPlanState(plansOnly)).toBe(true);
+    expect(getPlanState().plans).toHaveLength(0);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
   });
 
   it('survives round-trips through the whole-document sync merge', () => {
@@ -323,5 +348,99 @@ describe('reconcileActiveProgram (self-heal a wiped live program)', () => {
   it('is a no-op with no active block', () => {
     expect(reconcileActiveProgram()).toBe(false);
     expect(getStoredProgram()).toHaveLength(0);
+  });
+});
+
+
+// ── Phase 3: block provenance, pending rule, coach decisions (audit H2, M16) ──
+
+import { getCoachDecisions, recordCoachDecision, getLatestCompletedBlock } from './planStore';
+
+describe('finishing the week on the previous workouts — only undoes an activation', () => {
+  it('never reactivates a block the user wrapped up deliberately', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    completeActiveBlock(makeRetro('x'), JUL6 - 10 * 86_400_000);       // user wrap-up
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000);
+    expect(canDeferActiveBlock()).toBe(false);
+    expect(deferActiveBlockToNextWeek(JUL6 + 2 * 86_400_000)).toBe(false);
+    const wrapped = getPlanState().plans.flatMap(p => p.blocks).find(b => b.completedBy === 'user')!;
+    expect(wrapped.status).toBe('completed');
+    expect(wrapped.retrospective).toBeDefined();
+  });
+
+  it('refuses while another block is already queued, instead of overwriting it', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000); // closes B1 by activation
+    activateProposal(makeProposal({ startDate: '2026-08-03' }), null, JUL6 + 3 * 86_400_000); // queued
+    expect(getPlanState().pendingActivation).toBeDefined();
+    expect(canDeferActiveBlock()).toBe(false);
+  });
+
+  it('restores the LIVE program the activation replaced, edits included', () => {
+    activateProposal(makeProposal({ startDate: '2026-06-01' }), null, JUL6 - 30 * 86_400_000);
+    const edited = [...getStoredProgram(), { id: 99, label: 'My extra day', muscleGroups: 'Arms', exercises: [{ id: 'hammer-curls', name: 'Hammer Curls', sets: 3, repLow: 10, repHigh: 12 }] }];
+    saveStoredProgram(edited);
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6 + 2 * 86_400_000);
+    expect(canDeferActiveBlock()).toBe(true);
+    expect(deferActiveBlockToNextWeek(JUL6 + 2 * 86_400_000)).toBe(true);
+    expect(getStoredProgram().some(d => d.id === 99)).toBe(true);
+    expect(getPlanState().pendingActivation?.block.startDate).toBe('2026-07-13');
+  });
+});
+
+describe('activation is one-directional: a future start always waits', () => {
+  it('queues a future-dated block even when nothing is running', () => {
+    const r = activateProposal(makeProposal({ startDate: '2026-07-13' }), null, JUL6);
+    expect(r.started).toBe(false);
+    expect(getActiveBlockInfo()).toBeNull();
+    expect(getPlanState().pendingActivation?.block.startDate).toBe('2026-07-13');
+    expect(getActivePhase(JUL6)).toBeNull();
+  });
+
+  it('installs immediately when the start date is today or past', () => {
+    const r = activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6);
+    expect(r.started).toBe(true);
+    expect(getActiveBlockInfo()).not.toBeNull();
+  });
+});
+
+describe('coach decisions live on the active block', () => {
+  it('records accept/decline per adjustment, latest answer wins, and resets with the block', () => {
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6);
+    expect(getCoachDecisions()).toEqual([]);
+    recordCoachDecision('1:bench:add-set', false, JUL6 + 1);
+    recordCoachDecision('1:bench:add-set', true, JUL6 + 2);
+    expect(getCoachDecisions()).toEqual([{ key: '1:bench:add-set', accepted: true, at: JUL6 + 2 }]);
+    completeActiveBlock(makeRetro('x'), JUL6 + 10);
+    expect(getCoachDecisions()).toEqual([]);
+    expect(getLatestCompletedBlock()?.coachDecisions).toHaveLength(1);
+  });
+});
+
+
+describe('a goal nobody chose is not a prescription source (audit F2)', () => {
+  it('a migrated plan has no planned goal until a wizard block joins it', () => {
+    const now = JUL6;
+    localStorage.setItem('liftlog_plan', JSON.stringify({
+      version: 1, updatedAt: now,
+      plans: [{ id: 'm', goal: 'hypertrophy', origin: 'migrated', status: 'active', createdAt: now,
+        blocks: [{ id: 'f', name: 'Foundation training', focus: 'hypertrophy', startDate: '2026-06-01', phases: [], openEnded: true, program: [], intent: '', progression: '', status: 'active', activatedAt: now }] }],
+    }));
+    expect(getPlannedGoal()).toBeNull();
+    expect(getTrainingGoal()).toBe('general');
+    // Activating a wizard block with the same goal appends it to the migrated
+    // plan — and THAT is the choice.
+    activateProposal(makeProposal({ goal: 'hypertrophy', startDate: '2026-07-06' }), null, JUL6);
+    expect(getPlannedGoal()).toBe('hypertrophy');
+  });
+
+  it('a migrated plan is built around a neutral placeholder goal', async () => {
+    await clearIDB();
+    const id = await createSession(1, 1, JUL6 - 86_400_000);
+    await addSetLog(id, 'leg-press', 1, 100, 10);
+    await completeSession(id, JUL6 - 86_400_000 + 3_600_000);
+    expect(await ensureJourneyMigrated()).toBe(true);
+    expect(getActivePlan()?.goal).toBe('general');
+    expect(getPlannedGoal()).toBeNull();
   });
 });

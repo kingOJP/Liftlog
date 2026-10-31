@@ -15,6 +15,8 @@ export interface Session {
   completedAt?: number;
   /** Last meaningful write — per-session conflict resolution for merge sync. */
   updatedAt?: number;
+  /** Free-text session note (how it went); synced on the session document */
+  note?: string;
 }
 
 export interface SetLog {
@@ -39,6 +41,15 @@ export interface SetLog {
    * by JSON so legacy docs stay byte-identical on the wire.
    */
   warmup?: boolean;
+  /**
+   * The rep range prescribed when this set was logged (Stage 0 of the
+   * adaptive-engine roadmap). Lets the engine tell "the range changed under
+   * me" from "I missed" — a 10–15 slot becoming 12–15 the week after an
+   * increase used to read as a failed session. Absent on pre-prescription
+   * rows and on unprescribed (free) logging; schemaless like `order`.
+   */
+  repLow?: number;
+  repHigh?: number;
 }
 
 // Difficulty ratings — feature removed, store kept for compatibility
@@ -63,8 +74,9 @@ function idbReq<T>(request: IDBRequest<T>): Promise<T> {
 function txDone(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    // A deliberate tx.abort() carries no error object — never reject with null
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
   });
 }
 
@@ -120,10 +132,124 @@ export async function createSession(dayId: number, weekNumber: number, startedAt
 export async function completeSession(sessionId: number, completedAt = Date.now()): Promise<void> {
   const db = await openDB();
   const store = db.transaction('sessions', 'readonly').objectStore('sessions');
-  const session = await idbReq<Session>(store.get(sessionId));
+  const session = await idbReq<Session | undefined>(store.get(sessionId));
+  // Tolerate a missing row (a purge or an account switch got there first)
+  // rather than throwing on `undefined` and leaving the caller's UI stuck.
+  if (!session) return;
   session.completedAt = completedAt;
   session.updatedAt = Date.now();
   await idbReq(db.transaction('sessions', 'readwrite').objectStore('sessions').put(session));
+}
+
+/** One logged set, as the atomic writers take it. */
+export interface SetInput {
+  exerciseId: string;
+  setNumber: number;
+  weight: number;
+  reps: number;
+  order?: number;
+  warmup?: boolean;
+  repLow?: number;
+  repHigh?: number;
+}
+
+function setLogRecord(sessionId: number, s: SetInput): SetLog {
+  return {
+    sessionId,
+    exerciseId: s.exerciseId,
+    setNumber: s.setNumber,
+    weight: s.weight,
+    reps: s.reps,
+    ...(s.order != null ? { order: s.order } : {}),
+    ...(s.warmup ? { warmup: true } : {}),
+    ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
+  } as SetLog;
+}
+
+/**
+ * Write a finished workout — the session row AND every set — in ONE readwrite
+ * transaction over both stores. Either all of it lands or none of it does.
+ *
+ * This is what makes the ghost purge safe: before, createSession committed
+ * first and each set followed in its own transaction, so an app kill, a quota
+ * error or a background purge racing the writes could leave (and then
+ * tombstone, app-wide) a real workout with no sets. There is no such window
+ * now — a session row never exists without its sets.
+ */
+export async function saveWorkout(input: {
+  dayId: number;
+  weekNumber: number;
+  startedAt: number;
+  completedAt: number;
+  sets: SetInput[];
+  note?: string;
+}): Promise<number> {
+  const db = await openDB();
+  const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
+  const now = Date.now();
+  const session: Session = {
+    guid: crypto.randomUUID(),
+    dayId: input.dayId,
+    weekNumber: input.weekNumber,
+    startedAt: input.startedAt,
+    completedAt: input.completedAt,
+    updatedAt: now,
+    ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+  };
+  const putReq = tx.objectStore('sessions').add(session);
+  let sessionId = 0;
+  // The add's success callback runs while the transaction is still active, so
+  // the set inserts queue on the same transaction and commit with it.
+  putReq.onsuccess = () => {
+    sessionId = putReq.result as number;
+    const logs = tx.objectStore('setLogs');
+    for (const s of input.sets) logs.add(setLogRecord(sessionId, s));
+  };
+  await txDone(tx);
+  return sessionId;
+}
+
+/**
+ * Replace a session's sets (the edit-session flow), optionally re-dating it,
+ * in ONE transaction: the old logs are deleted and the new ones inserted
+ * together, and the session's updatedAt is bumped in the same commit so merge
+ * sync propagates the edit. An interruption leaves the original intact.
+ */
+export async function rewriteSessionSets(
+  sessionId: number,
+  sets: SetInput[],
+  redate?: { completedAt: number; weekNumber: number },
+  /** undefined leaves the note alone; null or '' clears it */
+  note?: string | null,
+): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
+  const sessions = tx.objectStore('sessions');
+  const logs = tx.objectStore('setLogs');
+  const now = Date.now();
+
+  const getReq = sessions.get(sessionId) as IDBRequest<Session | undefined>;
+  getReq.onsuccess = () => {
+    const session = getReq.result;
+    if (!session) { tx.abort(); return; }
+    session.updatedAt = now;
+    if (redate) {
+      session.completedAt = redate.completedAt;
+      session.startedAt = Math.min(session.startedAt, redate.completedAt);
+      session.weekNumber = redate.weekNumber;
+    }
+    if (note !== undefined) {
+      if (note && note.trim()) session.note = note.trim();
+      else delete session.note;
+    }
+    sessions.put(session);
+  };
+  const keysReq = logs.index('sessionId').getAllKeys(sessionId);
+  keysReq.onsuccess = () => {
+    for (const key of keysReq.result) logs.delete(key);
+    for (const s of sets) logs.add(setLogRecord(sessionId, s));
+  };
+  await txDone(tx);
 }
 
 // Bump a session's updatedAt after its set logs were rewritten (edit-session
@@ -263,7 +389,16 @@ export async function deleteSetLogsByExerciseId(exerciseId: string): Promise<voi
 // Each purge records a session tombstone so the deletion propagates through
 // merge sync instead of resurrecting from the server copy. exerciseLogs for
 // the removed sessions are dropped too (that store is otherwise unused).
-export async function purgeEmptySessions(): Promise<number> {
+/**
+ * A session younger than this is never purged. Every write path is atomic now,
+ * so an empty session should not exist at all — but a ghost is old by
+ * definition, and refusing to tombstone anything fresh costs nothing while
+ * guaranteeing that no future write path (or a crash mid-transaction on a
+ * browser with weaker guarantees) can delete a workout app-wide.
+ */
+export const PURGE_GRACE_MS = 60 * 60_000;
+
+export async function purgeEmptySessions(now = Date.now()): Promise<number> {
   const db = await openDB();
   const [sessions, setLogs, exerciseLogs] = await Promise.all([
     idbReq<Session[]>(db.transaction('sessions', 'readonly').objectStore('sessions').getAll()),
@@ -272,7 +407,9 @@ export async function purgeEmptySessions(): Promise<number> {
   ]);
 
   const withSets = new Set(setLogs.map(l => l.sessionId));
-  const empty = sessions.filter(s => !withSets.has(s.id!));
+  const isOld = (s: Session) =>
+    now - Math.max(s.startedAt, s.completedAt ?? 0, s.updatedAt ?? 0) > PURGE_GRACE_MS;
+  const empty = sessions.filter(s => !withSets.has(s.id!) && isOld(s));
   if (empty.length === 0) return 0;
   const emptyIds = new Set(empty.map(s => s.id!));
 
@@ -312,13 +449,15 @@ export async function migrateExerciseIds(): Promise<number> {
 // Same mechanics as migrateExerciseIds, but the map is dynamic (pulled from
 // the server) and every affected session gets its updatedAt bumped so the
 // remapped copy propagates through merge sync as the newer document.
-export async function remapSetLogExerciseIds(map: Record<string, string>): Promise<number> {
+export async function remapSetLogExerciseIds(
+  map: Record<string, string>,
+): Promise<{ remapped: number; fromIds: string[] }> {
   const db = await openDB();
   const logs = await idbReq<SetLog[]>(
     db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
   );
   const toFix = logs.filter(l => map[l.exerciseId]);
-  if (toFix.length === 0) return 0;
+  if (toFix.length === 0) return { remapped: 0, fromIds: [] };
 
   const tx = db.transaction('setLogs', 'readwrite');
   const store = tx.objectStore('setLogs');
@@ -330,7 +469,7 @@ export async function remapSetLogExerciseIds(map: Record<string, string>): Promi
   for (const sessionId of new Set(toFix.map(l => l.sessionId))) {
     await touchSession(sessionId);
   }
-  return toFix.length;
+  return { remapped: toFix.length, fromIds: [...new Set(toFix.map(l => l.exerciseId))] };
 }
 
 // Wipes every store. Used when a different account signs in on this device so
@@ -382,37 +521,33 @@ export async function mergeServerSessions(
 }
 
 async function applySessionMergePlan(db: IDBDatabase, plan: SessionMergePlan): Promise<void> {
-  // Deletions + replaced-session cleanup need the set logs of every touched session
+  // The whole plan — deletions, replaced-session cleanup, and every incoming
+  // document with its sets — commits in ONE transaction. A kill mid-pull used
+  // to leave the other device's workout as an empty local session, which the
+  // next purge tombstoned and the next push deleted everywhere.
   const doomedSessionIds = new Set<number>([
     ...plan.deleteLocalIds,
     ...plan.replace.map(r => r.localId),
   ]);
+  const allLogs = doomedSessionIds.size > 0
+    ? await idbReq<SetLog[]>(db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll())
+    : [];
 
-  if (doomedSessionIds.size > 0) {
-    const allLogs = await idbReq<SetLog[]>(
-      db.transaction('setLogs', 'readonly').objectStore('setLogs').getAll(),
-    );
-    const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
-    const sessionStore = tx.objectStore('sessions');
-    const logStore = tx.objectStore('setLogs');
-    for (const id of plan.deleteLocalIds) sessionStore.delete(id);
-    for (const log of allLogs) {
-      if (doomedSessionIds.has(log.sessionId)) logStore.delete(log.id!);
-    }
-    await txDone(tx);
+  const tx = db.transaction(['sessions', 'setLogs'], 'readwrite');
+  const sessionStore = tx.objectStore('sessions');
+  const logStore = tx.objectStore('setLogs');
+  for (const id of plan.deleteLocalIds) sessionStore.delete(id);
+  for (const log of allLogs) {
+    if (doomedSessionIds.has(log.sessionId)) logStore.delete(log.id!);
   }
-
   // Replaced sessions keep their local id (kept references stay valid);
   // inserted sessions get a fresh autoincrement id.
-  for (const { localId, doc } of plan.replace) {
-    await writeSessionDoc(db, doc, localId);
-  }
-  for (const doc of plan.insert) {
-    await writeSessionDoc(db, doc);
-  }
+  for (const { localId, doc } of plan.replace) queueSessionDoc(tx, doc, localId);
+  for (const doc of plan.insert) queueSessionDoc(tx, doc);
+  await txDone(tx);
 }
 
-async function writeSessionDoc(db: IDBDatabase, doc: SessionDoc, localId?: number): Promise<void> {
+function queueSessionDoc(tx: IDBTransaction, doc: SessionDoc, localId?: number): void {
   const session: Session = {
     ...(localId !== undefined ? { id: localId } : {}),
     guid: doc.guid,
@@ -421,23 +556,18 @@ async function writeSessionDoc(db: IDBDatabase, doc: SessionDoc, localId?: numbe
     startedAt: doc.startedAt,
     completedAt: doc.completedAt,
     updatedAt: doc.updatedAt,
+    ...(doc.note ? { note: doc.note } : {}),
   };
-  const sid = await idbReq(
-    db.transaction('sessions', 'readwrite').objectStore('sessions').put(session),
-  ) as number;
-
-  const tx = db.transaction('setLogs', 'readwrite');
-  const store = tx.objectStore('setLogs');
-  for (const s of doc.sets) {
-    store.add({
-      sessionId: sid,
-      exerciseId: s.exerciseId,
-      setNumber: s.setNumber,
-      weight: s.weight,
-      reps: s.reps,
-      ...(s.order != null ? { order: s.order } : {}),
-      ...(s.warmup ? { warmup: true } : {}),
-    } as SetLog);
-  }
-  await txDone(tx);
+  const putReq = tx.objectStore('sessions').put(session);
+  putReq.onsuccess = () => {
+    const sid = putReq.result as number;
+    const store = tx.objectStore('setLogs');
+    for (const s of doc.sets) {
+      store.add(setLogRecord(sid, {
+        exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps,
+        order: s.order ?? undefined, warmup: s.warmup ?? undefined,
+        repLow: s.repLow ?? undefined, repHigh: s.repHigh ?? undefined,
+      }));
+    }
+  };
 }

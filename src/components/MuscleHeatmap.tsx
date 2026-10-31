@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { MuscleGroup } from '../data/taxonomy';
 import type { TrainingSnapshot } from '../data/analytics';
 import { volumeTargetFor } from '../data/analytics';
-import { getTrainingGoal } from '../data/planStore';
+import { getTrainingGoal, getProfileOrDefault } from '../data/planStore';
 import { computeMuscleHeat, heatColor, heatLabel, presetWindow } from '../data/heatmap';
 import type { HeatPreset } from '../data/heatmap';
 import './MuscleHeatmap.css';
@@ -32,7 +32,7 @@ function fromDateInput(value: string, endOfDay = false): number {
 export default function MuscleHeatmap({ snapshot }: Props) {
   // The "on target" band belongs to the active goal — 6 weekly sets is on
   // target for a triathlete and well under it for a bodybuilder.
-  const band = volumeTargetFor(getTrainingGoal());
+  const band = volumeTargetFor(getTrainingGoal(), getProfileOrDefault().experience);
   const [preset, setPreset] = useState<HeatPreset>('30d');
   const [customFrom, setCustomFrom] = useState(() => toDateInput(Date.now() - 30 * 86_400_000));
   const [customTo, setCustomTo] = useState(() => toDateInput(Date.now()));
@@ -54,10 +54,19 @@ export default function MuscleHeatmap({ snapshot }: Props) {
   );
 
   const rate = (m: MuscleGroup) => heat.byMuscle.get(m)?.weeklyRate ?? 0;
+  const toggleRegion = (m: MuscleGroup) => setSelected(sel => (sel === m ? null : m));
+  // Each region is a labelled, keyboard-reachable control, not a bare path.
   const region = (m: MuscleGroup) => ({
     fill: heatColor(rate(m), band),
     className: `hm-region${selected === m ? ' hm-selected' : ''}`,
-    onClick: () => setSelected(sel => (sel === m ? null : m)),
+    role: 'button' as const,
+    tabIndex: 0,
+    'aria-label': `${m}: ${rate(m).toFixed(1)} sets a week`,
+    'aria-pressed': selected === m,
+    onClick: () => toggleRegion(m),
+    onKeyDown: (e: React.KeyboardEvent<SVGPathElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRegion(m); }
+    },
   });
 
   const selectedHeat = selected ? heat.byMuscle.get(selected) : null;

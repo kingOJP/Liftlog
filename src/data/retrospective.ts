@@ -11,6 +11,7 @@
 
 import type { MuscleGroup } from './taxonomy';
 import type { TrainingSnapshot } from './analytics';
+import { dayInPhase } from './program';
 import type { VolumeTarget } from './analytics';
 import {
   muscleSetTotals,
@@ -22,7 +23,7 @@ import { getExerciseName } from './programStore';
 import { primaryMuscleFor } from './analytics';
 import { assessExercise, exercisePointSeries, MIN_TREND_SESSIONS } from './progress';
 import type { BlockRetrospective, ExerciseOutcome, MuscleOutcome, TrainingBlock } from './plan';
-import { blockAnchor, blockEndTs } from './plan';
+import { blockAnchor, blockEndTs, blockPhaseResolver } from './plan';
 
 const WEEK_MS = 7 * 86_400_000;
 const MIN_SESSIONS_FOR_TREND = MIN_TREND_SESSIONS;
@@ -36,25 +37,34 @@ export function computeBlockRetrospective(
   // judged against that goal's band rather than a global hypertrophy default —
   // otherwise a sport-support block always reports every muscle as under-fed
   // and hands the next planner run a bogus "add volume" carryover.
-  const band = volumeTargetFor(block.focus);
+  const band = volumeTargetFor(block.focus, block.experience);
   const from = blockAnchor(block).getTime();
   const scheduledEnd = blockEndTs(block);
   const to = Math.min(now, scheduledEnd ?? now);
 
-  const inWindow = snapshot.sessions.filter(s => {
-    const ts = sessionTimestamp(s);
-    return ts >= from && ts <= to;
-  });
-  const include = (s: (typeof inWindow)[number]) => {
+  const include = (s: TrainingSnapshot['sessions'][number]) => {
     const ts = sessionTimestamp(s);
     return ts >= from && ts <= to;
   };
+  const inWindow = snapshot.sessions.filter(include);
 
   // Weeks actually elapsed (capped at the block's scheduled length)
   const weeks = Math.max(1 / 7, Math.min((to - from) / WEEK_MS, block.openEnded ? Infinity : block.phases.length));
 
-  const daysPerWeek = block.program.length;
-  const sessionsPlanned = block.openEnded ? null : Math.round(daysPerWeek * weeks);
+  // Sessions the block actually scheduled: per elapsed week, the days gated
+  // INTO that week's phase. A sport-support block programs three sessions in
+  // its build weeks and one through the taper — counting program.length ×
+  // weeks told an athlete who attended every scheduled session that adherence
+  // was the limiter.
+  const elapsedWeeks = block.openEnded ? 0 : Math.min(block.phases.length, Math.ceil(weeks - 1e-9));
+  let sessionsPlanned: number | null = null;
+  if (!block.openEnded) {
+    sessionsPlanned = 0;
+    for (let w = 0; w < elapsedWeeks; w++) {
+      const phase = block.phases[w];
+      sessionsPlanned += block.program.filter(d => dayInPhase(d, phase)).length;
+    }
+  }
   const adherencePct = sessionsPlanned == null || sessionsPlanned === 0
     ? null
     : Math.min(100, Math.round((inWindow.length / sessionsPlanned) * 100));
@@ -69,13 +79,22 @@ export function computeBlockRetrospective(
   // volume-load trend, and PR events — not e1RM alone. The whole block is the
   // window (first vs last session inside it), with exercise-order freshness
   // discounting applied to the endpoints.
+  // The block's own phases say which of its weeks were planned easy weeks:
+  // the deload it ends on, the intro or recovery week it opened with. Those
+  // sessions are lighter by prescription and are kept out of the endpoints —
+  // judging first-session-to-deload-session reported every block that ended
+  // as designed as "strength flat to down" and flagged most of it for
+  // rotation.
+  const phaseOf = blockPhaseResolver(block);
   const strength: ExerciseOutcome[] = [];
   let blockPRs = 0;
-  for (const [exerciseId, points] of exercisePointSeries(snapshot, include)) {
+  for (const [exerciseId, points] of exercisePointSeries(snapshot, include, phaseOf)) {
     if (points.length < 2) continue;
     const assessment = assessExercise(exerciseId, points, block.focus, undefined, Infinity);
-    const first = points[0];
-    const end = points[points.length - 1];
+    const hard = points.filter(p => !p.easy);
+    const judged = hard.length > 0 ? hard : points;
+    const first = judged[0];
+    const end = judged[judged.length - 1];
     const prCount = points.reduce((n, p) => n + (p.weightPR ? 1 : 0) + (p.repPR ? 1 : 0), 0);
     blockPRs += prCount;
     strength.push({
@@ -135,6 +154,7 @@ export function computeBlockRetrospective(
       .filter(s => s.status === 'stalled' || s.status === 'declining')
       .map(s => s.name),
     blockPRs,
+    addsVolume: block.focus !== 'sport-support',
   });
 
   return {
@@ -164,8 +184,10 @@ function buildSummary(args: {
   reviewNames: string[];
   blockPRs: number;
   band: VolumeTarget;
+  /** whether the next planner run may add sets (never on sport-support) */
+  addsVolume: boolean;
 }): string[] {
-  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames, blockPRs, band } = args;
+  const { sessions, sessionsPlanned, adherencePct, strength, muscles, underMuscles, reviewNames, blockPRs, band, addsVolume } = args;
   const out: string[] = [];
 
   if (sessions === 0) {
@@ -190,12 +212,20 @@ function buildSummary(args: {
     const best = strength[0];
     const decliners = strength.filter(s => s.status === 'declining');
     const prLine = blockPRs > 0 ? ` You set ${blockPRs} PR${blockPRs === 1 ? '' : 's'} (weight and rep records) along the way.` : '';
+    const progressing = strength.filter(s => s.status === 'progressing').length;
+    const signed = `${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%`;
+    // The sentence has to agree with its own number: "inched forward" next to
+    // a minus sign, or "flat to down" next to 98 PRs, reads as a broken coach.
     if (avg >= 3) {
-      out.push(`Strength moved the right way: estimated 1RMs averaged ${avg >= 0 ? '+' : ''}${avg.toFixed(1)}% across ${strength.length} tracked lifts, led by ${best.name} at +${best.changePct.toFixed(1)}%.${prLine}`);
-    } else if (avg > 0 || blockPRs > 0) {
-      out.push(`Strength inched forward — ${avg.toFixed(1)}% on average across ${strength.length} tracked lifts.${prLine} Slow blocks happen; volume quality and sleep are the usual levers.`);
+      out.push(`Strength moved the right way: estimated 1RMs averaged ${signed} across ${strength.length} tracked lifts, led by ${best.name} at +${best.changePct.toFixed(1)}%.${prLine}`);
+    } else if (avg > 0) {
+      out.push(`Strength inched forward — ${signed} on average across ${strength.length} tracked lifts, with ${progressing} of them progressing.${prLine} Slow blocks happen; volume quality and sleep are the usual levers.`);
+    } else if (avg > -3) {
+      out.push(progressing > strength.length / 2
+        ? `Strength held: ${progressing} of ${strength.length} tracked lifts progressed on reps or volume while estimated 1RMs stayed level (${signed} on average).${prLine}`
+        : `Strength held level (${signed} average across ${strength.length} lifts).${prLine} Holding through a block is a base to build on, not a setback.`);
     } else {
-      out.push(`Strength was flat to down (${avg.toFixed(1)}% average across ${strength.length} lifts) — a sign of accumulated fatigue or life stress. The next block opens easier on purpose.`);
+      out.push(`Strength moved back (${signed} average across ${strength.length} lifts) — a sign of accumulated fatigue or life stress. The next block opens easier on purpose.`);
     }
     if (decliners.length > 0 && avg >= 3) {
       out.push(`Not everything cooperated: ${decliners.map(d => d.name).slice(0, 3).join(', ')} lost ground and ${decliners.length === 1 ? 'is' : 'are'} flagged for rotation.`);
@@ -207,7 +237,9 @@ function buildSummary(args: {
   if (muscles.length > 0) {
     let volumeLine = `${optimal} of ${muscles.length} trained muscles landed in the ${band.low}–${band.high} weekly-set band.`;
     if (underMuscles.length > 0) {
-      volumeLine += ` ${underMuscles.slice(0, 3).join(', ')} came in under target — the next block adds a set there.`;
+      volumeLine += addsVolume
+        ? ` ${underMuscles.slice(0, 3).join(', ')} came in under target — the next block adds a set there.`
+        : ` ${underMuscles.slice(0, 3).join(', ')} came in under target, which is fine on a sport-support dose — the sport has the prior claim on that recovery.`;
     }
     out.push(volumeLine);
   }

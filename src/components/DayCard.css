@@ -87,3 +87,24 @@
   padding: 5px 9px;
   border-radius: 6px;
 }
+
+/* The body is a real button: reset its chrome, keep the card's look */
+.day-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.day-card-body:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 4px;
+  border-radius: 8px;
+}

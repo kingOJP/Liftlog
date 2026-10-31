@@ -425,6 +425,13 @@
   border-color: var(--purple);
 }
 
+.review-swap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .review-swap-name {
   font-size: 13.5px;
   font-weight: 700;
@@ -609,4 +616,29 @@
 .setup-exact-date .setup-date-input {
   flex: 0 1 auto;
   width: auto;
+}
+
+/* What each picked injury chip does to the plan */
+.setup-constraints {
+  margin: 10px 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.setup-constraints strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.setup-error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--red);
+  background: var(--bg-card);
+  border: 1px solid var(--red);
+  border-radius: 8px;
 }
