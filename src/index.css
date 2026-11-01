@@ -5,16 +5,48 @@
 }
 
 :root {
-  --bg: #0f0f12;
-  --bg-card: #1a1a1e;
-  --bg-input: #252529;
+  /* Surfaces — near-black, layered by lightness rather than by borders alone */
+  --bg: #0a0a0f;
+  --bg-elev: #101017;
+  --bg-card: #14141b;
+  --bg-input: #1c1c26;
+  --surface: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.008) 100%);
+
+  /* Accent */
   --purple: #7C72E8;
+  --purple-bright: #9a91ff;
   --purple-dim: #4a4490;
+  --purple-tint: rgba(124, 114, 232, 0.12);
+  --accent-grad: linear-gradient(135deg, #8f86f5 0%, #6c62e2 100%);
+  --accent-wash: linear-gradient(135deg, rgba(124, 114, 232, 0.20) 0%, rgba(124, 114, 232, 0.04) 60%, rgba(124, 114, 232, 0.02) 100%);
+
+  /* Status */
   --green: #1D9E75;
+  --green-bright: #2fc493;
+  --green-tint: rgba(29, 158, 117, 0.14);
   --red: #E85555;
-  --text: #F2F2F2;
-  --text-muted: #888888;
-  --border: #2a2a2e;
+  --red-tint: rgba(232, 85, 85, 0.12);
+  --amber: #E8C44A;
+  --blue: #5b8cff;
+
+  /* Text */
+  --text: #f2f2f7;
+  --text-muted: #8a8a96;
+  --text-faint: #5d5d6a;
+
+  /* Lines */
+  --border: #24242e;
+  --hairline: rgba(255, 255, 255, 0.06);
+
+  /* Shape & depth */
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+  --shadow-glow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(124, 114, 232, 0.35), 0 12px 36px -14px rgba(124, 114, 232, 0.55);
+  --shadow-btn: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 8px 20px -8px rgba(124, 114, 232, 0.7);
+
+  color-scheme: dark;
 }
 
 html, body, #root {
@@ -23,8 +55,38 @@ html, body, #root {
 
 body {
   background-color: var(--bg);
+  /* A faint violet bloom behind the top of the app — depth without decoration */
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(124, 114, 232, 0.10) 0%, rgba(124, 114, 232, 0) 60%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+/* Shared inline icon (components/Icon.tsx) — inherits the text colour */
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Numbers that change in place shouldn't jitter */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

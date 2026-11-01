@@ -1,54 +1,78 @@
 .day-card {
+  position: relative;
+  overflow: hidden;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--purple);
-  border-radius: 12px;
-  padding: 16px;
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 16px 16px 16px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  cursor: pointer;
-  transition: border-color 0.15s, opacity 0.15s;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s, transform 0.12s;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Accent rail — a soft gradient bar instead of a flat border */
+.day-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--purple-bright), var(--purple-dim));
+  box-shadow: 0 0 12px rgba(124, 114, 232, 0.6);
+}
+
 .day-card:active {
-  opacity: 0.7;
+  transform: scale(0.99);
+  border-color: var(--purple-dim);
 }
 
-.day-card.done {
-  border-left-color: var(--green);
-}
-
-.day-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.day-card.done::before {
+  background: linear-gradient(180deg, var(--green-bright), var(--green));
+  box-shadow: 0 0 12px rgba(29, 158, 117, 0.55);
 }
 
 .day-number {
   font-size: 11px;
   font-weight: 700;
-  color: var(--purple);
+  color: var(--purple-bright);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.12em;
 }
 
 .day-card.done .day-number {
-  color: var(--green);
+  color: var(--green-bright);
 }
 
 .day-muscles {
-  font-size: 16px;
+  font-size: 16.5px;
   font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text);
 }
 
 .day-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
   font-size: 13px;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 4px;
+}
+
+.day-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.day-meta .icon {
+  color: var(--text-faint);
 }
 
 .day-card-right {
@@ -60,13 +84,13 @@
 }
 
 .edit-day-btn {
-  background: none;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 12px;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12.5px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 6px 14px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: border-color 0.15s, color 0.15s;
@@ -74,22 +98,30 @@
 
 .edit-day-btn:active {
   border-color: var(--purple);
-  color: var(--purple);
+  color: var(--purple-bright);
 }
 
 .done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  color: var(--green);
-  background: rgba(29, 158, 117, 0.15);
-  padding: 5px 9px;
-  border-radius: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green-bright);
+  background: var(--green-tint);
+  border: 1px solid rgba(29, 158, 117, 0.3);
+  padding: 4px 9px;
+  border-radius: 999px;
 }
 
 /* The body is a real button: reset its chrome, keep the card's look */
 .day-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   padding: 0;

@@ -1,32 +1,157 @@
 .login-view {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  padding: 24px 16px;
-}
-
-.login-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  max-width: 320px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: calc(48px + env(safe-area-inset-top)) 24px calc(32px + env(safe-area-inset-bottom));
 }
 
-.login-app-name {
-  font-size: 36px;
-  font-weight: 800;
+/* ── Backdrop: window light, rack uprights, floor glow, a plate ── */
+.login-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    /* light falling in from a high window, top right */
+    radial-gradient(60% 45% at 92% 12%, rgba(220, 220, 235, 0.16) 0%, rgba(220, 220, 235, 0) 70%),
+    /* a soft shaft of that light angling down */
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 52%, rgba(255, 255, 255, 0.045) 60%, rgba(255, 255, 255, 0) 70%),
+    /* the floor catching it */
+    radial-gradient(80% 22% at 70% 72%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 70%),
+    /* a whisper of the app's violet low in the frame */
+    radial-gradient(90% 40% at 0% 100%, rgba(124, 114, 232, 0.14) 0%, rgba(124, 114, 232, 0) 70%),
+    linear-gradient(180deg, #0c0c10 0%, #08080b 100%);
+}
+
+/* Rack uprights — two dim vertical posts with punched holes */
+.login-backdrop::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 30%;
+  right: 30%;
+  width: 26px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 18px, rgba(0, 0, 0, 0.55) 18px 22px) center / 6px 100% no-repeat,
+    linear-gradient(90deg, #121217, #1b1b22 50%, #111115);
+  opacity: 0.55;
+  box-shadow: 120px 0 0 -4px rgba(18, 18, 23, 0.7);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0));
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0));
+}
+
+/* Vignette so the text side stays legible */
+.login-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(8, 8, 11, 0.85) 0%, rgba(8, 8, 11, 0.35) 55%, rgba(8, 8, 11, 0) 100%),
+    linear-gradient(180deg, rgba(8, 8, 11, 0) 55%, rgba(8, 8, 11, 0.95) 100%);
+}
+
+.login-plate {
+  position: absolute;
+  right: -90px;
+  top: 30%;
+  width: 300px;
+  height: 300px;
+  filter: drop-shadow(-20px 30px 40px rgba(0, 0, 0, 0.8));
+  opacity: 0.9;
+}
+
+/* ── Content ── */
+.login-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
-  letter-spacing: -1px;
+}
+
+.login-brand-mark {
+  color: var(--purple-bright);
+  filter: drop-shadow(0 0 12px rgba(124, 114, 232, 0.6));
+}
+
+.login-hero {
+  margin-top: 56px;
+}
+
+.login-headline {
+  display: flex;
+  flex-direction: column;
+  font-size: clamp(38px, 11vw, 48px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--text);
+}
+
+.login-headline-accent {
+  background: linear-gradient(100deg, #b4adff 0%, var(--purple-bright) 45%, var(--purple) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .login-tagline {
-  font-size: 15px;
-  color: var(--text-muted);
-  margin-bottom: 16px;
+  margin-top: 18px;
+  max-width: 260px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #b4b4c0;
+}
+
+/* Three features, divided by hairlines */
+.login-features {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: auto;
+  padding-top: 40px;
+}
+
+.login-feature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
   text-align: center;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #b4b4c0;
+}
+
+.login-feature + .login-feature {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.login-feature .icon {
+  color: var(--text);
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 36px;
 }
 
 .login-error {
@@ -38,27 +163,37 @@
 .google-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   width: 100%;
-  background: #fff;
-  color: #3c4043;
+  background: #f4f4f7;
+  color: #1c1c22;
   border: none;
-  border-radius: 10px;
-  font-size: 15px;
+  border-radius: 999px;
+  font-size: 16px;
   font-weight: 600;
-  padding: 13px 20px;
+  padding: 16px 20px;
   cursor: pointer;
   text-decoration: none;
+  box-shadow: 0 10px 30px -12px rgba(255, 255, 255, 0.25);
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.15s;
+  transition: transform 0.12s, opacity 0.15s;
 }
 
 .google-btn:active {
-  opacity: 0.85;
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
 .google-logo {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+}
+
+.login-footnote {
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-muted);
 }

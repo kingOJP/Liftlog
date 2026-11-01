@@ -18,6 +18,7 @@ import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { fmtWeight, toDisplay } from '../data/units';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
+import Icon from './Icon';
 import './Dashboard.css';
 
 interface Props {
@@ -112,9 +113,15 @@ export default function Dashboard({
   const nextDay = coaching?.nextDay;
   const nextDayAdjustments = nextDay ? coaching?.plan.days.get(nextDay.dayId)?.changes.length ?? 0 : 0;
 
+  // With no program yet, the invitation to plan lives inside the start card
+  // next to the other two ways in, rather than as a separate strip above it.
+  const offerPlan = program.length === 0 && !journey && !pending;
+
   // Journey strip: where the user is in their block, or the invitation to plan
   let journeyCard: React.ReactNode;
-  if (journey) {
+  if (offerPlan) {
+    journeyCard = null;
+  } else if (journey) {
     const { plan, block } = journey;
     const rawWeek = blockWeekIndex(block);
     const week = Math.max(0, rawWeek) + 1;
@@ -197,9 +204,15 @@ export default function Dashboard({
   return (
     <div className="dashboard">
       <div className="week-header">
-        <span className="week-label">{getWeekDateRange()}</span>
+        <span className="week-icon"><Icon name="calendar" size={22} /></span>
+        <div className="week-text">
+          <span className="week-label">{getWeekDateRange()}</span>
+          <span className="week-sub">This week</span>
+        </div>
         {scheduled.length > 0 && (
-          <span className="week-progress">{completedDayIds.size} of {scheduled.length} done</span>
+          <span className={`week-progress${completedDayIds.size >= scheduled.length ? ' week-progress--done' : ''}`}>
+            <span className="tabular">{completedDayIds.size} of {scheduled.length}</span> done
+          </span>
         )}
       </div>
 
@@ -225,7 +238,11 @@ export default function Dashboard({
 
       {nextDay && (
         <button className="coach-card" onClick={() => onStartWorkout(nextDay.dayId)}>
-          <div className="coach-eyebrow">Next up · {lastTrainedLabel(nextDay.lastTrained)}</div>
+          <span className="coach-go" aria-hidden="true"><Icon name="chevron-right" size={18} strokeWidth={2.2} /></span>
+          <div className="coach-eyebrow">
+            <Icon name="bolt" size={14} strokeWidth={2} />
+            Next up · {lastTrainedLabel(nextDay.lastTrained)}
+          </div>
           <div className="coach-day">{nextDay.label} — {nextDay.muscleGroups}</div>
           {nextDayAdjustments > 0 && (
             <div className="coach-adjusted">
@@ -242,27 +259,48 @@ export default function Dashboard({
       )}
 
       {program.length === 0 ? (
-        <div className="day-list-empty">
-          <span className="day-list-empty-title">No workouts yet</span>
-          <span className="day-list-empty-detail">
-            Tell the coach your goal above and it designs your program with you —
-            every workout, explained, and yours to adjust before it starts.
-          </span>
-          <div className="empty-quick-cta">
-            <span className="empty-quick-or">or</span>
-            <button className="quick-workout-btn" onClick={onAddDay}>
-              ＋ Build my own program
+        <section className="start-card" aria-labelledby="start-card-title">
+          <div className="start-eyebrow">Get started</div>
+          <h2 id="start-card-title" className="start-title">How do you want to train?</h2>
+
+          {offerPlan && (
+            <button className="start-option start-option--primary" onClick={hasPlans ? onViewJourney : onPlanSetup}>
+              <span className="start-option-icon"><Icon name="target" size={22} /></span>
+              <span className="start-option-text">
+                <span className="start-badge">Recommended</span>
+                <span className="start-option-title">
+                  {hasPlans ? 'Plan your next block' : 'Let the coach design your plan'}
+                </span>
+                <span className="start-option-detail">
+                  Answer a few questions — get every workout planned and explained.
+                </span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
             </button>
-            <button className="quick-workout-btn" onClick={onQuickWorkout}>
-              ＋ Log a quick workout
+          )}
+
+          <div className="start-secondary">
+            <button className="start-option" onClick={onAddDay}>
+              <span className="start-option-icon"><Icon name="dumbbell" size={20} /></span>
+              <span className="start-option-text">
+                <span className="start-option-title">Build my own program</span>
+                <span className="start-option-detail">Pick your own days, exercises and sets.</span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
             </button>
-            <span className="empty-quick-hint">
-              Know what you want to run? Add your own days and sets. Just want to train today? Log a one-off session.
-            </span>
+            <button className="start-option" onClick={onQuickWorkout}>
+              <span className="start-option-icon"><Icon name="bolt" size={20} /></span>
+              <span className="start-option-text">
+                <span className="start-option-title">Log a quick workout</span>
+                <span className="start-option-detail">Just training today? Log a one-off session.</span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
+            </button>
           </div>
-        </div>
+        </section>
       ) : (
         <>
+          <h2 className="dash-section-title">Your workouts</h2>
           <div className="day-list">
             {scheduled.map(day => (
               <DayCard
@@ -282,10 +320,10 @@ export default function Dashboard({
           )}
           <div className="day-list-actions">
             <button className="quick-workout-btn quick-workout-btn--inline" onClick={onAddDay}>
-              ＋ Add a day
+              <Icon name="plus" size={16} strokeWidth={2} /> Add a day
             </button>
             <button className="quick-workout-btn quick-workout-btn--inline" onClick={onQuickWorkout}>
-              ＋ Log a one-off workout
+              <Icon name="plus" size={16} strokeWidth={2} /> One-off workout
             </button>
           </div>
         </>
@@ -293,15 +331,15 @@ export default function Dashboard({
 
       <nav className="dash-nav">
         <button className="dash-nav-btn" onClick={onViewMetrics}>
-          <span className="dash-nav-icon">📊</span>
+          <Icon name="chart" size={22} className="dash-nav-icon" />
           <span>Metrics</span>
         </button>
         <button className="dash-nav-btn" onClick={onViewHistory}>
-          <span className="dash-nav-icon">🗓️</span>
+          <Icon name="history" size={22} className="dash-nav-icon" />
           <span>History</span>
         </button>
         <button className="dash-nav-btn" onClick={onViewSettings}>
-          <span className="dash-nav-icon">⚙️</span>
+          <Icon name="settings" size={22} className="dash-nav-icon" />
           <span>Settings</span>
         </button>
       </nav>
