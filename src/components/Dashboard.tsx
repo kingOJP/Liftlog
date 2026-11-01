@@ -7,8 +7,15 @@ import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
 import type { Coaching } from '../data/insights';
-import { getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal, getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal } from '../data/planStore';
+import {
+  getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal,
+  getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal, getStrengthState,
+} from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
+import { bestLoggedMax, currentMax, etaLabel, projectGoal, strengthTrend } from '../data/strength';
+import { effectiveExperience } from '../data/experience';
+import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { fmtWeight, toDisplay } from '../data/units';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
 import Icon from './Icon';
@@ -53,6 +60,8 @@ export default function Dashboard({
     && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt);
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  // The first 1RM goal, with its live estimate — one line on the journey card
+  const [goalLine, setGoalLine] = useState<string | null>(null);
 
   // Training-journey context (sync localStorage reads — cheap per render)
   const journey = getActiveBlockInfo();
@@ -81,6 +90,20 @@ export default function Dashboard({
         snapshot.sessions.filter(s => sessionTimestamp(s) >= weekStart).map(s => s.dayId),
       ));
       setCoaching(computeCoaching(program, snapshot, Date.now(), phase, goal, getPhaseResolver(), getProfileOrDefault().experience, getCoachDecisions()));
+
+      const strength = getStrengthState();
+      const target = strength.goals[0];
+      if (!target) { setGoalLine(null); return; }
+      const stored = strength.maxes.find(m => m.exerciseId === target.exerciseId) ?? null;
+      const current = currentMax(stored, bestLoggedMax(snapshot, target.exerciseId));
+      const name = getExerciseLibrary().find(e => e.id === target.exerciseId)?.name ?? getExerciseName(target.exerciseId);
+      if (!current) { setGoalLine(`${name} goal: ${fmtWeight(target.targetWeight)} — enter a 1RM for an estimate`); return; }
+      const projection = projectGoal({
+        current: current.value, target: target.targetWeight,
+        experience: effectiveExperience(getProfileOrDefault(), snapshot), goal,
+        trend: strengthTrend(snapshot, target.exerciseId),
+      });
+      setGoalLine(`${name}: ${toDisplay(current.value)} → ${fmtWeight(target.targetWeight)} · ${etaLabel(projection)}${strength.goals.length > 1 ? ` · +${strength.goals.length - 1} more` : ''}`);
     });
     return () => { cancelled = true; };
   }, [program, weekNumber, phase, goal]);
@@ -142,6 +165,7 @@ export default function Dashboard({
             Next: {goalLabel(pending.goal)} block starts {startLabel(pending.block.startDate)} — the new workouts appear then
           </div>
         )}
+        {goalLine && <div className="journey-goal-line">🎯 {goalLine}</div>}
       </button>
     );
   } else if (pending) {

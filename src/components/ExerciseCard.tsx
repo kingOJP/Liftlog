@@ -18,6 +18,10 @@ interface Props {
   /** Per-set prescription — one row per programmed working set */
   plan?: SetPlan;
   lastSession?: ExerciseSession;
+  /** The lifter's stored 1RM for this exercise — prescribed loads are shown as a % of it */
+  oneRepMax?: number;
+  /** Opens the Strength screen for this lift; offered when the coach has nothing to prescribe a load from */
+  onSetMax?: () => void;
   onLogSet: (weight: number, reps: number, warmup: boolean) => void;
   onEditSet: (index: number, weight: number, reps: number, warmup: boolean) => void;
   onDeleteSet: (index: number) => void;
@@ -63,7 +67,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 };
 
 export default function ExerciseCard({
-  exercise, sets, recommendation, plan, lastSession,
+  exercise, sets, recommendation, plan, lastSession, oneRepMax, onSetMax,
   onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress, onViewHistory,
 }: Props) {
   const info = useInstructionSheet();
@@ -201,6 +205,15 @@ export default function ExerciseCard({
   const canLog = !!row && (timed || row.weight !== '') && row.reps !== '';
   const planComplete = !!plan && remaining.length === 0;
 
+  // The prescribed load as a share of the lifter's max — what "200 lbs" means.
+  const pctLabel = oneRepMax && recommendation && recommendation.weight > 0 && recommendation.targetReps == null
+    ? `${Math.round((recommendation.weight / oneRepMax) * 100)}% of 1RM`
+    : null;
+  // Nothing to prescribe a load from: no history and no max. The 1RM is the one
+  // input that turns "find a weight" into a number, so offer it right here.
+  const offerMax = !!onSetMax && !!plan && plan.rec == null && !lastSession && !timed
+    && exercise.repLow != null && sets.length === 0;
+
   return (
     <div className="exercise-card">
       <div className="ex-header">
@@ -232,8 +245,15 @@ export default function ExerciseCard({
               ? `${recommendation.targetReps} ${timed ? 'sec' : 'reps'}`
               : fmtWeight(recommendation.weight)}
           </span>
+          {pctLabel && <span className="ex-rec-pct">{pctLabel}</span>}
           <span className="ex-rec-reason">{recommendation.reason}</span>
         </div>
+      )}
+
+      {offerMax && (
+        <button type="button" className="ex-max-offer" onClick={onSetMax}>
+          Know your 1RM? Enter it and the coach sets your starting weight ›
+        </button>
       )}
 
       {lastSession && (

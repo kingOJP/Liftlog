@@ -177,6 +177,19 @@
   border-color: var(--purple);
 }
 
+/* Inline link-style action under a chart ("Set a 1RM or a goal for this lift ›") */
+.metric-link-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--purple);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 0 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── Muscle group bars ── */
 
 .muscle-list {

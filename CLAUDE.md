@@ -131,6 +131,23 @@ Long-term milestones (roughly):
     conditional (ETag) pull + worker hardening + SW update toast; exercise instructions;
     strength structure (barbell anchoring, phase rep ranges, top set + back-offs) and
     bodyweight regressions; per-exercise history, session notes, kg/lb preference, a11y.
+25. ✅ One-rep maxes + strength goals (`strength.ts`, `StrengthView`) — a stored 1RM is
+    the one *measurement* the engines get (everything else is an estimate). It anchors
+    the prescription where the log can't: a never-trained lift gets a real starting load
+    (`firstSessionFromMax` in recommendations.ts) instead of "find a weight", and a max
+    entered *after* the last session re-anchors the load (`maxReanchor`, same guard rails
+    as the rep-range re-anchor: ≥5% shift, ≤20% per step, a *lower* max only cuts load
+    when the last session also missed the range). The exercise card shows the prescribed
+    load as **% of 1RM**; the Strength screen shows the whole program as a % table. A
+    **1RM goal** gets a projection (`projectGoal`: the lifter's own e1RM trend, clamped
+    to a training-age-expected rate — ACSM ~40%/16%/10% per 6 mo/6 mo/yr — tempered by
+    the goal; a range, never a date), surfaced on the Journey ("Strength targets") and
+    the dashboard journey card. "Design a block around this lift" seeds the wizard
+    (`PlanSeed`) and the planner's `focusExerciseIds` guarantees the lift a main slot
+    (`anchorFocusLift`), bypassing the beginner skill gate and equipment filters with a
+    warning. Records ride the journey document (`PlanState.strength`, LWW sync; no
+    backend change). Entry points: Settings → 1RMs & goals (always available), Journey,
+    Metrics' e1RM chart, and a never-trained exercise card mid-workout.
 
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
@@ -266,11 +283,12 @@ type View =
   | { screen: 'settings' }
   | { screen: 'glossary' }
   | { screen: 'journey' }
-  | { screen: 'plan-setup' }
+  | { screen: 'plan-setup'; seed?: PlanSeed }
   | { screen: 'quick-setup' }
   | { screen: 'quick-workout' }
   | { screen: 'shared-preview' }
-  | { screen: 'shared-workout' };
+  | { screen: 'shared-workout' }
+  | { screen: 'strength'; exerciseId?: string; back: View };   // remembers where to return
 ```
 
 The per-exercise **history** (`ExerciseHistorySheet`) and the instruction sheet are overlays,
@@ -395,6 +413,16 @@ src/
                                   Also introWeeksFor()/stimulusChange() — novelty-driven
                                   intro weeks (phases are computed AFTER the days, so
                                   selection novelty can be measured)
+    strength.ts                — one-rep maxes + strength goals (pure): OneRepMax/StrengthGoal
+                                  types, %1RM math (pctOfMaxForReps, percentBandFor,
+                                  loadBandFor, programLoadsFor — the per-plan % table),
+                                  log evidence (bestLoggedMax, strengthTrend — least-squares
+                                  e1RM rate over 12 weeks, currentMax — a tested max stands
+                                  unless the log has beaten it SINCE), projectGoal()
+                                  (EXPECTED_WEEKLY_GAIN_PCT by training age, GOAL_RATE_SCALE,
+                                  ETA with a fast/slow band, feasibility). Persisted via
+                                  planStore (PlanState.strength); consumed by the
+                                  recommendation engine through PrescriptionContext.oneRepMax
     experience.ts              — data-driven experience inference: inferExperience(snapshot)
                                   (training age + consistency + difficulty mastered),
                                   effectiveExperience() (max of self-report and inferred),
@@ -479,7 +507,7 @@ src/
                                   proposed structure (confidence, split, phases, reasons) →
                                   workout review (kept/new/replacement badges, swap ⇄ / remove)
                                   → activate
-    SettingsView.tsx/css       — Exercises/Glossary entries, weight unit (lb/kg), rest-timer
+    SettingsView.tsx/css       — Exercises/Glossary/1RMs & goals entries, weight unit (lb/kg), rest-timer
                                   default, account + POST sign-out, sync status + Sync now
     ExerciseHistorySheet.tsx/css — per-exercise history overlay: bests, progress verdict + recent
                                   PRs, est-1RM and volume trends, every session with its sets and
@@ -487,6 +515,10 @@ src/
                                   Progress row and the exercise detail screen
     useDialog.ts               — the modal contract (Escape closes, focus moves in and is trapped,
                                   the opener gets focus back) shared by every dialog/sheet
+    StrengthView.tsx/css       — 1RMs & goals: list of tracked lifts → per-lift editor (max +
+                                  source + date with log evidence and "Use this", the program
+                                  as a % of 1RM table, goal input with live projection, "Add to
+                                  my plan", "Design a block around this lift" → seeded wizard)
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart (highlightIndex / highlightMax, zero-value
                                   gap bars) and LineChart (hand-rolled CSS/SVG)
@@ -508,7 +540,7 @@ src/
 | `liftlog_role` | `sync.ts` | Signed-in account's role (`user`/`admin`/`tester`) from the server — UI hint only |
 | `liftlog_deleted_sessions` | `sessionTombstones.ts` | Deleted-session tombstones (GUIDs; user-scoped, synced) |
 | `liftlog_draft_session` | `draftSession.ts` | In-progress workout draft — written on every set change, cleared at Finish |
-| `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile`; user-scoped, synced LWW) |
+| `liftlog_plan` | `planStore.ts` | Training journey document (all plans + blocks + retrospectives + athlete `profile` + `strength` 1RMs/goals; user-scoped, synced LWW) |
 | `liftlog_data_owner` | `sync.ts` | Email of the account the local data belongs to — a mismatch at startup wipes user-scoped local data |
 | `liftlog_program_updated` | `programStore.ts` | Clock of the program's last local edit (0 = unstamped); compared on both ends of sync |
 | `liftlog_restored_exercises` | `programStore.ts` | Tombstones this device knowingly lifted (re-added by hand / merge survivor), pushed as `restoredExerciseIds` until the server stops reporting them deleted |
@@ -762,6 +794,14 @@ same-era sessions so a re-anchor never reads as "already went up this week".
 
 Branches, evaluated in order:
 
+0a. **Anchor to a known 1RM** (`ctx.oneRepMax`, from `strength.ts` via planStore) — with
+   **no history**, `firstSessionFromMax` prescribes `loadFromMax(1RM, repHigh)` (Epley
+   solved for load × `REANCHOR_SAFETY`, snapped down to the equipment increment) as a
+   neutral `reanchor` rec instead of returning null; with history, a max entered **after**
+   the last session (`maxReanchor`) re-anchors when the derived load differs ≥5%, capped at
+   20% per step. Asymmetric like the rest of the engine: a higher max is acted on, a lower
+   one only when the last session also fell under the range (completed sets beat an entered
+   number). A max older than the latest session is ignored — the log has moved on.
 0. **Re-anchor (rep range changed)** — the reps logged sit ≥2 outside the prescribed range →
    recompute the load from the **estimated 1RM** instead of nudging it (see below).
 1. **Increase (volume at a fixed load)** — a full set count, **one set at `repHigh`**, and a
@@ -933,6 +973,8 @@ plain-language `goal` line stating what this session must do to earn the next in
   no fatigue-chasing in a scheduled easy week.
 - **Never-trained exercises still get a plan** — `rec` is null, weights are `null` (the card
   shows an empty input), targets are `repLow`, and the goal says to find a working weight.
+  The card offers "Know your 1RM?" there (→ Strength screen); with a stored max the plan is
+  instead anchored at the 1RM-derived load with set 1 aimed at `repHigh − 1`.
 - The plan is built from the **coach-adjusted** set count (`effectiveDay`), so a planner set
   addition shows up as a real prescribed row.
 - Targets and the fatigue fit both read the **fresh-slot baseline**, so a late-slot session

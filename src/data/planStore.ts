@@ -22,6 +22,8 @@ import type { BlockRetrospective, Goal, PhaseKind, TrainingBlock, TrainingPlan, 
 import { blockAnchor, currentPhase, defaultTrainingProfile, generatePlanId, goalLabel, nextMonday, toPlanDate, phaseResolverFor } from './plan';
 import { computeBlockRetrospective } from './retrospective';
 import type { PlanProposal } from './planner';
+import type { OneRepMax, StrengthGoal, StrengthState } from './strength';
+import { emptyStrengthState } from './strength';
 
 const PLAN_KEY = 'liftlog_plan';
 
@@ -42,7 +44,15 @@ export interface PlanState {
   pendingActivation?: PendingActivation;
   /** the athlete profile (Tier 1/2 onboarding inputs) — rides the same LWW sync */
   profile?: TrainingProfile;
+  /** one-rep maxes + 1RM goals (strength.ts) — rides the same LWW sync */
+  strength?: StrengthState;
   updatedAt: number;
+}
+
+/** True when the document carries anything worth syncing. */
+export function planStateHasContent(state: PlanState): boolean {
+  return state.plans.length > 0 || state.profile != null
+    || (state.strength != null && (state.strength.maxes.length > 0 || state.strength.goals.length > 0));
 }
 
 // Always a fresh object — callers (activateProposal etc.) mutate the returned
@@ -97,6 +107,59 @@ export function saveTrainingProfile(profile: TrainingProfile, now = Date.now()):
   const state = getPlanState();
   state.profile = { ...profile, updatedAt: now };
   savePlanState(state);
+}
+
+// ── Strength records (1RMs + goals) ───────────────────────────────────────────
+// One max and one goal per exercise, keyed by exercise id. Stored on the
+// journey document so they sync with the plan and clear with it on an account
+// switch — a 1RM is as much "the athlete" as the profile is.
+
+export function getStrengthState(): StrengthState {
+  return getPlanState().strength ?? emptyStrengthState();
+}
+
+export function getOneRepMax(exerciseId: string): OneRepMax | null {
+  return getStrengthState().maxes.find(m => m.exerciseId === exerciseId) ?? null;
+}
+
+export function getStrengthGoal(exerciseId: string): StrengthGoal | null {
+  return getStrengthState().goals.find(g => g.exerciseId === exerciseId) ?? null;
+}
+
+function updateStrength(mutate: (s: StrengthState) => void, now: number): void {
+  const state = getPlanState();
+  const strength = state.strength ?? emptyStrengthState();
+  mutate(strength);
+  state.strength = strength;
+  state.updatedAt = now;
+  savePlanState(state);
+}
+
+/** Upsert the max for an exercise (replaces any previous record). */
+export function saveOneRepMax(max: Omit<OneRepMax, 'updatedAt'>, now = Date.now()): OneRepMax {
+  const record: OneRepMax = { ...max, updatedAt: now };
+  updateStrength(s => {
+    s.maxes = [...s.maxes.filter(m => m.exerciseId !== max.exerciseId), record];
+  }, now);
+  return record;
+}
+
+export function removeOneRepMax(exerciseId: string, now = Date.now()): void {
+  updateStrength(s => { s.maxes = s.maxes.filter(m => m.exerciseId !== exerciseId); }, now);
+}
+
+/** Upsert the 1RM goal for an exercise. */
+export function saveStrengthGoal(exerciseId: string, targetWeight: number, now = Date.now()): StrengthGoal {
+  const existing = getStrengthGoal(exerciseId);
+  const goal: StrengthGoal = { exerciseId, targetWeight, createdAt: existing?.createdAt ?? now };
+  updateStrength(s => {
+    s.goals = [...s.goals.filter(g => g.exerciseId !== exerciseId), goal];
+  }, now);
+  return goal;
+}
+
+export function removeStrengthGoal(exerciseId: string, now = Date.now()): void {
+  updateStrength(s => { s.goals = s.goals.filter(g => g.exerciseId !== exerciseId); }, now);
 }
 
 // ── Readers ───────────────────────────────────────────────────────────────────
