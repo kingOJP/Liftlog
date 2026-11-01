@@ -90,53 +90,136 @@
   gap: 10px;
 }
 
-.day-list-empty {
+/* ── Start card: every way into training, in one place (empty program) ── */
+.start-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  text-align: center;
-  border: 1px dashed var(--border);
+  gap: 12px;
+  padding: 18px 16px 16px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
-  padding: 28px 20px;
-  background: rgba(255, 255, 255, 0.012);
+  box-shadow: var(--shadow-card);
 }
 
-.day-list-empty-title {
-  font-size: 16px;
+.start-eyebrow {
+  font-size: 11px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--purple-bright);
+}
+
+.start-title {
+  margin: -6px 0 2px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--text);
 }
 
-.day-list-empty-detail {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  max-width: 300px;
+.start-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, border-color 0.15s;
 }
 
-/* ── Quick / one-off workout CTA ── */
-.empty-quick-cta {
+.start-option:active {
+  transform: scale(0.99);
+  border-color: var(--purple-dim);
+}
+
+/* The coach's plan is the recommended path, so it carries the accent glow */
+.start-option--primary {
+  padding: 16px 12px 16px 14px;
+  background: var(--accent-wash);
+  border-color: rgba(124, 114, 232, 0.45);
+  box-shadow: var(--shadow-glow);
+}
+
+.start-option-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.22);
+}
+
+.start-option--primary .start-option-icon {
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  background: var(--accent-grad);
+  border: none;
+  box-shadow: var(--shadow-btn);
+}
+
+.start-option-text {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.start-option-title {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  width: 100%;
+  gap: 6px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
-.empty-quick-or {
-  font-size: 11px;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+.start-option--primary .start-option-title {
+  font-size: 16px;
 }
 
-.empty-quick-hint {
-  font-size: 12px;
+.start-option-detail {
+  font-size: 12.5px;
+  line-height: 1.45;
   color: var(--text-muted);
-  line-height: 1.5;
-  max-width: 280px;
+}
+
+.start-badge {
+  align-self: flex-start;
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.35);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.start-option-go {
+  color: var(--text-faint);
+}
+
+.start-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .quick-workout-btn {
@@ -206,8 +289,7 @@
 }
 
 .journey-card--cta {
-  border-style: dashed;
-  border-color: var(--purple-dim);
+  border-color: rgba(124, 114, 232, 0.45);
   background: var(--accent-wash);
 }
 

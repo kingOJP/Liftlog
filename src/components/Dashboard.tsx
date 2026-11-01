@@ -113,9 +113,15 @@ export default function Dashboard({
   const nextDay = coaching?.nextDay;
   const nextDayAdjustments = nextDay ? coaching?.plan.days.get(nextDay.dayId)?.changes.length ?? 0 : 0;
 
+  // With no program yet, the invitation to plan lives inside the start card
+  // next to the other two ways in, rather than as a separate strip above it.
+  const offerPlan = program.length === 0 && !journey && !pending;
+
   // Journey strip: where the user is in their block, or the invitation to plan
   let journeyCard: React.ReactNode;
-  if (journey) {
+  if (offerPlan) {
+    journeyCard = null;
+  } else if (journey) {
     const { plan, block } = journey;
     const rawWeek = blockWeekIndex(block);
     const week = Math.max(0, rawWeek) + 1;
@@ -253,25 +259,45 @@ export default function Dashboard({
       )}
 
       {program.length === 0 ? (
-        <div className="day-list-empty">
-          <span className="day-list-empty-title">No workouts yet</span>
-          <span className="day-list-empty-detail">
-            Tell the coach your goal above and it designs your program with you —
-            every workout, explained, and yours to adjust before it starts.
-          </span>
-          <div className="empty-quick-cta">
-            <span className="empty-quick-or">or</span>
-            <button className="quick-workout-btn" onClick={onAddDay}>
-              ＋ Build my own program
+        <section className="start-card" aria-labelledby="start-card-title">
+          <div className="start-eyebrow">Get started</div>
+          <h2 id="start-card-title" className="start-title">How do you want to train?</h2>
+
+          {offerPlan && (
+            <button className="start-option start-option--primary" onClick={hasPlans ? onViewJourney : onPlanSetup}>
+              <span className="start-option-icon"><Icon name="target" size={22} /></span>
+              <span className="start-option-text">
+                <span className="start-badge">Recommended</span>
+                <span className="start-option-title">
+                  {hasPlans ? 'Plan your next block' : 'Let the coach design your plan'}
+                </span>
+                <span className="start-option-detail">
+                  Answer a few questions — get every workout planned and explained.
+                </span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
             </button>
-            <button className="quick-workout-btn" onClick={onQuickWorkout}>
-              ＋ Log a quick workout
+          )}
+
+          <div className="start-secondary">
+            <button className="start-option" onClick={onAddDay}>
+              <span className="start-option-icon"><Icon name="dumbbell" size={20} /></span>
+              <span className="start-option-text">
+                <span className="start-option-title">Build my own program</span>
+                <span className="start-option-detail">Pick your own days, exercises and sets.</span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
             </button>
-            <span className="empty-quick-hint">
-              Know what you want to run? Add your own days and sets. Just want to train today? Log a one-off session.
-            </span>
+            <button className="start-option" onClick={onQuickWorkout}>
+              <span className="start-option-icon"><Icon name="bolt" size={20} /></span>
+              <span className="start-option-text">
+                <span className="start-option-title">Log a quick workout</span>
+                <span className="start-option-detail">Just training today? Log a one-off session.</span>
+              </span>
+              <Icon name="chevron-right" size={18} className="start-option-go" />
+            </button>
           </div>
-        </div>
+        </section>
       ) : (
         <>
           <h2 className="dash-section-title">Your workouts</h2>
