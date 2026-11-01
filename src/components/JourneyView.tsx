@@ -8,7 +8,7 @@ import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/pl
 import {
   canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState,
   getProfileOrDefault, getStrengthState, getTrainingGoal, getTrainingProfile,
-  saveTrainingProfile, startPendingActivation, planHasChosenGoal,
+  saveTrainingProfile, startPendingActivation, cancelPendingActivation, planHasChosenGoal,
 } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { effectiveExperience, experienceSuggestion, experienceSuggestionText } from '../data/experience';
@@ -100,6 +100,14 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
     await startPendingActivation(Date.now(), { force: true });
     setRefresh(r => r + 1);
     onChanged();
+  }
+
+  function cancelPending() {
+    if (!window.confirm('Cancel the scheduled block? Nothing has been installed yet — your current training stays as it is, and you can plan a new block any time.')) return;
+    if (cancelPendingActivation()) {
+      setRefresh(r => r + 1);
+      onChanged();
+    }
   }
 
   function deferToNextWeek() {
@@ -206,12 +214,18 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
               {' '}· {pending.block.phases.length} weeks
             </div>
             <p className="journey-hint">
-              Your current training keeps running until then — the new workouts install on the
-              start date, and the outgoing block gets its review at the same time.
+              {activeBlock
+                ? 'Your current training keeps running until then — the new workouts install on the start date, and the outgoing block gets its review at the same time.'
+                : 'The workouts install on the start date. Changed your mind? Cancel it and plan again — nothing has been installed yet.'}
             </p>
-            <button className="journey-secondary-btn" onClick={startPendingNow}>
-              Start it today instead
-            </button>
+            <div className="journey-actions">
+              <button className="journey-secondary-btn" onClick={startPendingNow}>
+                Start it today instead
+              </button>
+              <button className="journey-secondary-btn journey-secondary-btn--muted" onClick={cancelPending}>
+                Cancel this block
+              </button>
+            </div>
           </section>
         )}
 
@@ -300,12 +314,14 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
           <section className="journey-section">
             <span className="journey-label">No active block</span>
             <p className="journey-hint">
-              {state.plans.length === 0
-                ? 'Tell the coach your goal and it designs a complete training plan around your history — you review and adjust everything before it starts.'
-                : 'Your last block is wrapped up. Everything it taught the coach feeds the next one.'}
+              {pending
+                ? 'A block is scheduled above. Planning again replaces it with the new one.'
+                : state.plans.length === 0
+                  ? 'Tell the coach your goal and it designs a complete training plan around your history — you review and adjust everything before it starts.'
+                  : 'Your last block is wrapped up. Everything it taught the coach feeds the next one.'}
             </p>
             <button className="journey-primary-btn" onClick={onPlanNew}>
-              {state.plans.length === 0 ? 'Create my training plan' : 'Plan the next block'}
+              {pending ? 'Plan a different block' : state.plans.length === 0 ? 'Create my training plan' : 'Plan the next block'}
             </button>
           </section>
         )}

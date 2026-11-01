@@ -33,7 +33,7 @@ import {
   saveOneRepMax,
   saveStrengthGoal,
   saveTrainingProfile,
-  startPendingActivation, getPlannedGoal, getTrainingGoal, ensureJourneyMigrated,
+  startPendingActivation, cancelPendingActivation, getPlannedGoal, getTrainingGoal, ensureJourneyMigrated,
 } from './planStore';
 import { defaultTrainingProfile } from './plan';
 import 'fake-indexeddb/auto';
@@ -149,6 +149,40 @@ describe('activateProposal (scheduled — future start while a block runs)', () 
     expect(getPendingActivation()).toBeNull();
     expect(getActiveBlockInfo()!.block.startDate).toBe('2026-06-29');
     expect(getProgramStartValue()).toBe('2026-06-29');
+  });
+
+  it('cancels an un-started pending block, leaving the running block and its program untouched', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const running = getActiveBlockInfo()!.block;
+    const programBefore = getStoredProgram();
+    const midBlock = new Date('2026-06-10T12:00:00').getTime();
+    activateProposal(makeProposal({ startDate: '2026-06-29' }), null, midBlock);
+    expect(getPendingActivation()).not.toBeNull();
+
+    const cancelledAt = new Date('2026-06-11T12:00:00').getTime();
+    expect(cancelPendingActivation(cancelledAt)).toBe(true);
+    expect(getPendingActivation()).toBeNull();
+    expect(getActiveBlockInfo()!.block.id).toBe(running.id);
+    expect(getStoredProgram()).toEqual(programBefore);
+    // The clock moves so the cancellation outranks a stale copy elsewhere
+    expect(getPlanState().updatedAt).toBe(cancelledAt);
+    // Its start date arriving no longer installs anything
+    expect(getPlanState().plans[0].blocks).toHaveLength(1);
+  });
+
+  it('cancelling a scheduled first block returns the account to a blank journey', () => {
+    // Nothing running: the first-ever plan is approved for next Monday
+    const now = new Date('2026-06-10T12:00:00').getTime();
+    const { started } = activateProposal(makeProposal({ startDate: '2026-06-15' }), null, now);
+    expect(started).toBe(false);
+    expect(getPendingActivation()).not.toBeNull();
+
+    expect(cancelPendingActivation(now + 1000)).toBe(true);
+    expect(getPendingActivation()).toBeNull();
+    expect(getPlanState().plans).toHaveLength(0);
+    expect(getPlannedGoal()).toBeNull();
+    // Nothing queued → nothing to cancel
+    expect(cancelPendingActivation()).toBe(false);
   });
 
   it('replaces an un-started pending block when the user re-plans', () => {
