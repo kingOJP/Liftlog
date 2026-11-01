@@ -10,6 +10,7 @@ import type { Coaching } from '../data/insights';
 import {
   getPlanState, getActiveBlockInfo, getActivePhase, getPendingActivation, getTrainingGoal,
   getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal, getStrengthState,
+  restorableBlockProgram,
 } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
 import { bestLoggedMax, currentMax, etaLabel, projectGoal, strengthTrend } from '../data/strength';
@@ -33,6 +34,8 @@ interface Props {
   onQuickWorkout: () => void;
   onResumeWorkout: (draft: DraftSession) => void;
   onAddDay: () => void;
+  /** put the last wrapped-up block's workouts back as the program */
+  onRestoreLastBlock: () => void;
 }
 
 function startLabel(startDate: string): string {
@@ -49,7 +52,7 @@ function lastTrainedLabel(ts: number | null): string {
 
 export default function Dashboard({
   program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay,
+  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay, onRestoreLastBlock,
 }: Props) {
   const weekNumber = getWeekNumber();
   // An interrupted or abandoned-for-now workout, offered for resumption. Read
@@ -68,6 +71,8 @@ export default function Dashboard({
   const hasPlans = getPlanState().plans.length > 0;
   const phase = getActivePhase();
   const pending = getPendingActivation();
+  // Just wrapped a block → the dashboard is deliberately empty until the user decides
+  const restorable = program.length === 0 ? restorableBlockProgram() : null;
   const goal = getTrainingGoal();
 
   // Days can be gated to specific block phases — a sport-support block programs
@@ -196,7 +201,9 @@ export default function Dashboard({
     journeyCard = (
       <button className="journey-card journey-card--cta" onClick={onViewJourney}>
         <div className="journey-eyebrow">Training journey</div>
-        <div className="journey-status">No active block — plan your next one ›</div>
+        <div className="journey-status">
+          {restorable ? `${restorable.block.name} complete — see its review ›` : 'No active block — plan your next one ›'}
+        </div>
       </button>
     );
   }
@@ -260,8 +267,10 @@ export default function Dashboard({
 
       {program.length === 0 ? (
         <section className="start-card" aria-labelledby="start-card-title">
-          <div className="start-eyebrow">Get started</div>
-          <h2 id="start-card-title" className="start-title">How do you want to train?</h2>
+          <div className="start-eyebrow">{restorable ? 'Block complete' : 'Get started'}</div>
+          <h2 id="start-card-title" className="start-title">
+            {restorable ? "What's next?" : 'How do you want to train?'}
+          </h2>
 
           {offerPlan && (
             <button className="start-option start-option--primary" onClick={hasPlans ? onViewJourney : onPlanSetup}>
@@ -272,7 +281,9 @@ export default function Dashboard({
                   {hasPlans ? 'Plan your next block' : 'Let the coach design your plan'}
                 </span>
                 <span className="start-option-detail">
-                  Answer a few questions — get every workout planned and explained.
+                  {restorable
+                    ? `Everything the coach learned from ${restorable.block.name} feeds the next one — review it, then plan.`
+                    : 'Answer a few questions — get every workout planned and explained.'}
                 </span>
               </span>
               <Icon name="chevron-right" size={18} className="start-option-go" />
@@ -280,6 +291,16 @@ export default function Dashboard({
           )}
 
           <div className="start-secondary">
+            {restorable && (
+              <button className="start-option" onClick={onRestoreLastBlock}>
+                <span className="start-option-icon"><Icon name="history" size={20} /></span>
+                <span className="start-option-text">
+                  <span className="start-option-title">Keep training the same workouts</span>
+                  <span className="start-option-detail">Bring back the workouts from {restorable.block.name} as they were.</span>
+                </span>
+                <Icon name="chevron-right" size={18} className="start-option-go" />
+              </button>
+            )}
             <button className="start-option" onClick={onAddDay}>
               <span className="start-option-icon"><Icon name="dumbbell" size={20} /></span>
               <span className="start-option-text">

@@ -1244,6 +1244,18 @@ The planning layer above individual workouts. Two domain levels, deliberately no
   block — nothing to restore, since nothing was installed — and bumps the document clock so
   the cancellation syncs). If nothing is running (or the start is today/past), activation commits
   immediately as before. Dashboard/JourneyView surface the pending block.
+- **Wrapping a block up clears the dashboard.** `completeActiveBlock()` (the user path:
+  "Block complete — review it" / "End early") snapshots the live program onto the block as
+  `finalProgram` (edits included) and then stores a **stamped empty** program, so the finished
+  block's workouts come off the dashboard on every device and what comes next is the user's
+  decision, not a default. The Dashboard's empty state becomes "Block complete — what's
+  next?" (plan the next block / keep training the same workouts / quick workout / build by
+  hand) and the Journey review offers the same restore. `restoreLastBlockProgram()` installs
+  that program as a plain program — no block is reopened — and `restorableBlockProgram()`
+  gates the offer (latest user-closed block, nothing active or queued, program still empty).
+  The wizard compares against the restorable program when the live one is empty, so kept
+  lifts still read as kept and a same-selection block doesn't earn an intro week.
+  `reconcileActiveProgram()` cannot undo the wipe because it needs an active block.
 - **Undoing a premature activation.** `deferActiveBlockToNextWeek()` is the inverse of
   `commitActivation`: it reactivates the block the active one replaced (restoring its program
   as the live program and clearing the auto-generated retrospective) and reschedules the

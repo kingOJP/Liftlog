@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getStoredProgram, saveStoredProgram } from './programStore';
+import { getStoredProgram, saveStoredProgram, getProgramUpdatedAt } from './programStore';
 import { getProgramStartValue, saveProgramStart } from './settings';
 import { buildSnapshot } from './analytics';
 import type { BlockRetrospective } from './plan';
@@ -28,6 +28,8 @@ import {
   mergeServerPlanState,
   planStateHasContent,
   reconcileActiveProgram,
+  restorableBlockProgram,
+  restoreLastBlockProgram,
   removeOneRepMax,
   removeStrengthGoal,
   saveOneRepMax,
@@ -257,6 +259,42 @@ describe('completeActiveBlock', () => {
     expect(getActiveBlockInfo()).toBeNull();
     expect(getActivePlan()).not.toBeNull();
     expect(getLatestRetrospective()?.blockId).toBe(block.id);
+  });
+
+  it("takes the finished block's workouts off the dashboard — what comes next is the user's call", () => {
+    activateProposal(makeProposal(), null, JUN1);
+    expect(getStoredProgram()).toHaveLength(1);
+    completeActiveBlock(makeRetro('x'), 5000);
+    expect(getStoredProgram()).toEqual([]);
+    // Deliberate (stamped) wipe, so sync carries it to other devices
+    expect(getProgramUpdatedAt()).toBe(5000);
+    // …and the self-heal does not put it back: there is no active block
+    expect(reconcileActiveProgram()).toBe(false);
+    expect(getStoredProgram()).toEqual([]);
+  });
+
+  it('remembers the live program (edits included) so the user can keep training it', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    const edited = [{ ...getStoredProgram()[0], label: 'Edited day' }];
+    saveStoredProgram(edited, JUN1 + 1);
+    completeActiveBlock(makeRetro('x'), 5000);
+
+    const restorable = restorableBlockProgram();
+    expect(restorable?.program).toEqual(edited);
+    expect(restoreLastBlockProgram(6000)).toBe(true);
+    expect(getStoredProgram()).toEqual(edited);
+    // Restoring installs a plain program — no block is reopened
+    expect(getActiveBlockInfo()).toBeNull();
+    // A second restore has nothing to do
+    expect(restoreLastBlockProgram(7000)).toBe(false);
+  });
+
+  it('offers nothing to restore once a new block is running or queued', () => {
+    activateProposal(makeProposal(), null, JUN1);
+    completeActiveBlock(makeRetro('x'), JUL6 - 1000);
+    expect(restorableBlockProgram()).not.toBeNull();
+    activateProposal(makeProposal({ startDate: '2026-07-06' }), null, JUL6);
+    expect(restorableBlockProgram()).toBeNull();
   });
 });
 

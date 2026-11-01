@@ -260,6 +260,10 @@ export interface TrainingBlock {
   /** the LIVE program at activation time — what the undo path restores (it may
    *  carry edits the replaced block's own snapshot does not) */
   replacedProgram?: WorkoutDay[];
+  /** the LIVE program when the USER wrapped the block up (edits included).
+   *  Wrapping up clears the live program — the next step is the user's call —
+   *  and this is what "keep training these workouts" brings back. */
+  finalProgram?: WorkoutDay[];
   /** the experience level the block was planned at (sets its volume band) */
   experience?: ExperienceLevel;
   retrospective?: BlockRetrospective;

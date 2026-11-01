@@ -254,6 +254,10 @@ export function completeActiveBlock(
     block.completedAt = now;
     block.completedBy = 'user';
     if (retro) block.retrospective = retro;
+    // Remember what the user was actually training (mid-block edits included)
+    // so the workouts can be brought back on request.
+    const live = getStoredProgram();
+    block.finalProgram = live.length > 0 ? live : block.program;
   }
   if (alsoPlan) {
     plan.status = 'completed';
@@ -261,9 +265,38 @@ export function completeActiveBlock(
   }
   state.updatedAt = now;
   savePlanState(state);
-  // Between blocks, weeks count from when the last block ended — the anchor
-  // is managed automatically (no user-facing setting).
-  if (block) saveProgramStart(toPlanDate(new Date(now)));
+  if (block) {
+    // Between blocks, weeks count from when the last block ended — the anchor
+    // is managed automatically (no user-facing setting).
+    saveProgramStart(toPlanDate(new Date(now)));
+    // A finished block's workouts come off the dashboard: what comes next —
+    // the next planned block, the same workouts again, a hand-built program —
+    // is the user's decision, not a default. A STAMPED empty program is what
+    // sync treats as a deliberate wipe, so other devices follow.
+    saveStoredProgram([], now);
+  }
+}
+
+/** The program a completed block left behind, if one can be restored. */
+export function restorableBlockProgram(): { block: TrainingBlock; program: WorkoutDay[] } | null {
+  if (getActiveBlockInfo() || getPendingActivation()) return null;
+  const block = getLatestCompletedBlock();
+  if (!block || block.completedBy !== 'user') return null;
+  const program = block.finalProgram ?? block.program;
+  return program.length > 0 ? { block, program } : null;
+}
+
+/**
+ * Put the last wrapped-up block's workouts back on the dashboard as a plain
+ * program — no block is reopened, so the journey still shows nothing active
+ * and the next plan starts from the same retrospective. Returns true if it did.
+ */
+export function restoreLastBlockProgram(now = Date.now()): boolean {
+  if (getStoredProgram().length > 0) return false;
+  const restorable = restorableBlockProgram();
+  if (!restorable) return false;
+  saveStoredProgram(restorable.program, now);
+  return true;
 }
 
 /**

@@ -9,11 +9,12 @@ import {
   canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState,
   getProfileOrDefault, getStrengthState, getTrainingGoal, getTrainingProfile,
   saveTrainingProfile, startPendingActivation, cancelPendingActivation, planHasChosenGoal,
+  restorableBlockProgram, restoreLastBlockProgram,
 } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
 import { effectiveExperience, experienceSuggestion, experienceSuggestionText } from '../data/experience';
 import { bestLoggedMax, currentMax, etaLabel, goalProgress, projectGoal, strengthTrend } from '../data/strength';
-import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { getExerciseLibrary, getExerciseName, getStoredProgram } from '../data/programStore';
 import { fmtWeight, toDisplay } from '../data/units';
 import './JourneyView.css';
 
@@ -141,6 +142,18 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
     onChanged();
   }
 
+  // Wrapping up takes the block's workouts off the dashboard; the user can
+  // bring them back here if they'd rather keep training them as they are.
+  const restorable = useMemo(() => restorableBlockProgram(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const programEmpty = getStoredProgram().length === 0;
+  function keepLastWorkouts() {
+    if (restoreLastBlockProgram()) {
+      setRefresh(r => r + 1);
+      onChanged();
+      onBack();
+    }
+  }
+
   // Experience is self-reported at onboarding but keeps learning from data.
   // When logged training clearly outranks the stored level, offer the bump.
   const profile = useMemo(() => getTrainingProfile(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -233,9 +246,18 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
           <section className="journey-section journey-section--accent">
             <span className="journey-label">Block review</span>
             <Retro retro={justWrapped} />
+            <p className="journey-hint">
+              Its workouts are off your dashboard. What comes next is up to you: plan a new
+              block around what the coach learned, or keep training the same workouts.
+            </p>
             <button className="journey-primary-btn" onClick={onPlanNew}>
               Plan the next block
             </button>
+            {restorable && programEmpty && (
+              <button className="journey-text-btn" onClick={keepLastWorkouts}>
+                Keep training the same workouts for now
+              </button>
+            )}
           </section>
         )}
 
@@ -323,6 +345,11 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
             <button className="journey-primary-btn" onClick={onPlanNew}>
               {pending ? 'Plan a different block' : state.plans.length === 0 ? 'Create my training plan' : 'Plan the next block'}
             </button>
+            {restorable && programEmpty && (
+              <button className="journey-text-btn" onClick={keepLastWorkouts}>
+                Keep training the workouts from {restorable.block.name}
+              </button>
+            )}
           </section>
         )}
 

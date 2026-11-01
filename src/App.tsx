@@ -3,7 +3,7 @@ import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
 import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
 import type { SyncUser } from './data/sync';
-import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram } from './data/planStore';
+import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram, restoreLastBlockProgram, restorableBlockProgram } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
 import { clearDraftSession } from './data/draftSession';
 import type { DraftSession } from './data/draftSession';
@@ -429,7 +429,10 @@ function App() {
       case 'plan-setup':
         return (
           <PlanSetupView
-            program={program}
+            // After a wrap-up the live program is empty by design; the planner
+            // still compares against what was just trained so kept lifts read
+            // as kept and a same-selection block doesn't earn an intro week.
+            program={program.length > 0 ? program : (restorableBlockProgram()?.program ?? [])}
             seed={view.seed}
             onBack={() => setView({ screen: 'journey' })}
             onActivated={() => {
@@ -557,6 +560,9 @@ function App() {
             onViewJourney={() => setView({ screen: 'journey' })}
             onPlanSetup={() => setView({ screen: 'plan-setup' })}
             onQuickWorkout={() => setView({ screen: 'quick-setup' })}
+            onRestoreLastBlock={() => {
+              if (restoreLastBlockProgram()) { setProgram(getStoredProgram()); sync(); }
+            }}
           />
         </main>
       </>
