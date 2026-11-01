@@ -7,6 +7,7 @@
 // hardcoded rep range left anywhere on the client.
 
 import type { Exercise } from './program';
+import type { Goal, ExperienceLevel } from './plan';
 import type { TrainingSnapshot } from './analytics';
 import { profileFor } from './substitution';
 import { effectiveExperience } from './experience';
@@ -41,6 +42,14 @@ export interface PrescribeOptions {
   slot?: DosageSlot;
   /** Loaded snapshot, when the caller has one — enables the history fallback */
   snapshot?: TrainingSnapshot | null;
+  /**
+   * The goal to dose for, overriding the active plan's. The plan wizard passes
+   * the goal being *planned*, which isn't stored until the plan is activated.
+   * An explicit `null` means "no plan".
+   */
+  goal?: Goal | null;
+  /** The level to dose for, overriding the stored profile's effective level */
+  experience?: ExperienceLevel;
 }
 
 /**
@@ -56,8 +65,8 @@ export function prescribeFor(
   return resolvePrescription({
     profile: profileFor(exerciseId, opts.name),
     slot: opts.slot,
-    goal: getPlannedGoal(),
-    experience: effectiveExperience(getProfileOrDefault(), snapshot),
+    goal: opts.goal !== undefined ? opts.goal : getPlannedGoal(),
+    experience: opts.experience ?? effectiveExperience(getProfileOrDefault(), snapshot),
     history: exerciseHistory(exerciseId, snapshot),
   });
 }

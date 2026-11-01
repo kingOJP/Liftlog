@@ -6,9 +6,9 @@ import {
   getDeletedExerciseIds, addDeletedExerciseIds,
   mergeExerciseLibrary, ensureProgramExercisesInLibrary, getExerciseName,
   findExerciseByName, getRestoredExerciseIds, clearRestoredExerciseIds,
-  saveStoredProgram, clearStoredProgram, getProgramUpdatedAt,
+  saveStoredProgram, clearStoredProgram, getProgramUpdatedAt, pickableExercises,
 } from './programStore';
-import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta } from './exercises';
+import { getAllExerciseMeta, saveExerciseMeta, getExerciseMeta, EXERCISES } from './exercises';
 import type { WorkoutDay } from './program';
 
 beforeEach(() => localStorage.clear());
@@ -228,5 +228,32 @@ describe('findExerciseByName', () => {
   it('returns null for unknown names and blank input', () => {
     expect(findExerciseByName('Jefferson Deficit Zercher Squat')).toBeNull();
     expect(findExerciseByName('   ')).toBeNull();
+  });
+});
+
+describe('pickableExercises', () => {
+  it('offers the whole catalog, not just the library, so a newer catalog exercise is reachable', () => {
+    localStorage.setItem('liftlog_library_v3', '1'); // skip the seeding migration
+    saveExerciseLibrary([{ id: 'bench-press', name: 'Bench Press' }]);
+    const ids = new Set(pickableExercises().map(e => e.id));
+    for (const def of EXERCISES) expect(ids.has(def.id)).toBe(true);
+  });
+
+  it('lets a library entry shadow its catalog namesake, so history keeps one id', () => {
+    const rdl = EXERCISES.find(e => e.id === 'romanian-deadlifts')!;
+    localStorage.setItem('liftlog_library_v3', '1');
+    saveExerciseLibrary([{ id: 'romanian-deadlifts-1782000000000', name: rdl.name }]);
+    const matches = pickableExercises().filter(e => e.name === rdl.name);
+    expect(matches).toEqual([{ id: 'romanian-deadlifts-1782000000000', name: rdl.name }]);
+  });
+
+  it('leaves out archived and tombstoned exercises, and sorts by name', () => {
+    saveExerciseLibrary([{ id: 'my-move-1782000000000', name: 'My Move', archived: true }]);
+    addDeletedExerciseIds(['romanian-deadlifts']);
+    const list = pickableExercises();
+    expect(list.some(e => e.id === 'my-move-1782000000000')).toBe(false);
+    expect(list.some(e => e.id === 'romanian-deadlifts')).toBe(false);
+    const names = list.map(e => e.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });
 });

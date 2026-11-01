@@ -231,6 +231,31 @@ export function mergeExerciseLibrary(incoming: LibraryExercise[]): LibraryExerci
   return result;
 }
 
+// Everything an exercise picker can offer: the user's library first (the id
+// their history is logged under wins), then every built-in catalog exercise the
+// library doesn't already hold — by id or by name, so a custom "Back Extensions"
+// shadows the catalog one. The library alone isn't enough: catalog exercises
+// added after a user's library was seeded never join it until used, so a
+// library-only search hides part of what the app knows about. Archived and
+// tombstoned entries are left out.
+export function pickableExercises(): LibraryExercise[] {
+  const deleted = getDeletedExerciseIds();
+  const out: LibraryExercise[] = [];
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  for (const ex of getExerciseLibrary()) {
+    if (ex.archived) continue;
+    seenIds.add(ex.id);
+    seenNames.add(slugify(ex.name));
+    out.push({ id: ex.id, name: ex.name });
+  }
+  for (const def of EXERCISES) {
+    if (deleted.has(def.id) || seenIds.has(def.id) || seenNames.has(slugify(def.name))) continue;
+    out.push({ id: def.id, name: def.name });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // Repair pass: every exercise the program references must resolve in the
 // library, or history/metrics show raw IDs. Rebuilds missing entries from the
 // program slot itself (id, name, sets, rep range). Heals libraries that were

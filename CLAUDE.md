@@ -477,7 +477,8 @@ src/
     HistoryView.tsx/css        — all past sessions in reverse chronological order, with the
                                   session note; the card header is the one button
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
-                                  per-exercise "Find replacement" (⇄) suggestion panel
+                                  per-exercise "Find replacement" (⇄) suggestion panel with a
+                                  "Search all exercises…" fallback (replace with anything)
     ExerciseListView.tsx/css   — searchable alphabetical list of all exercises (data/search.ts —
                                   the same matcher as the picker), taps into ExerciseMetaView
     ExerciseMetaView.tsx/css   — "How to do it" entry + edit an exercise's muscle groups,
@@ -495,8 +496,14 @@ src/
                                   blocks with expandable reviews
     PlanSetupView.tsx/css      — collaborative plan wizard: goal + schedule + open notes →
                                   proposed structure (confidence, split, phases, reasons) →
-                                  workout review (kept/new/replacement badges, swap ⇄ / remove)
-                                  → activate
+                                  workout review (kept/new/replacement badges, swap ⇄ with the
+                                  coach's picks or "Search all exercises…", remove, ▲▼ reorder,
+                                  ＋ Add exercise — user picks dosed for the goal being PLANNED
+                                  via AddExercisePanel's goal/experience props) → activate
+    AddExercisePanel.tsx       — THE exercise picker (day editor, quick workout, mid-workout
+                                  add, plan review): pickableExercises() (library + full
+                                  catalog, programStore.ts) + muscle chips + create-new; used
+                                  both to add and to replace-with-anything
     SettingsView.tsx/css       — Exercises/Glossary/1RMs & goals entries, weight unit (lb/kg), rest-timer
                                   default, account + POST sign-out, sync status + Sync now
     ExerciseHistorySheet.tsx/css — per-exercise history overlay: bests, progress verdict + recent

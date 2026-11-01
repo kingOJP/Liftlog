@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkoutDay, Exercise } from '../data/program';
+import { prescriptionLabel } from '../data/program';
 import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
 import type { MuscleGroup } from '../data/taxonomy';
@@ -21,10 +22,11 @@ import {
 } from '../data/planStore';
 import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
-import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { ensureProgramExercisesInLibrary, getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { computeBlockRetrospective } from '../data/retrospective';
-import { suggestReplacements } from '../data/substitution';
+import { suggestReplacements, profileFor } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
+import AddExercisePanel from './AddExercisePanel';
 import { InfoButton } from './InstructionSheet';
 import { useInstructionSheet } from './useInstructionSheet';
 import './PlanSetupView.css';
@@ -179,6 +181,14 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [decisions, setDecisions] = useState<Map<string, ExerciseDecision>>(new Map());
   const [swapTarget, setSwapTarget] = useState<{ dayId: number; exerciseId: string } | null>(null);
+  // The open full picker: adding to a day, or replacing a slot with any
+  // exercise at all (beyond the three ranked suggestions).
+  const [picker, setPicker] = useState<
+    { dayId: number; mode: 'add' } | { dayId: number; mode: 'replace'; exerciseId: string } | null
+  >(null);
+  // The level the proposal was planned at — exercises the user brings in
+  // during review are dosed the same way the planner dosed its own picks.
+  const [planExperience, setPlanExperience] = useState<ExperienceLevel>(saved.experience);
   // Captured once at mount — the clock must not be read during render.
   const [now] = useState(() => Date.now());
   const [activating, setActivating] = useState(false);
@@ -298,33 +308,57 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
       ...(focusExerciseIds.length > 0 ? { focusExerciseIds } : {}),
     };
     const p = buildPlanProposal(input, program, snapshot, plannerRetro, getPhaseResolver());
+    setPlanExperience(effExp);
     setProposal(p);
     setDays(p.days.map(d => ({ ...d, exercises: [...d.exercises] })));
     setDecisions(new Map(p.decisions.map(d => [`${d.dayId}:${d.exerciseId}`, d])));
     setSwapTarget(null);
+    setPicker(null);
     setStage('structure');
   }
 
   // ── Review actions ────────────────────────────────────────────────────────────
-  function replaceExercise(dayId: number, oldEx: Exercise, sug: ReplacementSuggestion) {
+  function swapIn(dayId: number, oldEx: Exercise, next: Exercise, reason: string) {
     setDays(prev => prev.map(d => d.id !== dayId ? d : {
-      ...d,
-      exercises: d.exercises.map(e => e.id !== oldEx.id ? e : {
-        id: sug.exercise.id, name: sug.exercise.name,
-        sets: oldEx.sets, repLow: oldEx.repLow, repHigh: oldEx.repHigh,
-      }),
+      ...d, exercises: d.exercises.map(e => e.id !== oldEx.id ? e : next),
     }));
     setDecisions(prev => {
-      const next = new Map(prev);
-      next.delete(`${dayId}:${oldEx.id}`);
-      next.set(`${dayId}:${sug.exercise.id}`, {
-        exerciseId: sug.exercise.id, name: sug.exercise.name, dayId,
-        status: 'replacement', replacesName: oldEx.name,
-        reason: sug.reasons[0] ?? 'Your pick during review.',
+      const map = new Map(prev);
+      map.delete(`${dayId}:${oldEx.id}`);
+      map.set(`${dayId}:${next.id}`, {
+        exerciseId: next.id, name: next.name, dayId,
+        status: 'replacement', replacesName: oldEx.name, reason,
       });
-      return next;
+      return map;
     });
     setSwapTarget(null);
+    setPicker(null);
+  }
+
+  // A ranked suggestion trains the same muscle in the same role, so it keeps
+  // the slot's programming.
+  function replaceExercise(dayId: number, oldEx: Exercise, sug: ReplacementSuggestion) {
+    swapIn(dayId, oldEx, {
+      id: sug.exercise.id, name: sug.exercise.name,
+      sets: oldEx.sets, repLow: oldEx.repLow, repHigh: oldEx.repHigh,
+    }, sug.reasons[0] ?? 'Your pick during review.');
+  }
+
+  // A free pick can be anything — a deadlift in a cable row's slot — so it
+  // arrives from the panel already dosed for what it is, for the goal being
+  // planned, rather than inheriting the old slot's rep range.
+  function replaceWithPick(dayId: number, oldEx: Exercise, slot: Exercise) {
+    swapIn(dayId, oldEx, slot, 'Your pick — dosed for this plan’s goal.');
+  }
+
+  function addExercise(dayId: number, slot: Exercise) {
+    setDays(prev => prev.map(d => d.id !== dayId || d.exercises.some(e => e.id === slot.id) ? d
+      : { ...d, exercises: [...d.exercises, slot] }));
+    setDecisions(prev => new Map(prev).set(`${dayId}:${slot.id}`, {
+      exerciseId: slot.id, name: slot.name, dayId,
+      status: 'new', reason: 'Added by you — dosed for this plan’s goal.',
+    }));
+    setPicker(null);
   }
 
   function removeExercise(dayId: number, exerciseId: string) {
@@ -332,6 +366,19 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
       ...d, exercises: d.exercises.filter(e => e.id !== exerciseId),
     }));
     setSwapTarget(null);
+    setPicker(null);
+  }
+
+  function moveExercise(dayId: number, exerciseId: string, dir: -1 | 1) {
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d;
+      const idx = d.exercises.findIndex(e => e.id === exerciseId);
+      const target = idx + dir;
+      if (idx < 0 || target < 0 || target >= d.exercises.length) return d;
+      const exercises = [...d.exercises];
+      [exercises[idx], exercises[target]] = [exercises[target], exercises[idx]];
+      return { ...d, exercises };
+    }));
   }
 
   function handleActivate() {
@@ -341,6 +388,9 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
     setActivateError(null);
     try {
       saveTrainingProfile(buildProfile());
+      // Catalog exercises the planner (or the user) picked become first-class
+      // library entries, so history, metrics and metadata editing resolve them.
+      ensureProgramExercisesInLibrary(days);
       const outgoingRetro = activeInfo && snapshot && snapshot.sessions.length > 0
         ? computeBlockRetrospective(activeInfo.block, snapshot)
         : null;
@@ -498,34 +548,44 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
           <button className="back-btn" onClick={() => setStage('structure')} aria-label="Back">&#8592;</button>
           <div className="plan-setup-title">
             <span>Your workouts</span>
-            <span className="plan-setup-step">Swap or remove anything</span>
+            <span className="plan-setup-step">Add, swap or remove anything</span>
           </div>
         </header>
         <div className="plan-setup-body">
           <p className="setup-hint">
-            Every pick is explained — swap (⇄) or remove (×) anything before the plan goes live.
+            Every pick is explained — swap (⇄), remove (×), reorder or add exercises before the plan goes live.
             The best plan is the one you'll actually run.
           </p>
           {days.map(day => (
             <section className="setup-section" key={day.id}>
               <span className="setup-label">{day.label} · {day.muscleGroups}</span>
               <div className="review-list">
-                {day.exercises.map(ex => {
+                {day.exercises.map((ex, idx) => {
                   const decision = decisions.get(`${day.id}:${ex.id}`);
                   const isSwapping = swapTarget?.dayId === day.id && swapTarget.exerciseId === ex.id;
+                  const isPicking = picker?.mode === 'replace' && picker.dayId === day.id && picker.exerciseId === ex.id;
                   return (
                     <div className="review-ex" key={ex.id}>
                       <div className="review-ex-head">
                         <div className="review-ex-main">
                           <span className="review-ex-name">{ex.name}</span>
                           <span className="review-ex-dose">
-                            {ex.sets} × {ex.repLow}–{ex.repHigh}{unitFor(ex.id) === 'seconds' ? 's' : ''}
+                            {prescriptionLabel(ex)}{ex.repLow != null && unitFor(ex.id) === 'seconds' ? 's' : ''}
                           </span>
                         </div>
                         <div className="review-ex-actions">
+                          <div className="review-ex-order">
+                            <button className="review-ex-order-btn" aria-label={`Move ${ex.name} up`}
+                              disabled={idx === 0} onClick={() => moveExercise(day.id, ex.id, -1)}>▲</button>
+                            <button className="review-ex-order-btn" aria-label={`Move ${ex.name} down`}
+                              disabled={idx === day.exercises.length - 1} onClick={() => moveExercise(day.id, ex.id, 1)}>▼</button>
+                          </div>
                           <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
-                          <button className="review-ex-btn" aria-label={`Replace ${ex.name}`}
-                            onClick={() => setSwapTarget(isSwapping ? null : { dayId: day.id, exerciseId: ex.id })}>⇄</button>
+                          <button className={`review-ex-btn${isSwapping || isPicking ? ' active' : ''}`} aria-label={`Replace ${ex.name}`}
+                            onClick={() => {
+                              setPicker(null);
+                              setSwapTarget(isSwapping || isPicking ? null : { dayId: day.id, exerciseId: ex.id });
+                            }}>⇄</button>
                           <button className="review-ex-btn review-ex-btn--danger" aria-label={`Remove ${ex.name}`}
                             onClick={() => removeExercise(day.id, ex.id)}>×</button>
                         </div>
@@ -540,6 +600,7 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
                       )}
                       {isSwapping && (
                         <div className="review-swaps">
+                          {swapSuggestions.length > 0 && <span className="review-swaps-label">Coach's picks</span>}
                           {swapSuggestions.map(s => (
                             <button className="review-swap" key={s.exercise.id} onClick={() => replaceExercise(day.id, ex, s)}>
                               <span className="review-swap-head">
@@ -550,15 +611,49 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
                             </button>
                           ))}
                           {swapSuggestions.length === 0 && (
-                            <p className="setup-hint">No good alternative found for this slot.</p>
+                            <p className="setup-hint">No close match for this slot — pick anything below.</p>
                           )}
+                          <button className="review-swap-more"
+                            onClick={() => { setSwapTarget(null); setPicker({ dayId: day.id, mode: 'replace', exerciseId: ex.id }); }}>
+                            Search all exercises…
+                          </button>
                         </div>
+                      )}
+                      {isPicking && (
+                        <AddExercisePanel
+                          title={`Replace ${ex.name} with…`}
+                          excludeIds={new Set(day.exercises.map(e => e.id))}
+                          snapshot={snapshot}
+                          goal={goal}
+                          experience={planExperience}
+                          initialMuscle={profileFor(ex.id, ex.name).primaryMuscle}
+                          onAdd={slot => replaceWithPick(day.id, ex, slot)}
+                          onClose={() => setPicker(null)}
+                          addLabel="Swap in"
+                        />
                       )}
                     </div>
                   );
                 })}
                 {day.exercises.length === 0 && (
-                  <p className="setup-hint setup-hint--error">This day is empty — a plan can't activate with an empty workout.</p>
+                  <p className="setup-hint setup-hint--error">This day is empty — add an exercise, or the plan can't activate.</p>
+                )}
+                {picker?.mode === 'add' && picker.dayId === day.id ? (
+                  <AddExercisePanel
+                    title={`Add to ${day.label}`}
+                    excludeIds={new Set(day.exercises.map(e => e.id))}
+                    snapshot={snapshot}
+                    goal={goal}
+                    experience={planExperience}
+                    onAdd={slot => addExercise(day.id, slot)}
+                    onClose={() => setPicker(null)}
+                    addLabel="Add to day"
+                  />
+                ) : (
+                  <button className="review-add"
+                    onClick={() => { setSwapTarget(null); setPicker({ dayId: day.id, mode: 'add' }); }}>
+                    + Add exercise
+                  </button>
                 )}
               </div>
             </section>

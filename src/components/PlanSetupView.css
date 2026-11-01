@@ -642,3 +642,72 @@
   border: 1px solid var(--red);
   border-radius: 8px;
 }
+
+/* review: reorder, add, search-all */
+.review-ex-btn.active {
+  border-color: var(--purple);
+}
+
+.review-ex-order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-ex-order-btn {
+  width: 28px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.review-ex-order-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.review-swaps-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.review-swap-more {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--purple);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.review-add {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px;
+  width: 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.review-add:active,
+.review-swap-more:active {
+  border-color: var(--purple);
+}

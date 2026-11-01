@@ -49,6 +49,8 @@ export default function DayEditView({
   // strength trends, weekly volume balance) — loaded once, used lazily.
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  /** the slot being replaced from the full picker, beyond the ranked picks */
+  const [pickTargetId, setPickTargetId] = useState<string | null>(null);
   // "Now" is captured once at mount: reading the clock during render makes
   // the memoized suggestions drift across renders (react-hooks/purity).
   const [now] = useState(() => Date.now());
@@ -77,6 +79,13 @@ export default function DayEditView({
       e.id === oldEx.id ? { ...e, id: s.exercise.id, name: s.exercise.name } : e,
     ));
     setSwapTargetId(null);
+  }
+
+  // A free pick can be anything — a deadlift in a cable row's slot — so the
+  // panel's slot (dosed for what it is) replaces the old one outright.
+  function handleReplaceWithPick(oldEx: Exercise, slot: Exercise) {
+    setExercises(prev => prev.map(e => (e.id === oldEx.id ? slot : e)));
+    setPickTargetId(null);
   }
 
   function handleMove(id: string, dir: -1 | 1) {
@@ -168,8 +177,12 @@ export default function DayEditView({
                     </button>
                     <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />
                     <button
-                      className={`exercise-swap-btn${swapTargetId === ex.id ? ' active' : ''}`}
-                      onClick={() => setSwapTargetId(prev => (prev === ex.id ? null : ex.id))}
+                      className={`exercise-swap-btn${swapTargetId === ex.id || pickTargetId === ex.id ? ' active' : ''}`}
+                      onClick={() => {
+                        const open = swapTargetId === ex.id || pickTargetId === ex.id;
+                        setPickTargetId(null);
+                        setSwapTargetId(open ? null : ex.id);
+                      }}
                       aria-label={`Find replacement for ${ex.name}`}
                     >
                       ⇄
@@ -242,7 +255,23 @@ export default function DayEditView({
                         </span>
                       </div>
                     ))}
+                    <button className="swap-search-all"
+                      onClick={() => { setSwapTargetId(null); setPickTargetId(ex.id); }}>
+                      Search all exercises…
+                    </button>
                   </div>
+                )}
+
+                {pickTargetId === ex.id && (
+                  <AddExercisePanel
+                    title={`Replace ${ex.name} with…`}
+                    excludeIds={dayExerciseIds}
+                    snapshot={snapshot}
+                    initialMuscle={profileFor(ex.id, ex.name).primaryMuscle}
+                    onAdd={slot => handleReplaceWithPick(ex, slot)}
+                    onClose={() => setPickTargetId(null)}
+                    addLabel="Swap in"
+                  />
                 )}
               </div>
             ))}

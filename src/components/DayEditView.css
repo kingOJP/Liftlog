@@ -638,3 +638,68 @@
   color: var(--red);
   border-color: var(--red);
 }
+
+/* add panel: title, muscle chips, show-all */
+.add-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.add-muscle-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.add-muscle-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.add-muscle-chip {
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 11px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.add-muscle-chip.active {
+  background: rgba(124, 114, 232, 0.18);
+  border-color: var(--purple);
+  color: var(--text);
+}
+
+.add-show-all {
+  background: none;
+  border: none;
+  color: var(--purple);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.swap-search-all {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--purple);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px;
+  width: 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swap-search-all:active {
+  border-color: var(--purple);
+}

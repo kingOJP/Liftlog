@@ -171,3 +171,23 @@ describe('exerciseHistory — what the history fallback reads', () => {
     expect(exerciseHistory('squat', buildSnapshot(sessions, setLogs))).toHaveLength(1);
   });
 });
+
+describe('dosing for a goal that is not active yet (the plan wizard review)', () => {
+  it('doses for the goal passed in when no plan is stored', () => {
+    const dose = prescribeFor('romanian-deadlifts', { goal: 'strength', experience: 'advanced' });
+    expect(dose).not.toBeNull();
+    // heavy axial work on a strength goal sits in the low tier
+    expect(dose!.repHigh).toBeLessThanOrEqual(8);
+  });
+
+  it('treats an explicit null goal as "no plan", not as "use the stored one"', () => {
+    expect(prescribeFor('romanian-deadlifts', { goal: null })).toBeNull();
+  });
+
+  it('slotFor carries the overridden dose onto the slot as a plan range', () => {
+    const slot = slotFor('romanian-deadlifts', 'Romanian Deadlifts', { goal: 'hypertrophy', experience: 'intermediate' });
+    expect(slot.repLow).toBeDefined();
+    expect(slot.repHigh).toBeDefined();
+    expect(slot.rangeSource).toBe('plan');
+  });
+});
