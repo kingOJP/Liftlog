@@ -25,6 +25,7 @@ import PlanSetupView from './components/PlanSetupView';
 import QuickWorkoutView from './components/QuickWorkoutView';
 import SharedWorkoutView from './components/SharedWorkoutView';
 import StrengthView from './components/StrengthView';
+import Icon from './components/Icon';
 import type { PlanSeed } from './components/PlanSetupView';
 import {
   captureShareFromUrl, getPendingSharedWorkout, clearPendingShare,
