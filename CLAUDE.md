@@ -1240,7 +1240,9 @@ The planning layer above individual workouts. Two domain levels, deliberately no
   start date arrives: it computes the outgoing block's retrospective *then* (so the final
   training week counts), swaps in the new program, and re-anchors weeks. Re-planning before a
   pending block starts replaces it; JourneyView offers "Start it today instead"
-  (`force: true`). If nothing is running (or the start is today/past), activation commits
+  (`force: true`) and "Cancel this block" (`cancelPendingActivation()`: drops the queued
+  block — nothing to restore, since nothing was installed — and bumps the document clock so
+  the cancellation syncs). If nothing is running (or the start is today/past), activation commits
   immediately as before. Dashboard/JourneyView surface the pending block.
 - **Undoing a premature activation.** `deferActiveBlockToNextWeek()` is the inverse of
   `commitActivation`: it reactivates the block the active one replaced (restoring its program

@@ -457,6 +457,22 @@ export async function startPendingActivation(
 }
 
 /**
+ * Drop a block that was approved but hasn't started yet. Nothing was
+ * installed for it (the live program and the running block are untouched),
+ * so cancelling is just forgetting it — the user can plan again from scratch.
+ * Bumps the document clock so the cancellation wins over a stale copy on
+ * another device. Returns false when nothing was queued.
+ */
+export function cancelPendingActivation(now = Date.now()): boolean {
+  const state = getPlanState();
+  if (!state.pendingActivation) return false;
+  delete state.pendingActivation;
+  state.updatedAt = now;
+  savePlanState(state);
+  return true;
+}
+
+/**
  * The goal the user is currently training toward, or null when they have no
  * plan at all. Prescription needs to tell "no plan" apart from "general goal" —
  * dosing an ad-hoc lift as if a plan existed is how invented rep ranges creep
