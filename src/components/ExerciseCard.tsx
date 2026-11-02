@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { Exercise } from '../data/program';
 import { prescriptionLabel } from '../data/program';
 import type { WeightRec, ExerciseSession, SetPlan } from '../data/recommendations';
 import { unitFor } from '../data/exercises';
+import { movementPatternFor } from '../data/analytics';
 import { unitLabel } from '../data/taxonomy';
 import type { MeasureUnit } from '../data/taxonomy';
+import {
+  TECHNIQUE_INFO, GRIP_INFO, extensionOptionsFor, gripOptionsFor, techniqueOptionsFor,
+  isExtension, styleOf, variationKey, variationLabel,
+} from '../data/variations';
+import type { Grip, SetTechnique, SetVariation } from '../data/variations';
 import { InfoButton } from './InstructionSheet';
 import Icon from './Icon';
 import { fmtWeight, fromDisplay, toDisplay, unitLabelFor } from '../data/units';
@@ -12,9 +18,12 @@ import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
+/** One logged row: load, count, and how it was done. */
+export type LoggedEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
+
 interface Props {
   exercise: Exercise;
-  sets: Array<{ weight: number; reps: number; warmup?: boolean }>;
+  sets: LoggedEntry[];
   recommendation?: WeightRec;
   /** Per-set prescription — one row per programmed working set */
   plan?: SetPlan;
@@ -28,10 +37,16 @@ interface Props {
    */
   expanded: boolean;
   onToggle: () => void;
+  /**
+   * How today's sets are expected to be done — the slot's prescription, or
+   * last time's technique/grip. Pre-selected on the row; the prescription was
+   * built from sessions done this way, so the two agree.
+   */
+  variation?: SetVariation;
   /** Opens the Strength screen for this lift; offered when the coach has nothing to prescribe a load from */
   onSetMax?: () => void;
-  onLogSet: (weight: number, reps: number, warmup: boolean) => void;
-  onEditSet: (index: number, weight: number, reps: number, warmup: boolean) => void;
+  onLogSet: (entry: LoggedEntry) => void;
+  onEditSet: (index: number, entry: LoggedEntry) => void;
   onDeleteSet: (index: number) => void;
   /** When provided, shows a control to remove this exercise from the workout
    *  (used for exercises added mid-session). */
@@ -44,8 +59,12 @@ interface Props {
   onViewHistory?: (exerciseId: string, name: string) => void;
 }
 
-/** The row the lifter is filling in right now. */
-type Draft = { kind: 'work' | 'warmup'; weight: string; reps: string };
+/**
+ * The row the lifter is filling in right now. A `work` row is a numbered
+ * working set; an `extension` row (drop / rest-pause / partials) continues the
+ * set before it and is not numbered — it doesn't consume a prescribed set.
+ */
+type Draft = { kind: 'work' | 'warmup' | 'extension'; weight: string; reps: string } & SetVariation;
 
 // "100×10, 100×9, 95×8" — compressed to "100 lbs × 10, 9, 8" when the weight
 // never changes, which is the common case for straight sets.
@@ -103,8 +122,83 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
   hold: '→',
 };
 
+/** The small tag after a logged row's numbers: "paused · close grip". An extension's kind is already its label. */
+function rowTag(s: SetVariation): string | null {
+  return variationLabel({ technique: isExtension(s.technique) ? undefined : s.technique, grip: s.grip });
+}
+
+/** "Drop" / "Rest-pause" / "Partials" — the row label for a continuation, short enough for the label column. */
+function extensionShort(t: SetTechnique): string {
+  const short = TECHNIQUE_INFO[t].short;
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
+/** What the variation button on the active row reads: the extension kind, or the style tag. */
+function rowTagForRow(row: Draft): string | null {
+  if (row.kind === 'extension') {
+    const grip = row.grip ? ` · ${GRIP_INFO[row.grip].short}` : '';
+    return `${TECHNIQUE_INFO[row.technique!].short}${grip}`;
+  }
+  return variationLabel({ technique: row.technique, grip: row.grip });
+}
+
+interface PanelProps {
+  value: SetVariation;
+  techniques: SetTechnique[];
+  extensions: SetTechnique[];
+  grips: Grip[];
+  onChange: (next: SetVariation) => void;
+}
+
+/**
+ * The variation picker: one compact row of chips per dimension, scrolling
+ * sideways rather than wrapping so it never grows the card by more than two
+ * lines. "Straight" / "Standard" are the absence of a value, not a value.
+ */
+function VariationPanel({ value, techniques, extensions, grips, onChange }: PanelProps) {
+  const technique = value.technique ?? null;
+  const grip = value.grip ?? null;
+  const chip = (active: boolean, label: string, onClick: () => void, title?: string) => (
+    <button
+      type="button"
+      key={label}
+      className={`var-chip${active ? ' var-chip--on' : ''}`}
+      aria-pressed={active}
+      title={title}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="var-panel">
+      {(techniques.length > 0 || extensions.length > 0) && (
+        <div className="var-row">
+          <span className="var-label">Reps</span>
+          <div className="var-chips">
+            {chip(technique == null, 'Straight', () => onChange({ ...value, technique: undefined }))}
+            {techniques.map(t => chip(technique === t, TECHNIQUE_INFO[t].label, () => onChange({ ...value, technique: t }), TECHNIQUE_INFO[t].blurb))}
+            {extensions.length > 0 && <span className="var-divider" aria-hidden="true" />}
+            {extensions.map(t => chip(technique === t, TECHNIQUE_INFO[t].label, () => onChange({ ...value, technique: t }), TECHNIQUE_INFO[t].blurb))}
+          </div>
+        </div>
+      )}
+      {grips.length > 0 && (
+        <div className="var-row">
+          <span className="var-label">Grip</span>
+          <div className="var-chips">
+            {chip(grip == null, 'Standard', () => onChange({ ...value, grip: undefined }))}
+            {grips.map(g => chip(grip === g, GRIP_INFO[g].label, () => onChange({ ...value, grip: g })))}
+          </div>
+        </div>
+      )}
+      {technique && <p className="var-hint">{TECHNIQUE_INFO[technique].blurb}</p>}
+    </div>
+  );
+}
+
 export default function ExerciseCard({
-  exercise, sets, recommendation, plan, lastSession, oneRepMax, expanded, onToggle, onSetMax,
+  exercise, sets, recommendation, plan, lastSession, oneRepMax, expanded, onToggle, variation, onSetMax,
   onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress, onViewHistory,
 }: Props) {
   const info = useInstructionSheet();
@@ -115,10 +209,17 @@ export default function ExerciseCard({
   // of their own, the remaining prescribed sets follow them there rather than
   // snapping back to the recommendation.
   const [workingWeight, setWorkingWeight] = useState<string | null>(null);
+  // The technique/grip in force for the numbered sets — pre-selected from the
+  // expected variation, then whatever the lifter last chose. One tap to
+  // change, and it stays changed for the rest of the exercise.
+  const [sticky, setSticky] = useState<SetVariation>(() => styleOf(variation ?? {}));
+  const [showVariation, setShowVariation] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editWeight, setEditWeight] = useState('');
   const [editReps, setEditReps] = useState('');
   const [editWarmup, setEditWarmup] = useState(false);
+  const [editVariation, setEditVariation] = useState<SetVariation>({});
+  const [editShowVariation, setEditShowVariation] = useState(false);
   // The coach's reasoning (why this load, what earns the next one) sits behind
   // the recommendation chip — the number is what the lifter needs mid-set.
   const [showWhy, setShowWhy] = useState(false);
@@ -136,6 +237,15 @@ export default function ExerciseCard({
     setAppliedSignature(signature);
     setWorkingWeight(null);
   }
+  // Same pattern for the expected variation, which arrives with the plan.
+  // Only adopted while nothing has been logged — once the lifter has chosen a
+  // way to do the sets, a rebuilt plan must not override it.
+  const variationSig = variationKey(styleOf(variation ?? {}));
+  const [appliedVariation, setAppliedVariation] = useState(variationSig);
+  if (variationSig !== appliedVariation) {
+    setAppliedVariation(variationSig);
+    if (sets.length === 0) setSticky(styleOf(variation ?? {}));
+  }
 
   // Isometric holds and carries are counted in seconds, not reps: the logger,
   // the target line, the prescribed rows and the history all have to say so, or
@@ -146,14 +256,25 @@ export default function ExerciseCard({
   const targetLabel = timed
     ? `${prescriptionLabel(exercise)}s`
     : prescriptionLabel(exercise);
-  // Working sets are numbered on their own; warm-ups carry a label, not a
-  // number, so "Set 1" always means the first real work set.
+  // Which variations make sense for this movement — grips only where grip is
+  // a variable, deficit only where a block changes the lift, nothing for holds.
+  const pattern = movementPatternFor(exercise.id);
+  const techniqueOptions = techniqueOptionsFor(pattern, unit);
+  const extensionOptions = extensionOptionsFor(unit);
+  const gripOptions = gripOptionsFor(pattern);
+  const canVary = techniqueOptions.length > 0 || gripOptions.length > 0 || extensionOptions.length > 0;
+
+  // Working sets are numbered on their own; warm-ups and extensions carry a
+  // label, not a number, so "Set 1" always means the first real work set and
+  // a drop never eats a prescribed set.
   const setLabels: string[] = [];
   let workingSoFar = 0;
   for (const s of sets) {
     if (s.warmup) setLabels.push('Warm-up');
+    else if (isExtension(s.technique)) setLabels.push(`↳ ${extensionShort(s.technique!)}`);
     else { workingSoFar += 1; setLabels.push(`Set ${workingSoFar}`); }
   }
+  const lastWork = [...sets].reverse().find(s => !s.warmup);
 
   // Prescribed sets not yet logged. The first is the one being worked on now;
   // the rest are previewed so the whole session is visible up front.
@@ -173,12 +294,13 @@ export default function ExerciseCard({
     (activePrescription
       ? {
           kind: 'work',
+          ...sticky,
           weight: prescribedWeight(activePrescription.weight),
           reps: activePrescription.targetReps == null ? '' : String(activePrescription.targetReps),
         }
       : plan
         ? null
-        : { kind: 'work', weight: workingWeight ?? '', reps: '' });
+        : { kind: 'work', ...sticky, weight: workingWeight ?? '', reps: '' });
 
   const nextSetNum = workingSoFar + 1;
 
@@ -187,36 +309,85 @@ export default function ExerciseCard({
     setDraft({ ...row, ...patch });
   }
 
+  /**
+   * Change how the active row is done. An extension turns the row into a
+   * continuation of the last set (unnumbered, load left to the lifter for a
+   * drop, same load for rest-pause/partials); a rep style or grip sticks for
+   * every numbered set from here on.
+   */
+  function setRowVariation(next: SetVariation) {
+    if (!row) return;
+    if (isExtension(next.technique)) {
+      const sameLoad = next.technique !== 'drop' || (lastWork?.weight ?? 0) === 0;
+      setDraft({
+        kind: 'extension',
+        technique: next.technique,
+        ...(next.grip ? { grip: next.grip } : {}),
+        weight: lastWork && sameLoad ? (workingWeight ?? String(toDisplay(lastWork.weight))) : '',
+        reps: '',
+      });
+      return;
+    }
+    const style = styleOf(next);
+    setSticky(style);
+    if (row.kind === 'extension') {
+      // Back to a numbered set: the next prescribed row if one is left, else a
+      // free extra set at today's load.
+      if (remaining[0]) setDraft(null);
+      else setDraft({ kind: 'work', ...style, weight: workingWeight ?? (lastWork ? String(toDisplay(lastWork.weight)) : ''), reps: '' });
+    } else if (draft) {
+      setDraft({ ...draft, technique: style.technique, grip: style.grip });
+    }
+  }
+
   function handleLogSet() {
     if (!row) return;
     const w = timed ? 0 : fromDisplay(parseFloat(row.weight));
     const r = parseInt(row.reps, 10);
     // Weight of 0 is valid (bodyweight exercises); reps must be positive.
     if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
-    onLogSet(w, r, row.kind === 'warmup');
-    // Working sets set the day's load; warm-ups deliberately don't.
+    const warmup = row.kind === 'warmup';
+    onLogSet({
+      weight: w, reps: r,
+      ...(warmup ? { warmup: true } : {}),
+      ...(!warmup && row.technique ? { technique: row.technique } : {}),
+      ...(!warmup && row.grip ? { grip: row.grip } : {}),
+    });
+    // Working sets set the day's load; warm-ups and drops deliberately don't.
     if (row.kind === 'work') setWorkingWeight(row.weight);
     setDraft(null);
+    setShowVariation(false);
   }
 
   function addWarmup() {
+    setShowVariation(false);
     setDraft({ kind: 'warmup', weight: '', reps: '' });
   }
 
+  // One tap for the common case: a drop set (rest-pause on unloaded work,
+  // where there is no lighter weight to drop to). The panel offers the rest.
+  function addExtension() {
+    setShowVariation(false);
+    setRowVariation({ technique: (lastWork?.weight ?? 0) === 0 ? 'rest-pause' : 'drop', grip: sticky.grip });
+  }
+
   function addExtraSet() {
-    const lastWork = [...sets].reverse().find(s => !s.warmup);
     setDraft({
       kind: 'work',
+      ...sticky,
       weight: workingWeight ?? (lastWork ? String(toDisplay(lastWork.weight)) : ''),
       reps: lastWork ? String(lastWork.reps) : '',
     });
   }
 
   function startEdit(index: number) {
+    const s = sets[index];
     setEditingIndex(index);
-    setEditWeight(String(toDisplay(sets[index].weight)));
-    setEditReps(String(sets[index].reps));
-    setEditWarmup(!!sets[index].warmup);
+    setEditWeight(String(toDisplay(s.weight)));
+    setEditReps(String(s.reps));
+    setEditWarmup(!!s.warmup);
+    setEditVariation({ ...(s.technique ? { technique: s.technique } : {}), ...(s.grip ? { grip: s.grip } : {}) });
+    setEditShowVariation(false);
   }
 
   function confirmEdit() {
@@ -224,7 +395,13 @@ export default function ExerciseCard({
     const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
     const r = parseInt(editReps, 10);
     if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
-      onEditSet(editingIndex, w, r, editWarmup);
+      onEditSet(editingIndex, {
+        weight: w, reps: r,
+        ...(editWarmup ? { warmup: true } : {}),
+        // A warm-up has no technique (it isn't a working set to pause or drop)
+        ...(!editWarmup && editVariation.technique ? { technique: editVariation.technique } : {}),
+        ...(editVariation.grip ? { grip: editVariation.grip } : {}),
+      });
     }
     setEditingIndex(null);
   }
@@ -247,7 +424,13 @@ export default function ExerciseCard({
   // Without a plan (editing a past session) "done" is simply "has sets".
   const done = plan ? planComplete : sets.length > 0;
   const started = sets.length > 0;
-  const workingSets = sets.filter(s => !s.warmup);
+  // The numbered sets — what "3 sets · 190 lbs" counts (a drop is not a fourth set)
+  const workingSets = sets.filter(s => !s.warmup && !isExtension(s.technique));
+  const rowLabel = row ? rowTagForRow(row) : null;
+  const logLabel = !row ? '' :
+    row.kind === 'warmup' ? 'Log warm-up' :
+    row.kind === 'extension' ? `Log ${TECHNIQUE_INFO[row.technique!].label.toLowerCase()}` :
+    `Log set ${nextSetNum}`;
 
   // The prescribed load as a share of the lifter's max — what "200 lbs" means.
   const pctLabel = oneRepMax && recommendation && recommendation.weight > 0 && recommendation.targetReps == null
@@ -390,7 +573,8 @@ export default function ExerciseCard({
             <div className="set-log">
               {sets.map((s, i) =>
                 editingIndex === i ? (
-                  <div key={i} className={`set-row editing${s.warmup ? ' set-row--warmup' : ''}`}>
+                  <Fragment key={i}>
+                  <div className={`set-row editing${s.warmup ? ' set-row--warmup' : ''}`}>
                     <span className="set-num">{setLabels[i]}</span>
                     {!timed && (
                       <div className="inline-field">
@@ -426,13 +610,36 @@ export default function ExerciseCard({
                     >
                       W
                     </button>
+                    {canVary && !editWarmup && (
+                      <button
+                        type="button"
+                        className={`var-btn var-btn--sm${editVariation.technique || editVariation.grip ? ' var-btn--on' : ''}`}
+                        onClick={() => setEditShowVariation(v => !v)}
+                        aria-expanded={editShowVariation}
+                        aria-label="How this set was done"
+                        title="How this set was done"
+                      >
+                        <Icon name="sliders" size={14} />
+                      </button>
+                    )}
                     <button className="edit-confirm-btn" onClick={confirmEdit}>✓</button>
                     <button className="edit-cancel-btn" onClick={cancelEdit}>✗</button>
                   </div>
+                  {editShowVariation && !editWarmup && (
+                    <VariationPanel
+                      value={editVariation}
+                      techniques={techniqueOptions}
+                      // A row can only continue a set that came before it
+                      extensions={i > 0 ? extensionOptions : []}
+                      grips={gripOptions}
+                      onChange={setEditVariation}
+                    />
+                  )}
+                  </Fragment>
                 ) : (
                   <div
                     key={i}
-                    className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`}
+                    className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}${isExtension(s.technique) ? ' set-row--ext' : ''}`}
                     role="button"
                     tabIndex={0}
                     aria-label={`Edit ${setLabels[i]}`}
@@ -442,6 +649,7 @@ export default function ExerciseCard({
                     <span className="set-num">{setLabels[i]}</span>
                     {!timed && <span className="set-weight">{fmtWeight(s.weight)}</span>}
                     <span className="set-reps">{s.reps} {countLabel}</span>
+                    {rowTag(s) && <span className="set-tag">{rowTag(s)}</span>}
                     <button
                       className="delete-set-btn"
                       onClick={e => { e.stopPropagation(); onDeleteSet(i); }}
@@ -457,10 +665,12 @@ export default function ExerciseCard({
 
           {/* ── The set being logged right now, pre-filled from the prescription ── */}
           {row && (
-            <div className={`set-inputs${row.kind === 'warmup' ? ' set-inputs--warmup' : ''}`}>
+            <div className={`set-inputs${row.kind === 'warmup' ? ' set-inputs--warmup' : ''}${row.kind === 'extension' ? ' set-inputs--ext' : ''}`}>
               <div className="input-row">
                 <span className="set-num set-num--active">
-                  {row.kind === 'warmup' ? 'Warm-up' : `Set ${nextSetNum}`}
+                  {row.kind === 'warmup' ? 'Warm-up'
+                    : row.kind === 'extension' ? `↳ ${extensionShort(row.technique!)}`
+                    : `Set ${nextSetNum}`}
                 </span>
                 {!timed && (
                   <div className="weight-wrap">
@@ -469,7 +679,7 @@ export default function ExerciseCard({
                       type="number"
                       inputMode="decimal"
                       placeholder="Weight"
-                      aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                      aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : row.kind === 'extension' ? TECHNIQUE_INFO[row.technique!].label.toLowerCase() : `set ${nextSetNum}`}`}
                       value={row.weight}
                       onChange={e => updateRow({ weight: e.target.value })}
                       onKeyDown={handleKeyDown}
@@ -483,7 +693,7 @@ export default function ExerciseCard({
                     type="number"
                     inputMode="numeric"
                     placeholder={timed ? 'Seconds' : 'Reps'}
-                    aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                    aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : row.kind === 'extension' ? TECHNIQUE_INFO[row.technique!].label.toLowerCase() : `set ${nextSetNum}`}`}
                     value={row.reps}
                     onChange={e => updateRow({ reps: e.target.value })}
                     onKeyDown={handleKeyDown}
@@ -491,14 +701,35 @@ export default function ExerciseCard({
                   <span className="input-unit">{countLabel}</span>
                 </div>
               </div>
+              {showVariation && row.kind !== 'warmup' && (
+                <VariationPanel
+                  value={{ technique: row.technique, grip: row.grip }}
+                  techniques={techniqueOptions}
+                  extensions={lastWork ? extensionOptions : []}
+                  grips={gripOptions}
+                  onChange={setRowVariation}
+                />
+              )}
               <div className="log-actions">
                 {draft !== null && (
-                  <button type="button" className="draft-cancel-btn" onClick={() => setDraft(null)}>
+                  <button type="button" className="draft-cancel-btn" onClick={() => { setDraft(null); setShowVariation(false); }}>
                     Cancel
                   </button>
                 )}
+                {canVary && row.kind !== 'warmup' && (
+                  <button
+                    type="button"
+                    className={`var-btn${rowLabel ? ' var-btn--on' : ''}`}
+                    onClick={() => setShowVariation(v => !v)}
+                    aria-expanded={showVariation}
+                    aria-label="How this set is done — rep style and grip"
+                    title="Rep style and grip"
+                  >
+                    {rowLabel ?? <Icon name="sliders" size={16} />}
+                  </button>
+                )}
                 <button className="log-btn" disabled={!canLog} onClick={handleLogSet}>
-                  {row.kind === 'warmup' ? 'Log warm-up' : `Log set ${nextSetNum}`}
+                  {logLabel}
                 </button>
               </div>
             </div>
@@ -516,11 +747,16 @@ export default function ExerciseCard({
           {/* Quiet, contextual actions: a warm-up only makes sense before the
               working sets start, an extra set only once the plan is done, and
               an exercise added mid-session can be taken out again. */}
-          {draft === null && (workingSoFar === 0 || planComplete || onRemove) && (
+          {draft === null && (workingSoFar === 0 || lastWork || planComplete || onRemove) && (
             <div className="ex-actions">
               {workingSoFar === 0 && (
                 <button type="button" className="ex-action-btn" onClick={addWarmup}>
                   ＋ Warm-up
+                </button>
+              )}
+              {lastWork && extensionOptions.length > 0 && (
+                <button type="button" className="ex-action-btn" onClick={addExtension}>
+                  {(lastWork.weight ?? 0) === 0 ? '＋ Rest-pause' : '＋ Drop set'}
                 </button>
               )}
               {planComplete && (

@@ -32,6 +32,9 @@ interface SetEntry {
   repHigh?: number;
   /** Warm-up set — logged but excluded from the client's analytics (absent on working sets) */
   warmup?: boolean;
+  /** How the set was done — rep style / extension and grip (data/variations.ts); absent on a plain set */
+  technique?: string;
+  grip?: string;
 }
 
 interface SessionDoc {
@@ -332,7 +335,7 @@ interface PushPayload {
   // the same deterministic fallbacks the client would (legacy-<startedAt>,
   // completedAt) so identities agree across versions.
   sessions:      Array<{ id: number; guid?: string; dayId: number; weekNumber: number; startedAt: number; completedAt?: number | null; updatedAt?: number; note?: string | null }>;
-  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean; repLow?: number; repHigh?: number }>;
+  setLogs:       Array<{ id: number; sessionId: number; exerciseId: string; setNumber: number; weight: number; reps: number; order?: number; warmup?: boolean; repLow?: number; repHigh?: number; technique?: string; grip?: string }>;
   /** Dead feature (difficulty ratings) — accepted for wire compatibility, ignored */
   exerciseLogs:  unknown[];
   deletedSessionGuids?: string[];
@@ -361,6 +364,11 @@ const MAX_NOTE_CHARS = 2_000;
 
 const isOptString = (v: unknown) => v === undefined || v === null || typeof v === 'string';
 const isOptNumber = (v: unknown) => v === undefined || typeof v === 'number';
+// Set variations are a closed vocabulary on the client, but the worker only
+// checks the shape: a newer client may know a value this build doesn't, and
+// the server's job is to carry it faithfully, not to referee it.
+const MAX_TAG_CHARS = 24;
+const isOptTag = (v: unknown) => v === undefined || (typeof v === 'string' && v.length > 0 && v.length <= MAX_TAG_CHARS);
 
 function validatePush(data: PushPayload): string | null {
   if (typeof data !== 'object' || data === null) return 'payload must be an object';
@@ -393,7 +401,8 @@ function validatePush(data: PushPayload): string | null {
         typeof s.weight !== 'number' || typeof s.reps !== 'number' ||
         !isOptNumber(s.order) ||
         (s.warmup !== undefined && typeof s.warmup !== 'boolean') ||
-        !isOptNumber(s.repLow) || !isOptNumber(s.repHigh)) {
+        !isOptNumber(s.repLow) || !isOptNumber(s.repHigh) ||
+        !isOptTag(s.technique) || !isOptTag(s.grip)) {
       return 'malformed set log';
     }
   }
@@ -544,8 +553,8 @@ async function push(request: Request, userId: string, env: Env): Promise<Respons
   const setsBySession = new Map<number, SetEntry[]>();
   for (const s of data.setLogs) {
     const arr = setsBySession.get(s.sessionId) ?? [];
-    // undefined order/warmup are dropped by JSON.stringify, keeping legacy docs unchanged
-    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order, warmup: s.warmup, repLow: s.repLow, repHigh: s.repHigh });
+    // undefined order/warmup/technique/grip are dropped by JSON.stringify, keeping legacy docs unchanged
+    arr.push({ exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps, order: s.order, warmup: s.warmup, repLow: s.repLow, repHigh: s.repHigh, technique: s.technique, grip: s.grip });
     setsBySession.set(s.sessionId, arr);
   }
 

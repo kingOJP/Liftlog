@@ -149,6 +149,18 @@ Long-term milestones (roughly):
     backend change). Entry points: Settings → 1RMs & goals (always available), Journey,
     Metrics' e1RM chart, and a never-trained exercise card mid-workout.
 
+26. ✅ Set variations (`docs/set-variations.md`) — how a set was done, per set: a **rep
+    style** (paused / tempo / deficit) or an **extension** of the set before it (drop /
+    rest-pause / partials), plus **grip** (close / wide / neutral / underhand / overhand /
+    mixed). `variations.ts` owns the vocabulary, the per-pattern options and the compiled
+    muscle-emphasis shift table (close-grip bench → more triceps, wide pulldown → less
+    biceps, deficit deadlift → quads join in); `musclesForSet`/`muscleSetTotals` read every
+    set through it, so the coach, Metrics, heatmap and retrospective see the shift. An
+    extension is unnumbered on the card, counts half a set of volume and never feeds e1RM
+    or progression; rep styles and grips are compared **like for like** by the prescription
+    engine (`sessionHistory.ts`) and the progress engine (per-style trend and PR bests).
+    One sliders control beside Log set, "＋ Drop set", slot-level pinning in the day editor.
+
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
   rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
@@ -463,6 +475,16 @@ src/
     syncMerge.ts               — pure session-merge planner: SessionDoc, sessionGuid(),
                                   sessionUpdatedAt(), planSessionMerge() — the sync-v2 merge rules,
                                   unit-tested without IndexedDB
+    variations.ts              — set variations (pure, compiled): SetTechnique (rep styles paused/
+                                  tempo/deficit; extensions drop/rest-pause/partials) + Grip,
+                                  labels, gripOptionsFor()/techniqueOptionsFor() per movement
+                                  pattern, setCredit() (an extension is half a set),
+                                  countsForStrength() (extensions never feed e1RM),
+                                  adjustInvolvement() — THE muscle-emphasis shift table
+    sessionHistory.ts          — expectedVariation(ex, snapshot) + exerciseHistory(): the
+                                  like-for-like per-exercise history the prescription engine
+                                  reads (extension rows out, same style/grip only, borrowed
+                                  plain sets flagged the first time a variation is logged)
     sessionTombstones.ts       — deleted-session tombstone set (localStorage, user-scoped, synced)
     draftSession.ts            — in-progress workout draft (localStorage): saveDraftSession(),
                                   getResumableDraft(), clearDraftSession()
@@ -481,22 +503,31 @@ src/
                                   timer + coach-plan overlay/banner + duration capture. Owns
                                   `activeId` — the ONE open exercise card (accordion); logging
                                   the last prescribed set advances it to the next unfinished
-                                  lift. Finish sits in the flow at the end of the list, not in
-                                  a fixed bar; the session note is behind "＋ Add a note"
+                                  lift (warm-ups and extension rows never count). Finish sits
+                                  in the flow at the end of the list, not in a fixed bar; the
+                                  session note is behind "＋ Add a note". Builds each card's
+                                  history like for like (sessionHistory.ts) and passes the
+                                  expected variation down
     ExerciseCard.tsx/css       — per-exercise card with two states. Collapsed: one row — name
                                   + status (coach's load and target / "2 / 3" / "✓ 3 sets ·
                                   190 lbs"). Open: the recommendation chip (tap → the reason,
                                   goal line and % of 1RM), "last time" line, logged sets
-                                  (tap-to-edit), the next set pre-filled and editable, the
-                                  remaining sets as one "Then" line, and contextual actions
-                                  (＋ Warm-up only before the first working set, ＋ Extra set
-                                  only once the plan is done, Remove only on a mid-workout add)
+                                  (tap-to-edit, with a quiet "paused · close grip" tag and
+                                  "↳ Drop" continuation rows), the next set pre-filled and
+                                  editable beside the set-variation control (sliders button →
+                                  Reps/Grip chip panel; sticky per exercise), the remaining
+                                  sets as one "Then" line, and contextual actions (＋ Warm-up
+                                  only before the first working set, ＋ Drop set once a set is
+                                  logged, ＋ Extra set only once the plan is done, Remove only
+                                  on a mid-workout add)
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
     HistoryView.tsx/css        — all past sessions in reverse chronological order, with the
                                   session note; the card header is the one button
     DayEditView.tsx/css        — edit a day's muscle group label + add/remove exercises +
                                   per-exercise "Find replacement" (⇄) suggestion panel with a
                                   "Search all exercises…" fallback (replace with anything)
+    SlotDoseEditor.tsx         — sets × rep range + coach/manual progression + the slot's
+                                  prescribed technique/grip chips (day editor + quick workout)
     ExerciseListView.tsx/css   — searchable alphabetical list of all exercises (data/search.ts —
                                   the same matcher as the picker), taps into ExerciseMetaView
     ExerciseMetaView.tsx/css   — "How to do it" entry + edit an exercise's muscle groups,
@@ -584,6 +615,10 @@ src/
   back to set-log insertion order. Schemaless field — no version bump (see below). Travels in
   the sync wire (SessionDoc sets, D1 `sets_json`); `undefined` is dropped by JSON so legacy
   docs are byte-identical.
+- `technique?` / `grip?` (`data/variations.ts`): how the set was done. Same footing as
+  `order` — schemaless, omitted when absent, on the wire and in `sets_json`; the worker
+  checks shape only (optional string ≤ 24 chars), the client drops values it doesn't know.
+  An extension row (`drop`/`rest-pause`/`partials`) is a continuation of the set before it.
 
 **`exerciseLogs`** — index: `sessionId` (difficulty ratings — feature removed, store kept for compatibility; no longer synced)
 - `id`, `sessionId`, `exerciseId`, `difficulty`
@@ -1705,6 +1740,15 @@ PROGRAM references) that are otherwise only checked by hand.
   deleted by `purgeEmptySessions()` (startup + around every sync). This also cleaned up the
   legacy duplicate-workout problem for good.
 - **Weight 0 is valid** — bodyweight exercises log with 0 lbs; only reps must be positive.
+- **A drop set is more set, not a new set** (`docs/set-variations.md`). Extension rows are
+  unnumbered on the card (the plan's next row is still Set 3 after a drop on Set 2), count
+  `EXTENSION_SET_CREDIT` (0.5) toward weekly muscle volume, and never reach e1RM, strength
+  maxes, the progress point or the prescription engine. Rep styles and grips are compared
+  like for like: the engine prescribes from sessions done the same way (borrowing plain
+  sets, flagged, the first time), the progress trend and PR bests are per style, so moving
+  a lift to paused reps restarts its trend instead of reading as a decline. The muscle
+  shift never touches the primary and caps a secondary at 0.75, so `weight === 1` still
+  uniquely names the prime mover everywhere.
 - **Session timestamps are the duration signal** — `startedAt` is stamped when WorkoutView
   opens and `completedAt` at the *final logged set* (not the "Finish" tap), so
   `completedAt − startedAt` is the workout duration. No schema change was needed. Sessions

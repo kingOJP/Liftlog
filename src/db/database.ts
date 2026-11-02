@@ -2,6 +2,8 @@ import { LEGACY_ID_MAP } from '../data/legacyIds';
 import { addSessionTombstones } from '../data/sessionTombstones';
 import { planSessionMerge, mergePlanIsEmpty } from '../data/syncMerge';
 import type { SessionDoc, SessionMergePlan } from '../data/syncMerge';
+import type { SetTechnique, Grip } from '../data/variations';
+import { isSetTechnique, isGrip } from '../data/variations';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -50,6 +52,16 @@ export interface SetLog {
    */
   repLow?: number;
   repHigh?: number;
+  /**
+   * How the set was done (data/variations.ts): a rep style (paused / tempo /
+   * deficit) or an extension of the set before it (drop / rest-pause /
+   * partials), and the grip. Both optional and absent on a plain straight set,
+   * so legacy rows and docs are untouched; schemaless like `order`. Extensions
+   * count half a set of volume and never feed e1RM or the progression engine;
+   * rep styles and grips shift muscle emphasis and are compared like-for-like.
+   */
+  technique?: SetTechnique;
+  grip?: Grip;
 }
 
 // Difficulty ratings — feature removed, store kept for compatibility
@@ -151,6 +163,8 @@ export interface SetInput {
   warmup?: boolean;
   repLow?: number;
   repHigh?: number;
+  technique?: SetTechnique;
+  grip?: Grip;
 }
 
 function setLogRecord(sessionId: number, s: SetInput): SetLog {
@@ -163,6 +177,10 @@ function setLogRecord(sessionId: number, s: SetInput): SetLog {
     ...(s.order != null ? { order: s.order } : {}),
     ...(s.warmup ? { warmup: true } : {}),
     ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
+    // Only values this build knows: a newer client's vocabulary arriving via
+    // sync is dropped rather than stored as a string the engines can't read.
+    ...(isSetTechnique(s.technique) ? { technique: s.technique } : {}),
+    ...(isGrip(s.grip) ? { grip: s.grip } : {}),
   } as SetLog;
 }
 
@@ -567,6 +585,7 @@ function queueSessionDoc(tx: IDBTransaction, doc: SessionDoc, localId?: number):
         exerciseId: s.exerciseId, setNumber: s.setNumber, weight: s.weight, reps: s.reps,
         order: s.order ?? undefined, warmup: s.warmup ?? undefined,
         repLow: s.repLow ?? undefined, repHigh: s.repHigh ?? undefined,
+        technique: s.technique ?? undefined, grip: s.grip ?? undefined,
       }));
     }
   };

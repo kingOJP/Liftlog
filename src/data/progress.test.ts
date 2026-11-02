@@ -258,3 +258,89 @@ describe('rep PRs are judged against sessions before this one (audit M11)', () =
     expect(pts[1].repPR).toBe(true);
   });
 });
+
+// Set variations: a trend is read like for like. Moving a lift from
+// touch-and-go to paused reps (or to a new grip) drops the numbers for reasons
+// that are not weakness, and moving back lifts them for reasons that are not
+// a PR. Extension rows (drops, partials) are more set, not a new one, and
+// never enter a session's point.
+describe('set variations in the progress read', () => {
+  type V = { technique?: 'paused' | 'tempo' | 'deficit' | 'drop' | 'rest-pause' | 'partials'; grip?: 'close' | 'wide' };
+  function buildV(entries: Array<{ sets: Array<[number, number, V?]> }>, exerciseId = 'flat-barbell-bench-press') {
+    const sessions: Session[] = [];
+    const setLogs: SetLog[] = [];
+    let logId = 1;
+    entries.forEach((e, i) => {
+      const completedAt = T0 + i * 3 * DAY;
+      sessions.push({ id: i + 1, dayId: 1, weekNumber: 1, startedAt: completedAt - 3_600_000, completedAt });
+      e.sets.forEach(([weight, reps, v], j) => {
+        setLogs.push({ id: logId++, sessionId: i + 1, exerciseId, setNumber: j + 1, weight, reps, order: 0, ...(v ?? {}) });
+      });
+    });
+    return buildSnapshot(sessions, setLogs);
+  }
+  const flat = (w: number, r: number, v?: V): Array<[number, number, V?]> => [[w, r, v], [w, r, v], [w, r, v]];
+  const P: V = { technique: 'paused' };
+
+  it('does not call a lift declining because it switched to paused reps', () => {
+    const snap = buildV([
+      { sets: flat(200, 8) }, { sets: flat(205, 8) }, { sets: flat(210, 8) },
+      { sets: flat(185, 5, P) }, // the same strength, paused — ~12% lower numbers
+    ]);
+    const p = assessSnapshot(snap, 'strength').get('flat-barbell-bench-press')!;
+    expect(p.status).not.toBe('declining');
+    expect(p.evidence.some(e => /switched to paused/.test(e))).toBe(true);
+  });
+
+  it('judges a paused block against its own paused sessions once there are enough', () => {
+    const snap = buildV([
+      { sets: flat(210, 8) },
+      { sets: flat(185, 5, P) }, { sets: flat(190, 5, P) }, { sets: flat(195, 5, P) },
+    ]);
+    const p = assessSnapshot(snap, 'strength').get('flat-barbell-bench-press')!;
+    expect(p.status).toBe('progressing');
+    expect(p.evidence.some(e => /paused sessions only/.test(e))).toBe(true);
+  });
+
+  it('switching back from paused to touch-and-go is not a weight PR', () => {
+    const snap = buildV([
+      { sets: flat(210, 8) },
+      { sets: flat(185, 5, P) }, { sets: flat(190, 5, P) },
+      { sets: flat(205, 8) }, // lighter than the lift's own touch-and-go best
+    ]);
+    const points = exercisePointSeries(snap).get('flat-barbell-bench-press')!;
+    expect(points[3].weightPR).toBe(false);
+  });
+
+  it('a new grip is its own trend too', () => {
+    const snap = buildV([
+      { sets: flat(150, 10) }, { sets: flat(155, 10) }, { sets: flat(160, 10) },
+      { sets: flat(130, 10, { grip: 'wide' }) },
+    ], 'lat-pull-down');
+    const p = assessSnapshot(snap, 'hypertrophy').get('lat-pull-down')!;
+    expect(p.status).not.toBe('declining');
+  });
+
+  it('a drop set tacked on one week does not read as lost volume the next', () => {
+    const snap = buildV([
+      { sets: [...flat(100, 10), [70, 12, { technique: 'drop' }], [50, 12, { technique: 'drop' }]] },
+      { sets: flat(100, 10) },
+      { sets: flat(100, 10) },
+    ], 'cable-fly');
+    const points = exercisePointSeries(snap).get('cable-fly')!;
+    expect(points[0].sets).toHaveLength(3);
+    expect(points[0].tonnage).toBe(points[1].tonnage);
+    const p = assessSnapshot(snap, 'hypertrophy').get('cable-fly')!;
+    expect(p.status).not.toBe('declining');
+  });
+
+  it('a heavy partial is never a weight PR', () => {
+    const snap = buildV([
+      { sets: flat(200, 5) },
+      { sets: [...flat(200, 5), [250, 3, { technique: 'partials' }]] },
+    ]);
+    const points = exercisePointSeries(snap).get('flat-barbell-bench-press')!;
+    expect(points[1].weightPR).toBe(false);
+    expect(points[1].maxWeight).toBe(200);
+  });
+});

@@ -441,6 +441,8 @@ function groupWireSessions(sessions: WireSession[], setLogs: SetLog[]): SessionD
       warmup:     l.warmup,
       repLow:     l.repLow,
       repHigh:    l.repHigh,
+      technique:  l.technique,
+      grip:       l.grip,
     })),
   }));
 }

@@ -17,6 +17,7 @@
 // sync replaced mid-workout can still be finished as it was started.
 
 import type { WorkoutDay } from './program';
+import type { SetTechnique, Grip } from './variations';
 
 export type DraftOrigin = 'program' | 'quick' | 'shared';
 
@@ -25,7 +26,7 @@ export interface DraftSession {
   /** When the workout view was opened — preserved so duration stays correct */
   startedAt: number;
   savedAt: number;
-  sets: Record<string, Array<{ weight: number; reps: number; warmup?: boolean }>>;
+  sets: Record<string, Array<{ weight: number; reps: number; warmup?: boolean; technique?: SetTechnique; grip?: Grip }>>;
   /** exercise ids in the order they were first trained (order tracking) */
   order?: string[];
   /** the day as it was when the workout started (v2 drafts; absent on older ones) */

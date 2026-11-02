@@ -25,7 +25,7 @@ import type { TrainingSnapshot } from './analytics';
 import {
   avgDurationByDay,
   muscleSetTotals,
-  musclesForExercise,
+  musclesForSlot,
   sessionTimestamp,
   volumeTargetFor,
 } from './analytics';
@@ -155,7 +155,7 @@ export function computeProgramPlan(
   const daySetsForMuscle = (day: WorkoutDay, muscle: MuscleGroup): number => {
     let sets = 0;
     for (const ex of day.exercises) {
-      const inv = musclesForExercise(ex.id).find(m => m.muscle === muscle);
+      const inv = musclesForSlot(ex).find(m => m.muscle === muscle);
       if (inv) sets += ex.sets * inv.weight;
     }
     return sets;
@@ -170,7 +170,7 @@ export function computeProgramPlan(
   const programMuscles = new Set<MuscleGroup>();
   for (const day of program) {
     for (const ex of day.exercises) {
-      const primary = musclesForExercise(ex.id).find(m => m.weight === 1);
+      const primary = musclesForSlot(ex).find(m => m.weight === 1);
       if (primary) programMuscles.add(primary.muscle);
     }
   }
@@ -209,7 +209,7 @@ export function computeProgramPlan(
     const setsPerCandidate = new Map<string, number>(); // exId → planned sets for this muscle
     for (const day of program) {
       for (const ex of day.exercises) {
-        const inv = musclesForExercise(ex.id).find(m => m.muscle === muscle);
+        const inv = musclesForSlot(ex).find(m => m.muscle === muscle);
         if (inv) setsPerCandidate.set(ex.id, ex.sets * inv.weight);
       }
     }
@@ -226,7 +226,7 @@ export function computeProgramPlan(
       if (!dayEligible(day.id)) continue;
       if (!durationHeadroom(day.id)) continue;
       for (const ex of day.exercises) {
-        const involvement = musclesForExercise(ex.id);
+        const involvement = musclesForSlot(ex);
         const inv = involvement.find(m => m.muscle === muscle);
         if (!inv) continue;
         if (ex.sets >= MAX_EXERCISE_SETS) continue;
@@ -319,7 +319,7 @@ export function computeProgramPlan(
         if (ex.sets <= MIN_EXERCISE_SETS) continue;
         if (changedExercises.has(`${day.id}:${ex.id}`)) continue;
         if (declined.has(`${day.id}:${ex.id}:remove-set`)) continue;
-        const primary = musclesForExercise(ex.id).find(m => m.weight === 1);
+        const primary = musclesForSlot(ex).find(m => m.weight === 1);
         if (primary?.muscle !== muscle) continue;
         if (!best || ex.sets > best.ex.sets) best = { day, ex };
       }

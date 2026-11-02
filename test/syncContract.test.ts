@@ -141,6 +141,26 @@ describe('the payload contract between this client and this worker', () => {
     expect(sets.every(s => s.order === 0)).toBe(true);
   });
 
+  it('carries set technique and grip through the server, and leaves plain sets untagged', async () => {
+    await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 61_000,
+      sets: [
+        { exerciseId: 'bench-press', setNumber: 1, weight: 185, reps: 5, technique: 'paused', grip: 'close' },
+        { exerciseId: 'bench-press', setNumber: 2, weight: 135, reps: 10, technique: 'drop' },
+        { exerciseId: 'bench-press', setNumber: 3, weight: 185, reps: 5 },
+      ],
+    });
+    await pushSync();
+
+    await clearIDB();
+    await pullSync();
+    const sets = (await dumpIDB()).setLogs.sort((a, b) => a.setNumber - b.setNumber);
+    expect(sets[0]).toMatchObject({ technique: 'paused', grip: 'close' });
+    expect(sets[1]).toMatchObject({ technique: 'drop' });
+    expect('technique' in sets[2]).toBe(false);
+    expect('grip' in sets[2]).toBe(false);
+  });
+
   it('carries a session note across devices and clears it when edited away', async () => {
     const id = await saveWorkout({
       dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 61_000,

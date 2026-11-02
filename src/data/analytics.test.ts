@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildSnapshot, headSetTotals } from './analytics';
+import { buildSnapshot, headSetTotals, muscleSetTotals, e1rmSeries } from './analytics';
 import { computeMetrics } from './metrics';
 import type { Session, SetLog } from '../db/database';
 
@@ -71,5 +71,55 @@ describe('headSetTotals — Tier 3 muscle-head accumulation', () => {
     const totals = headSetTotals(buildSnapshot(headSessions, setLogs));
     expect(totals.byHead.size).toBe(0);
     expect(totals.unspecified.get('Quads')).toBe(1);
+  });
+});
+
+// Set variations: how a set was done changes what it counts for. An extension
+// row (drop / rest-pause / partials) is the previous set carrying on, so it is
+// half a set of volume and never a strength estimate; a grip shifts the muscle
+// split the volume accounting reads.
+describe('set variations in the volume and strength reads', () => {
+  const sessions: Session[] = [
+    { id: 1, dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 2_000 },
+  ];
+
+  it('counts a drop set as half a set, not a new one', () => {
+    const logs: SetLog[] = [
+      { id: 1, sessionId: 1, exerciseId: 'cable-fly', setNumber: 1, weight: 40, reps: 12 },
+      { id: 2, sessionId: 1, exerciseId: 'cable-fly', setNumber: 2, weight: 40, reps: 12 },
+      { id: 3, sessionId: 1, exerciseId: 'cable-fly', setNumber: 3, weight: 30, reps: 10, technique: 'drop' },
+      { id: 4, sessionId: 1, exerciseId: 'cable-fly', setNumber: 4, weight: 20, reps: 10, technique: 'drop' },
+    ];
+    const { totals } = muscleSetTotals(buildSnapshot(sessions, logs));
+    expect(totals.get('Chest')).toBe(3);        // 1 + 1 + 0.5 + 0.5
+    expect(totals.get('Delts')).toBe(1.5);      // secondary at half of that
+  });
+
+  it('reads a close-grip bench as more of a triceps exercise', () => {
+    const plain: SetLog[] = [
+      { id: 1, sessionId: 1, exerciseId: 'flat-barbell-bench-press', setNumber: 1, weight: 185, reps: 8 },
+    ];
+    const close: SetLog[] = [{ ...plain[0], grip: 'close' }];
+    expect(muscleSetTotals(buildSnapshot(sessions, plain)).totals.get('Triceps')).toBe(0.5);
+    expect(muscleSetTotals(buildSnapshot(sessions, close)).totals.get('Triceps')).toBe(0.75);
+    // the prime mover is untouched either way
+    expect(muscleSetTotals(buildSnapshot(sessions, close)).totals.get('Chest')).toBe(1);
+  });
+
+  it('keeps partials and drops out of the e1RM series', () => {
+    const logs: SetLog[] = [
+      { id: 1, sessionId: 1, exerciseId: 'flat-barbell-bench-press', setNumber: 1, weight: 185, reps: 8 },
+      // a heavy partial would "estimate" a 1RM the lifter has never moved through a full range
+      { id: 2, sessionId: 1, exerciseId: 'flat-barbell-bench-press', setNumber: 2, weight: 275, reps: 5, technique: 'partials' },
+    ];
+    const series = e1rmSeries(buildSnapshot(sessions, logs)).get('flat-barbell-bench-press')!;
+    expect(series[0].value).toBeCloseTo(185 * (1 + 8 / 30));
+  });
+
+  it('a session of only drop rows still counts (as half sets) rather than vanishing', () => {
+    const logs: SetLog[] = [
+      { id: 1, sessionId: 1, exerciseId: 'cable-fly', setNumber: 1, weight: 30, reps: 10, technique: 'drop' },
+    ];
+    expect(muscleSetTotals(buildSnapshot(sessions, logs)).totals.get('Chest')).toBe(0.5);
   });
 });

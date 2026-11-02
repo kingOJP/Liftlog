@@ -5,7 +5,7 @@
 export type IconName =
   | 'logo' | 'calendar' | 'chart' | 'history' | 'settings' | 'bolt'
   | 'chevron-right' | 'check' | 'plus' | 'dumbbell' | 'clock' | 'trophy'
-  | 'target' | 'body';
+  | 'target' | 'body' | 'sliders';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   logo: <path d="M3 9v6M6.5 6.5v11M17.5 6.5v11M21 9v6M6.5 12h11" />,
@@ -46,6 +46,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <circle cx="12" cy="12" r="8.5" />
       <circle cx="12" cy="12" r="4.5" />
       <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+    </>
+  ),
+  sliders: (
+    <>
+      <path d="M4 7.5h9M17 7.5h3M4 16.5h3M11 16.5h9" />
+      <circle cx="15" cy="7.5" r="2" />
+      <circle cx="9" cy="16.5" r="2" />
     </>
   ),
   body: (

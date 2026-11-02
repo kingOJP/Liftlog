@@ -33,6 +33,12 @@ describe('prescription labels', () => {
     expect(prescriptionLabel({ sets: 3, repHigh: 12 })).toBe('3 sets');
   });
 
+  it('names a prescribed variation on the long form only', () => {
+    expect(prescriptionDetail({ sets: 4, repLow: 3, repHigh: 5, technique: 'paused', grip: 'close' }))
+      .toBe('4 sets · 3–5 reps · paused · close grip');
+    expect(prescriptionLabel({ sets: 4, repLow: 3, repHigh: 5 })).toBe('4 × 3–5');
+  });
+
   it('gets the singular right for a one-set slot', () => {
     expect(prescriptionLabel({ sets: 1 })).toBe('1 set');
     expect(prescriptionDetail({ sets: 1 })).toBe('1 set');

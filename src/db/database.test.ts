@@ -474,3 +474,35 @@ describe('session notes', () => {
     expect((await getSession(id))!.note).toBeUndefined();
   });
 });
+
+// Set variations are schemaless fields like `order`: stored when present,
+// omitted (not `undefined`) when absent, and only values this build knows.
+describe('set variations on the set log', () => {
+  it('stores technique and grip when given them and omits them otherwise', async () => {
+    const id = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 61_000,
+      sets: [
+        { exerciseId: 'bench-press', setNumber: 1, weight: 185, reps: 5, technique: 'paused', grip: 'close' },
+        { exerciseId: 'bench-press', setNumber: 2, weight: 135, reps: 8, technique: 'drop' },
+        { exerciseId: 'bench-press', setNumber: 3, weight: 185, reps: 5 },
+      ],
+    });
+    const logs = await getSetLogsForSession(id);
+    expect(logs[0]).toMatchObject({ technique: 'paused', grip: 'close' });
+    expect(logs[1]).toMatchObject({ technique: 'drop' });
+    expect('grip' in logs[1]).toBe(false);
+    expect('technique' in logs[2]).toBe(false);
+    expect('grip' in logs[2]).toBe(false);
+  });
+
+  it('drops a value this build does not know rather than storing an unreadable tag', async () => {
+    const id = await saveWorkout({
+      dayId: 1, weekNumber: 1, startedAt: 1_000, completedAt: 61_000,
+      sets: [{ exerciseId: 'bench-press', setNumber: 1, weight: 185, reps: 5,
+        technique: 'cluster' as unknown as 'paused', grip: 'hook' as unknown as 'mixed' }],
+    });
+    const [log] = await getSetLogsForSession(id);
+    expect('technique' in log).toBe(false);
+    expect('grip' in log).toBe(false);
+  });
+});

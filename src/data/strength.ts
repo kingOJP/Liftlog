@@ -32,6 +32,7 @@
 
 import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp } from './analytics';
+import { countsForStrength } from './variations';
 import type { ExperienceLevel, Goal } from './plan';
 import type { WeightType } from './taxonomy';
 import type { Exercise, WorkoutDay } from './program';
@@ -173,6 +174,7 @@ export function bestLoggedMax(snapshot: TrainingSnapshot, exerciseId: string): L
     const ts = sessionTimestamp(session);
     for (const s of snapshot.setsBySession.get(session.id!) ?? []) {
       if (s.exerciseId !== exerciseId || s.weight <= 0 || s.reps <= 0 || s.reps > E1RM_VALID_REPS) continue;
+      if (!countsForStrength(s.technique)) continue; // drops, rest-pause bursts and partials aren't maxes
       const e1rm = epley1RM(s.weight, s.reps);
       if (!best || e1rm > best.e1rm) best = { e1rm, weight: s.weight, reps: s.reps, ts };
     }
@@ -187,6 +189,7 @@ export function e1rmSeriesFor(snapshot: TrainingSnapshot, exerciseId: string): {
     let best = 0;
     for (const s of snapshot.setsBySession.get(session.id!) ?? []) {
       if (s.exerciseId !== exerciseId || s.weight <= 0 || s.reps <= 0 || s.reps > E1RM_VALID_REPS) continue;
+      if (!countsForStrength(s.technique)) continue;
       best = Math.max(best, epley1RM(s.weight, s.reps));
     }
     if (best > 0) points.push({ ts: sessionTimestamp(session), e1rm: best });
