@@ -164,6 +164,17 @@ export default function WorkoutView({
     return Object.keys(restoredDraft.sets).filter(id => !dayIds.has(id)).map(id => exerciseFromId(id, null));
   });
   const [showAddPanel, setShowAddPanel] = useState(false);
+  // The exercise being worked on — the one card that's open. Everything else
+  // collapses to a one-line status so a whole session fits on a screen. Starts
+  // on the first exercise with nothing logged (a restored draft resumes where
+  // it left off).
+  const [activeId, setActiveId] = useState<string | null>(() => {
+    const logged = restoredDraft?.sets ?? {};
+    const open = day.exercises.find(e => (logged[e.id]?.filter(s => !s.warmup).length ?? 0) < e.sets);
+    return (open ?? day.exercises[0])?.id ?? null;
+  });
+  // The note field is out of the way until there's something to say.
+  const [noteOpen, setNoteOpen] = useState(() => !!restoredDraft?.note);
   // The loaded snapshot — kept so context for a mid-workout exercise can be
   // computed without another IndexedDB read.
   const [snapshot, setSnapshot] = useState<TrainingSnapshot | null>(null);
@@ -188,38 +199,6 @@ export default function WorkoutView({
   // final logged set. completedAt − startedAt is the workout duration.
   const [sessionStart, setSessionStart] = useState(() => restoredDraft?.startedAt ?? Date.now());
   const lastSetAtRef = useRef<number | null>(null);
-  // The finish bar only appears once the user has scrolled to the bottom of
-  // the workout — it sits where "Log Set" muscle memory expects a button, so
-  // keeping it off-screen mid-workout prevents accidental early saves.
-  const [atBottom, setAtBottom] = useState(false);
-
-  useEffect(() => {
-    const check = () => {
-      const doc = document.documentElement;
-      const scrollBottom = window.innerHeight + window.scrollY;
-      setAtBottom(scrollBottom >= doc.scrollHeight - 24);
-    };
-    check();
-    window.addEventListener('scroll', check, { passive: true });
-    window.addEventListener('resize', check);
-    return () => {
-      window.removeEventListener('scroll', check);
-      window.removeEventListener('resize', check);
-    };
-  }, []);
-
-  // Content height changes without a scroll event (sets logged, banners
-  // dismissed, coach adjustments loaded) — re-check whether we're at the bottom.
-  // Deferred to a frame so the measurement reads the committed layout (and so
-  // it isn't a synchronous setState during the effect's commit).
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      const doc = document.documentElement;
-      setAtBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - 24);
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [sets, effectiveDay, addedExercises, showAddPanel, planDismissed, restRunId, loading]);
-
   // Stamp the time of the most recent set activity — completedAt uses it so
   // the session duration reflects training time, not phone-in-hand time.
   const totalSets = Object.values(sets).reduce((sum, s) => sum + s.length, 0);
@@ -340,6 +319,7 @@ export default function WorkoutView({
       setOriginalCompletedAt(ts);
       setDateInput(toLocalDateValue(ts));
       setNote(session?.note ?? '');
+      if (session?.note) setNoteOpen(true);
     });
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
@@ -373,6 +353,32 @@ export default function WorkoutView({
     }));
     // Warm-up sets don't start the rest timer — you're not resting between them.
     if (!isEditMode && !warmup) setRestRunId(id => id + 1);
+    // That was the last prescribed set: move on to the next unfinished
+    // exercise so the lifter is looking at what comes next while they rest.
+    // The finished card stays a tap away for an extra set or an edit.
+    const plan = setPlans[exerciseId];
+    const working = (sets[exerciseId] ?? []).filter(s => !s.warmup).length + (warmup ? 0 : 1);
+    if (!warmup && plan && working >= plan.sets.length) advanceFrom(exerciseId);
+  }
+
+  // Open the next exercise (after this one, then wrapping round) that still
+  // has prescribed sets to log; stay put when everything is done.
+  function advanceFrom(exerciseId: string) {
+    const order = [...effectiveDay.exercises, ...addedExercises].map(e => e.id);
+    const from = order.indexOf(exerciseId);
+    const incomplete = (id: string) => {
+      const plan = setPlans[id];
+      if (!plan) return false;
+      const working = (sets[id] ?? []).filter(s => !s.warmup).length + (id === exerciseId ? 1 : 0);
+      return working < plan.sets.length;
+    };
+    const next = [...order.slice(from + 1), ...order.slice(0, from)].find(incomplete);
+    if (!next) return;
+    setActiveId(next);
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-exercise-id="${CSS.escape(next)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   }
 
   function handleEditSet(exerciseId: string, index: number, weight: number, reps: number, warmup: boolean) {
@@ -399,6 +405,7 @@ export default function WorkoutView({
     const present = new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id));
     if (present.has(ex.id)) return;
     setAddedExercises(prev => [...prev, ex]);
+    setActiveId(ex.id);
   }
 
   // Remove a mid-workout exercise (and any sets logged under it). Only exercises
@@ -412,6 +419,7 @@ export default function WorkoutView({
       return next;
     });
     exerciseOrderRef.current = exerciseOrderRef.current.filter(id => id !== exerciseId);
+    setActiveId(prev => (prev === exerciseId ? null : prev));
   }
 
   async function handleFinish() {
@@ -537,7 +545,7 @@ export default function WorkoutView({
 
       <div
         className="exercise-list"
-        style={restRunId > 0 ? { paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' } : undefined}
+        style={restRunId > 0 ? { paddingBottom: 'calc(140px + env(safe-area-inset-bottom))' } : undefined}
       >
         {isEditMode && originalCompletedAt != null && (
           <div className="workout-date-field">
@@ -611,6 +619,8 @@ export default function WorkoutView({
             recommendation={recommendations[ex.id]}
             plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
+            expanded={activeId === ex.id}
+            onToggle={() => setActiveId(prev => (prev === ex.id ? null : ex.id))}
             regression={regressions[ex.id]}
             onRegress={s => handleAddExercise(slotFor(s.exercise.id, s.exercise.name, { snapshot }))}
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
@@ -629,6 +639,8 @@ export default function WorkoutView({
             recommendation={recommendations[ex.id]}
             plan={setPlans[ex.id]}
             lastSession={lastSessions[ex.id]}
+            expanded={activeId === ex.id}
+            onToggle={() => setActiveId(prev => (prev === ex.id ? null : ex.id))}
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
             oneRepMax={maxes[ex.id]}
             onSetMax={onSetMax && !isEditMode ? () => onSetMax(ex.id) : undefined}
@@ -652,17 +664,43 @@ export default function WorkoutView({
           </button>
         )}
 
-        <div className="session-note">
-          <label className="session-note-label" htmlFor="session-note">Session notes</label>
-          <textarea
-            id="session-note"
-            className="session-note-input"
-            rows={2}
-            maxLength={2000}
-            placeholder="How did it go? Sleep, soreness, a cue that clicked…"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-          />
+        {noteOpen ? (
+          <div className="session-note">
+            <label className="session-note-label" htmlFor="session-note">Session notes</label>
+            <textarea
+              id="session-note"
+              className="session-note-input"
+              rows={2}
+              maxLength={2000}
+              placeholder="How did it go? Sleep, soreness, a cue that clicked…"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              autoFocus={!note}
+            />
+          </div>
+        ) : (
+          <button type="button" className="session-note-add" onClick={() => setNoteOpen(true)}>
+            ＋ Add a note
+          </button>
+        )}
+
+        {/* Finish lives at the end of the page, in the flow, not in a fixed
+            bar: the per-set "Log" button is inside the open card, so the two
+            can't be confused, and the session's own length is what puts the
+            button under the last exercise. */}
+        <div className="finish-section">
+          {saveError && (
+            <p className="finish-error" role="alert">
+              Couldn't save: {saveError}. Your sets are still here — try again.
+            </p>
+          )}
+          <button
+            className="finish-btn"
+            disabled={totalSets === 0 || finishing}
+            onClick={handleFinish}
+          >
+            {finishing ? 'Saving…' : isEditMode ? 'Save Changes' : 'Finish Workout'}
+          </button>
         </div>
       </div>
 
@@ -671,22 +709,6 @@ export default function WorkoutView({
       )}
 
       {!isEditMode && <RestTimer runId={restRunId} onDismiss={() => setRestRunId(0)} />}
-
-      <div className={`finish-bar${atBottom ? '' : ' finish-bar--hidden'}`}>
-        {saveError && (
-          <p className="finish-error" role="alert">
-            Couldn't save: {saveError}. Your sets are still here — try again.
-          </p>
-        )}
-        <button
-          className="finish-btn"
-          tabIndex={atBottom ? 0 : -1}
-          disabled={totalSets === 0 || finishing}
-          onClick={handleFinish}
-        >
-          {finishing ? 'Saving…' : isEditMode ? 'Save Changes' : 'Finish Workout'}
-        </button>
-      </div>
     </div>
   );
 }

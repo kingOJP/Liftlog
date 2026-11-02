@@ -478,11 +478,19 @@ src/
     DayCard.tsx/css            — single day card (exercise count + ~duration from the coach's
                                   3-min-per-set estimate) as two real buttons: start, Edit
     WorkoutView.tsx/css        — workout logging + edit-session mode + recommendations + rest
-                                  timer + coach-plan overlay/banner + duration capture
-    ExerciseCard.tsx/css       — per-exercise card: recommendation chip, "last time" line,
-                                  goal line, the whole prescription (next set pre-filled and
-                                  editable, remaining sets previewed), ＋ Warm-up / ＋ Extra
-                                  set, tap-to-edit logged sets
+                                  timer + coach-plan overlay/banner + duration capture. Owns
+                                  `activeId` — the ONE open exercise card (accordion); logging
+                                  the last prescribed set advances it to the next unfinished
+                                  lift. Finish sits in the flow at the end of the list, not in
+                                  a fixed bar; the session note is behind "＋ Add a note"
+    ExerciseCard.tsx/css       — per-exercise card with two states. Collapsed: one row — name
+                                  + status (coach's load and target / "2 / 3" / "✓ 3 sets ·
+                                  190 lbs"). Open: the recommendation chip (tap → the reason,
+                                  goal line and % of 1RM), "last time" line, logged sets
+                                  (tap-to-edit), the next set pre-filled and editable, the
+                                  remaining sets as one "Then" line, and contextual actions
+                                  (＋ Warm-up only before the first working set, ＋ Extra set
+                                  only once the plan is done, Remove only on a mid-workout add)
     RestTimer.tsx/css          — floating rest countdown; auto-(re)starts on each logged set
     HistoryView.tsx/css        — all past sessions in reverse chronological order, with the
                                   session note; the card header is the one button
@@ -1572,6 +1580,18 @@ PROGRAM references) that are otherwise only checked by hand.
   so quick and shared workouts resume after a kill like program days, via the Dashboard's
   "Resume unfinished workout" card (`getUnfinishedWorkout()` → `App.handleResumeDraft`). Back
   with logged sets asks for confirmation (the draft survives either way).
+- **One exercise card is open at a time.** The workout page is an accordion: WorkoutView's
+  `activeId` picks the card that shows inputs and coaching, every other exercise collapses to
+  a one-line status so a whole session reads on one screen. It starts on the first exercise
+  with nothing logged (a restored draft resumes where it stopped), a mid-workout add opens the
+  newcomer, and logging the last prescribed set auto-advances to the next unfinished lift
+  (`advanceFrom`, scrolling it into view) — the finished card stays a tap away for an extra
+  set or an edit. The coach's reasoning sits behind the recommendation chip ("why"), the
+  remaining sets are one "Then" line, and the warm-up / extra-set / remove actions appear only
+  when they apply. Finish is in the flow at the end of the list (the old fixed bar hid until
+  scroll-to-bottom to keep it away from "Log set" muscle memory; with the Log button inside the
+  open card and the page short, an inline button under the last exercise does the same job),
+  and the rest timer sits at the bottom edge. The session note opens from "＋ Add a note".
 - **An open workout is frozen.** `App` snapshots the day into the view (`{ screen: 'workout';
   day }`) and WorkoutView freezes `day`/`program` in state, so a background pull that replaces
   the program can neither unmount the workout nor change its exercises mid-set; the tick also
