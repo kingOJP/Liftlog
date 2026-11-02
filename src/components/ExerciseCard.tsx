@@ -6,6 +6,7 @@ import { unitFor } from '../data/exercises';
 import { unitLabel } from '../data/taxonomy';
 import type { MeasureUnit } from '../data/taxonomy';
 import { InfoButton } from './InstructionSheet';
+import Icon from './Icon';
 import { fmtWeight, fromDisplay, toDisplay, unitLabelFor } from '../data/units';
 import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
@@ -20,6 +21,13 @@ interface Props {
   lastSession?: ExerciseSession;
   /** The lifter's stored 1RM for this exercise — prescribed loads are shown as a % of it */
   oneRepMax?: number;
+  /**
+   * Whether this is the exercise being worked on. One card is open at a time:
+   * the open one carries the inputs and the coaching, the rest collapse to a
+   * one-line status so the whole session fits on a screen.
+   */
+  expanded: boolean;
+  onToggle: () => void;
   /** Opens the Strength screen for this lift; offered when the coach has nothing to prescribe a load from */
   onSetMax?: () => void;
   onLogSet: (weight: number, reps: number, warmup: boolean) => void;
@@ -52,6 +60,35 @@ function formatLastSets(sets: ExerciseSession['sets'], unit: MeasureUnit): strin
   return sets.map(s => `${toDisplay(s.weight)}×${s.reps}`).join(', ');
 }
 
+// The sets still to come, in the same compressed shape as "last time":
+// "190 lbs × 10, 9" — or "45s, 40s" for a hold. Loads the lifter has chosen
+// today (`workingWeight`) replace the prescribed ones, in the display unit.
+// Returns null when there's nothing to say (no load and no targets).
+function formatUpcoming(
+  sets: SetPlan['sets'], unit: MeasureUnit, weightUnit: string, workingWeight: string | null,
+): string | null {
+  const count = (n: number | null) => (n == null ? '—' : unit === 'seconds' ? `${n}s` : String(n));
+  const counts = sets.map(s => count(s.targetReps)).join(', ');
+  const hasTargets = sets.some(s => s.targetReps != null);
+  if (unit === 'seconds') return hasTargets ? counts : null;
+  const loads = sets.map(s => workingWeight ?? (s.weight == null ? null : String(toDisplay(s.weight))));
+  // No load known yet (a first session): just the rep targets.
+  if (loads.every(l => l == null)) return hasTargets ? `${counts} ${unitLabel(unit)}` : null;
+  if (new Set(loads).size === 1) return `${loads[0]} ${weightUnit} × ${counts}`;
+  return sets.map((s, i) => `${loads[i] ?? '—'}×${count(s.targetReps)}`).join(', ');
+}
+
+// A finished exercise, in a collapsed row: "3 sets · 190 lbs" (the day's
+// working weight — most used, heaviest on a tie), "3 holds" for a timed one.
+function doneLabel(sets: Array<{ weight: number; reps: number }>, timed: boolean): string {
+  const n = sets.length;
+  if (timed) return `${n} hold${n === 1 ? '' : 's'}`;
+  const counts = new Map<number, number>();
+  for (const s of sets) counts.set(s.weight, (counts.get(s.weight) ?? 0) + 1);
+  const [top] = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+  return `${n} set${n === 1 ? '' : 's'}${top > 0 ? ` · ${fmtWeight(top)}` : ''}`;
+}
+
 function lastSessionLabel(ts: number): string {
   const days = Math.floor((Date.now() - ts) / 86_400_000);
   if (days <= 0) return 'today';
@@ -67,7 +104,7 @@ const DIRECTION_ICON: Record<WeightRec['direction'], string> = {
 };
 
 export default function ExerciseCard({
-  exercise, sets, recommendation, plan, lastSession, oneRepMax, onSetMax,
+  exercise, sets, recommendation, plan, lastSession, oneRepMax, expanded, onToggle, onSetMax,
   onLogSet, onEditSet, onDeleteSet, onRemove, regression, onRegress, onViewHistory,
 }: Props) {
   const info = useInstructionSheet();
@@ -82,6 +119,9 @@ export default function ExerciseCard({
   const [editWeight, setEditWeight] = useState('');
   const [editReps, setEditReps] = useState('');
   const [editWarmup, setEditWarmup] = useState(false);
+  // The coach's reasoning (why this load, what earns the next one) sits behind
+  // the recommendation chip — the number is what the lifter needs mid-set.
+  const [showWhy, setShowWhy] = useState(false);
 
   // The prescription arrives asynchronously (it needs a history read) — drop a
   // stale working weight when a DIFFERENT plan lands, per the React "adjusting
@@ -204,6 +244,10 @@ export default function ExerciseCard({
 
   const canLog = !!row && (timed || row.weight !== '') && row.reps !== '';
   const planComplete = !!plan && remaining.length === 0;
+  // Without a plan (editing a past session) "done" is simply "has sets".
+  const done = plan ? planComplete : sets.length > 0;
+  const started = sets.length > 0;
+  const workingSets = sets.filter(s => !s.warmup);
 
   // The prescribed load as a share of the lifter's max — what "200 lbs" means.
   const pctLabel = oneRepMax && recommendation && recommendation.weight > 0 && recommendation.targetReps == null
@@ -214,223 +258,287 @@ export default function ExerciseCard({
   const offerMax = !!onSetMax && !!plan && plan.rec == null && !lastSession && !timed
     && exercise.repLow != null && sets.length === 0;
 
+  const upcomingLabel = upcoming.length > 0 ? formatUpcoming(upcoming, unit, weightUnit, workingWeight) : null;
+
+  const recLabel = recommendation
+    ? `${DIRECTION_ICON[recommendation.direction]} ${
+        recommendation.targetReps != null
+          ? `${recommendation.targetReps} ${timed ? 'sec' : 'reps'}`
+          : fmtWeight(recommendation.weight)
+      }`
+    : null;
+  const recTone = recommendation
+    ? recommendation.kind === 'reanchor' ? 'reanchor' : recommendation.direction
+    : null;
+
+  // What a collapsed card says about itself: done (with today's numbers),
+  // in progress (sets logged of planned), or waiting (the coach's load + the
+  // target), so the session can be read top to bottom without opening anything.
+  const summary = done ? (
+    <span className="ex-summary ex-summary--done">
+      <Icon name="check" size={14} strokeWidth={2.5} />
+      {doneLabel(workingSets.length > 0 ? workingSets : sets, timed)}
+    </span>
+  ) : started ? (
+    <span className="ex-summary">
+      <span className="ex-progress">{workingSoFar} / {plan ? plan.sets.length : exercise.sets}</span>
+    </span>
+  ) : (
+    <span className="ex-summary">
+      {recLabel && <span className={`ex-summary-rec ex-summary-rec--${recTone}`}>{recLabel}</span>}
+      <span className="ex-summary-target">{targetLabel}</span>
+    </span>
+  );
+
   return (
-    <div className="exercise-card">
+    <div
+      className={`exercise-card${expanded ? ' exercise-card--open' : ''}${done ? ' exercise-card--done' : ''}`}
+      data-exercise-id={exercise.id}
+    >
       <div className="ex-header">
-        <span className="ex-name">{exercise.name}</span>
-        <InfoButton name={exercise.name} onClick={() => info.open(exercise.id, exercise.name)} />
-        <span className="ex-target">{targetLabel}</span>
-        {onRemove && (
-          <button
-            className="ex-remove-btn"
-            onClick={onRemove}
-            aria-label={`Remove ${exercise.name} from this workout`}
-          >
-            ×
-          </button>
+        <button
+          type="button"
+          className="ex-toggle"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={`${exercise.name}${expanded ? '' : ' — open'}`}
+        >
+          <span className="ex-name">{exercise.name}</span>
+          {expanded ? (
+            <span className="ex-target">{targetLabel}</span>
+          ) : (
+            <>
+              {summary}
+              <span className="ex-chevron" aria-hidden="true">
+                <Icon name="chevron-right" size={15} strokeWidth={2} />
+              </span>
+            </>
+          )}
+        </button>
+        {expanded && (
+          <InfoButton name={exercise.name} onClick={() => info.open(exercise.id, exercise.name)} />
         )}
       </div>
 
-      {/* Re-anchoring a load to a new rep range is a correction, not a verdict
-          on the last session — colour it neutrally so a block that moves to
-          higher reps doesn't read as a punishment. The arrow still says which
-          way the weight moved. */}
-      {recommendation && (
-        <div className={`ex-rec ex-rec--${
-          recommendation.kind === 'reanchor' ? 'reanchor' : recommendation.direction
-        }`}>
-          <span className="ex-rec-weight">
-            {DIRECTION_ICON[recommendation.direction]}{' '}
-            {recommendation.targetReps != null
-              ? `${recommendation.targetReps} ${timed ? 'sec' : 'reps'}`
-              : fmtWeight(recommendation.weight)}
-          </span>
-          {pctLabel && <span className="ex-rec-pct">{pctLabel}</span>}
-          <span className="ex-rec-reason">{recommendation.reason}</span>
-        </div>
-      )}
+      {expanded && (
+        <div className="ex-body">
+          {/* The coach's number and the lifter's last numbers on one line; the
+              reasoning behind them is a tap away rather than a paragraph. */}
+          {(recommendation || lastSession || offerMax) && (
+            <div className="ex-coach">
+              {recommendation && recLabel && (
+                <button
+                  type="button"
+                  className={`ex-rec ex-rec--${recTone}${showWhy ? ' ex-rec--open' : ''}`}
+                  onClick={() => setShowWhy(v => !v)}
+                  aria-expanded={showWhy}
+                  aria-label={`${recLabel} — why?`}
+                >
+                  <span className="ex-rec-weight">{recLabel}</span>
+                  <span className="ex-rec-why" aria-hidden="true">why</span>
+                </button>
+              )}
+              {offerMax && (
+                <button type="button" className="ex-max-offer" onClick={onSetMax}>
+                  Know your 1RM? ›
+                </button>
+              )}
+              {lastSession && (
+                <button
+                  type="button"
+                  className="ex-last"
+                  onClick={() => onViewHistory?.(exercise.id, exercise.name)}
+                  aria-label={`History for ${exercise.name}`}
+                  disabled={!onViewHistory}
+                >
+                  <span className="ex-last-label">Last · {lastSessionLabel(lastSession.completedAt)}</span>
+                  <span className="ex-last-sets">{formatLastSets(lastSession.sets, unit)}{onViewHistory ? ' ›' : ''}</span>
+                </button>
+              )}
+            </div>
+          )}
 
-      {offerMax && (
-        <button type="button" className="ex-max-offer" onClick={onSetMax}>
-          Know your 1RM? Enter it and the coach sets your starting weight ›
-        </button>
-      )}
+          {/* Re-anchoring a load to a new rep range is a correction, not a
+              verdict on the last session — the chip is coloured neutrally so a
+              block that moves to higher reps doesn't read as a punishment. */}
+          {recommendation && showWhy && (
+            <div className={`ex-why ex-why--${recTone}`}>
+              <p className="ex-why-reason">
+                {recommendation.reason}
+                {pctLabel && <span className="ex-rec-pct">{pctLabel}</span>}
+              </p>
+              {plan && <p className="ex-why-goal">{plan.goal}</p>}
+            </div>
+          )}
+          {/* With nothing to recommend from, the goal line is the only guidance
+              ("find a working weight") — it stays in view. */}
+          {!recommendation && plan && <p className="ex-goal">{plan.goal}</p>}
 
-      {lastSession && (
-        <button
-          type="button"
-          className="ex-last ex-last--btn"
-          onClick={() => onViewHistory?.(exercise.id, exercise.name)}
-          aria-label={`History for ${exercise.name}`}
-          disabled={!onViewHistory}
-        >
-          <span className="ex-last-label">Last time · {lastSessionLabel(lastSession.completedAt)}</span>
-          <span className="ex-last-sets">{formatLastSets(lastSession.sets, unit)}{onViewHistory ? ' ›' : ''}</span>
-        </button>
-      )}
+          {regression && onRegress && (
+            <div className="ex-regress">
+              <span className="ex-regress-text">
+                Three sessions short of the range. <strong>{regression.exercise.name}</strong> trains the
+                same muscle with a way to start lighter — build strength there and come back to this.
+              </span>
+              <button className="ex-regress-btn" onClick={() => onRegress(regression)}>
+                Add {regression.exercise.name} today
+              </button>
+            </div>
+          )}
 
-      {plan && <p className="ex-goal">{plan.goal}</p>}
+          {sets.length > 0 && (
+            <div className="set-log">
+              {sets.map((s, i) =>
+                editingIndex === i ? (
+                  <div key={i} className={`set-row editing${s.warmup ? ' set-row--warmup' : ''}`}>
+                    <span className="set-num">{setLabels[i]}</span>
+                    {!timed && (
+                      <div className="inline-field">
+                        <input
+                          className="inline-input"
+                          type="number"
+                          inputMode="decimal"
+                          value={editWeight}
+                          onChange={e => setEditWeight(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          autoFocus
+                        />
+                        <span className="inline-unit">{weightUnit}</span>
+                      </div>
+                    )}
+                    <div className="inline-field">
+                      <input
+                        className="inline-input"
+                        type="number"
+                        inputMode="numeric"
+                        value={editReps}
+                        onChange={e => setEditReps(e.target.value)}
+                        onKeyDown={handleEditKeyDown}
+                        autoFocus={timed}
+                      />
+                      <span className="inline-unit">{timed ? 'sec' : 'rp'}</span>
+                    </div>
+                    <button
+                      className={`warmup-chip${editWarmup ? ' warmup-chip--on' : ''}`}
+                      onClick={() => setEditWarmup(v => !v)}
+                      aria-pressed={editWarmup}
+                      title="Tag as warm-up"
+                    >
+                      W
+                    </button>
+                    <button className="edit-confirm-btn" onClick={confirmEdit}>✓</button>
+                    <button className="edit-cancel-btn" onClick={cancelEdit}>✗</button>
+                  </div>
+                ) : (
+                  <div
+                    key={i}
+                    className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit ${setLabels[i]}`}
+                    onClick={() => startEdit(i)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(i); } }}
+                  >
+                    <span className="set-num">{setLabels[i]}</span>
+                    {!timed && <span className="set-weight">{fmtWeight(s.weight)}</span>}
+                    <span className="set-reps">{s.reps} {countLabel}</span>
+                    <button
+                      className="delete-set-btn"
+                      onClick={e => { e.stopPropagation(); onDeleteSet(i); }}
+                      aria-label={`Delete ${setLabels[i]}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+          )}
 
-      {regression && onRegress && (
-        <div className="ex-regress">
-          <span className="ex-regress-text">
-            Three sessions short of the range. <strong>{regression.exercise.name}</strong> trains the
-            same muscle with a way to start lighter — build strength there and come back to this.
-          </span>
-          <button className="ex-regress-btn" onClick={() => onRegress(regression)}>
-            Add {regression.exercise.name} today
-          </button>
-        </div>
-      )}
-
-      {sets.length > 0 && (
-        <div className="set-log">
-          {sets.map((s, i) =>
-            editingIndex === i ? (
-              <div key={i} className={`set-row editing${s.warmup ? ' set-row--warmup' : ''}`}>
-                <span className="set-num">{setLabels[i]}</span>
+          {/* ── The set being logged right now, pre-filled from the prescription ── */}
+          {row && (
+            <div className={`set-inputs${row.kind === 'warmup' ? ' set-inputs--warmup' : ''}`}>
+              <div className="input-row">
+                <span className="set-num set-num--active">
+                  {row.kind === 'warmup' ? 'Warm-up' : `Set ${nextSetNum}`}
+                </span>
                 {!timed && (
-                  <div className="inline-field">
+                  <div className="weight-wrap">
                     <input
-                      className="inline-input"
+                      className="num-input"
                       type="number"
                       inputMode="decimal"
-                      value={editWeight}
-                      onChange={e => setEditWeight(e.target.value)}
-                      onKeyDown={handleEditKeyDown}
-                      autoFocus
+                      placeholder="Weight"
+                      aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                      value={row.weight}
+                      onChange={e => updateRow({ weight: e.target.value })}
+                      onKeyDown={handleKeyDown}
                     />
-                    <span className="inline-unit">{weightUnit}</span>
+                    <span className="input-unit">{weightUnit}</span>
                   </div>
                 )}
-                <div className="inline-field">
+                <div className={`reps-wrap${timed ? ' reps-wrap--solo' : ''}`}>
                   <input
-                    className="inline-input"
+                    className="num-input"
                     type="number"
                     inputMode="numeric"
-                    value={editReps}
-                    onChange={e => setEditReps(e.target.value)}
-                    onKeyDown={handleEditKeyDown}
-                    autoFocus={timed}
+                    placeholder={timed ? 'Seconds' : 'Reps'}
+                    aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
+                    value={row.reps}
+                    onChange={e => updateRow({ reps: e.target.value })}
+                    onKeyDown={handleKeyDown}
                   />
-                  <span className="inline-unit">{timed ? 'sec' : 'rp'}</span>
+                  <span className="input-unit">{countLabel}</span>
                 </div>
-                <button
-                  className={`warmup-chip${editWarmup ? ' warmup-chip--on' : ''}`}
-                  onClick={() => setEditWarmup(v => !v)}
-                  aria-pressed={editWarmup}
-                  title="Tag as warm-up"
-                >
-                  W
-                </button>
-                <button className="edit-confirm-btn" onClick={confirmEdit}>✓</button>
-                <button className="edit-cancel-btn" onClick={cancelEdit}>✗</button>
               </div>
-            ) : (
-              <div
-                key={i}
-                className={`set-row set-row--done${s.warmup ? ' set-row--warmup' : ''}`}
-                role="button"
-                tabIndex={0}
-                aria-label={`Edit ${setLabels[i]}`}
-                onClick={() => startEdit(i)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(i); } }}
-              >
-                <span className="set-num">{setLabels[i]}</span>
-                {!timed && <span className="set-weight">{fmtWeight(s.weight)}</span>}
-                <span className="set-reps">{s.reps} {countLabel}</span>
-                <button
-                  className="delete-set-btn"
-                  onClick={e => { e.stopPropagation(); onDeleteSet(i); }}
-                  aria-label={`Delete ${setLabels[i]}`}
-                >
-                  ×
+              <div className="log-actions">
+                {draft !== null && (
+                  <button type="button" className="draft-cancel-btn" onClick={() => setDraft(null)}>
+                    Cancel
+                  </button>
+                )}
+                <button className="log-btn" disabled={!canLog} onClick={handleLogSet}>
+                  {row.kind === 'warmup' ? 'Log warm-up' : `Log set ${nextSetNum}`}
                 </button>
               </div>
-            )
+            </div>
           )}
-        </div>
-      )}
 
-      {/* ── The set being logged right now, pre-filled from the prescription ── */}
-      {row && (
-        <div className={`set-inputs${row.kind === 'warmup' ? ' set-inputs--warmup' : ''}`}>
-          <div className="input-row">
-            <span className="set-num set-num--active">
-              {row.kind === 'warmup' ? 'Warm-up' : `Set ${nextSetNum}`}
-            </span>
-            {!timed && (
-              <div className="weight-wrap">
-                <input
-                  className="num-input"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="Weight"
-                  aria-label={`Weight for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
-                  value={row.weight}
-                  onChange={e => updateRow({ weight: e.target.value })}
-                  onKeyDown={handleKeyDown}
-                />
-                <span className="input-unit">{weightUnit}</span>
-              </div>
-            )}
-            <div className={`reps-wrap${timed ? ' reps-wrap--solo' : ''}`}>
-              <input
-                className="num-input"
-                type="number"
-                inputMode="numeric"
-                placeholder={timed ? 'Seconds' : 'Reps'}
-                aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : `set ${nextSetNum}`}`}
-                value={row.reps}
-                onChange={e => updateRow({ reps: e.target.value })}
-                onKeyDown={handleKeyDown}
-              />
-              <span className="input-unit">{countLabel}</span>
-            </div>
-          </div>
-          <div className="log-actions">
-            {draft !== null && (
-              <button type="button" className="draft-cancel-btn" onClick={() => setDraft(null)}>
-                Cancel
-              </button>
-            )}
-            <button className="log-btn" disabled={!canLog} onClick={handleLogSet}>
-              {row.kind === 'warmup' ? 'Log warm-up' : `Log set ${nextSetNum}`}
-            </button>
-          </div>
-        </div>
-      )}
+          {/* The rest of today's prescription in one line — enough to see the
+              whole session without a row per set. */}
+          {upcomingLabel && (
+            <p className="ex-upcoming">
+              <span className="ex-upcoming-label">Then</span>
+              {upcomingLabel}
+            </p>
+          )}
 
-      {/* ── The rest of today's prescription, so the session is visible up front ── */}
-      {upcoming.length > 0 && (
-        <div className="set-plan">
-          {upcoming.map(p => (
-            <div className="set-row set-row--planned" key={p.setNumber}>
-              <span className="set-num">Set {p.setNumber}</span>
-              {!timed && (
-                <span className="set-weight">
-                  {(workingWeight ?? (p.weight == null ? null : String(toDisplay(p.weight)))) ?? '—'} {weightUnit}
-                </span>
+          {/* Quiet, contextual actions: a warm-up only makes sense before the
+              working sets start, an extra set only once the plan is done, and
+              an exercise added mid-session can be taken out again. */}
+          {draft === null && (workingSoFar === 0 || planComplete || onRemove) && (
+            <div className="ex-actions">
+              {workingSoFar === 0 && (
+                <button type="button" className="ex-action-btn" onClick={addWarmup}>
+                  ＋ Warm-up
+                </button>
               )}
-              <span className={`set-reps${timed ? ' set-reps--solo' : ''}`}>
-                {p.targetReps == null ? '—' : `${p.targetReps} ${countLabel}`}
-              </span>
+              {planComplete && (
+                <button type="button" className="ex-action-btn" onClick={addExtraSet}>
+                  ＋ Extra set
+                </button>
+              )}
+              {onRemove && (
+                <button
+                  type="button"
+                  className="ex-action-btn ex-action-btn--remove"
+                  onClick={onRemove}
+                  aria-label={`Remove ${exercise.name} from this workout`}
+                >
+                  Remove
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Warm-ups are an explicit addition rather than a mode on the working
-          set — the prescribed sets stay pre-filled and ready to log. */}
-      {draft === null && (
-        <div className="ex-actions">
-          <button type="button" className="ex-action-btn" onClick={addWarmup}>
-            ＋ Warm-up set
-          </button>
-          {planComplete && (
-            <button type="button" className="ex-action-btn" onClick={addExtraSet}>
-              ＋ Extra set
-            </button>
           )}
         </div>
       )}
