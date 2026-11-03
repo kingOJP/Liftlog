@@ -12,10 +12,9 @@ import {
   getPhaseResolver, getProfileOrDefault, getCoachDecisions, planHasChosenGoal, getStrengthState,
 } from '../data/planStore';
 import { PHASE_INFO, blockEnded, blockWeekIndex, goalLabel, mondayOf } from '../data/plan';
-import { bestLoggedMax, currentMax, etaLabel, projectGoal, strengthTrend } from '../data/strength';
-import { effectiveExperience } from '../data/experience';
+import { bestLoggedMax, currentMax, supportingFrequency } from '../data/strength';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
-import { fmtWeight, toDisplay } from '../data/units';
+import { fmtWeight } from '../data/units';
 import { dayInPhase } from '../data/program';
 import DayCard from './DayCard';
 import './Dashboard.css';
@@ -96,13 +95,14 @@ export default function Dashboard({
       const stored = strength.maxes.find(m => m.exerciseId === target.exerciseId) ?? null;
       const current = currentMax(stored, bestLoggedMax(snapshot, target.exerciseId));
       const name = getExerciseLibrary().find(e => e.id === target.exerciseId)?.name ?? getExerciseName(target.exerciseId);
-      if (!current) { setGoalLine(`${name} goal: ${fmtWeight(target.targetWeight)} — enter a 1RM for an estimate`); return; }
-      const projection = projectGoal({
-        current: current.value, target: target.targetWeight,
-        experience: effectiveExperience(getProfileOrDefault(), snapshot), goal,
-        trend: strengthTrend(snapshot, target.exerciseId),
-      });
-      setGoalLine(`${name}: ${toDisplay(current.value)} → ${fmtWeight(target.targetWeight)} · ${etaLabel(projection)}${strength.goals.length > 1 ? ` · +${strength.goals.length - 1} more` : ''}`);
+      const freq = supportingFrequency(program, target.exerciseId);
+      const parts = [
+        current ? fmtWeight(current.value) : null,
+        target.targetWeight != null ? `→ ${fmtWeight(target.targetWeight)}` : null,
+      ].filter(Boolean).join(' ');
+      const where = freq > 0 ? `trained ${freq}× a week` : 'not in your program';
+      const more = strength.goals.length > 1 ? ` · +${strength.goals.length - 1} more` : '';
+      setGoalLine(`${name}${parts ? `: ${parts}` : ''} · ${where}${more}`);
     });
     return () => { cancelled = true; };
   }, [program, weekNumber, phase, goal]);

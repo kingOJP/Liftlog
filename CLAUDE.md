@@ -131,23 +131,34 @@ Long-term milestones (roughly):
     conditional (ETag) pull + worker hardening + SW update toast; exercise instructions;
     strength structure (barbell anchoring, phase rep ranges, top set + back-offs) and
     bodyweight regressions; per-exercise history, session notes, kg/lb preference, a11y.
-25. ✅ One-rep maxes + strength goals (`strength.ts`, `StrengthView`) — a stored 1RM is
+25. ✅ One-rep maxes + building a lift (`strength.ts`, `StrengthView`) — a stored 1RM is
     the one *measurement* the engines get (everything else is an estimate). It anchors
     the prescription where the log can't: a never-trained lift gets a real starting load
     (`firstSessionFromMax` in recommendations.ts) instead of "find a weight", and a max
     entered *after* the last session re-anchors the load (`maxReanchor`, same guard rails
     as the rep-range re-anchor: ≥5% shift, ≤20% per step, a *lower* max only cuts load
     when the last session also missed the range). The exercise card shows the prescribed
-    load as **% of 1RM**; the Strength screen shows the whole program as a % table. A
-    **1RM goal** gets a projection (`projectGoal`: the lifter's own e1RM trend, clamped
-    to a training-age-expected rate — ACSM ~40%/16%/10% per 6 mo/6 mo/yr — tempered by
-    the goal; a range, never a date), surfaced on the Journey ("Strength targets") and
-    the dashboard journey card. "Design a block around this lift" seeds the wizard
-    (`PlanSeed`) and the planner's `focusExerciseIds` guarantees the lift a main slot
-    (`anchorFocusLift`), bypassing the beginner skill gate and equipment filters with a
-    warning. Records ride the journey document (`PlanState.strength`, LWW sync; no
-    backend change). Entry points: Settings → 1RMs & goals (always available), Journey,
-    Metrics' e1RM chart, and a never-trained exercise card mid-workout.
+    load as **% of 1RM**; the Strength screen shows the whole program as a % table.
+    **Building a lift** is coaching, not a countdown: there is deliberately **no
+    time-to-goal estimate** (a date from a self-reported level is a guess wearing a
+    number). Instead the screen says *what it takes* (`whatItTakes`: the lift 2–3×/week,
+    its catalogued `VARIATIONS` — paused/front squat, paused/close-grip bench,
+    paused/deficit deadlift — each its own catalog exercise so paused history never
+    pollutes the parent's prescription) and reads the log for the weak link
+    (`techniqueRead`: 4–8-rep e1RM vs heavy evidence — a tested max or logged ≤3-rep
+    sets — ≥8% apart → "positions, not horsepower" with lift-specific work; the reverse →
+    thin rep base). Two routes program it: **Add to my current plan** (main slot on a
+    day + a variation on another, via `slotFor`) and **Build a block around it** (wizard
+    seeded with `PlanSeed`; a `focusFrequency` question; the planner's `anchorFocusLift`
+    places the lift as a main slot and its variations as main slots on further days,
+    bypassing the beginner skill gate and equipment filters with a warning). Only once a
+    block exists does `projectBlock` say what it is *built to deliver* — a range over the
+    block's productive weeks, read from the lifter's logged trend ahead of the
+    training-age rate, scaled by frequency and goal; an optional target is framed
+    against that range (inside / beyond / reached), never dated. Records
+    (`StrengthGoal`, target optional) ride the journey document (`PlanState.strength`,
+    LWW sync; no backend change). Entry points: Settings → 1RMs & goals, Journey
+    "Strength targets", Metrics' e1RM chart, and a never-trained exercise card.
 
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned

@@ -35,6 +35,7 @@ import { dosage, isHeavyAxial } from './dosage';
 import { fmtWeight } from './units';
 import type { Slot, DayTemplate } from './sports';
 import { buildSportPlan, buildSportPhases, sportLabel, sportMeta } from './sports';
+import { variationsFor } from './strength';
 
 // ── Input / output ────────────────────────────────────────────────────────────
 
@@ -70,6 +71,13 @@ export interface PlannerInput {
    * planner's job is to program it well, not to second-guess it.
    */
   focusExerciseIds?: string[];
+  /**
+   * Days a week each goal lift is trained (1–3; default 2). The first day is
+   * the lift itself as a main slot; further days get its catalogued
+   * variations (strength.ts VARIATIONS — paused, front-rack, deficit…) as
+   * main slots of their own, or a lighter repeat when the lift has none.
+   */
+  focusFrequency?: number;
 }
 
 export interface PlannerConfidence {
@@ -625,6 +633,8 @@ interface SelectCtx {
   review: Set<string>;
   /** lifts the block is designed around — see PlannerInput.focusExerciseIds */
   focus: Set<string>;
+  /** their variations, placed by anchorFocusLift — pass the same gates the goal lift does */
+  focusSupport: Set<string>;
 }
 
 // Can this athlete be programmed this exercise right now? Advanced-tagged lifts
@@ -633,7 +643,7 @@ interface SelectCtx {
 // lifters clear the gate outright — and so does a lift the athlete asked for.
 function meetsSkillGate(p: ExerciseProfile, ctx: SelectCtx): boolean {
   if (ctx.experience !== 'beginner') return true;
-  if (ctx.focus.has(p.id)) return true;
+  if (ctx.focus.has(p.id) || ctx.focusSupport.has(p.id)) return true;
   // Any lift that names prerequisites is gated for a beginner — the advanced
   // ones, and the few intermediate ones with a hard strength floor (chin-ups):
   // allowed once they've trained the lift itself or at least one prerequisite.
@@ -743,7 +753,7 @@ function pickForSlot(slot: Slot, ctx: SelectCtx, guidance: Guidance): { profile:
   // A goal lift passes the constraint filters: the athlete named it, and the
   // proposal carries a warning when it clashes with what they told us.
   const eligible = (p: ExerciseProfile) =>
-    !ctx.dayUsed.has(p.id) && (slot.reuse || !ctx.used.has(p.id)) && (ctx.focus.has(p.id) || allowedByGuidance(p, guidance));
+    !ctx.dayUsed.has(p.id) && (slot.reuse || !ctx.used.has(p.id)) && (ctx.focus.has(p.id) || ctx.focusSupport.has(p.id) || allowedByGuidance(p, guidance));
   let pool = (ctx.byMuscle.get(slot.muscle) ?? []).filter(eligible);
   // A slot's preferred lifts are explicit, and may be filed under a
   // neighbouring muscle (the conventional deadlift is Glutes-primary; a
@@ -909,6 +919,8 @@ export function buildPlanProposal(
   // Goal lifts get a main slot each before anything else is picked. The split
   // template is copied so the shared day templates stay pristine.
   const focus = new Set(input.focusExerciseIds ?? []);
+  const focusSupport = new Set<string>();
+  const focusFrequency = Math.min(3, Math.max(1, Math.round(input.focusFrequency ?? 2)));
   const dayTemplates: DayTemplate[] = split.days.map(d => ({ ...d, slots: d.slots.map(s => ({ ...s })) }));
   for (const id of focus) {
     const p = profileFor(id, currentNameById.get(id));
@@ -918,12 +930,23 @@ export function buildPlanProposal(
     if (!allowedByGuidance(p, guidance)) {
       warnings.push(`${p.name} is your goal lift but conflicts with your equipment or injury constraints — it was programmed anyway. Review it below.`);
     }
-    anchorFocusLift(dayTemplates, p, focus);
-    guidance.notes.push(`Designed around your ${p.name} goal — it leads its day as the main lift, and the block's loading is built to move its 1RM.`);
+    const placed = anchorFocusLift(dayTemplates, p, focus, focusFrequency, focusSupport);
+    const extra = placed.supportDays.length;
+    guidance.notes.push(
+      `Designed around your ${p.name} goal — it leads its day as the main lift${
+        extra > 0
+          ? `, and ${extra === 1 ? 'a second day' : `${extra} more days`} train${extra === 1 ? 's' : ''} it through ${placed.supportNames.join(' and ')}`
+          : ''
+      }. The block's loading is built to move its 1RM.`,
+    );
+    if (focusFrequency > 1 && extra < focusFrequency - 1) {
+      warnings.push(`${p.name} could only be placed on ${extra + 1} day${extra + 1 === 1 ? '' : 's'} with ${input.daysPerWeek} training days — add a day for the frequency you asked for.`);
+    }
   }
 
   const ctx: SelectCtx = {
     focus,
+    focusSupport,
     goal: input.goal,
     experience: input.experience,
     byMuscle,
@@ -1113,46 +1136,121 @@ export function buildPlanProposal(
 }
 
 /**
- * Guarantee a goal lift a main slot. The best home is an existing slot for its
- * primary muscle whose pattern list already includes the lift's pattern (a
- * squat goal takes the Quads/Squat slot); failing that, any slot for the
- * muscle; failing that, a new main slot at the front of the day with the
- * fewest slots. On a split that trains the muscle twice a week, the lift gets
- * ONE main slot — frequency on a heavy goal lift is a block-design decision the
- * athlete can make in review, not something to impose. The slot's preference
- * list is set so the selector picks it, and `main` so it's dosed as the
- * day's heavy anchor.
+ * Guarantee a goal lift its weekly frequency.
+ *
+ * Day one: the lift itself. The best home is an existing slot for its primary
+ * muscle whose pattern list already includes the lift's pattern (a squat goal
+ * takes the Quads/Squat slot); failing that, any slot for the muscle; failing
+ * that, a new main slot at the front of the day with the fewest slots.
+ *
+ * Further days (frequency 2–3): the lift's catalogued VARIATIONS, one per day,
+ * each a main slot of its own — a paused squat on the other lower day is how a
+ * second weekly exposure trains the weak position instead of repeating the
+ * grind. A lift with no variations is repeated as a lighter second session
+ * (`reuse`). Variation days prefer days that don't already anchor on a heavy
+ * barbell squat or hinge, and the slot is marked `heavy` so the one-axial-
+ * lift-per-session rule doesn't filter it out of the day it was placed on.
  */
-function anchorFocusLift(days: DayTemplate[], p: ExerciseProfile, focus: Set<string>): void {
+function anchorFocusLift(
+  days: DayTemplate[],
+  p: ExerciseProfile,
+  focus: Set<string>,
+  frequency: number,
+  support: Set<string>,
+): { supportDays: number[]; supportNames: string[] } {
   const muscle = p.primaryMuscle!;
-  let best: { slot: Slot; score: number } | null = null;
-  for (const day of days) {
+  const claimed = (slot: Slot) => {
+    const by = slot.preferIds?.[0];
+    return !!by && by !== p.id && (focus.has(by) || support.has(by));
+  };
+
+  // ── Day one: the lift itself ──
+  let best: { dayIdx: number; slot: Slot; score: number } | null = null;
+  days.forEach((day, dayIdx) => {
     for (const slot of day.slots) {
-      if (slot.muscle !== muscle) continue;
-      // A slot another goal lift already took stays its
-      const claimedBy = slot.preferIds?.[0];
-      if (claimedBy && claimedBy !== p.id && focus.has(claimedBy)) continue;
+      if (slot.muscle !== muscle || claimed(slot)) continue;
       const patternMatch = p.workoutType != null && (slot.patterns?.includes(p.workoutType) ?? false);
       const score = (patternMatch ? 2 : 0) + (slot.main ? 1 : 0);
-      if (!best || score > best.score) best = { slot, score };
+      if (!best || score > best.score) best = { dayIdx, slot, score };
     }
-  }
-  if (best) {
-    best.slot.preferIds = [p.id, ...(best.slot.preferIds ?? []).filter(id => id !== p.id)];
-    best.slot.main = true;
-    delete best.slot.mechanics; // the named lift decides, not the template's mechanics hint
-    if (p.workoutType && !(best.slot.patterns ?? []).includes(p.workoutType)) {
-      best.slot.patterns = [p.workoutType, ...(best.slot.patterns ?? [])];
-    }
-    return;
-  }
-  const lightest = days.reduce((a, b) => (b.slots.length < a.slots.length ? b : a), days[0]);
-  lightest.slots.unshift({
-    muscle,
-    ...(p.workoutType ? { patterns: [p.workoutType] } : {}),
-    main: true,
-    preferIds: [p.id],
   });
+  let mainDay: number;
+  if (best) {
+    const b: { dayIdx: number; slot: Slot } = best;
+    b.slot.preferIds = [p.id, ...(b.slot.preferIds ?? []).filter(id => id !== p.id)];
+    b.slot.main = true;
+    delete b.slot.mechanics; // the named lift decides, not the template's mechanics hint
+    if (p.workoutType && !(b.slot.patterns ?? []).includes(p.workoutType)) {
+      b.slot.patterns = [p.workoutType, ...(b.slot.patterns ?? [])];
+    }
+    mainDay = b.dayIdx;
+  } else {
+    mainDay = days.reduce((a, d, i) => (d.slots.length < days[a].slots.length ? i : a), 0);
+    days[mainDay].slots.unshift({
+      muscle,
+      ...(p.workoutType ? { patterns: [p.workoutType] } : {}),
+      main: true,
+      preferIds: [p.id],
+    });
+  }
+
+  // ── Further days: variations ──
+  const supportDays: number[] = [];
+  const supportNames: string[] = [];
+  const variations = variationsFor(p.id);
+  const usedDays = new Set<number>([mainDay]);
+  for (let n = 1; n < frequency; n++) {
+    const variation = variations[(n - 1) % Math.max(1, variations.length)];
+    const supportId = variation?.id ?? p.id;
+    const sp = variation ? profileFor(supportId) : p;
+    const slotMuscle = sp.primaryMuscle ?? muscle;
+
+    // Prefer a day with a free slot for the muscle, that doesn't already
+    // anchor on a heavy barbell squat/hinge; else the lightest unused day.
+    let pick: { dayIdx: number; slot: Slot | null; score: number } | null = null;
+    days.forEach((day, dayIdx) => {
+      if (usedDays.has(dayIdx)) return;
+      const anchorsAxial = day.slots.some(sl => {
+        const lead = sl.preferIds?.[0];
+        return !!lead && sl.main && isHeavyAxial(profileFor(lead));
+      });
+      // A slot that already prefers the lift itself (a strength block's barbell
+      // anchoring) is the best possible home for its variation.
+      const free = day.slots.find(sl => sl.muscle === slotMuscle && !claimed(sl));
+      const score = (free ? 2 : 0) + (anchorsAxial ? 0 : 1) - day.slots.length / 100;
+      if (!pick || score > pick.score) pick = { dayIdx, slot: free ?? null, score };
+    });
+    if (!pick) break;
+    const chosen: { dayIdx: number; slot: Slot | null } = pick;
+    const why = variation
+      ? `${variation.why} Trained here so ${p.name} gets its ${n === 1 ? 'second' : 'third'} weekly exposure in a different position.`
+      : `${p.name} again, lighter: the second weekly session is skill practice, not another max attempt.`;
+    const extra: Partial<Slot> = {
+      main: true,
+      heavy: true,
+      preferIds: [supportId],
+      why,
+      ...(variation ? {} : { reuse: true, dose: { sets: 3, repLow: 6, repHigh: 8 } }),
+    };
+    if (chosen.slot) {
+      Object.assign(chosen.slot, extra);
+      delete chosen.slot.mechanics;
+      if (sp.workoutType && !(chosen.slot.patterns ?? []).includes(sp.workoutType)) {
+        chosen.slot.patterns = [sp.workoutType, ...(chosen.slot.patterns ?? [])];
+      }
+    } else {
+      days[chosen.dayIdx].slots.unshift({
+        muscle: slotMuscle,
+        ...(sp.workoutType ? { patterns: [sp.workoutType] } : {}),
+        ...extra,
+      } as Slot);
+    }
+    if (variation) support.add(supportId);
+    usedDays.add(chosen.dayIdx);
+    supportDays.push(chosen.dayIdx);
+    supportNames.push(variation ? sp.name : 'a lighter repeat');
+  }
+  return { supportDays, supportNames };
 }
 
 // +/- one set on the exercise doing the most direct work for the muscle,

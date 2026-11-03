@@ -547,7 +547,7 @@ describe('a block designed around a goal lift', () => {
 
   it('adds a slot when no day trains the goal lift\'s muscle', () => {
     // Two full-body days have no Chest/Fly or Traps slot — a trap goal gets one added
-    const p = buildPlanProposal(input({ daysPerWeek: 2, focusExerciseIds: ['barbell-shrugs'] }), [], null);
+    const p = buildPlanProposal(input({ daysPerWeek: 2, focusExerciseIds: ['barbell-shrugs'], focusFrequency: 1 }), [], null);
     const all = p.days.flatMap(d => d.exercises);
     expect(all.filter(e => e.id === 'barbell-shrugs')).toHaveLength(1);
   });
@@ -569,5 +569,58 @@ describe('a block designed around a goal lift', () => {
     const a = buildPlanProposal(input({ daysPerWeek: 4 }), [], null);
     const b = buildPlanProposal(input({ daysPerWeek: 4, focusExerciseIds: [] }), [], null);
     expect(b.days).toEqual(a.days);
+  });
+});
+
+describe('a goal lift trained two or three times a week', () => {
+  const all = (p: ReturnType<typeof buildPlanProposal>) => p.days.flatMap(d => d.exercises.map(e => ({ day: d.id, ex: e })));
+
+  it('defaults to two days: the lift, then its first variation as a main slot on another day', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, experience: 'advanced', focusExerciseIds: ['barbell-back-squat'] }), [], null);
+    const squat = all(p).filter(s => s.ex.id === 'barbell-back-squat');
+    const paused = all(p).filter(s => s.ex.id === 'paused-back-squat');
+    expect(squat).toHaveLength(1);
+    expect(paused).toHaveLength(1);
+    expect(paused[0].day).not.toBe(squat[0].day);
+    expect(paused[0].ex.main).toBe(true);
+    const decision = p.decisions.find(d => d.exerciseId === 'paused-back-squat')!;
+    expect(decision.reason).toMatch(/dead stop in the hole/);
+    expect(p.guidanceNotes.some(n => /second day trains it through Paused Back Squat/.test(n))).toBe(true);
+  });
+
+  it('adds the second variation on a third day when asked for three', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, experience: 'advanced', focusExerciseIds: ['barbell-back-squat'], focusFrequency: 3 }), [], null);
+    const ids = all(p).map(s => s.ex.id);
+    expect(ids).toContain('barbell-back-squat');
+    expect(ids).toContain('paused-back-squat');
+    expect(ids).toContain('front-squat');
+    expect(new Set(all(p).filter(s => ['barbell-back-squat', 'paused-back-squat', 'front-squat'].includes(s.ex.id)).map(s => s.day)).size).toBe(3);
+  });
+
+  it('places just the lift when asked for once a week', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, experience: 'advanced', focusExerciseIds: ['barbell-back-squat'], focusFrequency: 1 }), [], null);
+    const ids = all(p).map(s => s.ex.id);
+    expect(ids).toContain('barbell-back-squat');
+    expect(ids).not.toContain('paused-back-squat');
+  });
+
+  it('repeats a lift with no catalogued variation as a lighter second session', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 4, focusExerciseIds: ['leg-press'] }), [], null);
+    const lp = all(p).filter(s => s.ex.id === 'leg-press');
+    expect(lp).toHaveLength(2);
+    expect(new Set(lp.map(s => s.day)).size).toBe(2);
+    expect(p.decisions.filter(d => d.exerciseId === 'leg-press').some(d => /skill practice/.test(d.reason))).toBe(true);
+  });
+
+  it('lets a beginner who named the squat get the paused variation too', () => {
+    const p = buildPlanProposal(input({ experience: 'beginner', daysPerWeek: 3, focusExerciseIds: ['barbell-back-squat'] }), [], null);
+    const ids = all(p).map(s => s.ex.id);
+    expect(ids).toContain('barbell-back-squat');
+    expect(ids).toContain('paused-back-squat');
+  });
+
+  it('warns when the schedule cannot hold the frequency asked for', () => {
+    const p = buildPlanProposal(input({ daysPerWeek: 2, focusExerciseIds: ['barbell-back-squat'], focusFrequency: 3 }), [], null);
+    expect(p.warnings.some(w => /could only be placed on 2 days/.test(w))).toBe(true);
   });
 });

@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { buildSnapshot } from './analytics';
 import type { Session, SetLog } from '../db/database';
 import {
-  bestLoggedMax, currentMax, e1rmSeriesFor, etaLabel, goalProgress, loadBandFor,
-  pctOfMaxForReps, percentBandFor, programLoadsFor, projectGoal, strengthTrend,
-  EXPECTED_WEEKLY_GAIN_PCT,
+  bestLoggedMax, currentMax, e1rmSeriesFor, goalProgress, loadBandFor,
+  pctOfMaxForReps, percentBandFor, programLoadsFor, projectBlock, strengthTrend,
+  supportingFrequency, supportingDays, techniqueRead, variationsFor, whatItTakes,
+  EXPECTED_WEEKLY_GAIN_PCT, FREQUENCY_RATE_SCALE, VARIATIONS,
 } from './strength';
+import { EXERCISE_MAP, difficultyFor } from './exercises';
 import type { OneRepMax } from './strength';
 
 const NOW = new Date('2026-07-01T12:00:00').getTime();
@@ -143,84 +145,177 @@ describe('currentMax — what the app believes the max is', () => {
   });
 });
 
-describe('projectGoal', () => {
-  const base = { current: 250, target: 300, experience: 'intermediate' as const, goal: 'strength' as const, trend: null, now: NOW };
-
-  it('uses the expected rate for the training age when there is no trend', () => {
-    const p = projectGoal(base);
-    expect(p.basis).toBe('expected');
-    expect(p.ratePctPerWeek).toBeCloseTo(EXPECTED_WEEKLY_GAIN_PCT.intermediate * 1.15, 5);
-    // 20% gain at ~0.63%/week ≈ 29 weeks
-    expect(p.weeks).toBeGreaterThan(25);
-    expect(p.weeks).toBeLessThan(35);
-    expect(p.weeksFast!).toBeLessThan(p.weeks!);
-    expect(p.weeksSlow!).toBeGreaterThan(p.weeks!);
-    expect(p.etaTs).toBe(NOW + p.weeks! * WEEK);
-  });
-
-  it('gives a beginner a much shorter timeline than an advanced lifter', () => {
-    const b = projectGoal({ ...base, experience: 'beginner' });
-    const a = projectGoal({ ...base, experience: 'advanced' });
-    expect(b.weeks!).toBeLessThan(a.weeks ?? Infinity);
-    // 20% at 0.18 × 1.15 ≈ 0.2%/week is ~90 weeks — inside the horizon, barely
-    expect(a.feasibility).toBe('long-shot');
-  });
-
-  it('reads the lifter\'s own pace when it has one, within plausible bounds', () => {
-    const fast = projectGoal({ ...base, trend: { ratePctPerWeek: 5, points: 4, spanWeeks: 4 } });
-    expect(fast.basis).toBe('observed');
-    // clamped to 2× the expected rate (then the goal scale)
-    expect(fast.ratePctPerWeek).toBeCloseTo(EXPECTED_WEEKLY_GAIN_PCT.intermediate * 2 * 1.15, 5);
-    expect(fast.notes[0]).toMatch(/faster than most/);
-
-    const modest = projectGoal({ ...base, trend: { ratePctPerWeek: 0.8, points: 4, spanWeeks: 5 } });
-    expect(modest.ratePctPerWeek).toBeCloseTo(0.8 * 1.15, 5);
-  });
-
-  it('tempers the estimate on a flat trend instead of promising nothing', () => {
-    const p = projectGoal({ ...base, trend: { ratePctPerWeek: -0.2, points: 5, spanWeeks: 6 } });
-    expect(p.basis).toBe('tempered');
-    expect(p.ratePctPerWeek).toBeCloseTo(EXPECTED_WEEKLY_GAIN_PCT.intermediate * 0.5 * 1.15, 5);
-    expect(p.notes[0]).toMatch(/flat/);
-  });
-
-  it('says a deficit is not when strength PRs happen', () => {
-    const p = projectGoal({ ...base, goal: 'fat-loss' });
-    expect(p.ratePctPerWeek).toBeLessThan(projectGoal(base).ratePctPerWeek);
-    expect(p.notes.some(n => /fat-loss/.test(n))).toBe(true);
-  });
-
-  it('calls a reached goal reached and a tiny gap within reach', () => {
-    expect(projectGoal({ ...base, target: 250 }).feasibility).toBe('reached');
-    expect(projectGoal({ ...base, target: 240 }).weeks).toBe(0);
-    expect(projectGoal({ ...base, target: 255 }).feasibility).toBe('close');
-  });
-
-  it('refuses to put a date on something past the horizon', () => {
-    const p = projectGoal({ ...base, current: 100, target: 400, experience: 'advanced' });
-    expect(p.weeks).toBeNull();
-    expect(p.etaTs).toBeNull();
-    expect(p.feasibility).toBe('long-shot');
-    expect(etaLabel(p)).toMatch(/more than two years/);
-  });
-
-  it('cannot project without a current max', () => {
-    const p = projectGoal({ ...base, current: 0 });
-    expect(p.weeks).toBeNull();
-    expect(p.notes[0]).toMatch(/Enter a current 1RM/);
-  });
-
-  it('formats the ETA with its band', () => {
-    const p = projectGoal(base);
-    expect(etaLabel(p)).toMatch(/^~\d+ weeks \(\d+–\d+\)$/);
-  });
-});
-
 describe('goalProgress', () => {
   it('is the share of the way from the starting max to the target', () => {
     expect(goalProgress(200, 250, 300)).toBe(0.5);
     expect(goalProgress(200, 320, 300)).toBe(1);
     expect(goalProgress(200, 190, 300)).toBe(0);
     expect(goalProgress(300, 300, 300)).toBe(1);
+  });
+});
+
+describe('variations — the big lifts\' training partners', () => {
+  it('every catalogued variation is a real catalog exercise that trains the same primary muscle', () => {
+    for (const [lift, variations] of Object.entries(VARIATIONS)) {
+      expect(EXERCISE_MAP.has(lift), lift).toBe(true);
+      expect(variations.length).toBeGreaterThan(0);
+      for (const v of variations) {
+        expect(EXERCISE_MAP.has(v.id), `${lift} → ${v.id}`).toBe(true);
+        expect(v.id).not.toBe(lift);
+        expect(v.why.length).toBeGreaterThan(20);
+      }
+    }
+  });
+
+  it('keeps the paused/deficit variations gated like the lifts they vary', () => {
+    for (const id of ['paused-back-squat', 'paused-deadlift', 'deficit-deadlift', 'front-squat']) {
+      expect(difficultyFor(id), id).toBe('advanced');
+    }
+  });
+
+  it('counts a program\'s weekly frequency on a lift through its variations', () => {
+    const day = (id: number, ids: string[]) => ({
+      id, label: `Day ${id}`, muscleGroups: '', exercises: ids.map(x => ({ id: x, name: x, sets: 3 })),
+    });
+    const program = [day(1, ['barbell-back-squat', 'leg-press']), day(2, ['paused-back-squat']), day(3, ['front-squat', 'barbell-back-squat']), day(4, ['leg-press'])];
+    expect(supportingFrequency(program, 'barbell-back-squat')).toBe(3);
+    expect(supportingDays(program, 'barbell-back-squat').map(d => d.ids)).toEqual([
+      ['barbell-back-squat'], ['paused-back-squat'], ['front-squat', 'barbell-back-squat'],
+    ]);
+    expect(supportingFrequency(program, 'leg-press')).toBe(2);
+    expect(variationsFor('leg-press')).toEqual([]);
+  });
+
+  it('says what it takes without needing a number', () => {
+    const w = whatItTakes('barbell-back-squat', 'the squat');
+    expect(w.frequency).toMatch(/2–3 times a week/);
+    expect(w.variations.map(v => v.id)).toContain('paused-back-squat');
+    expect(whatItTakes('leg-press').variationsNote).toMatch(/No catalogued variation/);
+  });
+});
+
+describe('techniqueRead — rep strength versus heavy strength', () => {
+  const stored = (weight: number, source: 'tested' | 'estimated' = 'tested') =>
+    ({ exerciseId: 'squat', weight, source, date: '2026-06-01', updatedAt: NOW - WEEK });
+
+  it('is null with nothing logged for the lift', () => {
+    expect(techniqueRead(history('squat', []), 'squat', null, NOW)).toBeNull();
+  });
+
+  it('calls out the positions when 5–8-rep work implies far more than the heavy evidence', () => {
+    // 275 × 6 ≈ 330 by Epley; the tested max is 290 — a 14% gap
+    const snap = history('squat', [{ weeksAgo: 1, sets: [[275, 6], [275, 6]] }]);
+    const read = techniqueRead(snap, 'squat', stored(290), NOW)!;
+    expect(read.kind).toBe('technique');
+    expect(read.heavyBasis).toBe('tested');
+    expect(read.gapPct!).toBeGreaterThan(8);
+    expect(read.detail).toMatch(/275 × 6/);
+    expect(read.suggestions.length).toBeGreaterThan(0);
+  });
+
+  it('reads heavy evidence off the log when there is no tested max', () => {
+    // a logged 295 × 1 (e1RM ≈ 305) against 270 × 8 (≈ 342) → technique, basis log
+    const snap = history('squat', [
+      { weeksAgo: 1, sets: [[270, 8]] },
+      { weeksAgo: 3, sets: [[295, 1]] },
+    ]);
+    const read = techniqueRead(snap, 'squat', null, NOW)!;
+    expect(read.kind).toBe('technique');
+    expect(read.heavyBasis).toBe('log');
+  });
+
+  it('uses lift-specific work when the catalog knows the lift', () => {
+    const snap = history('barbell-back-squat', [{ weeksAgo: 1, sets: [[275, 6]] }]);
+    const read = techniqueRead(snap, 'barbell-back-squat', { ...stored(290), exerciseId: 'barbell-back-squat' }, NOW)!;
+    expect(read.suggestions[0]).toMatch(/Paused squats/);
+  });
+
+  it('calls a thin rep base when the single runs past what rep work implies', () => {
+    // tested 340 vs 250 × 6 ≈ 300 → heavy is 13% ahead
+    const snap = history('squat', [{ weeksAgo: 1, sets: [[250, 6]] }]);
+    const read = techniqueRead(snap, 'squat', stored(340), NOW)!;
+    expect(read.kind).toBe('volume');
+    expect(read.suggestions[0]).toMatch(/70–80%/);
+  });
+
+  it('finds no leak when the two agree within a few percent', () => {
+    // 275 × 6 ≈ 330, tested 320 → 3%
+    const snap = history('squat', [{ weeksAgo: 1, sets: [[275, 6]] }]);
+    expect(techniqueRead(snap, 'squat', stored(320), NOW)!.kind).toBe('balanced');
+  });
+
+  it('asks for a heavy triple when nothing heavy exists to check the estimate against', () => {
+    const snap = history('squat', [{ weeksAgo: 1, sets: [[275, 6]] }]);
+    const read = techniqueRead(snap, 'squat', stored(320, 'estimated'), NOW)!;
+    expect(read.kind).toBe('no-heavy'); // an *estimated* stored max is not heavy evidence
+    expect(read.suggestions[0]).toMatch(/heavy triple/);
+  });
+
+  it('ignores evidence older than the window — strength today, not last year', () => {
+    const snap = history('squat', [
+      { weeksAgo: 1, sets: [[275, 6]] },
+      { weeksAgo: 40, sets: [[350, 1]] },
+    ]);
+    expect(techniqueRead(snap, 'squat', null, NOW)!.kind).toBe('no-heavy');
+  });
+
+  it('says so when the window holds nothing in either zone', () => {
+    // 12-rep sets are valid e1RM evidence but neither rep-strength (4–8) nor heavy (≤3)
+    const snap = history('squat', [{ weeksAgo: 1, sets: [[135, 12]] }]);
+    expect(techniqueRead(snap, 'squat', null, NOW)!.kind).toBe('insufficient');
+  });
+});
+
+describe('projectBlock — what a block is built to deliver', () => {
+  const base = { current: 300, weeks: 6, frequency: 2, experience: 'intermediate' as const, goal: 'strength' as const, trend: null };
+
+  it('gives a range around a central estimate, rounded to plates', () => {
+    const p = projectBlock(base);
+    expect(p.low).toBeLessThan(p.mid);
+    expect(p.mid).toBeLessThan(p.high);
+    expect(p.mid).toBeGreaterThan(300);
+    for (const v of [p.low, p.mid, p.high]) expect(v % 5).toBe(0);
+    expect(p.basis).toBe('expected');
+    expect(p.ratePctPerWeek).toBeCloseTo(EXPECTED_WEEKLY_GAIN_PCT.intermediate * 1.15, 5);
+  });
+
+  it('reads the lifter\'s own pace ahead of the training-age table', () => {
+    const own = projectBlock({ ...base, trend: { ratePctPerWeek: 0.9, points: 5, spanWeeks: 6 } });
+    expect(own.basis).toBe('observed');
+    expect(own.mid).toBeGreaterThan(projectBlock(base).mid);
+    // ...but clamps a fortnight of fireworks to twice the typical rate
+    const wild = projectBlock({ ...base, trend: { ratePctPerWeek: 6, points: 4, spanWeeks: 4 } });
+    expect(wild.ratePctPerWeek).toBeCloseTo(EXPECTED_WEEKLY_GAIN_PCT.intermediate * 2 * 1.15, 5);
+  });
+
+  it('tempers a flat trend instead of promising the old pace', () => {
+    const p = projectBlock({ ...base, trend: { ratePctPerWeek: -0.3, points: 5, spanWeeks: 6 } });
+    expect(p.basis).toBe('tempered');
+    expect(p.notes[0]).toMatch(/flat/);
+  });
+
+  it('scales with frequency and says so at once a week', () => {
+    const long = { ...base, current: 400, weeks: 8 };
+    const once = projectBlock({ ...long, frequency: 1 });
+    const thrice = projectBlock({ ...long, frequency: 3 });
+    expect(once.mid).toBeLessThan(projectBlock(long).mid);
+    expect(thrice.mid).toBeGreaterThan(projectBlock(long).mid);
+    expect(once.notes.some(n => /second day/.test(n))).toBe(true);
+    expect(FREQUENCY_RATE_SCALE[2]).toBe(1);
+  });
+
+  it('frames a target against the range rather than dating it', () => {
+    expect(projectBlock({ ...base, target: 290 }).target).toEqual({ weight: 290, verdict: 'reached' });
+    const inside = projectBlock({ ...base, target: 310 });
+    expect(inside.target!.verdict).toBe('inside');
+    const beyond = projectBlock({ ...base, target: 400 });
+    expect(beyond.target!.verdict).toBe('beyond');
+    expect(beyond.notes.some(n => /blocks/.test(n))).toBe(true);
+    expect(JSON.stringify(beyond)).not.toMatch(/etaTs|weeksFast/);
+  });
+
+  it('expects the low end in a deficit or a sport block', () => {
+    expect(projectBlock({ ...base, goal: 'fat-loss' }).mid).toBeLessThan(projectBlock(base).mid);
+    expect(projectBlock({ ...base, goal: 'sport-support' }).notes.some(n => /sport/.test(n))).toBe(true);
   });
 });

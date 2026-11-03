@@ -7,13 +7,13 @@ import {
 import type { BlockRetrospective, TrainingBlock, TrainingPlan } from '../data/plan';
 import {
   canDeferActiveBlock, completeActiveBlock, deferActiveBlockToNextWeek, getPlanState,
-  getProfileOrDefault, getStrengthState, getTrainingGoal, getTrainingProfile,
+  getStrengthState, getTrainingProfile,
   saveTrainingProfile, startPendingActivation, planHasChosenGoal,
 } from '../data/planStore';
 import { computeBlockRetrospective } from '../data/retrospective';
-import { effectiveExperience, experienceSuggestion, experienceSuggestionText } from '../data/experience';
-import { bestLoggedMax, currentMax, etaLabel, goalProgress, projectGoal, strengthTrend } from '../data/strength';
-import { getExerciseLibrary, getExerciseName } from '../data/programStore';
+import { experienceSuggestion, experienceSuggestionText } from '../data/experience';
+import { bestLoggedMax, currentMax, goalProgress, supportingFrequency, techniqueRead } from '../data/strength';
+import { getExerciseLibrary, getExerciseName, getStoredProgram } from '../data/programStore';
 import { fmtWeight, toDisplay } from '../data/units';
 import './JourneyView.css';
 
@@ -155,24 +155,21 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
   // Strength targets: every 1RM goal with where the lifter stands against it.
   const strength = useMemo(() => getStrengthState(), [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   const targets = useMemo(() => {
-    const experience = effectiveExperience(getProfileOrDefault(), snapshot);
-    const trainingGoal = getTrainingGoal();
+    const program = getStoredProgram();
     return strength.goals.map(goal => {
       const stored = strength.maxes.find(m => m.exerciseId === goal.exerciseId) ?? null;
       const logged = snapshot ? bestLoggedMax(snapshot, goal.exerciseId) : null;
       const current = currentMax(stored, logged);
-      const projection = current
-        ? projectGoal({
-            current: current.value, target: goal.targetWeight, experience, goal: trainingGoal,
-            trend: snapshot ? strengthTrend(snapshot, goal.exerciseId) : null,
-          })
-        : null;
+      const read = snapshot ? techniqueRead(snapshot, goal.exerciseId, stored) : null;
       return {
         goal,
         name: getExerciseLibrary().find(e => e.id === goal.exerciseId)?.name ?? getExerciseName(goal.exerciseId),
         current,
-        projection,
-        progress: current ? goalProgress(stored?.weight ?? current.value, current.value, goal.targetWeight) : 0,
+        frequency: supportingFrequency(program, goal.exerciseId),
+        read,
+        progress: goal.targetWeight != null && current
+          ? goalProgress(stored?.weight ?? current.value, current.value, goal.targetWeight)
+          : null,
       };
     });
   }, [strength, snapshot]);
@@ -319,18 +316,20 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
                   <div className="journey-target-head">
                     <span className="journey-target-name">{t.name}</span>
                     <span className="journey-target-nums">
-                      {t.current ? `${toDisplay(t.current.value)} → ` : ''}{fmtWeight(t.goal.targetWeight)}
+                      {t.current ? fmtWeight(t.current.value) : '—'}
+                      {t.goal.targetWeight != null ? ` → ${toDisplay(t.goal.targetWeight)}` : ''}
                     </span>
                   </div>
-                  <div className="journey-target-track">
-                    <div className="journey-target-fill" style={{ width: `${Math.round(t.progress * 100)}%` }} />
-                  </div>
+                  {t.progress != null && (
+                    <div className="journey-target-track">
+                      <div className="journey-target-fill" style={{ width: `${Math.round(t.progress * 100)}%` }} />
+                    </div>
+                  )}
                   <span className="journey-target-eta">
-                    {t.projection
-                      ? t.projection.feasibility === 'reached'
-                        ? 'Reached — test it and log the single'
-                        : `${etaLabel(t.projection)} at ${t.projection.basis === 'observed' ? 'your recent pace' : 'a typical pace'}`
-                      : 'Enter a 1RM to get an estimate'}
+                    {t.frequency > 0 ? `Trained ${t.frequency}× a week` : 'Not in your current program'}
+                    {t.read && (t.read.kind === 'technique' || t.read.kind === 'volume')
+                      ? ` · ${t.read.kind === 'technique' ? 'positions are the limiter' : 'rep base is the limiter'}`
+                      : ''}
                   </span>
                 </button>
               ))}
@@ -338,7 +337,7 @@ export default function JourneyView({ onBack, onPlanNew, onViewStrength, onChang
           ) : (
             <p className="journey-hint">
               Know your maxes? Enter a 1RM and the coach prescribes your working weights as a percentage of
-              it. Set a target and it estimates how long the climb will take.
+              it. Pick a lift to build and it says what the climb takes — and programs it.
             </p>
           )}
           <button className="journey-secondary-btn" onClick={() => onViewStrength()}>

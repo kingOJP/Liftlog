@@ -389,7 +389,7 @@ function App() {
             program={program}
             exerciseId={view.exerciseId}
             onBack={() => setView(view.back)}
-            onChanged={sync}
+            onChanged={() => { setProgram(getStoredProgram()); sync(); }}
             onPlanAround={exerciseId => setView({
               screen: 'plan-setup',
               seed: { goal: 'strength', focusExerciseIds: [exerciseId] },

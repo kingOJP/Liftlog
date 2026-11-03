@@ -659,6 +659,57 @@ const INSTRUCTIONS: Record<string, ExerciseInstructions> = {
     ],
     faults: ['Grip too narrow (hurts the wrists)', 'Elbows flaring'],
   },
+  // ── Strength-goal variations ─────────────────────────────────────────────
+  'paused-back-squat': {
+    setup: 'Set up exactly as for a back squat: bar on the upper back, feet shoulder width, big brace. Take 10–15% off your normal squat weight.',
+    cues: [
+      'Sit down to full depth and stop dead — count “one, two” with the bar motionless.',
+      'Stay tight in the hole: brace held, knees out, chest up, no sinking.',
+      'Drive up from the dead stop with the whole foot; there is no bounce to help you.',
+      'Keep the bar over mid-foot — the pause exposes any forward drift.',
+    ],
+    faults: ['Relaxing in the bottom and losing the brace', 'A “pause” that is really a slow bounce', 'Hips shooting up first out of the hole'],
+  },
+  'front-squat': {
+    setup: 'Bar across the front of your shoulders, fingertips under it, elbows high. Feet shoulder width, toes slightly out.',
+    cues: [
+      'Elbows up and forward the whole rep — the bar sits on your shoulders, not in your hands.',
+      'Brace, then sit straight down between your legs, torso as upright as you can keep it.',
+      'Go to full depth; the front rack lets your knees travel forward.',
+      'Drive up leading with the elbows so the chest never drops.',
+    ],
+    faults: ['Elbows dropping and the bar rolling forward', 'Rounding the upper back', 'Cutting depth short'],
+  },
+  'paused-bench-press': {
+    setup: 'Same set-up as a bench press: eyes under the bar, shoulder blades back and down, feet planted. Take 5–10% off your normal weight.',
+    cues: [
+      'Lower under control and let the bar settle on your chest — motionless for a full “one, two”.',
+      'Stay tight on the chest: blades pinned, legs driving, no sinking of the bar into you.',
+      'Press from the dead stop, back and slightly toward your face.',
+      'Keep the elbows about 45° — the pause shows you exactly where you lose position.',
+    ],
+    faults: ['Bar sinking into the chest during the pause', 'Hips lifting to start the press', 'Pausing above the chest instead of on it'],
+  },
+  'paused-deadlift': {
+    setup: 'Set up as for a conventional deadlift. Take 10–20% off — the pause makes this far harder than it looks.',
+    cues: [
+      'Break the bar off the floor and stop it just below the knee — a full two-count.',
+      'Hold position at the pause: back flat, lats tight, shins vertical, bar touching your legs.',
+      'Finish the pull by driving the hips through; don’t yank from the pause.',
+      'Lower under control and reset every rep from a dead stop.',
+    ],
+    faults: ['Hips rising before the pause', 'Bar drifting away from the shins', 'Rounding at the pause'],
+  },
+  'deficit-deadlift': {
+    setup: 'Stand on a plate or low block (1–3 in). Set up as for a conventional deadlift; take 10–15% off your normal weight.',
+    cues: [
+      'Get into a lower, tighter start: hips a little lower than usual, chest up, lats locked.',
+      'Push the floor away with the legs — this pull is about the first few inches.',
+      'Keep the bar against your shins; the extra range exposes any drift.',
+      'Lock out normally and lower under control.',
+    ],
+    faults: ['Rounding the lower back at the start', 'Hips shooting up and turning it into a stiff-leg pull', 'Too deep a deficit for your mobility'],
+  },
   'skull-crushers': {
     setup: 'Lie on a bench holding an EZ bar or dumbbells over your shoulders, arms straight.',
     cues: [

@@ -143,6 +143,16 @@ export const EXERCISES: ExerciseDef[] = [
   // Forearms
   { id: 'wrist-curls',              name: 'Wrist Curls',                      primaryMuscle: 'Forearms',    secondaryMuscles: [null, null, null],               workoutType: 'Curl',             equipment: 'Bench',             weightType: 'Dumbbell'   },
 
+  // ── Strength-goal variations ─────────────────────────────────────────────
+  // The big lifts' training partners (strength.ts VARIATIONS). Each is its own
+  // exercise, not a note on the parent: a paused rep is ~10% lighter and its
+  // history must never pollute the parent lift's prescription.
+  { id: 'paused-back-squat',        name: 'Paused Back Squat',                primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Hamstrings', 'Lower Back'], workoutType: 'Squat',      equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'front-squat',              name: 'Front Squat',                      primaryMuscle: 'Quads',       secondaryMuscles: ['Glutes', 'Abs', 'Upper Back'],  workoutType: 'Squat',            equipment: 'Squat Rack',        weightType: 'Barbell'    },
+  { id: 'paused-bench-press',       name: 'Paused Bench Press',               primaryMuscle: 'Chest',       secondaryMuscles: ['Delts', 'Triceps', null],       workoutType: 'Horizontal Press', equipment: 'Bench',             weightType: 'Barbell'    },
+  { id: 'paused-deadlift',          name: 'Paused Deadlift',                  primaryMuscle: 'Glutes',      secondaryMuscles: ['Hamstrings', 'Lower Back', 'Traps'], workoutType: 'Hip Hinge',   equipment: 'None',              weightType: 'Barbell'    },
+  { id: 'deficit-deadlift',         name: 'Deficit Deadlift',                 primaryMuscle: 'Glutes',      secondaryMuscles: ['Hamstrings', 'Lower Back', 'Quads'], workoutType: 'Hip Hinge',   equipment: 'None',              weightType: 'Barbell'    },
+
   // ── Athletic / sport-support layer ──────────────────────────────────────────
   // Unilateral force production, tendon loading, pelvic stability, trunk
   // anti-rotation and shoulder balance: the work that transfers to endurance
@@ -280,6 +290,11 @@ export const DIFFICULTY: Record<string, ExerciseDifficulty> = {
   // A whole-body, multi-position sequence with no room to muscle through a
   // missed step — the highest skill floor in the catalog.
   'kettlebell-turkish-get-up': 'advanced',
+  // Variations of the advanced barbell lifts are at least as demanding as the
+  // lift they vary: a pause removes the stretch reflex, a deficit lengthens the
+  // pull, a front rack adds a second skill. Earned the same way the parent is.
+  'paused-back-squat': 'advanced', 'front-squat': 'advanced',
+  'paused-deadlift': 'advanced', 'deficit-deadlift': 'advanced',
   // A chin-up is intermediate skill but a hard STRENGTH floor: a beginner who
   // can manage five is told to build to eight forever (audit F11). Listing it
   // here with a prerequisite is what lets the planner hold it back until the
@@ -298,6 +313,10 @@ export const PREREQUISITES: Record<string, string[]> = {
   'weighted-pull-ups':     ['chin-ups', 'lat-pull-down'],
   'kettlebell-swing':      ['romanian-deadlifts', 'dumbbell-rdl'],
   'kettlebell-turkish-get-up': ['side-plank', 'pallof-press'],
+  'paused-back-squat':     ['goblet-squat', 'hack-squat'],
+  'front-squat':           ['goblet-squat', 'kettlebell-goblet-squat'],
+  'paused-deadlift':       ['romanian-deadlifts', 'dumbbell-rdl'],
+  'deficit-deadlift':      ['romanian-deadlifts', 'dumbbell-rdl'],
   'good-mornings':         ['romanian-deadlifts', 'dumbbell-rdl'],
   'hanging-leg-raise':     ['machine-crunch', 'cable-crunch'],
   'copenhagen-plank':      ['side-plank', 'plank'],
@@ -373,6 +392,7 @@ export const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
   // and forward-lean dip/push work toward the sternocostal (lower) fibers.
   'incline-barbell-press': ['Upper Chest'], 'incline-dumbbell-press': ['Upper Chest'],
   'dumbbell-bench-press': ['Lower Chest'], 'flat-barbell-bench-press': ['Lower Chest'],
+  'paused-bench-press': ['Lower Chest'],
   'dumbbell-fly': ['Lower Chest'], 'weighted-dips': ['Lower Chest'], 'push-ups': ['Lower Chest'],
 
   // Delts — presses bias the anterior (front) head, raises isolate the
@@ -422,6 +442,7 @@ export const PRIMARY_HEADS: Record<string, MuscleHead[]> = {
   // gluteus maximus' role (medius/minimus have no dedicated Glutes-primary
   // movement in this catalog; hip abduction trains them under 'Abductors').
   'hip-thrusts': ['Gluteus Maximus'], 'conventional-deadlift': ['Gluteus Maximus'],
+  'paused-deadlift': ['Gluteus Maximus'], 'deficit-deadlift': ['Gluteus Maximus'],
   'cable-pull-through': ['Gluteus Maximus'], 'kettlebell-swing': ['Gluteus Maximus'],
 
   // Calves — a bent knee (seated) removes gastrocnemius' mechanical

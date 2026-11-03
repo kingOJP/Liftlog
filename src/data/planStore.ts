@@ -148,10 +148,18 @@ export function removeOneRepMax(exerciseId: string, now = Date.now()): void {
   updateStrength(s => { s.maxes = s.maxes.filter(m => m.exerciseId !== exerciseId); }, now);
 }
 
-/** Upsert the 1RM goal for an exercise. */
-export function saveStrengthGoal(exerciseId: string, targetWeight: number, now = Date.now()): StrengthGoal {
+/**
+ * Upsert the lift the athlete is working on. The target max is optional —
+ * the record means "I'm building this lift", and the number only decides how
+ * an end-of-block estimate is framed against it.
+ */
+export function saveStrengthGoal(exerciseId: string, targetWeight?: number | null, now = Date.now()): StrengthGoal {
   const existing = getStrengthGoal(exerciseId);
-  const goal: StrengthGoal = { exerciseId, targetWeight, createdAt: existing?.createdAt ?? now };
+  const goal: StrengthGoal = {
+    exerciseId,
+    ...(targetWeight != null && targetWeight > 0 ? { targetWeight } : {}),
+    createdAt: existing?.createdAt ?? now,
+  };
   updateStrength(s => {
     s.goals = [...s.goals.filter(g => g.exerciseId !== exerciseId), goal];
   }, now);

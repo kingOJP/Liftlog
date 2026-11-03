@@ -314,7 +314,124 @@
   white-space: nowrap;
 }
 
-/* ── Goal projection ── */
+/* ── Technique read ── */
+.technique {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--purple);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.technique--technique { border-left-color: #E8C44A; }
+.technique--volume    { border-left-color: #E8C44A; }
+.technique--balanced  { border-left-color: var(--green); }
+.technique--no-heavy,
+.technique--insufficient { border-left-color: var(--text-muted); }
+
+.technique-head {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.technique-detail {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.technique-list,
+.takes-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* ── What it takes ── */
+.takes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.takes-head {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.takes-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* ── In-plan status + block estimate ── */
+.plan-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.plan-status--off { border-left-color: var(--red); }
+
+.plan-status-head {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.plan-status-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.plan-status-estimate {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* ── Add to current plan ── */
+.add-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.strength-actions--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* ── Goal projection (legacy classes, kept for the wizard section) ── */
 .projection {
   display: flex;
   flex-direction: column;

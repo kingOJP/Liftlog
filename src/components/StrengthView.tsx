@@ -6,16 +6,18 @@ import type { TrainingSnapshot } from '../data/analytics';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { getExerciseMeta, unitFor } from '../data/exercises';
 import {
-  getOneRepMax, getProfileOrDefault, getStrengthGoal, getStrengthState, getTrainingGoal,
-  removeOneRepMax, removeStrengthGoal, saveOneRepMax, saveStrengthGoal,
+  getActiveBlockInfo, getOneRepMax, getProfileOrDefault, getStrengthGoal, getStrengthState,
+  getTrainingGoal, removeOneRepMax, removeStrengthGoal, saveOneRepMax, saveStrengthGoal,
 } from '../data/planStore';
 import { effectiveExperience } from '../data/experience';
-import { toPlanDate } from '../data/plan';
+import { blockWeekIndex, productiveWeeks, toPlanDate } from '../data/plan';
 import {
-  FEASIBILITY_LABEL, bestLoggedMax, currentMax, etaLabel, goalProgress, pctOfMax,
-  programLoadsFor, projectGoal, strengthTrend,
+  bestLoggedMax, currentMax, goalProgress, pctOfMax, programLoadsFor, projectBlock,
+  strengthTrend, supportingDays, techniqueRead, variationsFor, whatItTakes,
 } from '../data/strength';
-import type { MaxSource, OneRepMax, StrengthGoal } from '../data/strength';
+import type { BlockProjection, MaxSource, OneRepMax, StrengthGoal } from '../data/strength';
+import { getStoredProgram, saveStoredProgram } from '../data/programStore';
+import { slotFor } from '../data/prescribe';
 import { fmtWeight, fromDisplay, toDisplay, unitLabelFor } from '../data/units';
 import './StrengthView.css';
 
@@ -26,8 +28,22 @@ interface Props {
   onBack: () => void;
   /** launch the plan wizard seeded to build a block around this lift */
   onPlanAround: (exerciseId: string) => void;
-  /** called after any stored change (so the app can push a sync) */
+  /** called after any stored change — including a program edit (so the app refreshes + syncs) */
   onChanged: () => void;
+}
+
+/**
+ * The window a block estimate is made over: the productive weeks left in the
+ * active block, or a typical block when nothing is scheduled.
+ */
+function estimateWeeks(): { weeks: number; label: string } {
+  const info = getActiveBlockInfo();
+  if (info && !info.block.openEnded) {
+    const idx = Math.max(0, blockWeekIndex(info.block));
+    const left = productiveWeeks(info.block.phases.slice(idx));
+    if (left > 0) return { weeks: left, label: `the ${left} hard week${left === 1 ? '' : 's'} left in this block` };
+  }
+  return { weeks: 6, label: 'a typical 6-week block' };
 }
 
 function fmtDate(ts: number): string {
@@ -114,8 +130,8 @@ export default function StrengthView({ program, exerciseId, onBack, onPlanAround
       <div className="strength-body">
         <p className="strength-intro">
           Enter a one-rep max and the coach prescribes your working weights as a percentage of it —
-          including the first time you ever log the lift. Set a target and it estimates how long the
-          climb will take.
+          including the first time you ever log the lift. Pick a lift to build and it tells you what
+          the climb takes, reads your log for the weak link, and programs it.
         </p>
 
         {trackedIds.length > 0 && (
@@ -179,15 +195,9 @@ function LiftRow({ exerciseId, max, goal, snapshot, onClick }: {
 }) {
   const logged = snapshot ? bestLoggedMax(snapshot, exerciseId) : null;
   const current = currentMax(max, logged);
-  const projection = goal && current
-    ? projectGoal({
-        current: current.value, target: goal.targetWeight,
-        experience: effectiveExperience(getProfileOrDefault(), snapshot),
-        goal: getTrainingGoal(),
-        trend: snapshot ? strengthTrend(snapshot, exerciseId) : null,
-      })
-    : null;
-  const progress = goal && current ? goalProgress(max?.weight ?? current.value, current.value, goal.targetWeight) : null;
+  const target = goal?.targetWeight;
+  const progress = target != null && current ? goalProgress(max?.weight ?? current.value, current.value, target) : null;
+  const frequency = goal ? supportingDays(getStoredProgram(), exerciseId).length : 0;
 
   return (
     <button className="lift-row" onClick={onClick}>
@@ -205,12 +215,14 @@ function LiftRow({ exerciseId, max, goal, snapshot, onClick }: {
       </div>
       {goal && (
         <div className="lift-row-goal">
-          <div className="lift-progress-track">
-            <div className="lift-progress-fill" style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
-          </div>
+          {progress != null && (
+            <div className="lift-progress-track">
+              <div className="lift-progress-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+            </div>
+          )}
           <span className="lift-row-goal-text">
-            Goal {fmtWeight(goal.targetWeight)}
-            {projection ? ` · ${etaLabel(projection)}` : ''}
+            Building{target != null ? ` toward ${fmtWeight(target)}` : ''}
+            {frequency > 0 ? ` · trained ${frequency}× a week` : ' · not in your current program'}
           </span>
         </div>
       )}
@@ -235,8 +247,13 @@ function LiftEditor({ exerciseId, program, snapshot, onChanged, onPlanAround }: 
   const [weight, setWeight] = useState(stored ? String(toDisplay(stored.weight)) : '');
   const [source, setSource] = useState<MaxSource>(stored?.source ?? 'tested');
   const [date, setDate] = useState(stored?.date ?? toPlanDate(new Date()));
-  const [target, setTarget] = useState(storedGoal ? String(toDisplay(storedGoal.targetWeight)) : '');
-  const [savedFlash, setSavedFlash] = useState<'max' | 'goal' | null>(null);
+  const [target, setTarget] = useState(storedGoal?.targetWeight != null ? String(toDisplay(storedGoal.targetWeight)) : '');
+  const [savedFlash, setSavedFlash] = useState<'max' | 'goal' | 'plan' | null>(null);
+  // The "add to my current plan" picker
+  const [adding, setAdding] = useState(false);
+  const [mainDayId, setMainDayId] = useState<number | ''>('');
+  const [variationId, setVariationId] = useState<string>('');
+  const [variationDayId, setVariationDayId] = useState<number | ''>('');
   // A value being typed is "as of now" — fresher than anything in the log.
   const [openedAt] = useState(() => Date.now());
 
@@ -257,16 +274,34 @@ function LiftEditor({ exerciseId, program, snapshot, onChanged, onPlanAround }: 
   const current = currentMax(preview, logged);
 
   const slots = current ? programLoadsFor(exerciseId, current.value, program, weightType) : [];
-  const inProgram = program.some(d => d.exercises.some(e => e.id === exerciseId));
 
   const typedTarget = fromDisplay(parseFloat(target));
   const targetValid = isFinite(typedTarget) && typedTarget > 0;
-  const goalDirty = !storedGoal || storedGoal.targetWeight !== typedTarget;
-  const projection = targetValid
-    ? projectGoal({ current: current?.value ?? 0, target: typedTarget, experience, goal: trainingGoal, trend })
+  const targetOrNull = targetValid ? typedTarget : null;
+  const goalDirty = !storedGoal || (storedGoal.targetWeight ?? null) !== targetOrNull;
+
+  // What the climb consists of, and what the log says the weak link is.
+  const takes = whatItTakes(exerciseId, nameFor(exerciseId));
+  const read = snapshot ? techniqueRead(snapshot, exerciseId, preview) : null;
+  const trainedOn = supportingDays(program, exerciseId);
+  const frequency = trainedOn.length;
+  const variations = variationsFor(exerciseId);
+
+  // The end-of-block estimate — only once something is actually training the
+  // lift, because the number is a property of the plan, not of the lifter.
+  const window = estimateWeeks();
+  const estimate: BlockProjection | null = current && frequency > 0
+    ? projectBlock({
+        current: current.value, weeks: window.weeks, frequency, experience, goal: trainingGoal, trend,
+        target: targetOrNull,
+      })
     : null;
 
-  function flash(kind: 'max' | 'goal') {
+  const daysWithout = program.filter(d => !d.exercises.some(e => e.id === exerciseId));
+  // Already programmed → the picker only asks where a variation goes.
+  const needMain = frequency === 0;
+
+  function flash(kind: 'max' | 'goal' | 'plan') {
     setSavedFlash(kind);
     setTimeout(() => setSavedFlash(null), 1500);
   }
@@ -285,10 +320,29 @@ function LiftEditor({ exerciseId, program, snapshot, onChanged, onPlanAround }: 
     setDate(toPlanDate(new Date(logged.ts)));
   }
 
+  /** Start (or update) tracking this lift; the target is optional. */
   function saveGoal() {
-    if (!targetValid) return;
-    saveStrengthGoal(exerciseId, typedTarget);
+    saveStrengthGoal(exerciseId, targetOrNull);
     flash('goal');
+    onChanged();
+  }
+
+  /** Put the lift (and optionally a variation) into the live program as main slots. */
+  function addToPlan() {
+    if (needMain && mainDayId === '') return;
+    const next = program.map(d => ({ ...d, exercises: [...d.exercises] }));
+    const place = (dayId: number, id: string) => {
+      const day = next.find(d => d.id === dayId);
+      if (!day || day.exercises.some(e => e.id === id)) return;
+      const slot = slotFor(id, nameFor(id), { snapshot, slot: { main: true } });
+      day.exercises.unshift({ ...slot, main: true });
+    };
+    if (needMain && mainDayId !== '') place(mainDayId, exerciseId);
+    if (variationId && variationDayId !== '' && variationDayId !== mainDayId) place(variationDayId, variationId);
+    saveStoredProgram(next);
+    saveStrengthGoal(exerciseId, targetOrNull);
+    setAdding(false);
+    flash('plan');
     onChanged();
   }
 
@@ -402,80 +456,168 @@ function LiftEditor({ exerciseId, program, snapshot, onChanged, onPlanAround }: 
         </section>
       )}
 
-      {/* ── The goal ── */}
+      {/* ── Building this lift ── */}
       <section className="strength-section">
-        <span className="strength-label">1RM goal</span>
+        <span className="strength-label">Get stronger on this lift</span>
+
+        {read && (
+          <div className={`technique technique--${read.kind}`}>
+            <span className="technique-head">{read.headline}</span>
+            <p className="technique-detail">{read.detail}</p>
+            {read.suggestions.length > 0 && (
+              <ul className="technique-list">
+                {read.suggestions.map((sug, i) => <li key={i}>{sug}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="takes">
+          <span className="takes-head">What it takes</span>
+          <p className="takes-line">{takes.frequency}</p>
+          {takes.variations.length > 0 && (
+            <ul className="takes-list">
+              {takes.variations.map(v => (
+                <li key={v.id}><strong>{nameFor(v.id)}</strong> — {v.why}</li>
+              ))}
+            </ul>
+          )}
+          <p className="strength-hint">{takes.variationsNote} {takes.accessories}</p>
+        </div>
+
+        <div className={`plan-status${frequency > 0 ? '' : ' plan-status--off'}`}>
+          {frequency > 0 ? (
+            <>
+              <span className="plan-status-head">
+                In your plan · trained {frequency}× a week
+              </span>
+              <span className="plan-status-detail">
+                {trainedOn.map(t => `${t.day.label}: ${t.ids.map(nameFor).join(' + ')}`).join(' · ')}
+              </span>
+              {estimate && (
+                <p className="plan-status-estimate">
+                  Over {window.label} this is built to take your max from {fmtWeight(estimate.current)} to roughly{' '}
+                  <strong>{toDisplay(estimate.low)}–{fmtWeight(estimate.high)}</strong>
+                  {estimate.target && estimate.target.verdict === 'inside' ? ` — your ${fmtWeight(estimate.target.weight)} target sits inside that.` : '.'}
+                  {estimate.notes.map((n, i) => <span key={i}> {n}</span>)}
+                </p>
+              )}
+              {!estimate && (
+                <p className="strength-hint">Enter a 1RM above (or log the lift) and the coach estimates what this block is built to deliver.</p>
+              )}
+              {frequency < 2 && variations.length > 0 && !adding && (
+                <p className="strength-hint">Once a week is thin for a max. Add a second day below with a variation.</p>
+              )}
+            </>
+          ) : (
+            <span className="plan-status-head">Not in your current program — nothing is training it yet.</span>
+          )}
+        </div>
+
         <div className="max-weight-wrap">
           <input
             className="strength-input"
             type="number"
             inputMode="decimal"
-            placeholder={current ? `e.g. ${toDisplay(Math.round(current.value * 1.1 / 5) * 5)}` : 'Target 1RM'}
-            aria-label={`Target one-rep max in ${unit}`}
+            placeholder="Target max (optional)"
+            aria-label={`Target one-rep max in ${unit}, optional`}
             value={target}
             onChange={e => setTarget(e.target.value)}
           />
           <span className="strength-input-unit">{unit}</span>
         </div>
-
-        {projection && (
-          <div className={`projection projection--${projection.feasibility}`}>
-            <div className="projection-head">
-              <span className="projection-range">
-                {projection.current > 0 ? `${toDisplay(projection.current)} → ${fmtWeight(projection.target)}` : `→ ${fmtWeight(projection.target)}`}
-                {projection.current > 0 && projection.gapPct > 0 && (
-                  <span className="projection-gap"> · +{Math.round(projection.gapPct)}%</span>
-                )}
-              </span>
-              <span className="projection-badge">{FEASIBILITY_LABEL[projection.feasibility]}</span>
-            </div>
-            {projection.current > 0 && projection.feasibility !== 'reached' && (
-              <div className="projection-eta">
-                <span className="projection-eta-main">{etaLabel(projection)}</span>
-                {projection.etaTs && (
-                  <span className="projection-eta-date">
-                    around {new Date(projection.etaTs).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </span>
-                )}
-              </div>
-            )}
-            {projection.current > 0 && projection.feasibility !== 'reached' && (
-              <p className="projection-rate">
-                Assumes ~{projection.ratePctPerWeek.toFixed(2)}% a week
-                {projection.basis === 'observed' ? ' — your own recent pace on this lift' : projection.basis === 'tempered' ? ' — tempered for a flat trend' : ` — typical for ${experience === 'intermediate' || experience === 'advanced' ? 'an' : 'a'} ${experience} lifter`}
-                {current?.basis === 'log' ? ', from the max your log implies' : ''}.
-              </p>
-            )}
-            {projection.notes.map((n, i) => <p className="projection-note" key={i}>{n}</p>)}
-          </div>
+        {estimate?.target?.verdict === 'beyond' && (
+          <p className="strength-hint">{estimate.notes.find(n => /block/.test(n)) ?? ''}</p>
         )}
 
-        <div className="strength-actions">
-          <button className="strength-primary-btn" disabled={!targetValid || (!goalDirty && savedFlash !== 'goal')} onClick={saveGoal}>
-            {savedFlash === 'goal' ? 'Added to your plan' : storedGoal ? 'Update goal' : 'Add to my plan'}
-          </button>
-          {storedGoal && (
-            <button className="strength-text-btn strength-text-btn--danger" onClick={() => { removeStrengthGoal(exerciseId); onChanged(); }}>
-              Remove goal
+        {adding ? (
+          <div className="add-plan">
+            {needMain && (
+            <label className="add-plan-field">
+              <span>{nameFor(exerciseId)} — main lift on</span>
+              <select className="strength-select" value={mainDayId} onChange={e => setMainDayId(e.target.value === '' ? '' : Number(e.target.value))}>
+                <option value="">Pick a day…</option>
+                {daysWithout.map(d => <option key={d.id} value={d.id}>{d.label} · {d.muscleGroups}</option>)}
+              </select>
+            </label>
+            )}
+            {variations.length > 0 && (needMain ? daysWithout.length > 1 : daysWithout.length > 0) && (
+              <>
+                <label className="add-plan-field">
+                  <span>{needMain ? 'Second day — a variation (recommended)' : 'Variation for the extra day'}</span>
+                  <select className="strength-select" value={variationId} onChange={e => setVariationId(e.target.value)}>
+                    <option value="">{needMain ? 'No second day' : 'Pick a variation…'}</option>
+                    {variations.map(v => <option key={v.id} value={v.id}>{nameFor(v.id)}</option>)}
+                  </select>
+                </label>
+                {variationId && (
+                  <label className="add-plan-field">
+                    <span>{nameFor(variationId)} on</span>
+                    <select className="strength-select" value={variationDayId} onChange={e => setVariationDayId(e.target.value === '' ? '' : Number(e.target.value))}>
+                      <option value="">Pick a day…</option>
+                      {daysWithout.filter(d => d.id !== mainDayId && !d.exercises.some(e => e.id === variationId)).map(d => (
+                        <option key={d.id} value={d.id}>{d.label} · {d.muscleGroups}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
+            <div className="strength-actions">
+              <button
+                className="strength-primary-btn"
+                disabled={(needMain ? mainDayId === '' : !variationId) || (!!variationId && variationDayId === '')}
+                onClick={addToPlan}
+              >
+                Add to my plan
+              </button>
+              <button className="strength-text-btn" onClick={() => setAdding(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="strength-actions strength-actions--stack">
+            {daysWithout.length > 0 && (needMain || variations.some(v => daysWithout.some(d => !d.exercises.some(e => e.id === v.id)))) && (
+              <button
+                className={frequency > 0 ? 'strength-secondary-btn' : 'strength-primary-btn'}
+                onClick={() => { setMainDayId(''); setVariationId(variations[0]?.id ?? ''); setVariationDayId(''); setAdding(true); }}
+              >
+                {savedFlash === 'plan' ? 'Added to your plan' : frequency > 0 ? 'Add another day' : 'Add to my current plan'}
+              </button>
+            )}
+            <button
+              className="strength-secondary-btn"
+              onClick={() => {
+                // The lift rides into the plan as a goal even if nothing was tapped first.
+                saveStrengthGoal(exerciseId, targetOrNull);
+                if (maxValid && maxDirty) saveOneRepMax({ exerciseId, weight: typedMax, source, date });
+                onPlanAround();
+              }}
+            >
+              Build a block around it
             </button>
-          )}
-        </div>
+            {storedGoal ? (
+              <div className="strength-actions">
+                {goalDirty && (
+                  <button className="strength-text-btn" onClick={saveGoal}>
+                    {savedFlash === 'goal' ? 'Saved' : 'Save target'}
+                  </button>
+                )}
+                <button className="strength-text-btn strength-text-btn--danger" onClick={() => { removeStrengthGoal(exerciseId); onChanged(); }}>
+                  Stop tracking this lift
+                </button>
+              </div>
+            ) : (
+              <button className="strength-text-btn" onClick={saveGoal}>
+                {savedFlash === 'goal' ? 'Tracking' : 'Just track it on my Journey'}
+              </button>
+            )}
+          </div>
+        )}
         <p className="strength-hint">
-          {inProgram
-            ? 'Adding the goal keeps it on your Journey with a live estimate; the lift is already in your program, so the coach simply keeps progressing it. Or have the coach design a block around it — a strength block with this lift leading its day.'
-            : 'Adding the goal keeps it on your Journey with a live estimate — but this lift isn\'t in your program yet, so nothing is training it. Have the coach design a block around it: a strength block with this lift leading its day.'}
+          “Add to my current plan” puts the lift at the top of a day as its main lift — and a variation on a second
+          day — in the program you’re running now. “Build a block around it” has the coach design the next
+          block with this lift leading, trained 2–3× a week.
         </p>
-        <button
-          className="strength-secondary-btn"
-          onClick={() => {
-            // The goal rides along into the plan even if they didn't tap Add first.
-            if (targetValid && goalDirty) saveStrengthGoal(exerciseId, typedTarget);
-            if (maxValid && maxDirty) saveOneRepMax({ exerciseId, weight: typedMax, source, date });
-            onPlanAround();
-          }}
-        >
-          Design a block around this lift
-        </button>
       </section>
 
       {trend && (

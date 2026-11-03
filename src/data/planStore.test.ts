@@ -476,10 +476,13 @@ describe('strength records (1RMs + goals)', () => {
     expect(getOneRepMax('bench')).toBeNull();
   });
 
-  it('keeps a goal\'s creation date across retargets', () => {
-    saveStrengthGoal('bench', 275, JUN1);
+  it('keeps a goal\'s creation date across retargets, and the target is optional', () => {
+    saveStrengthGoal('bench', undefined, JUN1);
+    expect(getStrengthGoal('bench')).toEqual({ exerciseId: 'bench', createdAt: JUN1 });
     saveStrengthGoal('bench', 300, JUL6);
     expect(getStrengthGoal('bench')).toEqual({ exerciseId: 'bench', targetWeight: 300, createdAt: JUN1 });
+    saveStrengthGoal('bench', null, JUL6);
+    expect(getStrengthGoal('bench')!.targetWeight).toBeUndefined();
     expect(getStrengthState().goals).toHaveLength(1);
     removeStrengthGoal('bench');
     expect(getStrengthGoal('bench')).toBeNull();

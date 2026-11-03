@@ -66,8 +66,8 @@ const GROUPS: Group[] = [
         def: 'A working weight expressed as a share of your max. A rep range maps onto a percentage band — 8–12 reps is roughly 68–75% — so the same prescription means a different weight for every lifter. Shown on the exercise card once you’ve entered a 1RM.',
       },
       {
-        term: '1RM goal',
-        def: 'A target max for a lift. The coach estimates how long it will take from your recent pace on that lift (or the typical rate for your training age), with a range rather than a single date, and can design a block around the lift.',
+        term: 'Building a lift (1RM goal)',
+        def: 'Pick a lift to get stronger on and the coach says what the climb takes — the lift 2–3 times a week, variations like paused reps that load the position where a max is lost — and reads your log for the weak link: rep strength that outruns your heavy singles means positions, not horsepower. It can add the lift to your current plan or design a block around it; once a block is designed it says what that block is built to deliver, as a range. It never estimates a date — that would be a guess wearing a number.',
       },
       {
         term: 'Volume load',

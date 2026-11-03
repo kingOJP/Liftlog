@@ -23,6 +23,10 @@ import { effectiveExperience, inferExperience } from '../data/experience';
 import { unitFor } from '../data/exercises';
 import { getExerciseLibrary, getExerciseName } from '../data/programStore';
 import { computeBlockRetrospective } from '../data/retrospective';
+import { bestLoggedMax, currentMax, projectBlock, strengthTrend, supportingDays } from '../data/strength';
+import { getOneRepMax, getStrengthGoal } from '../data/planStore';
+import { productiveWeeks } from '../data/plan';
+import { fmtWeight, toDisplay } from '../data/units';
 import { suggestReplacements } from '../data/substitution';
 import type { ReplacementSuggestion } from '../data/substitution';
 import { InfoButton } from './InstructionSheet';
@@ -52,7 +56,7 @@ interface Props {
 // are interleaved by conversational flow, not grouped by tier — the user just
 // answers a short series of quick taps.
 type QId =
-  | 'goal' | 'experience' | 'trainingAge' | 'days'
+  | 'goal' | 'experience' | 'trainingAge' | 'days' | 'focusFrequency'
   | 'equipment' | 'injuries' | 'priority' | 'schedule' | 'startDate'
   // sport-support only
   | 'sport' | 'sportEvent' | 'raceProximity' | 'sportLoad' | 'weakLink'
@@ -80,13 +84,25 @@ const SPORT_ONLY_QUESTIONS: Partial<Record<QId, SportId[]>> = {
   weakLink: ['triathlon'],
 };
 
-function orderFor(goal: Goal, sport: SportId): QId[] {
-  if (goal !== 'sport-support') return BASE_ORDER;
-  return SPORT_ORDER.filter(q => {
-    const limited = SPORT_ONLY_QUESTIONS[q];
-    return !limited || limited.includes(sport);
-  });
+function orderFor(goal: Goal, sport: SportId, hasFocus = false): QId[] {
+  const base = goal !== 'sport-support'
+    ? BASE_ORDER
+    : SPORT_ORDER.filter(q => {
+        const limited = SPORT_ONLY_QUESTIONS[q];
+        return !limited || limited.includes(sport);
+      });
+  // A block built around a goal lift asks how often to train it, right after
+  // the number of training days it has to fit into.
+  if (!hasFocus) return base;
+  const at = base.indexOf('days');
+  return [...base.slice(0, at + 1), 'focusFrequency', ...base.slice(at + 1)];
 }
+
+const FOCUS_FREQUENCY_OPTIONS: { n: number; label: string; blurb: string }[] = [
+  { n: 1, label: 'Once a week', blurb: 'One heavy day. Thin for a max — a lift is a skill, and once a week is rare practice.' },
+  { n: 2, label: 'Twice a week', blurb: 'The lift one day, a variation (paused, front rack, deficit…) on another. The usual answer.' },
+  { n: 3, label: 'Three times', blurb: 'The lift plus two variations. Needs 4+ training days and a recovery budget to match.' },
+];
 
 type Stage = 'questions' | 'structure' | 'workouts';
 
@@ -135,10 +151,11 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
 
   // Answers
   const [goal, setGoal] = useState<Goal>(seed?.goal ?? activeGoal ?? 'hypertrophy');
-  const focusExerciseIds = seed?.focusExerciseIds ?? [];
+  const focusExerciseIds = useMemo(() => seed?.focusExerciseIds ?? [], [seed]);
+  const [focusFrequency, setFocusFrequency] = useState(2);
   const focusNames = useMemo(
     () => focusExerciseIds.map(id => getExerciseLibrary().find(e => e.id === id)?.name ?? getExerciseName(id)),
-    [focusExerciseIds], // eslint-disable-line react-hooks/exhaustive-deps
+    [focusExerciseIds],
   );
   const [experience, setExperience] = useState<ExperienceLevel>(saved.experience);
   const [trainingAgeMonths, setTrainingAgeMonths] = useState<number | undefined>(saved.trainingAgeMonths);
@@ -224,7 +241,7 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
   });
 
   const startDateValid = parsePlanDate(startDate) != null;
-  const order = orderFor(goal, sportId);
+  const order = orderFor(goal, sportId, focusExerciseIds.length > 0);
   // Switching goal can shorten the flow underneath us; clamp rather than crash.
   const qId = order[Math.min(qIndex, order.length - 1)];
 
@@ -295,7 +312,7 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
       // A goal change is one of the things that earns an introductory week.
       previousGoal: activeGoal ?? null,
       ...(goal === 'sport-support' ? { sport: sportContext() } : {}),
-      ...(focusExerciseIds.length > 0 ? { focusExerciseIds } : {}),
+      ...(focusExerciseIds.length > 0 ? { focusExerciseIds, focusFrequency } : {}),
     };
     const p = buildPlanProposal(input, program, snapshot, plannerRetro, getPhaseResolver());
     setProposal(p);
@@ -464,6 +481,53 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
             <p className="structure-intent">{proposal.intent}</p>
             <p className="setup-hint">{proposal.progression}</p>
           </section>
+
+          {focusExerciseIds.map(id => {
+            const name = focusNames[focusExerciseIds.indexOf(id)];
+            const trainedOn = supportingDays(proposal.days, id);
+            const stored = getOneRepMax(id);
+            const current = currentMax(stored, snapshot ? bestLoggedMax(snapshot, id) : null);
+            const weeks = productiveWeeks(proposal.phases);
+            const estimate = current
+              ? projectBlock({
+                  current: current.value, weeks, frequency: trainedOn.length,
+                  experience: proposal.input.experience, goal: proposal.input.goal,
+                  trend: snapshot ? strengthTrend(snapshot, id) : null,
+                  target: getStrengthGoal(id)?.targetWeight ?? null,
+                })
+              : null;
+            return (
+              <section className="setup-section setup-section--focus" key={id}>
+                <span className="setup-label">Your goal lift · {name}</span>
+                <p className="structure-intent">
+                  Trained {trainedOn.length}× a week —{' '}
+                  {trainedOn.map(t => `${t.day.label}: ${t.ids.map(x => getExerciseLibrary().find(e => e.id === x)?.name ?? getExerciseName(x)).join(' + ')}`).join(' · ')}.
+                </p>
+                {estimate ? (
+                  <>
+                    <p className="structure-intent">
+                      Over the block's {weeks} hard week{weeks === 1 ? '' : 's'} this is built to take your max from{' '}
+                      {fmtWeight(estimate.current)} to roughly <strong>{toDisplay(estimate.low)}–{fmtWeight(estimate.high)}</strong>
+                      {estimate.target
+                        ? estimate.target.verdict === 'inside'
+                          ? ` — your ${fmtWeight(estimate.target.weight)} target is inside that range.`
+                          : estimate.target.verdict === 'reached'
+                            ? ` — you're already at your ${fmtWeight(estimate.target.weight)} target; time to test it.`
+                            : ` — your ${fmtWeight(estimate.target.weight)} target is past this block.`
+                        : '.'}
+                    </p>
+                    {estimate.notes.map((n, i) => <p className="setup-hint" key={i}>{n}</p>)}
+                    <p className="setup-hint">
+                      A range, not a promise: it reads {estimate.basis === 'observed' ? 'your own recent pace on this lift' : estimate.basis === 'tempered' ? 'a tempered pace after a flat stretch' : 'the typical pace for your training age'},
+                      scaled by how often the block trains it.
+                    </p>
+                  </>
+                ) : (
+                  <p className="setup-hint">Enter a 1RM for {name} (Settings → 1RMs &amp; goals) or log it a few times, and the coach estimates what this block is built to deliver.</p>
+                )}
+              </section>
+            );
+          })}
 
           {proposal.guidanceNotes.length > 0 && (
             <section className="setup-section">
@@ -656,6 +720,22 @@ export default function PlanSetupView({ program, seed, onBack, onActivated }: Pr
                 </button>
               ))}
             </div>
+          </Question>
+        );
+
+      case 'focusFrequency':
+        return (
+          <Question title={`How often should ${focusNames.join(' and ')} be trained?`}
+            subtitle="Days a week on the lift or one of its variations. More exposures beat one heavier day.">
+            <div className="opt-list">
+              {FOCUS_FREQUENCY_OPTIONS.map(o => (
+                <OptionCard key={o.n} active={focusFrequency === o.n} label={o.label} blurb={o.blurb}
+                  onClick={() => pick(setFocusFrequency, o.n)} />
+              ))}
+            </div>
+            {focusFrequency === 3 && daysPerWeek < 4 && (
+              <p className="setup-hint setup-hint--error">Three exposures need at least four training days — the coach will fit what it can and say so.</p>
+            )}
           </Question>
         );
 

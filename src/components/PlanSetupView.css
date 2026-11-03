@@ -81,6 +81,10 @@
   padding: 14px 16px;
 }
 
+.setup-section--focus {
+  border-color: var(--purple);
+}
+
 .setup-section--warn {
   border-color: #E8C44A;
 }
