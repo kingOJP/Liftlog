@@ -7,6 +7,8 @@ import { getPhaseResolver, getTrainingGoal } from '../data/planStore';
 import { shortDateLabel } from '../data/program';
 import { unitFor } from '../data/exercises';
 import { fmtWeight, toDisplay, unitLabelFor } from '../data/units';
+import { countsForStrength, isExtension, styleOf, variationLabel } from '../data/variations';
+import type { SetLog } from '../db/database';
 import { LineChart } from './charts';
 import { useDialog } from './useDialog';
 import './InstructionSheet.css';
@@ -20,7 +22,7 @@ interface Props {
 
 interface SessionRow {
   ts: number;
-  sets: Array<{ weight: number; reps: number; warmup?: boolean }>;
+  sets: SetLog[];
   note?: string;
 }
 
@@ -67,10 +69,10 @@ export default function ExerciseHistorySheet({ exerciseId, exerciseName, onClose
 
     let heaviest = 0; let bestE1rm = 0; let mostReps = 0;
     for (const r of rows) for (const s of r.sets) {
-      if (s.warmup) continue;
+      if (s.warmup || isExtension(s.technique)) continue; // drops and partials aren't bests
       heaviest = Math.max(heaviest, s.weight);
       mostReps = Math.max(mostReps, s.reps);
-      if (s.weight > 0 && s.reps <= 12) bestE1rm = Math.max(bestE1rm, epley1RM(s.weight, s.reps));
+      if (s.weight > 0 && s.reps <= 12 && countsForStrength(s.technique)) bestE1rm = Math.max(bestE1rm, epley1RM(s.weight, s.reps));
     }
     const progress = assessSnapshot(snapshot, getTrainingGoal(), () => true, getPhaseResolver()).get(exerciseId) ?? null;
     return { rows, e1rm, volume, heaviest, bestE1rm, mostReps, progress };
@@ -79,11 +81,26 @@ export default function ExerciseHistorySheet({ exerciseId, exerciseName, onClose
   const LIMIT = 20;
   const shown = view ? (showAll ? view.rows : view.rows.slice(0, LIMIT)) : [];
   const fmtSets = (sets: SessionRow['sets']) => {
-    const work = sets.filter(s => !s.warmup);
+    const work = sets.filter(s => !s.warmup && !isExtension(s.technique));
     if (timed) return work.map(s => `${s.reps}s`).join(', ');
     const weights = new Set(work.map(s => s.weight));
     if (weights.size === 1) return `${fmtWeight(work[0].weight)} × ${work.map(s => s.reps).join(', ')}`;
     return work.map(s => `${toDisplay(s.weight)}×${s.reps}`).join(', ');
+  };
+  // "paused · close grip" when every working set shared it; the extras line
+  // names what was tacked on ("+ warm-up", "+ drop set").
+  const styleTag = (sets: SessionRow['sets']) => {
+    const work = sets.filter(s => !s.warmup && !isExtension(s.technique));
+    if (work.length === 0) return null;
+    const first = variationLabel(styleOf(work[0]));
+    return first && work.every(s => variationLabel(styleOf(s)) === first) ? first : null;
+  };
+  const extrasTag = (sets: SessionRow['sets']) => {
+    const parts: string[] = [];
+    if (sets.some(s => s.warmup)) parts.push('warm-up');
+    const ext = new Set(sets.filter(s => isExtension(s.technique)).map(s => s.technique!));
+    for (const t of ext) parts.push(t === 'drop' ? 'drop set' : t);
+    return parts.length > 0 ? `+ ${parts.join(', ')}` : null;
   };
 
   return createPortal(
@@ -163,7 +180,8 @@ export default function ExerciseHistorySheet({ exerciseId, exerciseName, onClose
                     <li key={r.ts} className="xh-session">
                       <span className="xh-session-date">{shortDateLabel(r.ts)}</span>
                       <span className="xh-session-sets">{fmtSets(r.sets)}</span>
-                      {r.sets.some(s => s.warmup) && <span className="xh-session-warm">+ warm-up</span>}
+                      {styleTag(r.sets) && <span className="xh-session-warm">{styleTag(r.sets)}</span>}
+                      {extrasTag(r.sets) && <span className="xh-session-warm">{extrasTag(r.sets)}</span>}
                       {r.note && <span className="xh-session-note">{r.note}</span>}
                     </li>
                   ))}

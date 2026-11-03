@@ -1,5 +1,7 @@
 import { getProgramStart } from './settings';
 import type { PhaseKind } from './plan';
+import type { SetTechnique, Grip } from './variations';
+import { variationLabel } from './variations';
 
 /**
  * A programmed exercise — one slot in a workout day. Carries the PRESCRIPTION
@@ -38,6 +40,16 @@ export interface Exercise {
    * lifters who run their own progression.
    */
   progression?: 'coach' | 'manual';
+  /**
+   * The prescribed way to do the sets (data/variations.ts): a rep style such
+   * as paused or deficit, and/or a grip. Optional — most slots are plain. When
+   * set, every set logged on the slot defaults to it, the engine prescribes
+   * from sessions done the same way, and the volume accounting reads the
+   * shifted muscle emphasis ("paused close-grip bench" is a different slot
+   * from "bench", and the coach should know).
+   */
+  technique?: SetTechnique;
+  grip?: Grip;
   archived?: boolean;
 }
 
@@ -177,12 +189,19 @@ export function rangeLabel(repLow: number, repHigh: number): string {
   return repLow === repHigh ? `${repLow}` : `${repLow}–${repHigh}`;
 }
 
-/** "3 sets · 8–12 reps", or "3 sets" when unprescribed — the long form. */
-export function prescriptionDetail(ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'progression'>): string {
+/**
+ * "3 sets · 8–12 reps", or "3 sets" when unprescribed — the long form. A slot
+ * with a prescribed variation says so: "4 sets · 3–5 reps · paused · close grip".
+ */
+export function prescriptionDetail(
+  ex: Pick<Exercise, 'sets' | 'repLow' | 'repHigh' | 'progression' | 'technique' | 'grip'>,
+): string {
   const sets = `${ex.sets} set${ex.sets === 1 ? '' : 's'}`;
-  const base = ex.repLow != null && ex.repHigh != null
+  let base = ex.repLow != null && ex.repHigh != null
     ? `${sets} · ${rangeLabel(ex.repLow, ex.repHigh)} reps`
     : sets;
+  const variation = variationLabel({ technique: ex.technique, grip: ex.grip });
+  if (variation) base = `${base} · ${variation}`;
   return ex.progression === 'manual' ? `${base} · your own progression` : base;
 }
 

@@ -603,6 +603,58 @@
   color: var(--purple);
 }
 
+.slot-variation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.slot-variation-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.slot-variation-label {
+  flex: 0 0 34px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.slot-variation-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.slot-variation-chips::-webkit-scrollbar { display: none; }
+
+.slot-variation .var-chip {
+  flex: 0 0 auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.slot-variation .var-chip--on {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+
 .slot-dose-hint {
   margin: 8px 0 0;
   font-size: 12px;

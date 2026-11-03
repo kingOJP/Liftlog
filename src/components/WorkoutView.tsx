@@ -10,8 +10,11 @@ import {
   getSession,
 } from '../db/database';
 import type { SetInput } from '../db/database';
-import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
+import { loadTrainingSnapshot } from '../data/analytics';
 import type { TrainingSnapshot } from '../data/analytics';
+import { expectedVariation, exerciseHistory } from '../data/sessionHistory';
+import type { SetVariation } from '../data/variations';
+import { isExtension, variationLabel } from '../data/variations';
 import { buildSetPlan, historyDepthFor, needsRegression } from '../data/recommendations';
 import type { WeightRec, ExerciseSession, SetPlan, PrescriptionContext } from '../data/recommendations';
 import { getExerciseMeta, unitFor } from '../data/exercises';
@@ -50,7 +53,23 @@ interface Props {
   onSetMax?: (exerciseId: string) => void;
 }
 
-type SetEntry = { weight: number; reps: number; warmup?: boolean };
+/** One row of the in-progress log — what ExerciseCard emits and the draft stores. */
+export type SetEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
+
+/** How many NUMBERED working sets a list holds — warm-ups and extension rows (drops etc.) don't count toward the plan. */
+function numberedSets(list: SetEntry[] | undefined): number {
+  return (list ?? []).filter(s => !s.warmup && !isExtension(s.technique)).length;
+}
+
+/** Drop the undefined/false optional fields so the draft and the save stay compact. */
+function compactEntry(e: SetEntry): SetEntry {
+  return {
+    weight: e.weight, reps: e.reps,
+    ...(e.warmup ? { warmup: true } : {}),
+    ...(e.technique ? { technique: e.technique } : {}),
+    ...(e.grip ? { grip: e.grip } : {}),
+  };
+}
 
 // Local-time yyyy-mm-dd for an <input type="date"> value
 // Combine a yyyy-mm-dd value with the original session's time-of-day, so re-dating
@@ -81,28 +100,15 @@ function contextForExercise(
   snapshot: TrainingSnapshot,
   positions: ReturnType<typeof snapshotPositions>,
   ctx: PrescriptionContext,
-): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession; history: ExerciseSession[]; oneRepMax?: number } {
-  const history: ExerciseSession[] = [];
+): { plan: SetPlan; rec?: WeightRec; last?: ExerciseSession; history: ExerciseSession[]; oneRepMax?: number; variation: SetVariation } {
   // Enough sessions for the athlete's stall window plus a dropped late-slot
   // one — a flat cap of four switched stall detection off for advanced lifters.
   const depth = historyDepthFor(ctx.experience);
-  for (const session of snapshot.sessions) { // newest first
-    const exSets = (snapshot.setsBySession.get(session.id!) ?? [])
-      .filter(s => s.exerciseId === ex.id)
-      .sort((a, b) => a.setNumber - b.setNumber)
-      .map(s => ({
-        weight: s.weight, reps: s.reps,
-        ...(s.repLow != null && s.repHigh != null ? { repLow: s.repLow, repHigh: s.repHigh } : {}),
-      }));
-    if (exSets.length > 0) {
-      history.push({
-        completedAt: sessionTimestamp(session),
-        sets: exSets,
-        position: positions.get(session.id!)?.get(ex.id) ?? null,
-      });
-    }
-    if (history.length >= depth) break;
-  }
+  // The way today's sets are expected to be done (the slot's prescription, or
+  // last time's), and the sessions done that way — the engine compares like
+  // with like, and extension rows (drops, partials) never reach it.
+  const variation = expectedVariation(ex, snapshot);
+  const { history, borrowed } = exerciseHistory(snapshot, ex.id, depth, positions, variation);
   const weightType = getExerciseMeta(ex.id).weightType;
   // A known 1RM anchors the load where the log can't: a first session, or a
   // max entered since the last one.
@@ -116,7 +122,12 @@ function contextForExercise(
     scheme: topSetScheme(ex, ctx.goal, ctx.experience, weightType) ? 'top-set' : 'straight',
     oneRepMax: max ? { weight: max.weight, updatedAt: max.updatedAt } : null,
   });
-  return { plan, last: history[0], rec: plan.rec ?? undefined, history, oneRepMax: max?.weight };
+  if (borrowed) {
+    // Prescribed from sets done a different way — say so instead of letting the
+    // number pose as earned under this style.
+    plan.goal = `First time logging this ${variationLabel(variation)} — the load comes from your other sets, so expect fewer reps. ${plan.goal}`;
+  }
+  return { plan, last: history[0], rec: plan.rec ?? undefined, history, oneRepMax: max?.weight, variation };
 }
 
 export default function WorkoutView({
@@ -170,7 +181,7 @@ export default function WorkoutView({
   // it left off).
   const [activeId, setActiveId] = useState<string | null>(() => {
     const logged = restoredDraft?.sets ?? {};
-    const open = day.exercises.find(e => (logged[e.id]?.filter(s => !s.warmup).length ?? 0) < e.sets);
+    const open = day.exercises.find(e => numberedSets(logged[e.id]) < e.sets);
     return (open ?? day.exercises[0])?.id ?? null;
   });
   // The note field is out of the way until there's something to say.
@@ -277,12 +288,13 @@ export default function WorkoutView({
   // Recommendations + "last time" context for every rendered exercise (the
   // day's plus any added mid-workout), derived from the snapshot. Recomputes
   // when an exercise is added so a newcomer gets its history-driven rec too.
-  const { recommendations, lastSessions, setPlans, regressions, maxes } = useMemo(() => {
+  const { recommendations, lastSessions, setPlans, regressions, maxes, variations } = useMemo(() => {
     const recs: Record<string, WeightRec> = {};
     const lasts: Record<string, ExerciseSession> = {};
     const plans: Record<string, SetPlan> = {};
     const easier: Record<string, ReplacementSuggestion> = {};
     const maxes: Record<string, number> = {};
+    const variations: Record<string, SetVariation> = {};
     if (snapshot) {
       const positions = snapshotPositions(snapshot);
       // The prescription reads the athlete as well as the lift: the plan's goal
@@ -296,8 +308,9 @@ export default function WorkoutView({
       };
       const present = new Set([...effectiveDay.exercises, ...addedExercises].map(e => e.id));
       for (const ex of [...effectiveDay.exercises, ...addedExercises]) {
-        const { plan, rec, last, history, oneRepMax } = contextForExercise(ex, snapshot, positions, ctx);
+        const { plan, rec, last, history, oneRepMax, variation } = contextForExercise(ex, snapshot, positions, ctx);
         plans[ex.id] = plan;
+        variations[ex.id] = variation;
         if (last) lasts[ex.id] = last;
         if (rec) recs[ex.id] = rec;
         if (oneRepMax) maxes[ex.id] = oneRepMax;
@@ -309,7 +322,7 @@ export default function WorkoutView({
         }
       }
     }
-    return { recommendations: recs, lastSessions: lasts, setPlans: plans, regressions: easier, maxes };
+    return { recommendations: recs, lastSessions: lasts, setPlans: plans, regressions: easier, maxes, variations };
   }, [snapshot, effectiveDay, addedExercises, phase, isEditMode, sessionStart]);
 
   useEffect(() => {
@@ -324,9 +337,9 @@ export default function WorkoutView({
     getSetLogsForSession(existingSessionId).then(setLogs => {
       const groupedSets: Record<string, SetEntry[]> = {};
       for (const sl of setLogs) {
-        (groupedSets[sl.exerciseId] ??= []).push({
-          weight: sl.weight, reps: sl.reps, ...(sl.warmup ? { warmup: true } : {}),
-        });
+        (groupedSets[sl.exerciseId] ??= []).push(compactEntry({
+          weight: sl.weight, reps: sl.reps, warmup: sl.warmup, technique: sl.technique, grip: sl.grip,
+        }));
       }
       setSets(groupedSets);
       // Preserve the session's original exercise order through the rewrite
@@ -343,22 +356,26 @@ export default function WorkoutView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingSessionId]);
 
-  function handleLogSet(exerciseId: string, weight: number, reps: number, warmup: boolean) {
+  function handleLogSet(exerciseId: string, entry: SetEntry) {
     if (!exerciseOrderRef.current.includes(exerciseId)) {
       exerciseOrderRef.current = [...exerciseOrderRef.current, exerciseId];
     }
     setSets(prev => ({
       ...prev,
-      [exerciseId]: [...(prev[exerciseId] ?? []), { weight, reps, ...(warmup ? { warmup: true } : {}) }],
+      [exerciseId]: [...(prev[exerciseId] ?? []), compactEntry(entry)],
     }));
     // Warm-up sets don't start the rest timer — you're not resting between them.
-    if (!isEditMode && !warmup) setRestRunId(id => id + 1);
+    // (A drop or rest-pause row does: it's logged once the extended set is over.)
+    if (!isEditMode && !entry.warmup) setRestRunId(id => id + 1);
     // That was the last prescribed set: move on to the next unfinished
     // exercise so the lifter is looking at what comes next while they rest.
-    // The finished card stays a tap away for an extra set or an edit.
+    // The finished card stays a tap away for an extra set, a drop or an edit.
+    // Only a NUMBERED working set counts toward the plan — a warm-up or an
+    // extension row (drop / rest-pause / partials) never advances.
+    const counts = !entry.warmup && !isExtension(entry.technique);
     const plan = setPlans[exerciseId];
-    const working = (sets[exerciseId] ?? []).filter(s => !s.warmup).length + (warmup ? 0 : 1);
-    if (!warmup && plan && working >= plan.sets.length) advanceFrom(exerciseId);
+    const working = numberedSets(sets[exerciseId]) + (counts ? 1 : 0);
+    if (counts && plan && working >= plan.sets.length) advanceFrom(exerciseId);
   }
 
   // Open the next exercise (after this one, then wrapping round) that still
@@ -369,7 +386,7 @@ export default function WorkoutView({
     const incomplete = (id: string) => {
       const plan = setPlans[id];
       if (!plan) return false;
-      const working = (sets[id] ?? []).filter(s => !s.warmup).length + (id === exerciseId ? 1 : 0);
+      const working = numberedSets(sets[id]) + (id === exerciseId ? 1 : 0);
       return working < plan.sets.length;
     };
     const next = [...order.slice(from + 1), ...order.slice(0, from)].find(incomplete);
@@ -381,12 +398,10 @@ export default function WorkoutView({
     });
   }
 
-  function handleEditSet(exerciseId: string, index: number, weight: number, reps: number, warmup: boolean) {
+  function handleEditSet(exerciseId: string, index: number, entry: SetEntry) {
     setSets(prev => ({
       ...prev,
-      [exerciseId]: (prev[exerciseId] ?? []).map((s, i) =>
-        i === index ? { weight, reps, ...(warmup ? { warmup: true } : {}) } : s
-      ),
+      [exerciseId]: (prev[exerciseId] ?? []).map((s, i) => (i === index ? compactEntry(entry) : s)),
     }));
   }
 
@@ -441,6 +456,8 @@ export default function WorkoutView({
         setInputs.push({
           exerciseId, setNumber: i + 1, weight: set.weight, reps: set.reps, order,
           ...(set.warmup ? { warmup: true } : {}),
+          ...(set.technique ? { technique: set.technique } : {}),
+          ...(set.grip ? { grip: set.grip } : {}),
           ...range,
         });
       });
@@ -626,8 +643,9 @@ export default function WorkoutView({
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
             oneRepMax={maxes[ex.id]}
             onSetMax={onSetMax && !isEditMode ? () => onSetMax(ex.id) : undefined}
-            onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
-            onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
+            variation={variations[ex.id]}
+            onLogSet={entry => handleLogSet(ex.id, entry)}
+            onEditSet={(i, entry) => handleEditSet(ex.id, i, entry)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
           />
         ))}
@@ -644,8 +662,9 @@ export default function WorkoutView({
             onViewHistory={(id, name) => setHistoryFor({ id, name })}
             oneRepMax={maxes[ex.id]}
             onSetMax={onSetMax && !isEditMode ? () => onSetMax(ex.id) : undefined}
-            onLogSet={(w, r, warmup) => handleLogSet(ex.id, w, r, warmup)}
-            onEditSet={(i, w, r, warmup) => handleEditSet(ex.id, i, w, r, warmup)}
+            variation={variations[ex.id]}
+            onLogSet={entry => handleLogSet(ex.id, entry)}
+            onEditSet={(i, entry) => handleEditSet(ex.id, i, entry)}
             onDeleteSet={i => handleDeleteSet(ex.id, i)}
             onRemove={() => handleRemoveAdded(ex.id)}
           />

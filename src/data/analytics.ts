@@ -11,6 +11,8 @@ import { startOfWeek } from './program';
 import type { Goal, ExperienceLevel } from './plan';
 import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
 import { getExerciseLibrary } from './programStore';
+import { adjustInvolvement, countsForStrength, setCredit, variationKey } from './variations';
+import type { SetVariation } from './variations';
 
 // Secondary muscles count as a fraction of a direct ("hard") set
 export const SECONDARY_SET_WEIGHT = 0.5;
@@ -177,6 +179,8 @@ export function e1rmSeries(snapshot: TrainingSnapshot): Map<string, E1rmPoint[]>
 
     const bestPerExercise = new Map<string, number>();
     for (const s of logs) {
+      // A drop, a rest-pause burst or partials say nothing about a 1RM
+      if (!countsForStrength(s.technique)) continue;
       const e1rm = epley1RM(s.weight, s.reps);
       if (e1rm > (bestPerExercise.get(s.exerciseId) ?? 0)) {
         bestPerExercise.set(s.exerciseId, e1rm);
@@ -263,6 +267,27 @@ export function primaryMuscleFor(id: string): MuscleGroup | null {
   return musclesForExercise(id).find(m => m.weight === 1)?.muscle ?? null;
 }
 
+/**
+ * The muscles ONE SET of an exercise trains, done a particular way. The base
+ * classification above, shifted by the set's grip and rep style through the
+ * compiled table in data/variations.ts (close-grip bench → more triceps,
+ * deficit deadlift → quads join in, wide pulldown → less biceps). The primary
+ * never changes and no secondary climbs to 1, so "weight === 1" still names
+ * the prime mover. With no variation this IS musclesForExercise.
+ */
+export function musclesForSet(id: string, variation: SetVariation | null | undefined): MuscleInvolvement[] {
+  const identity = resolveExerciseIdentity(id);
+  const base: MuscleInvolvement[] = [];
+  if (identity.primaryMuscle) base.push({ muscle: identity.primaryMuscle, weight: 1 });
+  for (const sm of identity.secondaryMuscles) if (sm) base.push({ muscle: sm, weight: SECONDARY_SET_WEIGHT });
+  return adjustInvolvement(base, identity.workoutType, variation);
+}
+
+/** A program slot's muscles, read through the variation it prescribes (if any). */
+export function musclesForSlot(slot: { id: string; technique?: SetVariation['technique']; grip?: SetVariation['grip'] }): MuscleInvolvement[] {
+  return musclesForSet(slot.id, { technique: slot.technique, grip: slot.grip });
+}
+
 // The exercise's movement pattern, same precedence as musclesForExercise:
 // user override (getExerciseMeta) → master catalog → name match for custom
 // library entries with no override. THE resolver for pattern-vs-growth
@@ -276,9 +301,12 @@ export function movementPatternFor(id: string): MovementPattern | null {
 // THE set-counting model, shared by metrics, insights, the coach planner and
 // the heatmap so every surface reports the same number: each logged set counts
 // 1 toward its exercise's primary muscle and SECONDARY_SET_WEIGHT toward each
-// secondary. Sets of an exercise with no primary muscle are "unmapped" — they
-// surface as the "Other" bucket / unclassified warning instead of silently
-// skewing a muscle's total.
+// secondary — read through the set's grip/technique (musclesForSet), and
+// scaled by setCredit(): an extension row (drop / rest-pause / partials) is
+// half a set, because it is the set before it carrying on, not a new one.
+// Sets of an exercise with no primary muscle are "unmapped" — they surface as
+// the "Other" bucket / unclassified warning instead of silently skewing a
+// muscle's total.
 
 export interface MuscleSetTotals {
   /** fractional hard sets per muscle across the included sessions */
@@ -295,23 +323,29 @@ export function muscleSetTotals(
   const totals = new Map<MuscleGroup, number>();
   let unmappedSets = 0;
   const unmappedExerciseIds = new Set<string>();
+  // Cached per (exercise, variation) — the metadata resolve is the expensive
+  // part (audit M17), and a plain set and a close-grip set of the same lift
+  // resolve to different involvement.
   const involvementCache = new Map<string, MuscleInvolvement[]>();
 
   for (const session of snapshot.sessions) {
     if (!include(session)) continue;
     for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
-      let involvement = involvementCache.get(log.exerciseId);
+      const variation = { technique: log.technique, grip: log.grip };
+      const key = `${log.exerciseId}|${variationKey(variation)}`;
+      let involvement = involvementCache.get(key);
       if (!involvement) {
-        involvement = musclesForExercise(log.exerciseId);
-        involvementCache.set(log.exerciseId, involvement);
+        involvement = musclesForSet(log.exerciseId, variation);
+        involvementCache.set(key, involvement);
       }
       if (!involvement.some(m => m.weight === 1)) {
         unmappedSets++;
         unmappedExerciseIds.add(log.exerciseId);
         continue;
       }
+      const credit = setCredit(log.technique);
       for (const { muscle, weight } of involvement) {
-        totals.set(muscle, (totals.get(muscle) ?? 0) + weight);
+        totals.set(muscle, (totals.get(muscle) ?? 0) + weight * credit);
       }
     }
   }
@@ -358,13 +392,14 @@ export function headSetTotals(
     for (const log of snapshot.setsBySession.get(session.id!) ?? []) {
       const { primary, heads } = resolve(log.exerciseId);
       if (!primary) continue;
+      const credit = setCredit(log.technique);
       if (heads.length === 0) {
-        unspecified.set(primary, (unspecified.get(primary) ?? 0) + 1);
+        unspecified.set(primary, (unspecified.get(primary) ?? 0) + credit);
         continue;
       }
       for (const head of heads) {
         const key = `${primary}::${head}`;
-        byHead.set(key, (byHead.get(key) ?? 0) + 1);
+        byHead.set(key, (byHead.get(key) ?? 0) + credit);
       }
     }
   }

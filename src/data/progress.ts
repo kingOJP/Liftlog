@@ -23,6 +23,7 @@ import type { Session, SetLog } from '../db/database';
 import { fmtWeight } from './units';
 import type { TrainingSnapshot } from './analytics';
 import { epley1RM, sessionTimestamp, movementPatternFor } from './analytics';
+import { isExtension, styleOf, variationKey, variationLabel } from './variations';
 import { getExerciseName } from './programStore';
 import type { Goal, PhaseResolver } from './plan';
 import { isEasyPhase } from './plan';
@@ -92,6 +93,15 @@ export interface ExercisePoint {
    * climbed all the way to its last hard week.
    */
   easy: boolean;
+  /**
+   * The session's dominant rep style + grip (variationKey; "" for plain
+   * straight sets). Trends are read like-for-like: a block that moves from
+   * touch-and-go to paused bench is not a lift getting weaker, and coming back
+   * is not a PR. Extension rows (drops, rest-pause, partials) are not in the
+   * point at all — a drop set tacked on one week and skipped the next would
+   * otherwise swing the volume signal for reasons that are not progress.
+   */
+  style: string;
 }
 
 // Position of each exercise within a session: explicit `order` when the logs
@@ -145,12 +155,17 @@ export function exercisePointSeries(
 
     const byExercise = new Map<string, SetLog[]>();
     for (const log of logs) {
+      if (isExtension(log.technique)) continue; // more set, not a new one — see ExercisePoint.style
       const arr = byExercise.get(log.exerciseId);
       if (arr) arr.push(log);
       else byExercise.set(log.exerciseId, [log]);
     }
 
     for (const [exerciseId, sets] of byExercise) {
+      const style = dominantStyle(sets);
+      // PR bests are tracked per (exercise, style): a paused 225 is not the
+      // same record as a touch-and-go 225, in either direction.
+      const prKey = `${exerciseId}|${style}`;
       let bestE1rm = 0, validE1rm = 0, tonnage = 0, totalReps = 0, maxWeight = 0;
       const weightCounts = new Map<number, number>();
       for (const s of sets) {
@@ -168,12 +183,12 @@ export function exercisePointSeries(
       }
 
       const prLabels: string[] = [];
-      const prevBestWeight = bestWeight.get(exerciseId);
+      const prevBestWeight = bestWeight.get(prKey);
       // A planned easy week can't set a PR — the load is lighter by design,
       // and "PR" there would only ever mean the lifter ignored the plan.
       const weightPR = !easy && prevBestWeight != null && maxWeight > prevBestWeight;
       if (weightPR) prLabels.push(`Weight PR — ${fmtWeight(maxWeight)}`);
-      bestWeight.set(exerciseId, Math.max(prevBestWeight ?? 0, maxWeight));
+      bestWeight.set(prKey, Math.max(prevBestWeight ?? 0, maxWeight));
 
       // Rep PR: more reps than ever before at a weight you've lifted BEFORE
       // THIS SESSION. The session's bests are computed first and compared to
@@ -181,7 +196,7 @@ export function exercisePointSeries(
       // while updating made set 2 beating set 1 a "PR", including on the very
       // first session at a never-lifted weight.
       let repPR = false;
-      const repMap = bestRepsAtWeight.get(exerciseId) ?? new Map<number, number>();
+      const repMap = bestRepsAtWeight.get(prKey) ?? new Map<number, number>();
       const sessionBest = new Map<number, number>();
       for (const s of sets) sessionBest.set(s.weight, Math.max(sessionBest.get(s.weight) ?? 0, s.reps));
       for (const [weight, reps] of sessionBest) {
@@ -194,7 +209,7 @@ export function exercisePointSeries(
         }
         repMap.set(weight, Math.max(prev ?? 0, reps));
       }
-      bestRepsAtWeight.set(exerciseId, repMap);
+      bestRepsAtWeight.set(prKey, repMap);
 
       const point: ExercisePoint = {
         ts,
@@ -211,6 +226,7 @@ export function exercisePointSeries(
         repPR,
         prLabels: [...new Set(prLabels)].slice(0, 2),
         easy,
+        style,
       };
       const arr = series.get(exerciseId);
       if (arr) arr.push(point);
@@ -265,6 +281,24 @@ function median(values: number[]): number | null {
 
 const pct = pctChange;
 
+/** The variation most of a session's sets were done with (ties → first seen). */
+function dominantStyle(sets: Array<{ technique?: string; grip?: string }>): string {
+  const counts = new Map<string, number>();
+  for (const s of sets) {
+    const k = variationKey(styleOf(s));
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  let best = ''; let bestCount = -1;
+  for (const [k, c] of counts) if (c > bestCount) { best = k; bestCount = c; }
+  return best;
+}
+
+/** "paused · close grip" from a style key, for evidence strings. */
+function styleLabel(style: string): string {
+  const [technique, grip] = style.split('|');
+  return variationLabel(styleOf({ technique, grip })) ?? 'straight sets';
+}
+
 export function assessExercise(
   exerciseId: string,
   points: ExercisePoint[],
@@ -280,7 +314,14 @@ export function assessExercise(
   // (a recovery week opening a block), there is no hard evidence either way
   // and the window is used as-is rather than inventing a verdict from nothing.
   const hardWindow = window.filter(p => !p.easy);
-  const judged = hardWindow.length > 0 ? hardWindow : window;
+  const hardOrAll = hardWindow.length > 0 ? hardWindow : window;
+  // Like for like: only sessions done the way the latest one was done are
+  // compared. Switching to paused reps (or a new grip) restarts the trend
+  // rather than reading as a decline — and switching back is not a PR.
+  const latestStyle = hardOrAll[hardOrAll.length - 1]?.style ?? '';
+  const likeForLike = hardOrAll.filter(p => (p.style ?? '') === latestStyle);
+  const styleChanged = likeForLike.length < hardOrAll.length;
+  const judged = likeForLike.length > 0 ? likeForLike : hardOrAll;
   const lastHard = judged[judged.length - 1];
 
   // Freshness context: was the latest session trained much later in the
@@ -363,9 +404,14 @@ export function assessExercise(
   if (hardWindow.length > 0 && hardWindow.length < window.length) {
     evidence.push('planned easy-week sessions are left out of the trend');
   }
+  if (styleChanged) {
+    evidence.push(judged.length < MIN_TREND_SESSIONS
+      ? `switched to ${styleLabel(latestStyle)} — the trend restarts from there, no verdict yet`
+      : `judged on ${styleLabel(latestStyle)} sessions only — a technique change resets the comparison`);
+  }
   if (points.length < MIN_TREND_SESSIONS) {
     evidence.push('still building a baseline — log a few more sessions for a verdict');
-  } else if (judged.length < MIN_TREND_SESSIONS) {
+  } else if (judged.length < MIN_TREND_SESSIONS && !styleChanged) {
     evidence.push('only a couple of hard sessions since the easy week — no verdict yet');
   }
 

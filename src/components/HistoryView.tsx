@@ -7,7 +7,13 @@ import { isQuickWorkout } from '../data/quickWorkout';
 import { loadTrainingSnapshot } from '../data/analytics';
 import { fmtWeight } from '../data/units';
 import type { Session, SetLog } from '../db/database';
+import { TECHNIQUE_INFO, isExtension, variationLabel } from '../data/variations';
 import './HistoryView.css';
+
+// "paused · close grip" — how a set was done; an extension's kind is its label already
+function setTag(s: SetLog): string | null {
+  return variationLabel({ technique: isExtension(s.technique) ? undefined : s.technique, grip: s.grip });
+}
 
 interface Props {
   program: WorkoutDay[];
@@ -117,8 +123,10 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                       <span className="history-ex-name">{getExerciseName(exId)}</span>
                       <div className="history-sets">
                         {(grouped[exId] ?? []).map((s, i) => (
-                          <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}`}>
-                            <span className="history-set-num">Set {s.setNumber}</span>
+                          <div key={i} className={`history-set-row${s.warmup ? ' history-set-row--warmup' : ''}${isExtension(s.technique) ? ' history-set-row--ext' : ''}`}>
+                            <span className="history-set-num">
+                              {isExtension(s.technique) ? `↳ ${TECHNIQUE_INFO[s.technique!].short}` : `Set ${s.setNumber}`}
+                            </span>
                             {unitFor(exId) === 'seconds' ? (
                               <span className="history-set-reps">{s.reps} sec</span>
                             ) : (
@@ -128,6 +136,7 @@ export default function HistoryView({ program, onBack, onEditSession }: Props) {
                               </>
                             )}
                             {s.warmup && <span className="history-set-warmup">warm-up</span>}
+                            {setTag(s) && <span className="history-set-tag">{setTag(s)}</span>}
                           </div>
                         ))}
                       </div>

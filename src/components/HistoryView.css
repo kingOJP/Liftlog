@@ -175,6 +175,23 @@
   padding: 1px 5px;
 }
 
+.history-set-tag {
+  font-size: 11px;
+  color: var(--text-faint);
+  align-self: center;
+}
+
+/* A drop / rest-pause / partials row continues the set above it */
+.history-set-row--ext .history-set-num {
+  color: var(--purple-bright);
+  width: auto;
+  min-width: 44px;
+}
+
+.history-set-row--ext .history-set-weight {
+  font-weight: 500;
+}
+
 .edit-session-btn {
   margin-top: 4px;
   width: 100%;

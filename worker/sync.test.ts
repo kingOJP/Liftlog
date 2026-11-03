@@ -113,6 +113,8 @@ describe('payload validation', () => {
   it.each([
     ['malformed session',              { sessions: [{ id: 'one', dayId: 1, weekNumber: 1, startedAt: 1 }] }],
     ['malformed set log',              { setLogs: [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 'heavy', reps: 8 }] }],
+    ['malformed set log',              { setLogs: [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8, technique: 7 }] }],
+    ['malformed set log',              { setLogs: [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8, grip: 'x'.repeat(40) }] }],
     ['deletedSessionGuids must be an array', { deletedSessionGuids: 'nope' }],
     ['malformed deleted session guid', { deletedSessionGuids: [42] }],
     ['deletedExerciseIds must be an array',  { deletedExerciseIds: {} }],
@@ -126,7 +128,7 @@ describe('payload validation', () => {
 
   it('accepts the optional set-log fields the client now sends', async () => {
     const res = await push(pushBody({
-      setLogs: [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8, order: 2, warmup: true }],
+      setLogs: [{ id: 1, sessionId: 1, exerciseId: 'x', setNumber: 1, weight: 100, reps: 8, order: 2, warmup: true, technique: 'paused', grip: 'close' }],
       sessions: [{ id: 1, dayId: 1, weekNumber: 1, startedAt: 1, completedAt: 1, updatedAt: 1 }],
     }));
     expect(res.status).toBe(200);
