@@ -365,8 +365,34 @@
 .journey-seg--maintenance     { background: #6C7A89; color: rgba(108, 122, 137, 0.5); }
 .journey-seg--race-week       { background: var(--purple-bright); color: rgba(154, 145, 255, 0.6); }
 
-/* ── Coach card ── */
+/* ── Coach card: This week + Next up in one glowing card ── */
 .coach-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  background-image: var(--accent-wash);
+  border: 1px solid rgba(124, 114, 232, 0.45);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glow);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.coach-card:has(.coach-next:active) {
+  border-color: var(--purple);
+}
+
+/* The week row inside the card: same layout as the standalone header,
+   without its own card chrome. */
+.week-header--inline {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.coach-next {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -374,20 +400,16 @@
   text-align: left;
   width: 100%;
   color: inherit;
-  background: var(--bg-card);
-  background-image: var(--accent-wash);
-  border: 1px solid rgba(124, 114, 232, 0.45);
-  border-radius: var(--radius-lg);
+  background: none;
+  border: none;
   padding: 16px 56px 16px 16px;
   cursor: pointer;
-  box-shadow: var(--shadow-glow);
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.12s, border-color 0.15s;
+  transition: background-color 0.12s;
 }
 
-.coach-card:active {
-  transform: scale(0.99);
-  border-color: var(--purple);
+.coach-next:active {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .coach-go {

@@ -201,20 +201,57 @@ export default function Dashboard({
     );
   }
 
+  // The week at a glance — tops the Next up card, or stands alone without one
+  const weekSummary = (
+    <>
+      <span className="week-icon"><Icon name="calendar" size={22} /></span>
+      <div className="week-text">
+        <span className="week-label">{getWeekDateRange()}</span>
+        <span className="week-sub">This week</span>
+      </div>
+      {scheduled.length > 0 && (
+        <span className={`week-progress${completedDayIds.size >= scheduled.length ? ' week-progress--done' : ''}`}>
+          <span className="tabular">{completedDayIds.size} of {scheduled.length}</span> done
+        </span>
+      )}
+    </>
+  );
+
   return (
     <div className="dashboard">
-      <div className="week-header">
-        <span className="week-icon"><Icon name="calendar" size={22} /></span>
-        <div className="week-text">
-          <span className="week-label">{getWeekDateRange()}</span>
-          <span className="week-sub">This week</span>
+      {/* This week + Next up share one card: the week at a glance, then the
+          one tap that starts the next workout. Without a next day the week
+          header stands alone. */}
+      {nextDay ? (
+        <section className="coach-card" aria-label="This week">
+          <div className="week-header week-header--inline">
+            {weekSummary}
+          </div>
+          <button className="coach-next" onClick={() => onStartWorkout(nextDay.dayId)}>
+            <span className="coach-go" aria-hidden="true"><Icon name="chevron-right" size={18} strokeWidth={2.2} /></span>
+            <div className="coach-eyebrow">
+              <Icon name="bolt" size={14} strokeWidth={2} />
+              Next up · {lastTrainedLabel(nextDay.lastTrained)}
+            </div>
+            <div className="coach-day">{nextDay.label} — {nextDay.muscleGroups}</div>
+            {nextDayAdjustments > 0 && (
+              <div className="coach-adjusted">
+                ✦ Coach adjusted this workout — open it to see what changed and why
+              </div>
+            )}
+            {topInsight && (
+              <div className={`coach-insight coach-insight--${topInsight.kind}`}>
+                <span className="coach-insight-title">{topInsight.title}</span>
+                <span className="coach-insight-detail">{topInsight.detail}</span>
+              </div>
+            )}
+          </button>
+        </section>
+      ) : (
+        <div className="week-header">
+          {weekSummary}
         </div>
-        {scheduled.length > 0 && (
-          <span className={`week-progress${completedDayIds.size >= scheduled.length ? ' week-progress--done' : ''}`}>
-            <span className="tabular">{completedDayIds.size} of {scheduled.length}</span> done
-          </span>
-        )}
-      </div>
+      )}
 
       {unfinished && (
         <button className="resume-card" onClick={() => onResumeWorkout(unfinished)}>
@@ -225,36 +262,6 @@ export default function Dashboard({
           <div className="resume-detail">
             {draftSetCount(unfinished)} set{draftSetCount(unfinished) === 1 ? '' : 's'} logged · started {lastTrainedLabel(unfinished.startedAt).replace('trained ', '')}
           </div>
-        </button>
-      )}
-
-      {journeyCard}
-
-      {syncTrouble && (
-        <p className="sync-badge" role="status">
-          Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
-        </p>
-      )}
-
-      {nextDay && (
-        <button className="coach-card" onClick={() => onStartWorkout(nextDay.dayId)}>
-          <span className="coach-go" aria-hidden="true"><Icon name="chevron-right" size={18} strokeWidth={2.2} /></span>
-          <div className="coach-eyebrow">
-            <Icon name="bolt" size={14} strokeWidth={2} />
-            Next up · {lastTrainedLabel(nextDay.lastTrained)}
-          </div>
-          <div className="coach-day">{nextDay.label} — {nextDay.muscleGroups}</div>
-          {nextDayAdjustments > 0 && (
-            <div className="coach-adjusted">
-              ✦ Coach adjusted this workout — open it to see what changed and why
-            </div>
-          )}
-          {topInsight && (
-            <div className={`coach-insight coach-insight--${topInsight.kind}`}>
-              <span className="coach-insight-title">{topInsight.title}</span>
-              <span className="coach-insight-detail">{topInsight.detail}</span>
-            </div>
-          )}
         </button>
       )}
 
@@ -329,6 +336,8 @@ export default function Dashboard({
         </>
       )}
 
+      {journeyCard}
+
       <nav className="dash-nav">
         <button className="dash-nav-btn" onClick={onViewMetrics}>
           <Icon name="chart" size={22} className="dash-nav-icon" />
@@ -343,6 +352,12 @@ export default function Dashboard({
           <span>Settings</span>
         </button>
       </nav>
+
+      {syncTrouble && (
+        <p className="sync-badge" role="status">
+          Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
+        </p>
+      )}
     </div>
   );
 }
