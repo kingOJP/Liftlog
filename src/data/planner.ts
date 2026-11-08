@@ -203,8 +203,11 @@ export function applyInjuryArea(g: Guidance, area: InjuryArea): void {
       // Pattern-based, not name-based — catches every vertical press
       // regardless of naming (e.g. "Machine Shoulder Press" has no "overhead"
       // in its name, so a name-substring filter alone would miss it).
-      add(['Dip', 'Vertical Press'], [],
-        'Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay.');
+      // Upright rows are filed under 'Lateral Raise' (they train the side
+      // delt) but pull the arm into internal rotation at shoulder height —
+      // the classic impingement position — so they go by name.
+      add(['Dip', 'Vertical Press'], ['upright row'],
+        'Shoulder issue noted — no overhead pressing, dips or upright rows; horizontal pressing and raises stay.');
       break;
     case 'lower-back':
       add(['Hip Hinge', 'Squat'], ['good morning'],
@@ -215,11 +218,11 @@ export function applyInjuryArea(g: Guidance, area: InjuryArea): void {
         'Hip issue noted — no deep lunging or heavy hinging; machines and hip thrusts carry the lower body.');
       break;
     case 'elbow':
-      add(['Dip'], ['skull', 'close-grip', 'close grip', 'preacher'],
+      add(['Dip'], ['skull', 'close-grip', 'close grip', 'preacher', 'jm press'],
         'Elbow issue noted — no skull-crushers, dips or close-grip pressing; cable pressdowns and neutral-grip pulls stay.');
       break;
     case 'wrist':
-      add([], ['wrist curl', 'barbell bench', 'barbell overhead', 'front squat', 'push-up', 'push up'],
+      add([], ['wrist curl', 'barbell bench', 'barbell overhead', 'front squat', 'push-up', 'push up', 'barbell curl'],
         'Wrist issue noted — no barbell pressing, push-ups or wrist curls; neutral-grip dumbbell and machine work instead.');
       break;
   }

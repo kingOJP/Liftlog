@@ -13,8 +13,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   EXERCISES, EXERCISE_MAP, DIFFICULTY, PREREQUISITES, PRIMARY_HEADS, MUSCLE_HEADS,
-  DIFFICULTY_RANK, difficultyFor, prerequisitesFor, headsFor,
+  DIFFICULTY_RANK, ALIASES, difficultyFor, prerequisitesFor, headsFor, aliasesFor,
+  slugifyName, catalogDefFor, catalogDefForName,
 } from './exercises';
+import { NAMED_VARIANTS, namedVariantFor } from './namedVariants';
+import { gripOptionsFor, techniqueOptionsFor } from './variations';
 import {
   MUSCLE_GROUPS, MUSCLE_REGIONS, MOVEMENT_PATTERNS, MOVEMENT_CATEGORIES,
   EQUIPMENT_OPTIONS, WEIGHT_TYPES, MEASURE_UNITS, regionFor, patternCategoryFor,
@@ -185,5 +188,82 @@ describe('instructions', () => {
   it('resolves a timestamped copy of a catalog exercise and nothing for a true custom one', () => {
     expect(instructionsFor('back-extensions-1782324854942')).toBe(instructionsFor('back-extensions'));
     expect(instructionsFor('jefferson-split-squats-1782324854942')).toBeNull();
+  });
+});
+
+describe('aliases', () => {
+  // Every name the catalog answers to — ids, names, aliases — must point at
+  // exactly one exercise, or "RDL" could resolve differently in search, the
+  // create flow and catalogDefFor.
+  it('never lets one slug name two different exercises', () => {
+    const owner = new Map<string, string>();
+    const claim = (slug: string, id: string, what: string) => {
+      const prev = owner.get(slug);
+      expect(prev == null || prev === id, `${what} "${slug}" names both ${prev} and ${id}`).toBe(true);
+      owner.set(slug, id);
+    };
+    for (const e of EXERCISES) {
+      claim(e.id, e.id, 'id');
+      claim(slugifyName(e.name), e.id, 'name');
+    }
+    for (const [id, aliases] of Object.entries(ALIASES)) {
+      expect(EXERCISE_MAP.has(id), `${id} has aliases but is not in the catalog`).toBe(true);
+      for (const a of aliases) {
+        expect(a.trim(), `${id} alias`).toBe(a);
+        expect(slugifyName(a), `${id}: "${a}" is just its own name`).not.toBe(slugifyName(EXERCISE_MAP.get(id)!.name));
+        claim(slugifyName(a), id, 'alias');
+      }
+    }
+  });
+
+  it('resolves a custom exercise created under an alias or the catalog name to the catalog definition', () => {
+    expect(catalogDefFor('rdl-1782324854942')?.id).toBe('romanian-deadlifts');
+    expect(catalogDefFor('bent-over-one-arm-dumbbell-row-1782324854942')?.id).toBe('bent-over-db-row');
+    expect(catalogDefFor('sumo-deadlift-1782324854942')?.id).toBe('sumo-deadlift');
+    expect(catalogDefForName("Farmer's Walk")?.id).toBe('farmer-carry');
+    expect(aliasesFor('romanian-deadlifts')).toContain('RDL');
+    // An untimestamped id is a catalog id or nothing — aliases never rename ids.
+    expect(catalogDefFor('rdl')).toBeNull();
+  });
+});
+
+describe('named variants', () => {
+  it('point at catalog exercises with modifiers their movement actually offers', () => {
+    for (const v of NAMED_VARIANTS) {
+      const def = EXERCISE_MAP.get(v.exerciseId);
+      expect(def, `${v.name} → ${v.exerciseId}`).toBeDefined();
+      expect(v.technique != null || v.grip != null, `${v.name} pins no modifier`).toBe(true);
+      if (v.grip) expect(gripOptionsFor(def!.workoutType), `${v.name}: ${v.grip}`).toContain(v.grip);
+      if (v.technique) expect(techniqueOptionsFor(def!.workoutType, def!.unit), `${v.name}: ${v.technique}`).toContain(v.technique);
+    }
+  });
+
+  it('never collide with a catalog id, name or alias, nor with each other', () => {
+    const seen = new Set<string>();
+    for (const v of NAMED_VARIANTS) {
+      for (const n of [v.name, ...(v.aliases ?? [])]) {
+        const slug = slugifyName(n);
+        expect(catalogDefForName(n), `variant "${n}" is a catalog name or alias`).toBeNull();
+        expect(seen.has(slug), `variant "${n}" is listed twice`).toBe(false);
+        seen.add(slug);
+        expect(namedVariantFor(n)).toBe(v);
+      }
+    }
+  });
+});
+
+describe('coverage', () => {
+  it('uses every movement pattern on at least one catalog exercise', () => {
+    const used = new Set(EXERCISES.map(e => e.workoutType));
+    for (const p of MOVEMENT_PATTERNS) expect(used.has(p), p).toBe(true);
+  });
+
+  it('carries the lifts every program is built from', () => {
+    // The November 2026 audit's gap list — the ones a returning lifter would
+    // notice missing first. A regression here is a deleted staple.
+    for (const id of [
+      'pull-ups', 'barbell-curl', 'front-squat', 'sumo-deadlift', 'trap-bar-deadlift',
+      'hip-adduction', 'arnold-press', 'machine-hip-thrust', 'nordic-hamstring-curl',
+    ]) expect(EXERCISE_MAP.has(id), id).toBe(true);
   });
 });

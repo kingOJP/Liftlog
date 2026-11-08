@@ -9,7 +9,7 @@ import type { Session, SetLog } from '../db/database';
 import type { MuscleGroup, MovementPattern } from './taxonomy';
 import { startOfWeek } from './program';
 import type { Goal, ExperienceLevel } from './plan';
-import { EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
+import { ALIASES, EXERCISES, EXERCISE_MAP, getExerciseMeta, headsFor } from './exercises';
 import { getExerciseLibrary } from './programStore';
 import { adjustInvolvement, countsForStrength, setCredit, variationKey } from './variations';
 import type { SetVariation } from './variations';
@@ -205,7 +205,12 @@ export function normalizeName(name: string): string {
 
 // Build a name → master-def lookup so custom exercise IDs can still resolve
 // their muscle involvement by name.
-const nameToDef = new Map(EXERCISES.map(d => [normalizeName(d.name), d]));
+// Names AND aliases, so a custom "RDL" with no metadata classifies as the
+// Romanian deadlift it is.
+const nameToDef = new Map<string, (typeof EXERCISES)[number]>();
+for (const d of EXERCISES) {
+  for (const n of [...(ALIASES[d.id] ?? []), d.name]) nameToDef.set(normalizeName(n), d);
+}
 
 export interface MuscleInvolvement {
   muscle: MuscleGroup;

@@ -73,18 +73,30 @@ export type MuscleHead = string;
 // planes — bench-style horizontal pressing and overhead-style vertical
 // pressing — the one real inconsistency in an otherwise-consistent list (Row,
 // Pull Down and Pull Up were already kept distinct by plane). Split here.
+//
+// Three isolation families joined in the November 2026 catalog audit, each
+// because an exercise would otherwise have had to borrow a pattern that means
+// something else to the planner's slot templates and the injury filters:
+//   'Adduction'     — the adductor machine (was nothing; 'Abduction' is the
+//                     opposite joint action)
+//   'Front Raise'   — shoulder flexion; filed under 'Lateral Raise' it would
+//                     fill side-delt slots with front-delt work pressing
+//                     already covers
+//   'Hip Extension' — kickbacks: hip extension with no spinal load and no
+//                     hamstring stretch, so not a 'Hip Hinge' (which the
+//                     lower-back injury filter bans) and not a 'Hip Thrust'
 export type MovementPattern =
-  | 'Abduction' | 'Anti-Rotation' | 'Calf Raise' | 'Carry' | 'Crunch' | 'Curl' | 'Dip'
-  | 'Face Pull' | 'Fly' | 'Hip Hinge' | 'Hip Thrust' | 'Horizontal Press' | 'Jump'
-  | 'Lateral Raise' | 'Leg Curl' | 'Leg Extension' | 'Leg Press' | 'Lunge' | 'Plank'
-  | 'Pull Down' | 'Pull Over' | 'Pull Up' | 'Reverse Fly' | 'Rotation' | 'Row'
-  | 'Shrug' | 'Squat' | 'Tricep Extension' | 'Vertical Press';
+  | 'Abduction' | 'Adduction' | 'Anti-Rotation' | 'Calf Raise' | 'Carry' | 'Crunch' | 'Curl'
+  | 'Dip' | 'Face Pull' | 'Fly' | 'Front Raise' | 'Hip Extension' | 'Hip Hinge' | 'Hip Thrust'
+  | 'Horizontal Press' | 'Jump' | 'Lateral Raise' | 'Leg Curl' | 'Leg Extension' | 'Leg Press'
+  | 'Lunge' | 'Plank' | 'Pull Down' | 'Pull Over' | 'Pull Up' | 'Reverse Fly' | 'Rotation'
+  | 'Row' | 'Shrug' | 'Squat' | 'Tricep Extension' | 'Vertical Press';
 
 // ── Movement category (Tier 1) ───────────────────────────────────────────────
 // A coarser layer above MovementPattern, for the same reason Region sits above
 // MuscleGroup: MovementPattern is the right altitude for "find a similar
 // exercise" (Row and Pull Down are genuinely different movements), but most
-// of its ~28 values have only 1–3 exercises — too few to say anything about a
+// of its ~32 values have only 1–3 exercises — too few to say anything about a
 // *trend*. "Is my Face Pull number going up" is just that exercise's own
 // progress restated; "is my Push pattern going up" aggregates enough
 // exercises to be a real signal, the same mental model lifters already use
@@ -113,6 +125,7 @@ const CATEGORY_OF: Record<MovementPattern, MovementCategory> = {
   Curl: 'Isolation', 'Tricep Extension': 'Isolation', Fly: 'Isolation',
   'Reverse Fly': 'Isolation', 'Lateral Raise': 'Isolation', 'Leg Extension': 'Isolation',
   'Leg Curl': 'Isolation', 'Calf Raise': 'Isolation', Abduction: 'Isolation',
+  Adduction: 'Isolation', 'Front Raise': 'Isolation', 'Hip Extension': 'Isolation',
   Shrug: 'Isolation', Rotation: 'Isolation',
 };
 
@@ -151,11 +164,11 @@ export const MUSCLE_GROUPS: MuscleGroup[] = [
 ];
 
 export const MOVEMENT_PATTERNS: MovementPattern[] = [
-  'Abduction', 'Anti-Rotation', 'Calf Raise', 'Carry', 'Crunch', 'Curl', 'Dip',
-  'Face Pull', 'Fly', 'Hip Hinge', 'Hip Thrust', 'Horizontal Press', 'Jump',
-  'Lateral Raise', 'Leg Curl', 'Leg Extension', 'Leg Press', 'Lunge', 'Plank',
-  'Pull Down', 'Pull Over', 'Pull Up', 'Reverse Fly', 'Rotation', 'Row',
-  'Shrug', 'Squat', 'Tricep Extension', 'Vertical Press',
+  'Abduction', 'Adduction', 'Anti-Rotation', 'Calf Raise', 'Carry', 'Crunch', 'Curl',
+  'Dip', 'Face Pull', 'Fly', 'Front Raise', 'Hip Extension', 'Hip Hinge', 'Hip Thrust',
+  'Horizontal Press', 'Jump', 'Lateral Raise', 'Leg Curl', 'Leg Extension', 'Leg Press',
+  'Lunge', 'Plank', 'Pull Down', 'Pull Over', 'Pull Up', 'Reverse Fly', 'Rotation',
+  'Row', 'Shrug', 'Squat', 'Tricep Extension', 'Vertical Press',
 ];
 
 export const EQUIPMENT_OPTIONS: Equipment[] = [

@@ -34,7 +34,7 @@ import {
 } from './analytics';
 import type { Goal } from './plan';
 import { assessSnapshot, progressDirections } from './progress';
-import { EXERCISES, EXERCISE_MAP, DIFFICULTY_RANK, catalogDefFor, difficultyFor, prerequisitesFor, unitFor } from './exercises';
+import { EXERCISES, EXERCISE_MAP, DIFFICULTY_RANK, catalogDefFor, catalogDefForName, difficultyFor, prerequisitesFor, unitFor } from './exercises';
 import type { ExerciseDifficulty } from './exercises';
 import { getExerciseLibrary, getDeletedExerciseIds } from './programStore';
 
@@ -110,6 +110,11 @@ export function candidateProfiles(): ExerciseProfile[] {
     if (ex.archived) continue;
     seenIds.add(ex.id);
     seenNames.add(normalizeName(ex.name));
+    // A custom copy of a catalog exercise (by name, alias or timestamped
+    // slug) shadows its namesake — "RDL" in the library hides Romanian
+    // Deadlifts, or the swap list offers the same lift twice.
+    const namesake = catalogDefFor(ex.id) ?? catalogDefForName(ex.name);
+    if (namesake) seenIds.add(namesake.id);
     const p = profileFor(ex.id, ex.name);
     if (p.primaryMuscle) out.push(p);
   }

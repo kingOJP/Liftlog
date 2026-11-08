@@ -161,6 +161,15 @@ Long-term milestones (roughly):
     engine (`sessionHistory.ts`) and the progress engine (per-style trend and PR bests).
     One sliders control beside Log set, "＋ Drop set", slot-level pinning in the day editor.
 
+27. ✅ Catalog audit (`docs/catalog-audit-2026-11.md`) — 89 → 141 exercises (every common
+    gym machine, the routinely prescribed lifts, a bodybuilder's top picks per muscle), 13
+    metadata corrections (squats credit Adductors not Hamstrings; equipment fixes), three new
+    isolation patterns (Adduction / Front Raise / Hip Extension). Variants that are an existing
+    exercise with a grip or rep style are **named variants** (`namedVariants.ts`: "Wide Grip Lat
+    Pulldown" → lat-pull-down + wide grip, pinned on the slot), not new exercises. **Aliases**
+    (`ALIASES` in exercises.ts: "RDL", "OHP", "Pec Deck") drive search, reuse the catalog id in
+    the create flow, and heal custom exercises created under that name (`catalogDefFor`).
+
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
   rules toward an estimator: record the prescription and per-set timestamps (Stage 0), a
@@ -336,11 +345,16 @@ src/
     settings.ts                — device-local settings (localStorage): the week-numbering
                                   anchor (managed automatically — first-use stamp, then the
                                   journey via planStore.ensureWeekAnchor) + rest-timer default
-    exercises.ts               — Single source of truth for the ~89 built-in exercises
+    exercises.ts               — Single source of truth for the 141 built-in exercises
                                   (ExerciseDef), EXERCISES array, EXERCISE_MAP, getExerciseMeta(),
                                   saveExerciseMeta() — metadata overrides in localStorage.
                                   Includes the curated catalog expansion that feeds the
-                                  substitution engine's candidate pool
+                                  substitution engine's candidate pool. Also ALIASES +
+                                  aliasesFor()/catalogDefForName() (other names an exercise is
+                                  known by) and slugifyName()
+    namedVariants.ts           — named variants: "Pendlay Row" → barbell-rows + paused. A lift
+                                  that is an existing exercise with a grip/technique is a variant
+                                  pinned on the slot (applyNamedVariant), never a catalog row
     programStore.ts            — localStorage CRUD: getStoredProgram, saveStoredProgram,
                                   getExerciseLibrary, saveExerciseLibrary, addToExerciseLibrary,
                                   getExerciseName, generateExerciseId.
@@ -468,7 +482,9 @@ src/
                                   faults) for every catalog exercise; instructionsFor(id) resolves
                                   timestamped catalog copies, null for a true custom exercise
     search.ts                  — matchesExerciseQuery()/filterExercises(): every typed word must
-                                  appear in the name, any order — shared by the list and the picker
+                                  appear in the name or one alias, any order; spacing-insensitive,
+                                  db/bb/kb/sl shorthand, optional plural — shared by the list and
+                                  the picker
     units.ts                   — weight unit preference (lb/kg): toDisplay()/fromDisplay()/
                                   fmtWeight() — storage is ALWAYS lbs; only labels and inputs
                                   convert, and every engine reason string formats through here
@@ -1409,7 +1425,7 @@ serves first-run onboarding and every replan; it saves the profile on activate.
 
 ## Exercise data architecture
 
-`src/data/exercises.ts` is the single source of truth for the ~89 built-in exercises
+`src/data/exercises.ts` is the single source of truth for the 141 built-in exercises
 (the original 28 plus a curated catalog expansion that feeds the substitution engine's
 candidate pool — catalog-only exercises join the user's library when swapped into the
 program, not before):
@@ -1457,6 +1473,19 @@ program, not before):
   Pallof press and dead bug. The swing and get-up are `advanced` with prerequisites (a
   controlled hip hinge; core anti-rotation work) for the same reason good mornings is — an
   unforgiving technique floor.
+- The **November 2026 audit** layer (52 exercises; full table and rationale in
+  `docs/catalog-audit-2026-11.md`). Rules worth keeping when adding more: **a grip or rep-style
+  variant is a named variant, not an exercise** (`namedVariants.ts`); an implement or angle
+  that changes loading or the head trained *is* an exercise; new ids are `slugifyName(name)`
+  so a user's same-named custom entry resolves to it through `catalogDefFor`; every addition
+  needs a difficulty (advanced ⇒ prerequisites), heads where established and instructions —
+  `catalog.test.ts` enforces all of it, plus that no id/name/alias slug names two exercises.
+  Assisted machines are deliberately absent: their stack is counterweight, so every progression
+  branch would read them backwards until the body-weight log exists.
+- **Aliases** (`ALIASES`) are other names for the *same* movement. Search, `findExerciseByName`
+  (the create flow reuses the catalog id), `analytics`' name match and `catalogDefFor` (a custom
+  `rdl-1782…` resolves to Romanian Deadlifts) all read them; a custom entry named by an alias
+  shadows its catalog namesake in the picker and the substitution pool.
 
 `src/data/program.ts` defines the 4-day `PROGRAM` with just id, name, sets, repLow, repHigh per exercise. It no longer contains `RETIRED_EXERCISES` — those are now in `EXERCISES` in exercises.ts.
 
@@ -1509,7 +1538,7 @@ only the type name and vocabulary change.
   earlier merge into `'Press'`) remap unambiguously since they name their plane directly.
 - **Tier 1 — MovementCategory** (`MOVEMENT_CATEGORIES`, `patternCategoryFor()` in
   `taxonomy.ts`) — a coarser layer above MovementPattern, for the same reason Region sits above
-  MuscleGroup: most of MovementPattern's ~28 values have only 1–3 exercises, too few to show a
+  MuscleGroup: most of MovementPattern's ~32 values have only 1–3 exercises, too few to show a
   *trend* — "is my Face Pull number going up" just restates that exercise's own progress. Eight
   categories (Squat, Hinge, Push, Pull, Core, Carry, Power, Isolation) aggregate enough
   exercises to say something new — the same mental model lifters already use for

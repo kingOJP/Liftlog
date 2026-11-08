@@ -206,9 +206,20 @@ describe('getExerciseName — orphaned timestamped ids', () => {
 
 describe('findExerciseByName', () => {
   it('matches a library exercise regardless of casing, punctuation and spacing', () => {
-    const hit = findExerciseByName('  bench   press?? ');
-    // No "bench press" in the default catalog — seed one as a custom entry
+    const hit = findExerciseByName('  jefferson   curl?? ');
+    // No "jefferson curl" in the catalog or its aliases — seed one as a custom entry
     expect(hit).toBeNull();
+    addToExerciseLibrary({ id: 'jefferson-curl-1700000000000', name: 'Jefferson Curl', sets: 3, repLow: 8, repHigh: 12 });
+    expect(findExerciseByName('JEFFERSON curl!')?.id).toBe('jefferson-curl-1700000000000');
+  });
+
+  it('resolves a catalog alias to the catalog identity instead of minting a duplicate', () => {
+    expect(findExerciseByName('RDL')?.id).toBe('romanian-deadlifts');
+    expect(findExerciseByName('lat pulldown')?.id).toBe('lat-pull-down');
+    expect(findExerciseByName('Bench Press')?.id).toBe('flat-barbell-bench-press');
+  });
+
+  it('prefers a library entry already named by the alias over the catalog namesake', () => {
     addToExerciseLibrary({ id: 'bench-press-1700000000000', name: 'Bench Press', sets: 3, repLow: 8, repHigh: 12 });
     expect(findExerciseByName('BENCH press!')?.id).toBe('bench-press-1700000000000');
   });
@@ -234,9 +245,17 @@ describe('findExerciseByName', () => {
 describe('pickableExercises', () => {
   it('offers the whole catalog, not just the library, so a newer catalog exercise is reachable', () => {
     localStorage.setItem('liftlog_library_v3', '1'); // skip the seeding migration
-    saveExerciseLibrary([{ id: 'bench-press', name: 'Bench Press' }]);
+    saveExerciseLibrary([{ id: 'jefferson-curl', name: 'Jefferson Curl' }]);
     const ids = new Set(pickableExercises().map(e => e.id));
     for (const def of EXERCISES) expect(ids.has(def.id)).toBe(true);
+  });
+
+  it('lets a custom entry named by an alias shadow its catalog namesake', () => {
+    localStorage.setItem('liftlog_library_v3', '1');
+    saveExerciseLibrary([{ id: 'rdl-1782000000000', name: 'RDL' }]);
+    const ids = pickableExercises().map(e => e.id);
+    expect(ids).toContain('rdl-1782000000000');
+    expect(ids).not.toContain('romanian-deadlifts');
   });
 
   it('lets a library entry shadow its catalog namesake, so history keeps one id', () => {

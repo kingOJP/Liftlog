@@ -3,7 +3,9 @@ import type { Exercise, LibraryExercise } from '../data/program';
 import {
   addToExerciseLibrary, findExerciseByName, generateExerciseId, pickableExercises,
 } from '../data/programStore';
-import { getExerciseMeta } from '../data/exercises';
+import { aliasesFor, catalogDefForName, getExerciseMeta } from '../data/exercises';
+import type { NamedVariant } from '../data/namedVariants';
+import { NAMED_VARIANTS, applyNamedVariant, namedVariantDetail, namedVariantFor } from '../data/namedVariants';
 import type { TrainingSnapshot } from '../data/analytics';
 import type { MuscleGroup } from '../data/taxonomy';
 import { MUSCLE_GROUPS } from '../data/taxonomy';
@@ -14,6 +16,16 @@ import { filterExercises } from '../data/search';
 import { InfoButton } from './InstructionSheet';
 import { useInstructionSheet } from './useInstructionSheet';
 import './DayEditView.css';
+
+/** One picker row: an exercise, or a named variant of one. */
+interface PickEntry {
+  key: string;
+  ex: LibraryExercise;
+  name: string;
+  aliases: string[];
+  primary: MuscleGroup | null;
+  variant?: NamedVariant;
+}
 
 interface Props {
   /** Exercises already present — hidden from results and never re-added */
@@ -68,10 +80,24 @@ export default function AddExercisePanel({
   );
 
   // One metadata read per entry per open, not per keystroke.
-  const entries = useMemo(
-    () => pool.map(ex => ({ ex, name: ex.name, primary: getExerciseMeta(ex.id).primaryMuscle ?? null })),
+  const entries = useMemo<PickEntry[]>(
+    () => pool.map(ex => ({
+      key: ex.id, ex, name: ex.name, aliases: aliasesFor(ex.id),
+      primary: getExerciseMeta(ex.id).primaryMuscle ?? null,
+    })),
     [pool],
   );
+  // Named variants ("Wide Grip Lat Pulldown") ride on an exercise the pool
+  // offers — a deleted or shadowed base takes its variants with it. They
+  // only appear once something is typed, so the browse list stays one row
+  // per exercise.
+  const variantEntries = useMemo<PickEntry[]>(() => {
+    const byId = new Map(entries.map(e => [e.ex.id, e]));
+    return NAMED_VARIANTS.flatMap(v => {
+      const base = byId.get(v.exerciseId);
+      return base ? [{ key: `${v.exerciseId}|${v.name}`, ex: base.ex, name: v.name, aliases: v.aliases ?? [], primary: base.primary, variant: v }] : [];
+    });
+  }, [entries]);
   // Chips only for muscles something in the pool actually trains.
   const muscles = useMemo(() => {
     const present = new Set(entries.map(e => e.primary));
@@ -87,9 +113,9 @@ export default function AddExercisePanel({
   }, []);
 
   const textMatches = useMemo(() => filterExercises(
-    entries.filter(e => !excludeIds.has(e.ex.id)),
+    [...entries, ...(search.trim() ? variantEntries : [])].filter(e => !excludeIds.has(e.ex.id)),
     search,
-  ), [entries, excludeIds, search]);
+  ), [entries, variantEntries, excludeIds, search]);
   const searchResults = useMemo(
     () => (muscle ? textMatches.filter(e => e.primary === muscle) : textMatches),
     [textMatches, muscle],
@@ -97,9 +123,11 @@ export default function AddExercisePanel({
   // Matches the muscle chip is hiding — offered as a one-tap way out.
   const hiddenByMuscle = textMatches.length - searchResults.length;
 
+  // A typed catalog name, alias or named variant is not something to create.
   const exactMatch = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q !== '' && pool.some(e => e.name.trim().toLowerCase() === q);
+    return q !== '' && (pool.some(e => e.name.trim().toLowerCase() === q)
+      || catalogDefForName(q) != null || namedVariantFor(q) != null);
   }, [pool, search]);
 
   const suggested = useMemo(
@@ -123,13 +151,23 @@ export default function AddExercisePanel({
   }
 
   // The library holds identity only — dose the slot here, for the active plan.
-  function handleAddFromLibrary(ex: LibraryExercise) {
-    commit(slotFor(ex.id, ex.name, doseOpts));
+  // A named variant is its base exercise's slot with the modifier pinned.
+  function handleAddFromLibrary(ex: LibraryExercise, variant?: NamedVariant) {
+    const slot = slotFor(ex.id, ex.name, doseOpts);
+    commit(variant ? applyNamedVariant(slot, variant) : slot);
   }
 
   function handleCreate() {
     const trimmed = search.trim();
     if (!trimmed) return;
+    const variant = namedVariantFor(trimmed);
+    const base = variant ? pool.find(e => e.id === variant.exerciseId) : undefined;
+    if (variant && base) {
+      if (!excludeIds.has(base.id)) handleAddFromLibrary(base, variant);
+      else if (onClose) onClose();
+      else reset();
+      return;
+    }
     const existing = findExerciseByName(trimmed);
     if (existing) {
       if (!excludeIds.has(existing.id)) handleAddFromLibrary(existing);
@@ -177,15 +215,15 @@ export default function AddExercisePanel({
       {!creating && (
         <>
           <div className="add-search-results">
-            {searchResults.slice(0, limit).map(({ ex, primary: muscle }) => {
+            {searchResults.slice(0, limit).map(({ key, ex, name, primary: muscle, variant }) => {
               return (
-                <div key={ex.id} className="add-search-result" role="button" tabIndex={0}
-                  onClick={() => handleAddFromLibrary(ex)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAddFromLibrary(ex); } }}>
+                <div key={key} className="add-search-result" role="button" tabIndex={0}
+                  onClick={() => handleAddFromLibrary(ex, variant)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAddFromLibrary(ex, variant); } }}>
                   <div className="add-search-text">
-                    <span className="add-search-name">{ex.name}</span>
+                    <span className="add-search-name">{name}</span>
                     <span className="add-search-meta">
-                      {[muscle].filter(Boolean).join(' · ')}
+                      {[variant ? namedVariantDetail(variant) : null, muscle].filter(Boolean).join(' · ')}
                     </span>
                   </div>
                   <InfoButton name={ex.name} onClick={() => info.open(ex.id, ex.name)} />

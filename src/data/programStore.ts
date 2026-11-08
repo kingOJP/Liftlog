@@ -1,4 +1,4 @@
-import { EXERCISES, EXERCISE_MAP, catalogDefFor, deleteExerciseMeta } from './exercises';
+import { EXERCISES, EXERCISE_MAP, catalogDefFor, catalogDefForName, deleteExerciseMeta } from './exercises';
 import { LEGACY_ID_MAP, canonicalizeId } from './legacyIds';
 import { type Exercise, type LibraryExercise, type WorkoutDay } from './program';
 
@@ -247,6 +247,9 @@ export function pickableExercises(): LibraryExercise[] {
     if (ex.archived) continue;
     seenIds.add(ex.id);
     seenNames.add(slugify(ex.name));
+    // A custom copy named by an alias ("RDL") shadows its catalog namesake too.
+    const namesake = catalogDefFor(ex.id) ?? catalogDefForName(ex.name);
+    if (namesake) seenIds.add(namesake.id);
     out.push({ id: ex.id, name: ex.name });
   }
   for (const def of EXERCISES) {
@@ -316,8 +319,13 @@ export function findExerciseByName(name: string): LibraryExercise | null {
   if (!slug) return null;
   const lib = getExerciseLibrary().find(e => slugify(e.name) === slug);
   if (lib) return lib;
-  const def = EXERCISES.find(e => e.id === slug || slugify(e.name) === slug);
-  if (def) return { id: def.id, name: def.name };
+  // A catalog id, name or alias ("RDL", "Lat Pulldown") — the library entry
+  // for it first, since that is the id the user's history is logged under.
+  const def = catalogDefForName(name);
+  if (def) {
+    const own = getExerciseLibrary().find(e => e.id === def.id);
+    return own ?? { id: def.id, name: def.name };
+  }
   return null;
 }
 
