@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { getUnfinishedWorkout, draftSetCount } from '../data/draftSession';
+import { reportError } from '../data/errorReport';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('LiftLog crashed while rendering', error, info.componentStack);
+    reportError('render', error);
   }
 
   render(): ReactNode {

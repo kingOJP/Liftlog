@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getRestDuration, saveRestDuration, REST_PRESETS } from '../data/settings';
+import { haptic } from '../data/native';
 import './RestTimer.css';
 
 // Wall-clock read, kept at module scope so it stays outside React's purity model.
@@ -45,7 +46,7 @@ export default function RestTimer({ runId, onDismiss }: Props) {
       if (left <= 0) {
         setRemaining(0);
         setDone(true);
-        if ('vibrate' in navigator) navigator.vibrate([120, 60, 120]);
+        haptic('success');
         clearInterval(id);
       } else {
         setRemaining(left);

@@ -4,6 +4,20 @@ import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import { listenForServiceWorkerUpdates } from './data/appUpdate.ts'
+import { installErrorReporting } from './data/errorReport.ts'
+import { listenForNativeSignIn, markNativeApp } from './data/native.ts'
+
+installErrorReporting();
+// Inside the native wrapper, sign-in finishes with the app being re-opened by URL.
+listenForNativeSignIn();
+markNativeApp();
+
+// Ask the browser not to evict this origin's storage under pressure. Workouts
+// sync, but a draft or an unpushed session lives only here; Safari in
+// particular clears script-writable storage for sites it considers idle.
+if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+  navigator.storage.persist().catch(() => {});
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -3,16 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#7C72E8" />
+    <meta name="description" content="LiftLog is a strength coach in your pocket: plan your training, log workouts, and get recommendations built from your own history." />
+    <meta name="theme-color" content="#0a0a0f" />
+    <meta name="color-scheme" content="dark" />
+    <!-- iOS turns runs of digits ("185 lbs × 8") into phone links otherwise -->
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LiftLog" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>LiftLog</title>
+    <!-- Painted before the stylesheet or any script arrives: the launch image,
+         this frame and the app share one background, so opening the app never
+         flashes white. React replaces #boot on its first render. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0a0a0f; color: #f2f2f7; }
+      #boot { height: 100%; display: flex; align-items: center; justify-content: center; }
+      #boot svg { width: 26vmin; max-width: 132px; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#8f86f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9v6M6.5 6.5v11M17.5 6.5v11M21 9v6M6.5 12h11" />
+        </svg>
+      </div>
+    </div>
+    <noscript>
+      <p style="padding: 24px; font-family: -apple-system, sans-serif;">LiftLog needs JavaScript to run. Please enable it and reload.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

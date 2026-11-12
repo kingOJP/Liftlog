@@ -53,6 +53,48 @@ html, body, #root {
   height: 100%;
 }
 
+html {
+  background-color: var(--bg);
+  /* Rotating the phone must not re-inflate the text */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* App feel. Chrome is not a document: no grey flash under a tap, no text
+   selection or callout menu on a long press, no 300 ms double-tap delay.
+   Anything a person would actually want to copy opts back in below. */
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+input, textarea, select, [contenteditable],
+.selectable, .crash-message {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Installed (home screen) or inside the native wrapper, the page is the app:
+   pinch-zoom would only ever happen by accident mid-set. In a browser tab
+   zoom stays available. */
+@media (display-mode: standalone) {
+  html { touch-action: pan-x pan-y; }
+}
+html.native-app { touch-action: pan-x pan-y; }
+
+/* Honour "Reduce Motion" everywhere, including animations added later. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   background-color: var(--bg);
   /* A faint violet bloom behind the top of the app — depth without decoration */

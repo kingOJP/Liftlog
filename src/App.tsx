@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from './data/program';
 import { getStoredProgram, saveStoredProgram, removeExerciseFromProgram } from './data/programStore';
-import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync } from './data/sync';
+import { getLoggedInUser, ensureLocalDataOwner, pullSync, pushSync, signInAgain } from './data/sync';
 import type { SyncUser } from './data/sync';
 import { ensureJourneyMigrated, ensureWeekAnchor, startPendingActivation, reconcileActiveProgram } from './data/planStore';
 import { migrateExerciseIds, ensureSessionGuids, purgeEmptySessions } from './db/database';
@@ -20,6 +20,9 @@ import MetricsView from './components/MetricsView';
 import SettingsView from './components/SettingsView';
 import GlossaryView from './components/GlossaryView';
 import LoginView from './components/LoginView';
+import LegalView from './components/LegalView';
+import { legalDocForPath } from './data/legal';
+import { setReportScreen } from './data/errorReport';
 import JourneyView from './components/JourneyView';
 import PlanSetupView from './components/PlanSetupView';
 import QuickWorkoutView from './components/QuickWorkoutView';
@@ -78,6 +81,8 @@ function App() {
   const workoutOpenRef = useRef(false);
   const workoutOpen = view.screen === 'workout' || view.screen === 'quick-workout' || view.screen === 'shared-workout';
   useEffect(() => { workoutOpenRef.current = workoutOpen; }, [workoutOpen]);
+  // Crash reports name the screen that was open
+  useEffect(() => { setReportScreen(view.screen); }, [view.screen]);
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
   // A new build took over the service worker. The toast waits until no
   // workout is open — reloading mid-set is the one thing it must never do.
@@ -260,6 +265,17 @@ function App() {
   }
 
   const loginError = new URLSearchParams(window.location.search).get('error') ?? undefined;
+
+  // /privacy, /terms and /support are public pages: readable signed out (the
+  // App Store listing and the login screen link to them) and signed in.
+  const legalDoc = legalDocForPath(window.location.pathname);
+  if (legalDoc) {
+    return (
+      <div className="app">
+        <LegalView doc={legalDoc} />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -568,7 +584,7 @@ function App() {
       {syncStatus.authExpired && (
         <div className="auth-banner" role="alert">
           <span>Your sign-in expired — workouts are saved on this phone but not syncing.</span>
-          <a className="auth-banner-link" href="/api/auth/google">Sign in again</a>
+          <button className="auth-banner-link" onClick={signInAgain}>Sign in again</button>
         </div>
       )}
       {renderView()}

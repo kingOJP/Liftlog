@@ -256,6 +256,29 @@ CREATE TABLE IF NOT EXISTS pending_exercises (
   review_note   TEXT
 );
 
+-- Sign-in identities: a provider subject → LiftLog account (see
+-- worker/migrations/0010_identities_and_handoffs.sql). refresh_token is kept
+-- for Apple only, so the account can be revoked there when it is deleted.
+CREATE TABLE IF NOT EXISTS user_identities (
+  provider      TEXT    NOT NULL,   -- 'google' | 'apple'
+  subject       TEXT    NOT NULL,
+  user_id       TEXT    NOT NULL,
+  refresh_token TEXT,
+  created_at    INTEGER NOT NULL,
+  PRIMARY KEY (provider, subject),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_identities_user ON user_identities (user_id);
+
+-- One-time codes carrying a finished sign-in from the system browser into a
+-- native app's web view.
+CREATE TABLE IF NOT EXISTS auth_handoffs (
+  code       TEXT    PRIMARY KEY,
+  user_id    TEXT    NOT NULL,
+  expires_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Which migration files have been applied to this database. Every file in
 -- worker/migrations/ records itself here; see worker/migrations/README.md
 -- for the apply step. Rows for 0002–0007 are back-filled by 0008 (they

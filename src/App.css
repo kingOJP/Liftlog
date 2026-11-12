@@ -143,8 +143,10 @@
   border-radius: 8px;
   background: var(--purple);
   color: #fff;
+  font: inherit;
   font-weight: 600;
-  text-decoration: none;
+  border: none;
+  cursor: pointer;
 }
 
 /* "Update ready" toast — bottom of the shell, above the home indicator */

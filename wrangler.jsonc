@@ -6,6 +6,10 @@
     "directory": "./dist",
     "binding": "ASSETS"
   },
+  // Keep worker logs (errors, client crash reports) searchable in the dashboard.
+  "observability": {
+    "enabled": true
+  },
   "vars": {
     "GOOGLE_CLIENT_ID": "109541002587-cj4v8kjgkrq83g2n3a0ks8i0un8ovctf.apps.googleusercontent.com"
   },

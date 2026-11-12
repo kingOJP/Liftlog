@@ -1,6 +1,42 @@
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Icon from './Icon';
 import type { IconName } from './Icon';
+import { signInPath, startNativeSignIn } from '../data/native';
+import type { SignInProvider } from '../data/native';
 import './LoginView.css';
+
+// Whether Sign in with Apple is configured on the server. Remembered between
+// launches so the button doesn't pop in after the screen has painted.
+const APPLE_KEY = 'liftlog_apple_signin';
+
+function useAppleAvailable(): boolean {
+  const [available, setAvailable] = useState(() => {
+    try { return localStorage.getItem(APPLE_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/providers')
+      .then(res => (res.ok ? res.json() : null))
+      .then((providers: { apple?: boolean } | null) => {
+        if (cancelled || !providers) return;
+        const apple = providers.apple === true;
+        setAvailable(apple);
+        try { localStorage.setItem(APPLE_KEY, apple ? '1' : '0'); } catch { /* private mode */ }
+      })
+      .catch(() => { /* offline: keep what we knew */ });
+    return () => { cancelled = true; };
+  }, []);
+  return available;
+}
+
+function subscribeOnline(listener: () => void): () => void {
+  window.addEventListener('online', listener);
+  window.addEventListener('offline', listener);
+  return () => {
+    window.removeEventListener('online', listener);
+    window.removeEventListener('offline', listener);
+  };
+}
 
 const FEATURES: Array<{ icon: IconName; label: string }> = [
   { icon: 'calendar', label: 'Personalized training plans' },
@@ -9,6 +45,17 @@ const FEATURES: Array<{ icon: IconName; label: string }> = [
 ];
 
 export default function LoginView({ error }: { error?: string }) {
+  const appleAvailable = useAppleAvailable();
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+
+  // On the web the link is simply followed. Inside the native wrapper the
+  // provider page has to open in the system browser instead (data/native.ts).
+  function handleSignIn(provider: SignInProvider) {
+    return (e: React.MouseEvent) => {
+      if (startNativeSignIn(provider)) e.preventDefault();
+    };
+  }
+
   return (
     <div className="login-view">
       {/* Gym backdrop drawn in CSS + SVG rather than a photo: nothing to
@@ -67,7 +114,22 @@ export default function LoginView({ error }: { error?: string }) {
             <p className="login-error" role="alert">Sign-in failed. Please try again.</p>
           )}
 
-          <a href="/api/auth/google" className="google-btn">
+          {!online && (
+            <p className="login-offline" role="status">
+              You're offline. Connect to the internet to sign in — after that, LiftLog works without a connection.
+            </p>
+          )}
+
+          {appleAvailable && (
+            <a href={signInPath('apple')} className="apple-btn" onClick={handleSignIn('apple')}>
+              <svg className="apple-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path fill="currentColor" d="M17.05 12.54c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.27 3.14-2.53.99-1.45 1.4-2.85 1.42-2.93-.03-.01-2.72-1.04-2.74-4.12zM14.46 4.9c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.55-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.58 3.04-1.45z"/>
+              </svg>
+              Continue with Apple
+            </a>
+          )}
+
+          <a href={signInPath('google')} className="google-btn" onClick={handleSignIn('google')}>
             <svg className="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -79,6 +141,10 @@ export default function LoginView({ error }: { error?: string }) {
 
           <p className="login-footnote">
             New here? Signing in creates your account — your training syncs across devices.
+          </p>
+          <p className="login-legal">
+            By continuing you agree to the <a href="/terms">Terms of Use</a> and{' '}
+            <a href="/privacy">Privacy Policy</a>.
           </p>
         </div>
       </div>

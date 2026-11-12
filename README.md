@@ -47,7 +47,10 @@ suggested, or exercise swapped comes with a plain-English reason.
 - **History** — every past session, expandable and editable (including re-dating).
 - **Sharing** — hand a workout to a friend via a QR code; their own recommendation engine fills
   in weights from their history, so the workout fits their level automatically.
-- **Cloud sync** — Google OAuth + a Cloudflare Worker/D1 backend keep every device in sync.
+- **Your account, your data** — sign in with Google or Apple, export everything as a file, or
+  delete the account and all its data from Settings. Privacy policy, terms and support live at
+  `/privacy`, `/terms` and `/support`.
+- **Cloud sync** — a Cloudflare Worker/D1 backend keeps every device in sync.
   Workouts merge per-session by immutable GUID (no lost data across devices); the training
   journey, program, exercise library and metadata sync too.
 

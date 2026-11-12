@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useWakeLock } from '../data/wakeLock';
+import { haptic } from '../data/native';
 import type { WorkoutDay, Exercise } from '../data/program';
 import { getWeekNumber, getWeekNumberForDate, toLocalDateValue } from '../data/program';
 import { computeProgramPlan, applyPlanToDay } from '../data/coach';
@@ -205,6 +207,8 @@ export default function WorkoutView({
   const [loading, setLoading] = useState(isEditMode);
   // Increments on every logged set to (re)start the rest timer. Edit mode skips it.
   const [restRunId, setRestRunId] = useState(0);
+  // Keep the screen on while logging a live workout (not while editing history)
+  useWakeLock(!isEditMode);
   // Duration tracking: the workout starts when the view opens (or when the
   // restored draft's workout originally started); the session ends at the
   // final logged set. completedAt − startedAt is the workout duration.
@@ -366,6 +370,7 @@ export default function WorkoutView({
     }));
     // Warm-up sets don't start the rest timer — you're not resting between them.
     // (A drop or rest-pause row does: it's logged once the extended set is over.)
+    if (!isEditMode) haptic('light');
     if (!isEditMode && !entry.warmup) setRestRunId(id => id + 1);
     // That was the last prescribed set: move on to the next unfinished
     // exercise so the lifter is looking at what comes next while they rest.

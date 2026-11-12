@@ -229,3 +229,125 @@
 .settings-sync-btn:disabled {
   opacity: 0.6;
 }
+
+.settings-nav-row:disabled {
+  opacity: 0.6;
+}
+
+.settings-nav-row--danger .settings-nav-title {
+  color: var(--red);
+}
+
+/* About: plain links, one per row */
+.settings-links {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.settings-link {
+  padding: 14px;
+  font-size: 15px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-link:last-child {
+  border-bottom: none;
+}
+
+.settings-link:active {
+  background: var(--bg-input);
+}
+
+.settings-version {
+  text-align: center;
+  color: var(--text-faint);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Delete-account confirmation */
+.settings-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.66);
+}
+
+.settings-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.settings-dialog:focus {
+  outline: none;
+}
+
+.settings-dialog-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.settings-dialog-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.settings-dialog-text strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.settings-dialog-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.settings-dialog-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.settings-dialog-btn {
+  flex: 1;
+  padding: 13px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-dialog-btn--danger {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+.settings-dialog-btn:disabled {
+  opacity: 0.45;
+}

@@ -1,0 +1,84 @@
+.legal-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.legal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+  border-bottom: 1px solid var(--hairline);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(10, 10, 15, 0.78);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  backdrop-filter: saturate(160%) blur(18px);
+}
+
+.legal-header .back-btn {
+  text-decoration: none;
+}
+
+.legal-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Long-form reading: the one place in the app where text is selectable prose. */
+.legal-body {
+  padding: 20px 20px calc(48px + env(safe-area-inset-bottom));
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.legal-body h2 {
+  margin: 28px 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.legal-body p,
+.legal-body ul {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+}
+
+.legal-body ul {
+  padding-left: 20px;
+}
+
+.legal-body li {
+  margin-bottom: 8px;
+}
+
+.legal-body strong,
+.legal-body em {
+  color: var(--text);
+  font-style: normal;
+}
+
+.legal-body a {
+  color: var(--purple-bright);
+}
+
+.legal-body .legal-lead {
+  color: var(--text);
+}
+
+.legal-updated,
+.legal-version {
+  font-size: 12.5px;
+  color: var(--text-faint) !important;
+}
+
+.legal-version {
+  margin-top: 32px !important;
+}

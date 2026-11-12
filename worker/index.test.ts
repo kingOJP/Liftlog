@@ -52,6 +52,61 @@ describe('routing', () => {
   });
 });
 
+describe('pages the app renders for signed-out visitors', () => {
+  // App Store Connect needs a public privacy-policy URL and a support URL.
+  // They are screens of the single-page app, so the shell must come back for
+  // them whatever the hosting fallback is configured to do.
+  it.each(['/privacy', '/terms', '/support', '/privacy/'])('serves the app shell for %s', async (path) => {
+    const seen: string[] = [];
+    env.ASSETS = { fetch: async (req: Request) => { seen.push(new URL(req.url).pathname); return new Response('shell'); } } as unknown as Fetcher;
+    expect(await (await get(path)).text()).toBe('shell');
+    expect(seen).toEqual(['/']);
+  });
+});
+
+describe('API responses', () => {
+  it('are never cacheable and never sniffed', async () => {
+    const res = await get('/api/sync', signIn(env));
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('answer an unknown API path with JSON, not the app shell', async () => {
+    const res = await get('/api/nope');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Not found' });
+  });
+});
+
+describe('client crash reports', () => {
+  const report = (cookie: string | undefined, body: string, method = 'POST') =>
+    worker.fetch(new Request('https://liftlog.test/api/client-error', {
+      method, headers: cookie ? { Cookie: cookie } : {}, body: method === 'POST' ? body : undefined,
+    }), env);
+
+  it('land in the worker log with the account id, clipped', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await report(signIn(env), JSON.stringify({ kind: 'render', message: 'x'.repeat(2000), screen: 'workout' }));
+    expect(res.status).toBe(204);
+    const logged = JSON.parse(log.mock.calls[0][1] as string) as Record<string, string>;
+    expect(logged.user).toBe('user-1');
+    expect(logged.screen).toBe('workout');
+    expect(logged.message).toHaveLength(500);
+    // The email stays out of the logs; the id is enough to find the account.
+    expect(log.mock.calls[0][1]).not.toContain('a@example.com');
+  });
+
+  it.each([
+    ['a signed-out caller', undefined, '{}', 'POST', 401],
+    ['an oversized body',   'COOKIE',  JSON.stringify({ message: 'x'.repeat(9000) }), 'POST', 413],
+    ['a non-JSON body',     'COOKIE',  'not json', 'POST', 400],
+    ['a GET',               'COOKIE',  '', 'GET', 405],
+  ])('refuse %s', async (_label, cookieFlag, body, method, status) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await report(cookieFlag ? signIn(env) : undefined, body, method)).status).toBe(status);
+  });
+});
+
 describe('error handling', () => {
   it('turns a thrown handler into a 500 rather than an unhandled rejection', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});

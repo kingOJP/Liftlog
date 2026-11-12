@@ -124,6 +124,17 @@ export function getLoggedInUser(): SyncUser | null {
   }
 }
 
+/**
+ * The server session expired while the device still believes it is signed in.
+ * Drop the (JS-readable) profile cookie and reload: the login screen comes up
+ * with every sign-in option, and because the local data's owner is unchanged,
+ * signing back in to the same account keeps everything logged in the meantime.
+ */
+export function signInAgain(): void {
+  document.cookie = 'liftlog_user=; Max-Age=0; Path=/; Secure; SameSite=Lax';
+  window.location.replace('/');
+}
+
 // The signed-in account's role ('user' | 'admin' | 'tester'), as reported by
 // the server on every pull. Purely a UI hint — every privileged action is
 // enforced server-side by /api/admin.
@@ -151,23 +162,35 @@ export async function ensureLocalDataOwner(): Promise<void> {
   if (!user) return;
   const owner = localStorage.getItem(OWNER_KEY);
   if (owner && owner !== user.email) {
-    // Account switch: wipe user-scoped data (workout history, program, session
-    // tombstones, training journey, drafts — and, under the ownership model,
-    // the exercise library, metadata overrides and deletion tombstones, which
-    // are user-owned too). Application-owned data (the compiled-in catalog,
-    // the pulled global metadata layer) and device settings survive.
-    await clearIDB();
-    clearStoredProgram();
-    clearSessionTombstones();
-    clearDraftSession();
-    clearPlanState();
-    clearExerciseLibraryData();
-    clearExerciseMeta();
-    clearSyncStatus();
-    localStorage.removeItem(ROLE_KEY);
-    localStorage.removeItem(ETAG_KEY);
+    await clearLocalUserData();
   }
   localStorage.setItem(OWNER_KEY, user.email);
+}
+
+/**
+ * Wipe everything on this device that belongs to an account: workout history,
+ * program, session tombstones, training journey, drafts — and, under the
+ * ownership model, the exercise library, metadata overrides and deletion
+ * tombstones, which are user-owned too. Application-owned data (the compiled-in
+ * catalog, the pulled global metadata layer) and device settings survive.
+ * Used on an account switch and after the account itself is deleted.
+ */
+export async function clearLocalUserData(): Promise<void> {
+  await clearIDB();
+  clearStoredProgram();
+  clearSessionTombstones();
+  clearDraftSession();
+  clearPlanState();
+  clearExerciseLibraryData();
+  clearExerciseMeta();
+  clearSyncStatus();
+  localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(ETAG_KEY);
+}
+
+/** Forget which account this device's data belonged to (after deleting it). */
+export function clearLocalDataOwner(): void {
+  localStorage.removeItem(OWNER_KEY);
 }
 
 /**
