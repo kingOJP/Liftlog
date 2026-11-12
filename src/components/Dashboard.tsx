@@ -2,7 +2,10 @@ import { useState, useEffect, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getUnfinishedWorkout, draftSetCount } from '../data/draftSession';
 import type { DraftSession } from '../data/draftSession';
-import { getSyncStatus, subscribeSyncStatus, accountNotLoaded } from '../data/syncStatus';
+import { getSyncStatus, subscribeSyncStatus, accountNotLoaded, backupOverdue } from '../data/syncStatus';
+import { countUnbackedSessions } from '../data/backup';
+import { getLoggedInUser } from '../data/sync';
+import { saveBackupFile } from './backupFile';
 import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
@@ -70,6 +73,21 @@ export default function Dashboard({
     setRetrying(true);
     try { await onRetrySync(); } finally { setRetrying(false); }
   }
+  // Workouts the server has not acknowledged. Counted whenever sync state or
+  // the program reference changes (App hands down a fresh one after every
+  // workout and every pull).
+  const [unbacked, setUnbacked] = useState(0);
+  useEffect(() => {
+    let live = true;
+    countUnbackedSessions().then(n => { if (live) setUnbacked(n); }).catch(() => {});
+    return () => { live = false; };
+  }, [program, syncStatus]);
+  // Uploads have failed for long enough, with real workouts at stake, that a
+  // quiet footnote is the wrong volume. This is the state that went unnoticed
+  // for two weeks behind "Not syncing right now".
+  const atRisk = unbacked > 0 && backupOverdue(syncStatus);
+  const failingSince = syncStatus.pushFailingSince == null ? ''
+    : new Date(syncStatus.pushFailingSince).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   // The first 1RM goal, with its live estimate — one line on the journey card
@@ -277,6 +295,34 @@ export default function Dashboard({
         </button>
       )}
 
+      {atRisk && (
+        <section className="start-card start-card--problem" aria-labelledby="at-risk-title" role="alert">
+          <div className="start-eyebrow">Not backed up</div>
+          <h2 id="at-risk-title" className="start-title">
+            {unbacked === 1 ? '1 workout is' : `${unbacked} workouts are`} only on this device
+          </h2>
+          <p className="start-problem-text">
+            {syncStatus.authExpired
+              ? 'You were signed out, so nothing has uploaded'
+              : 'Uploads have been failing'} since {failingSince}. Your workouts are safe here, but
+            this is the only copy — don't sign out, clear browser data or delete the app until
+            this is gone.
+          </p>
+          <div className="start-problem-actions">
+            {syncStatus.authExpired ? (
+              <a className="start-retry" href="/api/auth/google">Sign in again</a>
+            ) : (
+              <button className="start-retry" onClick={retryLoad} disabled={retrying}>
+                {retrying ? 'Uploading…' : 'Try again'}
+              </button>
+            )}
+            <button className="start-backup" onClick={() => { saveBackupFile(getLoggedInUser()?.email ?? null).catch(() => {}); }}>
+              Save a backup file
+            </button>
+          </div>
+        </section>
+      )}
+
       {notLoaded ? (
         <section className="start-card start-card--problem" aria-labelledby="load-failed-title" role="alert">
           <div className="start-eyebrow">Couldn't load your account</div>
@@ -378,9 +424,11 @@ export default function Dashboard({
         </button>
       </nav>
 
-      {syncTrouble && !notLoaded && (
+      {syncTrouble && !notLoaded && !atRisk && (
         <p className="sync-badge" role="status">
-          Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
+          Not syncing right now — {unbacked > 0
+            ? `${unbacked === 1 ? '1 workout is' : `${unbacked} workouts are`} saved on this phone and will upload`
+            : 'your workouts are safe on this phone and will upload'} when the connection is back.
         </p>
       )}
     </div>

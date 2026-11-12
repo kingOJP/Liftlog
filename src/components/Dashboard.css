@@ -133,6 +133,31 @@
   cursor: pointer;
 }
 
+.start-problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+a.start-retry {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.start-backup {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .start-retry:disabled {
   opacity: 0.6;
   cursor: default;

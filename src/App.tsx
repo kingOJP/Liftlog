@@ -134,6 +134,9 @@ function App() {
         // would upload it into this account.
         await ensureLocalDataOwner();
         setProgram(getStoredProgram());
+        // Ask the browser not to evict this origin's storage under pressure.
+        // Until a push lands, IndexedDB holds the only copy of a workout.
+        navigator.storage?.persist?.().catch(() => {});
       } catch (err) {
         console.error(err);
       }
@@ -409,6 +412,10 @@ function App() {
           <SettingsView
             user={user!}
             onBack={() => setView({ screen: 'dashboard' })}
+            onRestored={async () => {
+              setProgram(getStoredProgram());
+              await loadAccount();
+            }}
             onSyncNow={async () => {
               try {
                 if (await pullSync()) setProgram(getStoredProgram());
