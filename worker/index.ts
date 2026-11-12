@@ -2,6 +2,7 @@ import type { Env } from './types';
 import { handleAuth } from './auth';
 import { handleSync } from './sync';
 import { handleAdmin } from './admin';
+import { ensureSchema } from './migrate';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -11,10 +12,15 @@ export default {
       if (url.pathname.startsWith('/api/auth')) {
         return await handleAuth(request, env, url);
       }
+      // Sign-in above never waits on a migration. Everything that reads the
+      // user's data does: a database behind this build is brought up to date
+      // here rather than answering 500 until someone runs wrangler by hand.
       if (url.pathname === '/api/sync') {
+        await ensureSchema(env);
         return await handleSync(request, env);
       }
       if (url.pathname.startsWith('/api/admin')) {
+        await ensureSchema(env);
         return await handleAdmin(request, env, url);
       }
     } catch (err) {

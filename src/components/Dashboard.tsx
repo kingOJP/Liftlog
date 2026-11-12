@@ -2,7 +2,7 @@ import { useState, useEffect, useSyncExternalStore } from 'react';
 import type { WorkoutDay } from '../data/program';
 import { getUnfinishedWorkout, draftSetCount } from '../data/draftSession';
 import type { DraftSession } from '../data/draftSession';
-import { getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
+import { getSyncStatus, subscribeSyncStatus, accountNotLoaded } from '../data/syncStatus';
 import { getWeekNumber, getWeekDateRange } from '../data/program';
 import { loadTrainingSnapshot, sessionTimestamp } from '../data/analytics';
 import { computeCoaching } from '../data/insights';
@@ -33,6 +33,8 @@ interface Props {
   onQuickWorkout: () => void;
   onResumeWorkout: (draft: DraftSession) => void;
   onAddDay: () => void;
+  /** Re-run the account load (pull → settle → push) after a failed first load */
+  onRetrySync: () => Promise<void>;
 }
 
 function startLabel(startDate: string): string {
@@ -49,7 +51,7 @@ function lastTrainedLabel(ts: number | null): string {
 
 export default function Dashboard({
   program, onStartWorkout, onEditDay, onViewHistory, onViewMetrics, onViewSettings,
-  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay,
+  onViewJourney, onPlanSetup, onQuickWorkout, onResumeWorkout, onAddDay, onRetrySync,
 }: Props) {
   const weekNumber = getWeekNumber();
   // An interrupted or abandoned-for-now workout, offered for resumption. Read
@@ -58,6 +60,16 @@ export default function Dashboard({
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
   const syncTrouble = !syncStatus.authExpired && syncStatus.lastError != null
     && (syncStatus.lastSuccessAt == null || (syncStatus.lastErrorAt ?? 0) > syncStatus.lastSuccessAt);
+  // Signed in, but this device has never managed to download the account. An
+  // empty program here is not a blank slate — offering "design your plan"
+  // would tell the user their training is gone, and a plan made here would
+  // outrank the real one (newer clock) the moment sync recovered.
+  const notLoaded = program.length === 0 && accountNotLoaded(syncStatus);
+  const [retrying, setRetrying] = useState(false);
+  async function retryLoad() {
+    setRetrying(true);
+    try { await onRetrySync(); } finally { setRetrying(false); }
+  }
   const [completedDayIds, setCompletedDayIds] = useState<Set<number>>(new Set());
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   // The first 1RM goal, with its live estimate — one line on the journey card
@@ -265,7 +277,20 @@ export default function Dashboard({
         </button>
       )}
 
-      {program.length === 0 ? (
+      {notLoaded ? (
+        <section className="start-card start-card--problem" aria-labelledby="load-failed-title" role="alert">
+          <div className="start-eyebrow">Couldn't load your account</div>
+          <h2 id="load-failed-title" className="start-title">Your training isn't on this device yet</h2>
+          <p className="start-problem-text">
+            You're signed in, but LiftLog couldn't download your plan and workouts, so this
+            screen looks empty. Nothing has been deleted. Please don't start a new plan
+            here — try again in a moment.
+          </p>
+          <button className="start-retry" onClick={retryLoad} disabled={retrying}>
+            {retrying ? 'Loading…' : 'Try again'}
+          </button>
+        </section>
+      ) : program.length === 0 ? (
         <section className="start-card" aria-labelledby="start-card-title">
           <div className="start-eyebrow">Get started</div>
           <h2 id="start-card-title" className="start-title">How do you want to train?</h2>
@@ -353,7 +378,7 @@ export default function Dashboard({
         </button>
       </nav>
 
-      {syncTrouble && (
+      {syncTrouble && !notLoaded && (
         <p className="sync-badge" role="status">
           Not syncing right now — your workouts are safe on this phone and will upload when the connection is back.
         </p>

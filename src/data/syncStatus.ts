@@ -21,6 +21,13 @@
 
 export interface SyncStatus {
   lastSuccessAt: number | null;
+  /**
+   * When this device last completed a pull. Separate from `lastSuccessAt`
+   * (which a push also sets) because it answers a different question: has
+   * this device EVER loaded the account? Until it has, an empty program is
+   * not a new account — it is one that has not arrived yet.
+   */
+  lastPullAt: number | null;
   lastError: string | null;
   lastErrorAt: number | null;
   hasUnpushed: boolean;
@@ -30,7 +37,7 @@ export interface SyncStatus {
 const KEY = 'liftlog_sync_status';
 
 const DEFAULT: SyncStatus = {
-  lastSuccessAt: null, lastError: null, lastErrorAt: null, hasUnpushed: false, authExpired: false,
+  lastSuccessAt: null, lastPullAt: null, lastError: null, lastErrorAt: null, hasUnpushed: false, authExpired: false,
 };
 
 let cached: SyncStatus | null = null;
@@ -77,7 +84,7 @@ export function markPushSucceeded(now = Date.now()): void {
 }
 
 export function markPullSucceeded(now = Date.now()): void {
-  write({ ...load(), authExpired: false, lastSuccessAt: now, lastError: null, lastErrorAt: null });
+  write({ ...load(), authExpired: false, lastSuccessAt: now, lastPullAt: now, lastError: null, lastErrorAt: null });
 }
 
 export function markSyncFailed(error: unknown, now = Date.now()): void {
@@ -91,6 +98,16 @@ export function markAuthExpired(now = Date.now()): void {
 
 export function clearSyncStatus(): void {
   write({ ...DEFAULT });
+}
+
+/**
+ * True when this device has never managed to load the account and the attempt
+ * is failing. The app must not present that as a blank slate: the user would
+ * see their plan and history "gone", and a plan created here would carry a
+ * newer clock than the real one and replace it once sync recovered.
+ */
+export function accountNotLoaded(s: SyncStatus = load()): boolean {
+  return s.lastPullAt == null && s.lastError != null && !s.authExpired;
 }
 
 /** Human line for Settings: "Synced 3 min ago", "Never synced", or the error. */
