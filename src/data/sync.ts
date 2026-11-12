@@ -24,8 +24,10 @@ import type { PlanState } from './planStore';
 import { syncLock } from './syncLock';
 import {
   markAuthExpired, markPullSucceeded, markPushStarted, markPushSucceeded, markSyncFailed,
-  clearSyncStatus, getSyncStatus,
+  clearSyncStatus, getSyncStatus, markPushNotDelivered,
 } from './syncStatus';
+import { recordSyncedSessions, clearSyncedSessions } from './syncedSessions';
+import { stashStrandedBackup, restoreStrandedBackup } from './backup';
 
 export interface SyncUser {
   email: string;
@@ -156,6 +158,11 @@ export async function ensureLocalDataOwner(): Promise<void> {
     // the exercise library, metadata overrides and deletion tombstones, which
     // are user-owned too). Application-owned data (the compiled-in catalog,
     // the pulled global metadata layer) and device settings survive.
+    //
+    // If the outgoing account still holds workouts the server never received,
+    // this wipe would destroy the only copy — so they are stashed first and
+    // merged back the next time that account signs in here (backup.ts).
+    await stashStrandedBackup(owner);
     await clearIDB();
     clearStoredProgram();
     clearSessionTombstones();
@@ -164,10 +171,14 @@ export async function ensureLocalDataOwner(): Promise<void> {
     clearExerciseLibraryData();
     clearExerciseMeta();
     clearSyncStatus();
+    clearSyncedSessions();
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(ETAG_KEY);
   }
   localStorage.setItem(OWNER_KEY, user.email);
+  // Anything this account left stranded on this device comes back now; the
+  // startup push that follows uploads it.
+  await restoreStrandedBackup(user.email);
 }
 
 /**
@@ -182,9 +193,10 @@ export function pushSync(): Promise<void> {
     markPushStarted();
     try {
       const status = await pushSyncUnlocked();
-      if (status === 'unauthorized') markAuthExpired();
+      if (status === 'unauthorized') { markPushNotDelivered(); markAuthExpired(); }
       else markPushSucceeded();
     } catch (err) {
+      markPushNotDelivered();
       markSyncFailed(err);
       throw err;
     }
@@ -251,6 +263,9 @@ async function pushSyncUnlocked(): Promise<'ok' | 'unauthorized'> {
 
   if (res.status === 401) return 'unauthorized';
   if (!res.ok) throw new Error(`Sync push failed: ${res.status}`);
+  // The server holds everything this push carried — remember exactly which
+  // workouts, so "N workouts only on this device" is a count, not a guess.
+  recordSyncedSessions(payload.sessions.map(s => ({ guid: s.guid, updatedAt: s.updatedAt })));
   return 'ok';
 }
 
@@ -339,6 +354,7 @@ async function pullSyncUnlocked(): Promise<boolean | 'unauthorized'> {
   // the pendingSessions workaround it needed.
   addSessionTombstones(data.deletedSessionGuids ?? []);
   const docs = groupWireSessions(data.sessions, data.setLogs);
+  recordSyncedSessions(docs.map(d => ({ guid: d.guid, updatedAt: d.updatedAt })));
   let changed = await mergeServerSessions(docs, getSessionTombstones());
   if (await purgeEmptySessions() > 0) changed = true;
 

@@ -591,7 +591,9 @@ src/
 | `liftlog_program_updated` | `programStore.ts` | Clock of the program's last local edit (0 = unstamped); compared on both ends of sync |
 | `liftlog_restored_exercises` | `programStore.ts` | Tombstones this device knowingly lifted (re-added by hand / merge survivor), pushed as `restoredExerciseIds` until the server stops reporting them deleted |
 | `liftlog_exercise_merges` | `merges.ts` | Admin from→to exercise-id map (application-owned, replaced on pull; applied only when it or the pulled data changed) |
-| `liftlog_sync_status` | `syncStatus.ts` | Device-local sync visibility (`lastSuccessAt`, `lastError`, `hasUnpushed`, `authExpired`) |
+| `liftlog_sync_status` | `syncStatus.ts` | Device-local sync visibility (`lastSuccessAt`, `lastPullAt`, `lastError`, `pushFailingSince`, `hasUnpushed`, `authExpired`) |
+| `liftlog_synced_sessions` | `syncedSessions.ts` | Ledger of session guid → clock the server acknowledged (device-local, user-scoped) — the exact "not backed up" count |
+| `liftlog_stranded_backup:<email>` | `backup.ts` | An account's un-uploaded data, stashed before an account-switch wipe and merged back on its next sign-in |
 | `liftlog_sync_etag` | `sync.ts` | ETag of the last full pull — sent as `If-None-Match`; a 304 skips the merge |
 | `liftlog_weight_unit` | `units.ts` | Display/entry unit (`lb`/`kg`) — device-local; storage stays in lbs |
 | `liftlog_library_v2` | `programStore.ts` | Migration flag — deduplication pass 1 |
@@ -756,6 +758,26 @@ account — Try again" card instead of the first-run start card. Offering the pl
 would tell the user their training is gone, and a plan created on that device would outrank
 the real one (newer clock) once sync recovered. `App.loadAccount()` is the one pull → settle →
 push sequence, shared by startup and the retry.
+
+**The app knows what the server lacks, and says so loudly.** `syncedSessions.ts`
+(`liftlog_synced_sessions`) is a ledger of session guid → the `updatedAt` the server
+acknowledged, written after an accepted push and after a pull; `countUnbackedSessions()`
+(`backup.ts`) is therefore an exact count of workouts that exist only on this device.
+`SyncStatus.pushFailingSince` starts at the first failed upload and is cleared only by an
+accepted push (unlike `lastError`, which any successful pull clears). When uploads have failed
+for `BACKUP_OVERDUE_MS` (12 h — longer than "no signal at the gym") with workouts at stake, the
+Dashboard shows a red "N workouts are only on this device" card with *Try again* and *Save a
+backup file*; Settings shows the count and asks before signing out. This exists because a
+two-week outage was reported by one grey line of text.
+
+**A backup does not depend on the server** (`backup.ts`, `components/backupFile.ts`).
+`buildBackup()` is the whole user-scoped state as one JSON document (Settings → Backup; share
+sheet on iOS, download elsewhere). `restoreBackup()` is a **merge through the pull functions,
+never a replace**: sessions per document (newer wins, nothing dropped), journey by its clocks,
+library/metadata per row, program only when this device has none. The same document is what
+`ensureLocalDataOwner` **stashes before an account-switch wipe** when the outgoing account
+still holds un-uploaded workouts (`liftlog_stranded_backup:<email>`), and merges back on that
+account's next sign-in here. `App` also calls `navigator.storage.persist()`.
 
 **Sync is serialized and visible.** Every entry point runs through `syncLock` (`syncLock.ts`,
 a promise chain) so the 60 s tick, the focus handler, startup and the post-workout push never

@@ -30,6 +30,13 @@ export interface SyncStatus {
   lastPullAt: number | null;
   lastError: string | null;
   lastErrorAt: number | null;
+  /**
+   * When uploads started failing, and they have not succeeded since. Unlike
+   * `lastError` (which a successful pull clears, so it flaps when only pushes
+   * fail) this is cleared by exactly one thing: a push the server accepted.
+   * It is what turns "not syncing right now" into "not backed up for 9 days".
+   */
+  pushFailingSince: number | null;
   hasUnpushed: boolean;
   authExpired: boolean;
 }
@@ -37,7 +44,8 @@ export interface SyncStatus {
 const KEY = 'liftlog_sync_status';
 
 const DEFAULT: SyncStatus = {
-  lastSuccessAt: null, lastPullAt: null, lastError: null, lastErrorAt: null, hasUnpushed: false, authExpired: false,
+  lastSuccessAt: null, lastPullAt: null, lastError: null, lastErrorAt: null,
+  pushFailingSince: null, hasUnpushed: false, authExpired: false,
 };
 
 let cached: SyncStatus | null = null;
@@ -80,7 +88,7 @@ export function markPushStarted(): void {
 }
 
 export function markPushSucceeded(now = Date.now()): void {
-  write({ ...load(), hasUnpushed: false, authExpired: false, lastSuccessAt: now, lastError: null, lastErrorAt: null });
+  write({ ...load(), hasUnpushed: false, authExpired: false, pushFailingSince: null, lastSuccessAt: now, lastError: null, lastErrorAt: null });
 }
 
 export function markPullSucceeded(now = Date.now()): void {
@@ -90,6 +98,23 @@ export function markPullSucceeded(now = Date.now()): void {
 export function markSyncFailed(error: unknown, now = Date.now()): void {
   const message = error instanceof Error ? error.message : String(error);
   write({ ...load(), lastError: message, lastErrorAt: now });
+}
+
+/** A push did not reach the server (error, or signed out). Keeps the first time. */
+export function markPushNotDelivered(now = Date.now()): void {
+  const s = load();
+  if (s.pushFailingSince == null) write({ ...s, pushFailingSince: now });
+}
+
+/**
+ * Uploads have been failing long enough that it is no longer "no signal at the
+ * gym". Past this the app stops whispering and tells the user plainly that
+ * their recent training exists only on this device.
+ */
+export const BACKUP_OVERDUE_MS = 12 * 60 * 60 * 1000;
+
+export function backupOverdue(s: SyncStatus = load(), now = Date.now()): boolean {
+  return s.pushFailingSince != null && now - s.pushFailingSince >= BACKUP_OVERDUE_MS;
 }
 
 export function markAuthExpired(now = Date.now()): void {

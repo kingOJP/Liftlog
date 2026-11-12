@@ -229,3 +229,14 @@
 .settings-sync-btn:disabled {
   opacity: 0.6;
 }
+
+/* ── Backup ── */
+.settings-backup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-backup-input {
+  display: none;
+}

@@ -29,7 +29,8 @@ import { getPlanState, saveTrainingProfile, getTrainingProfile } from '../src/da
 import { defaultTrainingProfile } from '../src/data/plan';
 import { saveExerciseMeta, getExerciseMeta } from '../src/data/exercises';
 import type { WorkoutDay } from '../src/data/program';
-import { accountNotLoaded, clearSyncStatus, getSyncStatus } from '../src/data/syncStatus';
+import { accountNotLoaded, clearSyncStatus, getSyncStatus, backupOverdue, BACKUP_OVERDUE_MS } from '../src/data/syncStatus';
+import { buildBackup, restoreBackup, countUnbackedSessions, isBackupFile } from '../src/data/backup';
 
 let env: TestEnv;
 
@@ -513,5 +514,178 @@ describe('a fresh sign-in whose first pull fails', () => {
     await expect(pullSync()).rejects.toThrow();
     expect(getSyncStatus().lastPullAt).toBeNull();
     expect(accountNotLoaded()).toBe(true);
+  });
+});
+
+// "I was logging on my phone and I'm not seeing it on here." For two weeks the
+// phone held the only copy of every new workout and said so in one grey line.
+// These pin the three things that now stand between a sync outage and lost
+// training: the app knows exactly what the server lacks, a copy can leave the
+// device without the server, and an account switch no longer destroys it.
+describe('workouts the server has not received', () => {
+  beforeEach(() => {
+    signInBrowser('a@example.com');
+    clearSyncStatus();
+  });
+
+  // The test localStorage is a shim; enumerate it through the Storage API.
+  const strandedKeys = () => Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)!)
+    .filter(k => k.startsWith('liftlog_stranded_backup'));
+
+  const serverDown = () =>
+    vi.stubGlobal('fetch', async () => Response.json({ error: 'Internal server error' }, { status: 500 }));
+
+  it('are counted exactly: nothing after a push, only the new one after an outage', async () => {
+    await logWorkout(1_000);
+    expect(await countUnbackedSessions()).toBe(1);
+    await pushSync();
+    expect(await countUnbackedSessions()).toBe(0);
+
+    const healthy = globalThis.fetch;
+    serverDown();
+    await logWorkout(2_000);
+    await expect(pushSync()).rejects.toThrow();
+    expect(await countUnbackedSessions()).toBe(1);
+
+    vi.stubGlobal('fetch', healthy);
+    await pushSync();
+    expect(await countUnbackedSessions()).toBe(0);
+  });
+
+  it('count an edited workout again until the edit uploads', async () => {
+    const id = await logWorkout(1_000);
+    await pushSync();
+    await rewriteSessionSets(id, [{ exerciseId: 'bench-press', setNumber: 1, weight: 140, reps: 8, order: 0 }]);
+    expect(await countUnbackedSessions()).toBe(1);
+  });
+
+  it('do not count workouts that arrived from the server', async () => {
+    await logWorkout(1_000);
+    await pushSync();
+    await clearIDB();
+    localStorage.clear();
+    clearSyncStatus();
+    await pullSync();
+    expect((await dumpIDB()).sessions).toHaveLength(1);
+    expect(await countUnbackedSessions()).toBe(0);
+  });
+
+  // lastError is cleared by any successful pull, so it flaps when only pushes
+  // fail. The overdue clock must not: it starts at the first failed upload and
+  // stops at the first accepted one, nothing else.
+  it('are reported as overdue from the first failed upload until one succeeds', async () => {
+    const healthy = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) =>
+      (init?.method === 'POST'
+        ? Response.json({ error: 'Internal server error' }, { status: 500 })
+        : healthy(input, init)));
+    await logWorkout(1_000);
+    await expect(pushSync()).rejects.toThrow();
+    const since = getSyncStatus().pushFailingSince!;
+    expect(since).toBeGreaterThan(0);
+
+    await pullSync(); // succeeds — and must not reset the clock
+    await expect(pushSync()).rejects.toThrow();
+    expect(getSyncStatus().pushFailingSince).toBe(since);
+    expect(backupOverdue(getSyncStatus(), since + BACKUP_OVERDUE_MS - 1)).toBe(false);
+    expect(backupOverdue(getSyncStatus(), since + BACKUP_OVERDUE_MS)).toBe(true);
+
+    vi.stubGlobal('fetch', healthy);
+    await pushSync();
+    expect(getSyncStatus().pushFailingSince).toBeNull();
+  });
+
+  it('survive in a backup file that restores onto an empty device and then uploads', async () => {
+    saveStoredProgram([day(1)]);
+    saveTrainingProfile({ ...defaultTrainingProfile(), experience: 'advanced' });
+    await logWorkout(1_000, 3);
+    await logWorkout(2_000, 2);
+    serverDown();
+    await expect(pushSync()).rejects.toThrow();
+
+    // The file is plain JSON: it has to survive being written and read back.
+    const file: unknown = JSON.parse(JSON.stringify(await buildBackup('a@example.com')));
+    expect(isBackupFile(file)).toBe(true);
+
+    // A different, empty device — the phone is gone.
+    await clearIDB();
+    localStorage.clear();
+    clearSyncStatus();
+    const result = await restoreBackup(file as Parameters<typeof restoreBackup>[0]);
+    expect(result).toEqual({ sessionsRestored: 2, programRestored: true, planRestored: true });
+    const idb = await dumpIDB();
+    expect(idb.sessions).toHaveLength(2);
+    expect(idb.setLogs).toHaveLength(5);
+    expect(getStoredProgram()).toHaveLength(1);
+    expect(getTrainingProfile()?.experience).toBe('advanced');
+
+    // …and once the server is back, the restored data reaches it.
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString(), 'https://liftlog.test');
+      const headers = new Headers(init?.headers);
+      headers.set('Cookie', document.cookie);
+      return handleSync(new Request(url, { ...init, headers }), env);
+    });
+    await pushSync();
+    expect(env.raw.prepare('SELECT COUNT(*) AS n FROM session_docs').get()).toEqual({ n: 2 });
+    expect(await countUnbackedSessions()).toBe(0);
+  });
+
+  it('are never replaced by an older backup: restoring only fills gaps', async () => {
+    saveStoredProgram([day(1)]);
+    const id = await logWorkout(1_000);
+    const old = await buildBackup('a@example.com');
+
+    await rewriteSessionSets(id, [{ exerciseId: 'bench-press', setNumber: 1, weight: 200, reps: 5, order: 0 }]);
+    saveStoredProgram([day(1), day(2)]);
+    await logWorkout(5_000);
+
+    const result = await restoreBackup(old);
+    expect(result.sessionsRestored).toBe(0);
+    expect(result.programRestored).toBe(false);
+    const idb = await dumpIDB();
+    expect(idb.sessions).toHaveLength(2);
+    expect(idb.setLogs.find(l => l.sessionId === id)?.weight).toBe(200);
+    expect(getStoredProgram()).toHaveLength(2);
+  });
+
+  it('are stashed when another account signs in, and come back when theirs does', async () => {
+    await ensureLocalDataOwner();
+    saveStoredProgram([day(1)]);
+    await logWorkout(1_000);
+    await pushSync();
+    const healthy = globalThis.fetch;
+    serverDown();
+    await logWorkout(2_000); // never reaches the server
+    await expect(pushSync()).rejects.toThrow();
+    vi.stubGlobal('fetch', healthy);
+
+    // B signs in on the same phone: A's data must be gone from view…
+    signInBrowser('b@example.com');
+    await ensureLocalDataOwner();
+    expect((await dumpIDB()).sessions).toHaveLength(0);
+    expect(strandedKeys()).toEqual(['liftlog_stranded_backup:a@example.com']);
+    await pushSync();
+    expect(env.raw.prepare('SELECT COUNT(*) AS n FROM session_docs WHERE user_id = ?')
+      .get('user-b@example.com')).toEqual({ n: 0 });
+
+    // …and A, signing back in, gets the stranded workout back and uploaded.
+    signInBrowser('a@example.com');
+    await ensureLocalDataOwner();
+    await pullSync();
+    await pushSync();
+    expect((await dumpIDB()).sessions).toHaveLength(2);
+    expect(env.raw.prepare('SELECT COUNT(*) AS n FROM session_docs WHERE user_id = ?')
+      .get('user-a@example.com')).toEqual({ n: 2 });
+    expect(strandedKeys()).toEqual([]);
+  });
+
+  it('leave no stash behind when everything had already uploaded', async () => {
+    await ensureLocalDataOwner();
+    await logWorkout(1_000);
+    await pushSync();
+    signInBrowser('b@example.com');
+    await ensureLocalDataOwner();
+    expect(strandedKeys()).toEqual([]);
   });
 });

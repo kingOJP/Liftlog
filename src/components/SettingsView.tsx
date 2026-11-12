@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   getRestDuration, saveRestDuration, REST_PRESETS,
 } from '../data/settings';
@@ -6,6 +6,8 @@ import type { SyncUser } from '../data/sync';
 import { getWeightUnit, saveWeightUnit } from '../data/units';
 import type { WeightUnit } from '../data/units';
 import { describeSyncStatus, getSyncStatus, subscribeSyncStatus } from '../data/syncStatus';
+import { countUnbackedSessions } from '../data/backup';
+import { saveBackupFile, restoreBackupFile } from './backupFile';
 import './SettingsView.css';
 
 interface Props {
@@ -15,9 +17,11 @@ interface Props {
   onViewGlossary: () => void;
   onSyncNow: () => Promise<void>;
   onViewStrength: () => void;
+  /** A backup was merged in — refresh app state and upload it */
+  onRestored: () => Promise<void>;
 }
 
-export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow, onViewStrength }: Props) {
+export default function SettingsView({ user, onBack, onViewExercises, onViewGlossary, onSyncNow, onViewStrength, onRestored }: Props) {
   const [restSeconds, setRestSeconds] = useState(getRestDuration);
   const [unit, setUnit] = useState<WeightUnit>(getWeightUnit);
   const syncStatus = useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
@@ -27,6 +31,60 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
     if (syncing) return;
     setSyncing(true);
     try { await onSyncNow(); } finally { setSyncing(false); }
+  }
+
+  // Workouts the server has not acknowledged — shown beside the sync line and
+  // checked before signing out.
+  const [unbacked, setUnbacked] = useState(0);
+  useEffect(() => {
+    let live = true;
+    countUnbackedSessions().then(n => { if (live) setUnbacked(n); }).catch(() => {});
+    return () => { live = false; };
+  }, [syncStatus]);
+
+  // Signing out itself keeps local data, but it is the first step of the two
+  // ways to lose it (another account signing in here; reinstalling) — so it
+  // asks first when this device holds the only copy of something.
+  function confirmSignOut(e: React.FormEvent) {
+    if (unbacked === 0) return;
+    const ok = window.confirm(
+      `${unbacked === 1 ? '1 workout on this device hasn\'t' : `${unbacked} workouts on this device haven't`} been uploaded yet.\n\n` +
+      'Try "Sync now" or save a backup file first. Sign out anyway?',
+    );
+    if (!ok) e.preventDefault();
+  }
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [backupNote, setBackupNote] = useState<{ text: string; error?: boolean } | null>(null);
+
+  async function handleSaveBackup() {
+    try {
+      await saveBackupFile(user.email);
+    } catch {
+      setBackupNote({ text: "Couldn't create the backup file.", error: true });
+    }
+  }
+
+  async function handleRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const r = await restoreBackupFile(file, user.email);
+      const parts = [
+        `${r.sessionsRestored} workout${r.sessionsRestored === 1 ? '' : 's'} restored`,
+        ...(r.programRestored ? ['program restored'] : []),
+        ...(r.planRestored ? ['training plan restored'] : []),
+      ];
+      setBackupNote({
+        text: r.sessionsRestored === 0 && !r.programRestored && !r.planRestored
+          ? 'Nothing to restore — this device already has everything in that backup.'
+          : `${parts.join(', ')}.`,
+      });
+      await onRestored();
+    } catch (err) {
+      setBackupNote({ text: err instanceof Error ? err.message : 'Restore failed.', error: true });
+    }
   }
 
   function handleRestChange(seconds: number) {
@@ -115,7 +173,7 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
               <span className="settings-account-email">{user.email}</span>
             </div>
             {/* POST, not a link: a GET sign-out can be fired by a prefetch or a hostile page */}
-            <form method="post" action="/api/auth/logout" className="settings-logout-form">
+            <form method="post" action="/api/auth/logout" className="settings-logout-form" onSubmit={confirmSignOut}>
               <button type="submit" className="settings-logout">Sign out</button>
             </form>
           </div>
@@ -131,9 +189,37 @@ export default function SettingsView({ user, onBack, onViewExercises, onViewGlos
               </button>
             )}
           </div>
+          {unbacked > 0 && (
+            <p className="settings-hint settings-hint--error" role="status">
+              {unbacked === 1 ? '1 workout is' : `${unbacked} workouts are`} only on this device until the next successful sync.
+            </p>
+          )}
           <p className="settings-hint">
             Workouts, your program, exercise metadata and your training journey sync to your account.
             The rest timer and other device preferences stay on this device.
+          </p>
+        </section>
+
+        <section className="settings-section">
+          <span className="settings-label">Backup</span>
+          <div className="settings-backup">
+            <button className="settings-sync-btn" onClick={handleSaveBackup}>Save a backup file</button>
+            <button className="settings-sync-btn" onClick={() => fileInput.current?.click()}>Restore from a file</button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="settings-backup-input"
+              onChange={handleRestoreFile}
+              aria-label="Choose a LiftLog backup file"
+            />
+          </div>
+          {backupNote && (
+            <p className={`settings-hint${backupNote.error ? ' settings-hint--error' : ''}`} role="status">{backupNote.text}</p>
+          )}
+          <p className="settings-hint">
+            A backup is a copy of your workouts, program and plan that doesn't depend on sync.
+            Restoring only adds what this device is missing — it never replaces newer data.
           </p>
         </section>
       </div>
