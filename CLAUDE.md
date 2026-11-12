@@ -741,9 +741,21 @@ only); `validatePush` checks `exerciseMuscles`/`exerciseDetails` shapes, `comple
 it ever outgrows one, with every upsert ordered before anything destructive); tombstone
 `DELETE`s are issued once, when a tombstone is first learned, not for every tombstone on every
 push. Worker tests cover each on the `node:sqlite` testkit. D1 schema changes are numbered
-files in `worker/migrations/` recorded in `schema_migrations` — see
-`worker/migrations/README.md` for the apply step and the rule that `schema.sql` must change
-with them.
+files in `worker/migrations/` recorded in `schema_migrations`, **and the worker applies them
+itself**: `worker/migrate.ts` (`ensureSchema`, called by `index.ts` before `/api/sync` and
+`/api/admin`) adds any missing column on the first request after a deploy (one read per
+isolate when current). A new migration needs its `.sql` file, the `schema.sql` change **and**
+a `MIGRATIONS` entry — `migrate.test.ts` fails on drift. This exists because 0008/0009 were a
+manual `wrangler` step that got missed: every sync 500'd and a fresh sign-in looked like an
+empty account.
+
+**A device that has never loaded the account is not a new account.** `SyncStatus.lastPullAt`
+records the last completed pull (a push success does not count); `accountNotLoaded()` is true
+while it is null and sync is failing, and the Dashboard then shows a "Couldn't load your
+account — Try again" card instead of the first-run start card. Offering the plan wizard there
+would tell the user their training is gone, and a plan created on that device would outrank
+the real one (newer clock) once sync recovered. `App.loadAccount()` is the one pull → settle →
+push sequence, shared by startup and the retry.
 
 **Sync is serialized and visible.** Every entry point runs through `syncLock` (`syncLock.ts`,
 a promise chain) so the 60 s tick, the focus handler, startup and the post-workout push never

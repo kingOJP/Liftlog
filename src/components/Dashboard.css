@@ -103,6 +103,41 @@
   box-shadow: var(--shadow-card);
 }
 
+.start-card--problem {
+  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+}
+
+.start-card--problem .start-eyebrow {
+  color: var(--red);
+}
+
+.start-problem-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.start-retry {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: var(--shadow-btn);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.start-retry:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .start-eyebrow {
   font-size: 11px;
   font-weight: 700;

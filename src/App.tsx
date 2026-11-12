@@ -84,6 +84,44 @@ function App() {
   const updateReady = useSyncExternalStore(subscribeUpdateReady, getUpdateReady, () => false);
   const [updateDismissed, setUpdateDismissed] = useState(false);
 
+  // Pull the account, settle the journey around what arrived, push what this
+  // device owes. The startup sequence — and the dashboard's "Try again" when
+  // the first load failed, which must run the same steps in the same order.
+  async function loadAccount() {
+    try {
+      const didPull = await pullSync();
+      if (didPull) setProgram(getStoredProgram());
+    } catch (err) {
+      console.error(err);
+    }
+    try {
+      // Wrap pre-journey training (program + history, no plan) in a
+      // Foundation block — after pull, so a plan synced from another
+      // device wins over creating a fresh wrapper.
+      await ensureJourneyMigrated();
+      // A block approved mid-week installs its workouts on its start date
+      if (await startPendingActivation()) setProgram(getStoredProgram());
+      // Self-heal: if the live program was wiped (bad sync / update) but the
+      // active block still holds its workouts, restore them before the push
+      // below carries the repair up to the server.
+      if (reconcileActiveProgram()) setProgram(getStoredProgram());
+      // Week numbering follows the synced journey (block start / last block
+      // end) — keeps devices consistent without a manual setting.
+      ensureWeekAnchor();
+    } catch (err) {
+      console.error(err);
+    }
+    try {
+      await migrateExerciseIds();
+      await pushSync();
+    } catch (err) {
+      console.error(err);
+    }
+    // Force a fresh program reference so history/dashboard reload their
+    // snapshot after the startup cleanup (purge, migration, pull).
+    setProgram(getStoredProgram());
+  }
+
   // On mount: pull from server if logged in; if server is empty, push local data up.
   // The exercise-ID migration runs independently of pull so a sync failure can't
   // skip it; any remapped logs are pushed back up.
@@ -107,38 +145,7 @@ function App() {
       } catch (err) {
         console.error(err);
       }
-      try {
-        const didPull = await pullSync();
-        if (didPull) setProgram(getStoredProgram());
-      } catch (err) {
-        console.error(err);
-      }
-      try {
-        // Wrap pre-journey training (program + history, no plan) in a
-        // Foundation block — after pull, so a plan synced from another
-        // device wins over creating a fresh wrapper.
-        await ensureJourneyMigrated();
-        // A block approved mid-week installs its workouts on its start date
-        if (await startPendingActivation()) setProgram(getStoredProgram());
-        // Self-heal: if the live program was wiped (bad sync / update) but the
-        // active block still holds its workouts, restore them before the push
-        // below carries the repair up to the server.
-        if (reconcileActiveProgram()) setProgram(getStoredProgram());
-        // Week numbering follows the synced journey (block start / last block
-        // end) — keeps devices consistent without a manual setting.
-        ensureWeekAnchor();
-      } catch (err) {
-        console.error(err);
-      }
-      try {
-        await migrateExerciseIds();
-        await pushSync();
-      } catch (err) {
-        console.error(err);
-      }
-      // Force a fresh program reference so history/dashboard reload their
-      // snapshot after the startup cleanup (purge, migration, pull).
-      setProgram(getStoredProgram());
+      await loadAccount();
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -557,6 +564,7 @@ function App() {
             onViewJourney={() => setView({ screen: 'journey' })}
             onPlanSetup={() => setView({ screen: 'plan-setup' })}
             onQuickWorkout={() => setView({ screen: 'quick-setup' })}
+            onRetrySync={loadAccount}
           />
         </main>
       </>

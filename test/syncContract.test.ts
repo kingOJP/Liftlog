@@ -29,6 +29,7 @@ import { getPlanState, saveTrainingProfile, getTrainingProfile } from '../src/da
 import { defaultTrainingProfile } from '../src/data/plan';
 import { saveExerciseMeta, getExerciseMeta } from '../src/data/exercises';
 import type { WorkoutDay } from '../src/data/program';
+import { accountNotLoaded, clearSyncStatus, getSyncStatus } from '../src/data/syncStatus';
 
 let env: TestEnv;
 
@@ -465,5 +466,52 @@ describe('when the session has expired', () => {
     document.cookie = `liftlog_user=${encodeURIComponent(JSON.stringify({ email: 'x@example.com', name: 'X' }))}; path=/`;
     await expect(pushSync()).resolves.toBeUndefined();
     await expect(pullSync()).resolves.toBe(false);
+  });
+});
+
+// The report that motivated this block: "I just logged in and my plan and all
+// my workouts are gone." Nothing was gone — the server could not answer the
+// pull, and a device that has never loaded the account is indistinguishable
+// from a brand-new account unless something remembers that it never loaded.
+describe('a fresh sign-in whose first pull fails', () => {
+  beforeEach(async () => {
+    signInBrowser('a@example.com');
+    saveStoredProgram([day(1)]);
+    await logWorkout(1_000, 2);
+    await pushSync();
+    // A new device: same account, nothing local.
+    await clearIDB();
+    localStorage.clear();
+    clearSyncStatus();
+  });
+
+  it('is reported as "account not loaded", not as an empty account', async () => {
+    const healthy = globalThis.fetch;
+    vi.stubGlobal('fetch', async () => Response.json({ error: 'Internal server error' }, { status: 500 }));
+    await expect(pullSync()).rejects.toThrow(/500/);
+    expect(getStoredProgram()).toEqual([]);
+    expect(accountNotLoaded()).toBe(true);
+
+    // Once the server answers, the same device gets everything back.
+    vi.stubGlobal('fetch', healthy);
+    expect(await pullSync()).toBe(true);
+    expect(accountNotLoaded()).toBe(false);
+    expect(getStoredProgram()).toHaveLength(1);
+    expect((await dumpIDB()).sessions).toHaveLength(1);
+  });
+
+  // A push can succeed while pulls fail (it reads different columns, or the
+  // payload is empty). That must not be mistaken for having loaded the account.
+  it('is not cleared by a push that happens to succeed', async () => {
+    const healthy = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) =>
+      (init?.method === 'POST'
+        ? healthy(input, init)
+        : Response.json({ error: 'Internal server error' }, { status: 500 })));
+    await expect(pullSync()).rejects.toThrow();
+    await pushSync();
+    await expect(pullSync()).rejects.toThrow();
+    expect(getSyncStatus().lastPullAt).toBeNull();
+    expect(accountNotLoaded()).toBe(true);
   });
 });
