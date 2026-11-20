@@ -26,11 +26,12 @@ describe('buildSnapshot warm-up handling', () => {
   });
 
   it('does not count warm-up volume or muscle sets in metrics', () => {
-    const m = computeMetrics(buildSnapshot(sessions, setLogs), 1);
+    const snap = buildSnapshot(sessions, setLogs);
+    const m = computeMetrics(snap, 1);
     // Only the two 135 working sets count: 135×10 + 135×9
     expect(m.summary.totalVolume).toBe(135 * 10 + 135 * 9);
     // Two working sets → Chest counts 2 (not 4)
-    expect(m.muscleSets.find(s => s.muscle === 'Chest')?.sets).toBe(2);
+    expect(muscleSetTotals(snap).totals.get('Chest')).toBe(2);
   });
 
   it('a session of only warm-ups contributes nothing to analytics', () => {

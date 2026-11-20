@@ -1,0 +1,75 @@
+/* Pill-shaped segmented control (Segmented.tsx). The thumb is one element that
+   slides between equal segments, so a change reads as movement, not a blink. */
+
+.seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-count), minmax(0, 1fr));
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+}
+
+.seg::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / var(--seg-count));
+  border-radius: 999px;
+  transform: translateX(calc(var(--seg-index) * 100%));
+  transition: transform 0.24s cubic-bezier(0.3, 0.7, 0.2, 1);
+  background: rgba(124, 114, 232, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(124, 114, 232, 0.55), 0 4px 14px -6px rgba(124, 114, 232, 0.7);
+}
+
+.seg-btn {
+  position: relative;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
+}
+
+.seg-btn.is-active {
+  color: var(--text);
+}
+
+/* Tabs: the control that switches the whole page gets the solid accent */
+.seg--tabs::before {
+  background: var(--accent-grad);
+  box-shadow: var(--shadow-btn);
+}
+
+.seg--tabs .seg-btn {
+  min-height: 40px;
+  font-size: 14.5px;
+}
+
+.seg--tabs .seg-btn.is-active {
+  color: #fff;
+}
+
+/* Four segments on the narrowest phones: tighten the type, never truncate */
+@media (max-width: 360px) {
+  .seg--filter .seg-btn {
+    padding: 0 2px;
+    font-size: 12px;
+    letter-spacing: -0.02em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg::before { transition: none; }
+}

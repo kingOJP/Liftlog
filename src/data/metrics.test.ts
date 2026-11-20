@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { buildSnapshot } from './analytics';
-import { computeMetrics } from './metrics';
+import { computeMetrics, computeRangeSummary } from './metrics';
 import type { Session, SetLog } from '../db/database';
 
 beforeEach(() => localStorage.clear());
@@ -54,42 +54,10 @@ describe('computeMetrics', () => {
     ]);
   });
 
-  it('counts fractional muscle sets (primary 1, secondary 0.5) and flags unclassified exercises', () => {
+  it('names the logged exercises that have no primary muscle', () => {
     const m = computeMetrics(makeData(), NOW);
-    const find = (muscle: string) => m.muscleSets.find(s => s.muscle === muscle)?.sets;
-    // This week: one bench set — Chest primary, Delts + Triceps secondary
-    expect(find('Chest')).toBe(1);
-    expect(find('Delts')).toBe(0.5);
-    expect(find('Triceps')).toBe(0.5);
-    expect(find('Other')).toBe(1);   // the mystery exercise
     // Orphaned ids are humanized for display (getExerciseName fallback)
     expect(m.unclassifiedExercises).toEqual(['Mystery Exercise 1']);
-  });
-
-  it('credits secondary volume from compounds — a push day counts real triceps sets', () => {
-    // 4 incline press (Triceps secondary) + 3 pushdowns (Triceps primary)
-    const sessions: Session[] = [
-      { id: 1, dayId: 1, weekNumber: 1, startedAt: at(28), completedAt: at(28) + 3_600_000 },
-    ];
-    const setLogs: SetLog[] = [
-      ...[1, 2, 3, 4].map(s => ({
-        id: s, sessionId: 1, exerciseId: 'incline-barbell-press', setNumber: s, weight: 135, reps: 8,
-      })),
-      ...[1, 2, 3].map(s => ({
-        id: 4 + s, sessionId: 1, exerciseId: 'tricep-cable-pushdown', setNumber: s, weight: 50, reps: 12,
-      })),
-    ];
-    const m = computeMetrics(buildSnapshot(sessions, setLogs), NOW);
-    const triceps = m.muscleSets.find(s => s.muscle === 'Triceps');
-    expect(triceps?.sets).toBe(4 * 0.5 + 3);  // 5 fractional hard sets
-  });
-
-  it('falls back to the latest week with data when the current week is empty', () => {
-    // Three weeks on from the logged data — nothing this week
-    const m = computeMetrics(makeData(), NOW + 21 * DAY);
-    expect(m.summary.thisWeekVolume).toBe(0);
-    expect(m.muscleWeekLabel).not.toBe('This week');
-    expect(m.muscleSets.length).toBeGreaterThan(0);
   });
 });
 
@@ -154,5 +122,44 @@ describe('computeMetrics — weekly volume chart', () => {
     const m = computeMetrics(buildSnapshot(sessions, setLogs), NOW);
     expect(m.weeklyVolume).toHaveLength(8);
     expect(m.weeklyVolume[7].isCurrent).toBe(true);
+  });
+});
+
+describe('computeRangeSummary', () => {
+  // One 1,000 lb session `daysAgo` back each.
+  const sessionsAt = (...daysAgo: number[]) => {
+    const sessions: Session[] = daysAgo.map((d, i) => ({
+      id: i + 1, dayId: 1, weekNumber: 1,
+      startedAt: NOW - d * DAY, completedAt: NOW - d * DAY + 3_600_000,
+    }));
+    const setLogs: SetLog[] = sessions.map((s, i) => ({
+      id: i + 1, sessionId: s.id!, exerciseId: 'dumbbell-bench-press',
+      setNumber: 1, weight: 100, reps: 10,
+    }));
+    return buildSnapshot(sessions, setLogs);
+  };
+
+  it('totals the window and compares it with the equal-length window before', () => {
+    // 3 sessions in the last 30 days, 2 in the 30 before, 1 older than both.
+    const snap = sessionsAt(1, 10, 25, 35, 50, 70);
+    const r = computeRangeSummary(snap, NOW - 30 * DAY, NOW);
+    expect(r.workouts).toBe(3);
+    expect(r.volume).toBe(3000);
+    expect(r.prevVolume).toBe(2000);
+    expect(r.deltaPct).toBe(50);
+  });
+
+  it('reports no delta when nothing was logged in the window before', () => {
+    // Otherwise a lifter's first month reads as an infinite improvement.
+    const r = computeRangeSummary(sessionsAt(1, 3), NOW - 7 * DAY, NOW);
+    expect(r.workouts).toBe(2);
+    expect(r.deltaPct).toBeNull();
+  });
+
+  it('reports a full drop, not "no data", for an empty window after a trained one', () => {
+    const r = computeRangeSummary(sessionsAt(10), NOW - 7 * DAY, NOW);
+    expect(r.workouts).toBe(0);
+    expect(r.volume).toBe(0);
+    expect(r.deltaPct).toBe(-100);
   });
 });

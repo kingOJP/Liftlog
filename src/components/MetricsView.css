@@ -4,11 +4,15 @@
   min-height: 100%;
 }
 
+/* ── Header: title row + the tabs, both sticky ──
+   The tabs are the page's navigation, so they stay under the thumb's reach
+   wherever the page is scrolled. Frosted by the shared rule in App.css. */
+
 .metrics-header {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -16,29 +20,337 @@
   z-index: 10;
 }
 
-.metrics-title {
-  font-size: 17px;
+/* Taller than the other sub-view headers and carrying the page's navigation,
+   so it is a shade more opaque than the shared frosted rule: the tabs have to
+   stay legible over whatever is scrolling underneath them. */
+.app .metrics-view .metrics-header {
+  background: rgba(10, 10, 15, 0.9);
+}
+
+.metrics-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.app .metrics-view .metrics-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
 }
 
+/* Range dropdown: a styled pill over a real <select>, so iOS opens its own
+   picker. The select itself is invisible and keeps a 16px font, which is what
+   stops Safari zooming the page when it takes focus. */
+.metrics-range {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 12px 0 14px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.metrics-range .icon {
+  color: var(--text-muted);
+}
+
+.metrics-range select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.metrics-range:focus-within {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+/* ── Body ── */
+
 .metrics-body {
   flex: 1;
-  padding: 16px;
+  padding: 16px 16px calc(40px + env(safe-area-inset-bottom));
+}
+
+.metrics-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  gap: 18px;
 }
 
 .metrics-empty {
   font-size: 14px;
+  line-height: 1.45;
   color: var(--text-muted);
   text-align: center;
   margin: 12px 0;
 }
 
-/* ── Summary stats ── */
+.metrics-blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.metrics-blank-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 8px;
+  border-radius: 18px;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.22);
+}
+
+.metrics-blank-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.metrics-blank-text {
+  margin: 0;
+  max-width: 280px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* ── Groups of rows (insights, adjustments, progress, PRs) ── */
+
+.insight-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.group-label--good .icon  { color: var(--green-bright); }
+.group-label--watch .icon { color: var(--amber); }
+.group-label--plan .icon  { color: var(--purple-bright); }
+
+.group-note,
+.panel-intro {
+  margin: 0 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.panel-intro {
+  margin-bottom: 4px;
+}
+
+/* One row: accent edge, icon, two lines of text, and a chevron when it leads
+   somewhere. Rows that open a lift's history are real buttons. */
+.insight-row {
+  --row-accent: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 12px 12px 13px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--row-accent);
+  border-radius: 14px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  box-shadow: var(--shadow-card);
+}
+
+button.insight-row,
+button.progress-row {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, border-color 0.15s;
+}
+
+button.insight-row:active,
+button.progress-row:active {
+  transform: scale(0.985);
+}
+
+/* highlights */
+.insight-row--good,
+.insight-row--pr,
+.insight-row--trend-up,
+.insight-row--volume-up,
+.insight-row--consistency { --row-accent: var(--green-bright); }
+/* opportunities */
+.insight-row--trend-down,
+.insight-row--plateau { --row-accent: var(--red); }
+.insight-row--volume-high,
+.insight-row--program-gap { --row-accent: var(--amber); }
+/* automatic program adjustments */
+.insight-row--plan {
+  --row-accent: var(--purple-bright);
+  background-image: var(--accent-wash);
+}
+
+.insight-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  color: var(--row-accent);
+}
+
+.insight-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.insight-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.insight-detail {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.insight-go {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  transition: transform 0.2s;
+}
+
+.insight-go.is-open {
+  transform: rotate(180deg);
+}
+
+.pr-date {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Cards ── */
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-card);
+  background-image: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  /* a card scrolled to by the range dropdown clears the sticky header */
+  scroll-margin-top: 140px;
+}
+
+.metric-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.metric-card-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--purple-bright);
+  background: var(--purple-tint);
+  border: 1px solid rgba(124, 114, 232, 0.22);
+}
+
+.metric-heading {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+/* "Details ›" — padded out to a 44px target without growing the header */
+.metric-card-link {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin: -8px -8px -8px 0;
+  padding: 8px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.metric-card-link .icon {
+  color: var(--text-muted);
+}
+
+.metric-sub {
+  margin: -2px 0 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* ── Stat tiles ── */
 
 .stat-grid {
   display: grid;
@@ -48,319 +360,179 @@
 
 .stat-card {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 72px;
   background: var(--bg-card);
   background-image: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 13px 12px;
   box-shadow: var(--shadow-card);
 }
 
 .stat-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  margin-bottom: 8px;
-  border-radius: 11px;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   color: var(--purple-bright);
   background: var(--purple-tint);
   border: 1px solid rgba(124, 114, 232, 0.22);
 }
 
+.stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
 .stat-value {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
   color: var(--text);
+  white-space: nowrap;
 }
 
-.stat-value.delta-up {
-  color: var(--green-bright);
-}
-
-.stat-value.delta-down {
-  color: var(--red);
-}
+.stat-value.delta-up { color: var(--green-bright); }
+.stat-value.delta-down { color: var(--red); }
 
 .stat-label {
   font-size: 12px;
+  line-height: 1.3;
   color: var(--text-muted);
 }
 
-/* ── Unclassified-exercise warning ── */
+/* ── Unclassified-exercise notice ── */
 
 .metric-warning {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   background: var(--bg-card);
   background-image: linear-gradient(90deg, var(--red-tint), transparent 55%);
   border: 1px solid var(--hairline);
   border-left: 3px solid var(--red);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border-radius: 14px;
 }
 
-.metric-warning-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
+.metric-warning-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 12px 12px 13px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.metric-warning-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  color: var(--red);
 }
 
 .metric-warning-body {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.metric-warning-list {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* ── Sections ── */
-
-.metric-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--bg-card);
-  background-image: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  padding: 18px 16px;
-  box-shadow: var(--shadow-card);
-}
-
-.metric-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text);
   margin: 0;
-}
-
-.metric-heading-icon {
-  color: var(--purple-bright);
-}
-
-.metric-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 0 0 6px;
-  line-height: 1.4;
-}
-
-.metric-select {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 16px;
-  padding: 10px 12px;
-  width: 100%;
-  margin-bottom: 8px;
-  outline: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.metric-select:focus {
-  border-color: var(--purple);
-}
-
-/* Inline link-style action under a chart ("Set a 1RM or a goal for this lift ›") */
-.metric-link-btn {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  color: var(--purple);
+  padding: 0 14px 14px 57px;
   font-size: 13px;
-  font-weight: 600;
-  padding: 8px 0 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* ── Muscle group bars ── */
-
-.muscle-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.muscle-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.muscle-name {
-  font-size: 12px;
+  line-height: 1.45;
   color: var(--text-muted);
-  width: 84px;
-  flex-shrink: 0;
 }
 
-.muscle-bar-track {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-input);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.muscle-bar-fill {
-  height: 100%;
-  background: #3a3a48;
-  border-radius: 999px;
-  min-width: 2px;
-  transition: width 0.3s ease;
-}
-
-.muscle-bar-fill.in-range {
-  background: linear-gradient(90deg, var(--green), var(--green-bright));
-  box-shadow: 0 0 10px rgba(47, 196, 147, 0.4);
-}
-
-.muscle-count {
-  font-size: 13px;
+.metric-warning-body strong {
   font-weight: 600;
   color: var(--text);
-  width: 32px; /* fits fractional counts like "10.5" */
-  text-align: right;
-  flex-shrink: 0;
 }
 
-/* ── Coaching insights ── */
-.coach-insight-list {
+/* ── Weekly volume readout ── */
+
+.week-readout {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.coach-insight-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 11px 13px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid var(--hairline);
-  border-left: 3px solid var(--text-muted);
-}
-
-/* highlights */
-.coach-insight-item.coach-insight--pr,
-.coach-insight-item.coach-insight--trend-up,
-.coach-insight-item.coach-insight--volume-up,
-.coach-insight-item.coach-insight--consistency { border-left-color: var(--green); }
-/* opportunities */
-.coach-insight-item.coach-insight--trend-down,
-.coach-insight-item.coach-insight--plateau { border-left-color: var(--red); }
-.coach-insight-item.coach-insight--volume-high,
-.coach-insight-item.coach-insight--program-gap { border-left-color: #E8C44A; }
-/* automatic program adjustments */
-.coach-insight-item.coach-insight--plan { border-left-color: var(--purple); }
-
-/* ── Coach panel tabs ── */
-.coach-tabs {
-  display: flex;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  padding: 4px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.coach-tab {
-  flex: 1;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 6px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.12s, color 0.12s;
-}
-
-.coach-tab--active {
-  background: rgba(124, 114, 232, 0.22);
-  border-color: rgba(124, 114, 232, 0.55);
-  color: var(--text);
-  box-shadow: 0 4px 14px -6px rgba(124, 114, 232, 0.7);
-}
-
-.coach-tab-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.coach-subhead {
-  font-size: 11px;
+.week-readout-value {
+  font-size: 28px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin: 8px 0 0;
-  color: var(--text-muted);
-}
-
-.coach-subhead--good { color: var(--green); }
-.coach-subhead--opportunity { color: #E8C44A; }
-.coach-subhead--plan { color: var(--purple); }
-
-.coach-insight-item .coach-insight-title {
-  font-size: 14px;
-  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   color: var(--text);
 }
 
-.coach-insight-item .coach-insight-detail {
-  font-size: 12.5px;
+.week-readout-unit {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
   color: var(--text-muted);
 }
+
+.week-readout-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.delta-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.delta-chip--up   { color: var(--green-bright); background: var(--green-tint); }
+.delta-chip--down { color: var(--red); background: var(--red-tint); }
 
 /* ── Progress report ── */
-.progress-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 
 .progress-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.22);
+  gap: 8px;
+  width: 100%;
+  padding: 14px 12px 14px 14px;
+  background: var(--bg-card);
+  background-image: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 14px;
-  padding: 12px 13px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  box-shadow: var(--shadow-card);
 }
 
 .progress-row-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .progress-name {
-  font-size: 14px;
-  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--text);
 }
 
@@ -374,9 +546,9 @@
   padding: 3px 9px;
 }
 
-.progress-badge--progressing { background: rgba(29, 158, 117, 0.18);  color: var(--green); }
-.progress-badge--steady      { background: rgba(124, 114, 232, 0.16); color: var(--purple); }
-.progress-badge--stalled     { background: rgba(232, 196, 74, 0.16);  color: #E8C44A; }
+.progress-badge--progressing { background: rgba(29, 158, 117, 0.18);  color: var(--green-bright); }
+.progress-badge--steady      { background: rgba(124, 114, 232, 0.16); color: var(--purple-bright); }
+.progress-badge--stalled     { background: rgba(232, 196, 74, 0.16);  color: var(--amber); }
 .progress-badge--declining   { background: rgba(232, 85, 85, 0.16);   color: var(--red); }
 
 .progress-signals {
@@ -385,96 +557,117 @@
   gap: 6px;
 }
 
+.progress-signals:empty {
+  display: none;
+}
+
 .signal {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--hairline);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   font-variant-numeric: tabular-nums;
 }
 
-.signal-up   { color: var(--green); }
+.signal-up   { color: var(--green-bright); }
 .signal-down { color: var(--red); }
 
 .progress-evidence {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
   line-height: 1.4;
+  color: var(--text-muted);
 }
 
-/* ── Recent PRs ── */
-.pr-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pr-row {
+/* Text action under a list or chart, with a full-height tap target */
+.panel-more {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: linear-gradient(90deg, var(--green-tint), rgba(0, 0, 0, 0.2) 55%);
-  border: 1px solid var(--hairline);
-  border-left: 3px solid var(--green);
-  border-radius: 12px;
-  padding: 10px 13px;
-}
-
-.pr-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.pr-name {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.pr-label {
-  font-size: 12px;
-  color: var(--green);
-  font-weight: 600;
-}
-
-.pr-date {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* ── Exercise trends ── */
-.chart-subhead {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin: 10px 0 0;
-  color: var(--text-muted);
-}
-
-.metric-link-btn {
-  margin-top: 8px;
-  padding: 0;
-  border: none;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 2px;
   background: none;
-  color: var(--purple);
-  font-size: 13px;
+  border: none;
+  color: var(--purple-bright);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
   text-align: left;
-  cursor: pointer;
-}
-
-.progress-row--link {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
-.progress-row--link:focus-visible {
-  outline: 2px solid var(--purple);
-  outline-offset: 2px;
+/* ── Exercise trends ── */
+
+/* A real <select> (native iOS picker) dressed as the app's input */
+.metric-select {
+  position: relative;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.metric-select select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 40px 10px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.metric-select select:focus {
+  border-color: var(--purple);
+}
+
+.metric-select .icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.chart-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
+/* ── Smallest phones (iPhone SE-width and below) ── */
+
+@media (max-width: 360px) {
+  .stat-card {
+    gap: 9px;
+    padding: 12px 10px;
+  }
+
+  .stat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .stat-value {
+    font-size: 17px;
+  }
+
+  .app .metrics-view .metrics-title {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.insight-row, button.progress-row, .insight-go { transition: none; }
 }

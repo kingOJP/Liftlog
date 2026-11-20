@@ -1,0 +1,254 @@
+/* Heatmap detail sheet (HeatmapSheet.tsx) — builds on the shared .sheet shell */
+
+.hm-sheet-body {
+  gap: 14px;
+  /* room to scroll the last card clear of the home indicator */
+  padding-bottom: 8px;
+  overscroll-behavior: contain;
+}
+
+/* ── Figures ── */
+
+.hm-figures--large {
+  gap: 12px;
+  padding: 4px 6px 0;
+}
+
+.hm-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.hm-figure .body-figure {
+  max-width: 190px;
+}
+
+.hm-figure figcaption {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--text-muted);
+}
+
+/* ── Selected-muscle readout ── */
+
+.hm-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.hm-detail {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+}
+
+.hm-detail-muscle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hm-detail-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.hm-detail-stats {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.hm-detail-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Muscle groups: a meter list on one shared scale ── */
+
+.hm-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 14px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+}
+
+.hm-groups-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.hm-groups-icon {
+  color: var(--purple-bright);
+}
+
+.hm-groups-unit {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+
+.hm-rows {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.hm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 8px;
+  margin: 0 -8px;
+  width: calc(100% + 16px);
+  background: none;
+  border: none;
+  border-radius: 12px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+
+.hm-row:active,
+.hm-row.is-selected {
+  background: rgba(124, 114, 232, 0.12);
+}
+
+.hm-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hm-row-name {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.hm-row-value {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.hm-meter {
+  position: relative;
+  display: block;
+  height: 6px;
+  margin-left: 20px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+/* The goal's weekly band, as a lighter stretch of the track */
+.hm-meter-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.hm-meter-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  min-width: 3px;
+  border-radius: 999px;
+  transition: width 0.3s ease, background 0.25s ease;
+}
+
+.hm-groups-note,
+.hm-empty {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.hm-empty {
+  color: var(--text-muted);
+}
+
+/* ── Training insight ── */
+
+.hm-insight {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--bg-card);
+  background-image: var(--accent-wash);
+  border: 1px solid rgba(124, 114, 232, 0.3);
+  border-radius: 16px;
+}
+
+.hm-insight-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--purple-bright);
+}
+
+.hm-insight p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.hm-insight strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* The shared close button holds an icon here, not a × glyph */
+.hm-sheet .sheet-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-meter-fill, .hm-row { transition: none; }
+}

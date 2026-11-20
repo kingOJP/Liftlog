@@ -61,6 +61,10 @@ export interface Insight {
   priority: number;       // higher = surface first
   title: string;
   detail: string;
+  /** the lift this insight is about, when it is about one — lets the UI open
+   *  that lift's history from the row */
+  exerciseId?: string;
+  exerciseName?: string;
 }
 
 export interface NextDay {
@@ -173,6 +177,8 @@ export function computeCoaching(
       priority: 100 + freshPRs.length,
       title: `New ${p.name} PR`,
       detail: `${freshPRs[0].label}${freshPRs.length > 1 ? ` — plus ${freshPRs.length - 1} more` : ''}. That's the progression working.`,
+      exerciseId: p.exerciseId,
+      exerciseName: p.name,
     });
   }
 
@@ -184,6 +190,8 @@ export function computeCoaching(
       priority: 80 + p.score * 20,
       title: `${p.name} is climbing`,
       detail: `${capitalize(p.evidence.slice(0, 2).join('; '))} — keep riding this progression.`,
+      exerciseId: p.exerciseId,
+      exerciseName: p.name,
     });
   }
 
@@ -230,6 +238,8 @@ export function computeCoaching(
         priority: 90 + Math.abs(p.score) * 20,
         title: `${p.name} is trending down`,
         detail: `${capitalize(p.evidence.slice(0, 2).join('; '))}. Prioritize recovery — sleep and food — and hold volume at target rather than pushing load.`,
+        exerciseId: p.exerciseId,
+        exerciseName: p.name,
       });
     } else if (p.status === 'stalled') {
       opportunities.push({
@@ -237,6 +247,8 @@ export function computeCoaching(
         priority: 70,
         title: `${p.name} has stalled`,
         detail: `No weight or rep PRs and ${p.evidence.slice(0, 2).join(', ')} across your last ${p.sessions} sessions. If it doesn't move next session, the coach will recommend a deload — that's the plan working, not a setback.`,
+        exerciseId: p.exerciseId,
+        exerciseName: p.name,
       });
     }
   }
