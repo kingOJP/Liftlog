@@ -37,11 +37,6 @@ export interface ExerciseSeries {
   volumePoints: SeriesPoint[];
 }
 
-export interface MuscleSets {
-  muscle: string;
-  sets: number;
-}
-
 /** How many calendar weeks the volume chart looks back over. */
 export const VOLUME_WEEKS = 8;
 
@@ -51,12 +46,50 @@ export interface Metrics {
   /** Oldest → newest, one entry per calendar week (gaps included as zeroes) */
   weeklyVolume: WeeklyVolumePoint[];
   exercises: ExerciseSeries[];     // most-tracked first (for the default selection)
-  muscleSets: MuscleSets[];
-  muscleWeekLabel: string;
-  unclassifiedExercises: string[]; // logged exercises with no primary muscle (the "Other" bucket)
+  unclassifiedExercises: string[]; // logged exercises with no primary muscle — off the heatmap
 }
 
 const shortDate = shortDateLabel;
+
+// ── Range summary ─────────────────────────────────────────────────────────────
+
+export interface RangeSummary {
+  /** sessions with logged sets inside the window */
+  workouts: number;
+  /** Σ weight × reps inside the window */
+  volume: number;
+  /** the same, over the window of equal length immediately before it */
+  prevVolume: number;
+  /** volume vs prevVolume, whole percent; null when there is nothing before */
+  deltaPct: number | null;
+}
+
+/**
+ * Totals for an arbitrary time window, compared with the equal-length window
+ * before it. A trailing window is compared like for like — unlike "this week
+ * so far vs all of last week", which reads as a drop every Monday.
+ */
+export function computeRangeSummary(snapshot: TrainingSnapshot, from: number, to: number): RangeSummary {
+  const prevFrom = from - (to - from);
+  let workouts = 0;
+  let volume = 0;
+  let prevVolume = 0;
+  for (const session of snapshot.sessions) {
+    const logs = snapshot.setsBySession.get(session.id!) ?? [];
+    if (logs.length === 0) continue;
+    const ts = sessionTimestamp(session);
+    let sessionVolume = 0;
+    for (const s of logs) sessionVolume += s.weight * s.reps;
+    if (ts >= from && ts <= to) { workouts++; volume += sessionVolume; }
+    else if (ts >= prevFrom && ts < from) prevVolume += sessionVolume;
+  }
+  return {
+    workouts,
+    volume: Math.round(volume),
+    prevVolume: Math.round(prevVolume),
+    deltaPct: prevVolume > 0 ? Math.round(((volume - prevVolume) / prevVolume) * 100) : null,
+  };
+}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -69,8 +102,6 @@ export function computeMetrics(snapshot: TrainingSnapshot, now = Date.now()): Me
     summary: { totalWorkouts: 0, totalVolume: 0, thisWeekVolume: 0, lastWeekVolume: 0, deltaPct: null },
     weeklyVolume: [],
     exercises: [],
-    muscleSets: [],
-    muscleWeekLabel: '',
     unclassifiedExercises: [],
   };
   if (sessions.length === 0 || setsBySession.size === 0) return empty;
@@ -148,23 +179,8 @@ export function computeMetrics(snapshot: TrainingSnapshot, now = Date.now()): Me
     }))
     .sort((a, b) => b.points.length - a.points.length || a.name.localeCompare(b.name));
 
-  // ── Sets per muscle group ──
-  // Use the current program week; if it has no data, fall back to the latest
-  // week that does, so the chart is never needlessly empty. Counting uses the
-  // shared fractional model (primary = 1, secondary = 0.5) so this chart
-  // agrees with the coach, insights and heatmap — and with the 10–20
-  // hard-set target it's displayed against.
-  const weeksWithData = [...weekBuckets.keys()].sort((a, b) => b - a);
-  const muscleWeek = weekBuckets.has(currentWeekStart) ? currentWeekStart : (weeksWithData[0] ?? currentWeekStart);
-
-  const week = muscleSetTotals(snapshot, s => sessionWeekStart(s) === muscleWeek);
-  const muscleSets: MuscleSets[] = [...week.totals.entries()]
-    .map(([muscle, sets]) => ({ muscle: muscle as string, sets: Math.round(sets * 2) / 2 }));
-  if (week.unmappedSets > 0) muscleSets.push({ muscle: 'Other', sets: week.unmappedSets });
-  muscleSets.sort((a, b) => b.sets - a.sets);
-
-  // Logged exercises with no primary muscle (all-time) — their sets fall into
-  // the "Other" bucket, so tell the user which ones need classifying.
+  // Logged exercises with no primary muscle (all-time) — their sets can't be
+  // placed on a muscle, so tell the user which ones need classifying.
   const unclassifiedExercises = [...muscleSetTotals(snapshot).unmappedExerciseIds]
     .map(id => getExerciseName(id))
     .sort((a, b) => a.localeCompare(b));
@@ -180,10 +196,6 @@ export function computeMetrics(snapshot: TrainingSnapshot, now = Date.now()): Me
     },
     weeklyVolume,
     exercises,
-    muscleSets,
-    muscleWeekLabel: muscleWeek === currentWeekStart
-      ? 'This week'
-      : `Week of ${weekStartLabel(muscleWeek)}`,
     unclassifiedExercises,
   };
 }

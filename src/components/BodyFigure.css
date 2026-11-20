@@ -1,0 +1,54 @@
+/* The anatomical figure (BodyFigure.tsx). Three body tones — base, mid, rim
+   light — sit under the muscle regions, whose fill is the heat colour. */
+
+.body-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.bf-base { fill: #1f2130; }
+.bf-mid  { fill: #2a2f41; }
+.bf-rim  { fill: #3f445b; }
+
+.bf-region {
+  transition: fill 0.25s ease, opacity 0.2s ease;
+}
+
+.bf-sheen {
+  pointer-events: none;
+}
+
+/* Tappable figure: a transparent stroke widens every shape's hit area — a
+   trapezius is 13px tall on a phone — and doubles as the selection outline. */
+.bf-region--tap {
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bf-region--tap .bf-shape {
+  stroke: transparent;
+  stroke-width: 9;
+  stroke-linejoin: round;
+  pointer-events: all;
+}
+
+.has-selection .bf-region:not(.is-selected) {
+  opacity: 0.4;
+}
+
+.bf-region.is-selected .bf-shape {
+  stroke: var(--text);
+  stroke-width: 2.5;
+}
+
+.bf-region--tap:focus-visible .bf-shape {
+  stroke: var(--purple-bright);
+  stroke-width: 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-region { transition: none; }
+}

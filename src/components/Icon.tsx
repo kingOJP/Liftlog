@@ -5,7 +5,8 @@
 export type IconName =
   | 'logo' | 'calendar' | 'chart' | 'history' | 'settings' | 'bolt'
   | 'chevron-right' | 'check' | 'plus' | 'dumbbell' | 'clock' | 'trophy'
-  | 'target' | 'body' | 'sliders';
+  | 'target' | 'body' | 'sliders' | 'trend-up' | 'trend-down' | 'trend-flat'
+  | 'flame' | 'bulb' | 'alert' | 'close' | 'chevron-down' | 'chevron-left';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   logo: <path d="M3 9v6M6.5 6.5v11M17.5 6.5v11M21 9v6M6.5 12h11" />,
@@ -61,6 +62,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M6 8.5h12M12 8.5v6M12 14.5l-3 6.5M12 14.5l3 6.5" />
     </>
   ),
+  'trend-up': <path d="m3.5 17 5.5-5.5 4 4L20.5 8M15 8h5.5v5.5" />,
+  'trend-down': <path d="m3.5 7 5.5 5.5 4-4L20.5 16M15 16h5.5v-5.5" />,
+  'trend-flat': <path d="M3.5 12h17M16 7.5l4.5 4.5-4.5 4.5" />,
+  flame: <path d="M12 21a6.2 6.2 0 0 0 6.2-6.2c0-3.3-2-5.3-3.2-7.6-.5 1.8-1.4 2.8-2.6 3.4.3-3-.6-5.6-2.9-7.6.1 3.6-3.7 5.9-3.7 11.8A6.2 6.2 0 0 0 12 21z" />,
+  bulb: <path d="M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z" />,
+  alert: <path d="M12 4.5 3.5 19.5h17L12 4.5zM12 10.5v4M12 17.2h.01" />,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  'chevron-down': <path d="m5.5 9 6.5 6.5L18.5 9" />,
+  'chevron-left': <path d="M15 5.5 8.5 12l6.5 6.5" />,
 };
 
 interface Props {

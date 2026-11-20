@@ -32,7 +32,7 @@ Long-term milestones (roughly):
     mutates the stored program), workout-duration tracking as an optimization
     constraint, redesigned Coach insights (3 highlights + 3 opportunities;
     under-trained nudges removed — the planner fixes volume instead), muscle
-    heatmap (front/back SVG silhouettes, timeframe presets)
+    heatmap (front/back body figures, timeframe presets)
 15. ✅ Backend audit: Monday-anchored week numbering, per-account local-data
     isolation (`liftlog_data_owner`), app-wide exercise library + metadata with
     deletion tombstones (D1 `app_exercises`/`app_exercise_metadata`/`deleted_exercises`)
@@ -160,6 +160,15 @@ Long-term milestones (roughly):
     or progression; rep styles and grips are compared **like for like** by the prescription
     engine (`sessionHistory.ts`) and the progress engine (per-style trend and PR bests).
     One sliders control beside Log set, "＋ Drop set", slot-level pinning in the day editor.
+
+27. ✅ Metrics redesign for the phone — page-level tabs (Coach / Progress / PRs) in a sticky
+    header instead of one long scroll, ONE time range for everything range-based (header
+    dropdown and the heatmap's segmented pill are the same state), tappable rows that open
+    a lift's history, a weekly chart and trend charts that read out the bar/point under
+    the finger, and the heatmap rebuilt on an anatomical figure traced from the design
+    reference (`BodyFigure` + `bodyFigureData.ts`) with a detail sheet (`HeatmapSheet`:
+    per-muscle meter list against the goal's band + a volume-split insight). The heat
+    scale moved from teal to the reference's blue family. See the Metrics page section.
 
 **Future milestones:**
 - Adaptive engine v2 (`docs/adaptive-engine-roadmap.md`) — staged evolution from hand-tuned
@@ -448,10 +457,17 @@ src/
                                   ensureJourneyMigrated() (wraps legacy history in a Foundation
                                   block), mergeServerPlanState() (LWW sync)
     heatmap.ts                 — muscle heatmap data: computeMuscleHeat() over a time window,
-                                  heatColor()/heatLabel() (slate→teal→blue→violet weekly-rate
-                                  gradient), presetWindow()/mesocycleWindow()
+                                  heatColor()/heatLabel() (slate→blue→indigo→violet weekly-rate
+                                  gradient) + HEAT_LEGEND_GRADIENT built from the same colours,
+                                  presetWindow()/mesocycleWindow(). Also THE range model the
+                                  Metrics page reads: HeatRange, HEAT_PRESETS (every way the UI
+                                  names a range), rangeWindow(), previousWindow(), and
+                                  volumeSplit()/splitInsight() (lower/upper/core share of a
+                                  window vs the window before)
     metrics.ts                 — computeMetrics(snapshot, now) → Metrics (weekly volume bucketed
-                                  by calendar week, e1RM series, muscle sets)
+                                  by calendar week, e1RM series, unclassified exercises) and
+                                  computeRangeSummary(snapshot, from, to) — a window's totals
+                                  against the equal-length window before it
     insights.ts                — computeCoaching(program, snapshot) → Coaching: 3 positive
                                   highlights + 3 highest-impact opportunities, e1RM trend/plateau
                                   detection, weekly muscle volume, next-workout suggestion, and
@@ -535,11 +551,25 @@ src/
     InstructionSheet.tsx/css   — the bottom sheet with an exercise's setup / cues / faults and the
                                   ⓘ InfoButton every surface uses; useInstructionSheet.tsx is the
                                   per-screen state hook (open(id, name) + the rendered sheet)
-    MetricsView.tsx/css        — metrics dashboard: Coach section (highlights, opportunities,
-                                  program adjustments), muscle heatmap, volume summary, weekly
-                                  chart, e1RM chart, muscle sets chart, unclassified banner
-    MuscleHeatmap.tsx/css      — front/back SVG body silhouettes colored by weekly training
-                                  volume per muscle; 7d/30d/mesocycle/custom timeframe presets
+    MetricsView.tsx/css        — metrics page: sticky header (title, range dropdown, tabs) and
+                                  three tab panels — Coach (insights, program adjustments,
+                                  heatmap card, stat tiles, unclassified notice, weekly volume),
+                                  Progress (per-lift verdicts + Exercise Trends), PRs. Owns the
+                                  page's one HeatRange (see the Metrics page section)
+    MuscleHeatmap.tsx/css      — the compact heatmap card body (both figures as ONE button that
+                                  opens the detail sheet, plus a colour key) and the shared
+                                  HeatRangeControl (7d/30d/mesocycle/custom) and HeatLegend
+    HeatmapSheet.tsx/css       — heatmap detail sheet: large tappable figures, selected-muscle
+                                  readout, legend, per-muscle meter list against the goal's
+                                  band, "Training insight" (volume split vs the window before)
+    BodyFigure.tsx/css         — one anatomical figure (front or back): traced silhouette, two
+                                  shading tones and a region per muscle, filled by the caller.
+                                  One control per MUSCLE however many shapes it has
+    bodyFigureData.ts          — GENERATED path data for the figure (left half only; drawn
+                                  twice, mirrored). Traced from the design reference — don't
+                                  hand-edit the numbers
+    Segmented.tsx/css          — the pill segmented control with a sliding thumb; `tabs`
+                                  (solid accent, tab semantics) or `filter` (tinted, toggles)
     JourneyView.tsx/css        — training journey: active block (phase timeline, intent,
                                   progression), wrap-up/end-early with retrospective, past
                                   blocks with expandable reviews
@@ -567,7 +597,10 @@ src/
                                   my plan", "Design a block around this lift" → seeded wizard)
     LoginView.tsx/css          — Google OAuth login screen
     charts.tsx/css             — reusable BarChart (highlightIndex / highlightMax, zero-value
-                                  gap bars) and LineChart (hand-rolled CSS/SVG)
+                                  gap bars; `onSelect` makes the bars buttons whose value the
+                                  caller reads out) and LineChart (hand-rolled CSS/SVG; a touch
+                                  or sideways drag moves the read-out point, x labels thinned
+                                  to five so they can never overflow a phone)
 ```
 
 ---
@@ -1207,21 +1240,75 @@ target the adjusted set counts) and MetricsView (Program adjustments list). Full
   opportunities derive from each exercise's `status`, not a raw e1RM %.
 - **Per-muscle weekly set volume** (`muscleVolume`) and **next workout** (day longest untrained).
 
-Surfaced on the Dashboard (Coach card) and Metrics. On Metrics the Coach narrative, the
-**Progress Report** (per-exercise status + signal breakdown + evidence, attention items first)
-and the **Recent PRs** timeline share **one tabbed panel** (Coach / Progress / PRs — tabs
-appear only when they have content); below it sit **Exercise Trends** (paired est-1RM and
-volume-load charts), the heatmap, and volume charts.
+An insight about one lift carries `exerciseId`/`exerciseName`, so the row that shows it can
+open that lift's history. Surfaced on the Dashboard (Coach card) and Metrics.
 `SETS_TARGET_LOW`/`SETS_TARGET_HIGH` live in `analytics.ts` (re-exported from insights.ts).
 
-### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx`)
+### Metrics page (`MetricsView.tsx`)
 
-Front/back SVG silhouettes with one region per `MuscleGroup`, colored by weekly-rate volume:
-slate (untrained) → teal (10–20 target) → blue (elevated) → violet (very high) — a cool scale on
-purpose: high volume is something to watch, not an error. Muscle mapping
-reuses `musclesForExercise()` — no duplicate mapping. Presets: 7 days / 30 days / current
-mesocycle (4-week blocks anchored to the program start date) / custom range. Tap a region for
-sets + weekly rate + status.
+Built for one thumb on an iPhone. The header is sticky and holds the page's navigation: the
+title row (back, "Metrics", the range dropdown) and the **Coach / Progress / PRs** tabs — the
+tabs switch the *whole page*, so each is a short, focused screen rather than three sections
+buried in one long scroll, and they stay reachable wherever the page is scrolled. All three
+always exist (a tab that appears and disappears is a control you can't rely on); an empty one
+says why. Changing tab scrolls to the top.
+
+- **Coach** — What's working / Biggest opportunities / Program adjustments as rows (accent
+  edge, icon, full reason text — never truncated, the reason is the point), then the heatmap
+  card, four stat tiles, the unclassified-exercise notice (collapsed; expands to the names)
+  and Weekly Volume.
+- **Progress** — per-lift verdicts (attention items first, top 5 with show-all) and
+  **Exercise Trends** (paired est-1RM and volume-load charts for a chosen lift).
+- **PRs** — the PR timeline, newest first (up to 20).
+
+**A row with a chevron goes somewhere**: insights about a lift, program adjustments,
+progress rows and PRs all open `ExerciseHistorySheet`. Rows about no single lift (consistency,
+a program gap) are plain and carry no chevron.
+
+**One time range.** `MetricsView` owns a single `HeatRange`; the header dropdown (a real
+`<select>` under a styled pill, so iOS opens its own picker — the select keeps a 16px font,
+which is what stops Safari zooming) and the heatmap's segmented pill are two views of it, on
+the card and in the detail sheet alike. It scopes the heatmap, the insight line and the two
+range stat tiles ("Last 30 days (lbs)", "vs prior 30 days" — `computeRangeSummary`, a
+trailing window against the equal-length window before it, which unlike "this week so far vs
+last week" doesn't read as a drop every Monday). The other two tiles are lifetime totals and
+say so. The dropdown is hidden on Progress and PRs, where nothing reads it. `HEAT_PRESETS` is
+the one table of how a range is named everywhere.
+
+**Charts answer a touch.** There is no hover on a phone, so the weekly chart's bars are
+buttons — the tapped week's volume and its change on the week before read out above the
+chart (a week still in progress is never compared with a finished one) — and a touch or
+sideways drag on a trend chart moves the point being read (`touch-action: pan-y` keeps
+vertical scrolling). Both default to the latest value.
+
+### Muscle heatmap (`heatmap.ts` + `MuscleHeatmap.tsx` + `HeatmapSheet.tsx` + `BodyFigure.tsx`)
+
+Front/back anatomical figures with a region per `MuscleGroup`, colored by weekly-rate volume:
+slate (untrained) → blue (the goal's band, held as one colour) → indigo (elevated) → violet
+(very high) — one cool family on purpose: high volume is something to watch, not an error.
+`HEAT_LEGEND_GRADIENT` is built from the same constants, so the key cannot drift from the
+figure. Muscle mapping reuses `musclesForExercise()` — no duplicate mapping. Presets: 7 days /
+30 days / current mesocycle (4-week blocks anchored to the program start date) / custom range.
+
+**The figure is traced, not drawn.** `bodyFigureData.ts` is generated from the design
+reference: the silhouette, two tones of the body's own shading (mid tone, rim light) and
+every muscle shape, as the figure's left half — `BodyFigure` draws each path twice, mirrored
+about the centre line (shapes that straddle it, the trapezius diamond and lower back, are
+flagged `whole`). Three places it departs from the reference, all because the app tracks
+muscles the drawing merges: each large back shape is cut into **Upper Back** and **Lats**,
+the flanks carry an **Obliques** region, and the outer-thigh strips are **Abductors**
+(Adductors have no region — the inner thigh is too narrow to draw one; they still appear in
+the muscle list). A muscle is one control however many shapes it has.
+
+**Two sizes, two jobs.** On the Metrics page the pair of figures is a *single button* — at
+card size a forearm is a few pixels wide — beside a four-swatch key. It opens the detail
+sheet, where the figures are large enough to tap (a transparent stroke widens every shape's
+hit area), the selected muscle is outlined with the rest dimmed, and a **meter list** gives
+every trained muscle's weekly sets on one shared scale with the goal's band marked on each
+track — the reliable way to pick a muscle, and the replacement for the old "Sets per Muscle
+Group" chart. Untrained muscles are named in a line below it. The **Training insight** is
+`splitInsight()`: the share of the window's volume that went to the lower or upper body,
+its change in points against the window before, and any muscle trained then but skipped now.
 
 ---
 
@@ -1693,7 +1780,8 @@ PROGRAM references) that are otherwise only checked by hand.
   on the right and highlighted (`BarChart`'s `highlightIndex`, not `highlightMax`). It always
   ends on the current week even at zero ("this week so far" is the number to beat), spans at
   most `VOLUME_WEEKS` (8), and renders untrained weeks as real zero-height gaps rather than
-  collapsing them — a skipped week must look like a skipped week.
+  collapsing them — a skipped week must look like a skipped week. The bars are buttons: the
+  tapped week reads out above the chart, in the display unit.
 - **Time away is handled explicitly, not by accident** — the engine reads the last
   N sessions of an exercise regardless of when they happened, so the calendar needs
   its own guards. Two: the weekly rate cap (`weeklyCeiling`) anchors to the most
