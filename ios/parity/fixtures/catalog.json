@@ -1,0 +1,4659 @@
+{
+ "engine": "catalog",
+ "cases": [
+  {
+   "name": "catalog size",
+   "fn": "catalogIds",
+   "args": [],
+   "output": [
+    "incline-barbell-press",
+    "dumbbell-bench-press",
+    "cable-fly",
+    "seated-db-overhead-press",
+    "barbell-overhead-press",
+    "cable-lateral-raises",
+    "dumbbell-lateral-raises",
+    "face-pulls",
+    "bent-over-db-row",
+    "barbell-rows",
+    "lat-pull-down",
+    "straight-arm-pulldowns",
+    "weighted-pull-ups",
+    "back-extensions",
+    "overhead-tricep-ext",
+    "tricep-cable-pushdown",
+    "cable-pushdown",
+    "cable-kick-backs",
+    "incline-db-curls",
+    "hammer-curls",
+    "reverse-curls",
+    "leg-press",
+    "leg-extension",
+    "romanian-deadlifts",
+    "hip-thrusts",
+    "seated-calf-raises",
+    "standing-calf-raises",
+    "flat-barbell-bench-press",
+    "incline-dumbbell-press",
+    "machine-chest-press",
+    "pec-deck-fly",
+    "dumbbell-fly",
+    "weighted-dips",
+    "push-ups",
+    "machine-shoulder-press",
+    "machine-lateral-raise",
+    "reverse-pec-deck",
+    "dumbbell-rear-delt-fly",
+    "barbell-shrugs",
+    "dumbbell-shrugs",
+    "seated-cable-row",
+    "chest-supported-row",
+    "t-bar-row",
+    "chin-ups",
+    "dumbbell-pullover",
+    "conventional-deadlift",
+    "good-mornings",
+    "dumbbell-rdl",
+    "seated-leg-curl",
+    "lying-leg-curl",
+    "cable-pull-through",
+    "barbell-back-squat",
+    "hack-squat",
+    "smith-machine-squat",
+    "goblet-squat",
+    "bulgarian-split-squat",
+    "walking-lunges",
+    "leg-press-calf-raise",
+    "ez-bar-curls",
+    "preacher-curls",
+    "cable-curls",
+    "skull-crushers",
+    "close-grip-bench-press",
+    "cable-crunch",
+    "hanging-leg-raise",
+    "machine-crunch",
+    "wrist-curls",
+    "dumbbell-step-up",
+    "single-leg-rdl",
+    "hip-abduction",
+    "banded-hip-abduction",
+    "single-leg-calf-raise",
+    "pogo-hops",
+    "box-jump",
+    "pallof-press",
+    "dead-bug",
+    "plank",
+    "side-plank",
+    "copenhagen-plank",
+    "farmer-carry",
+    "db-external-rotation",
+    "db-y-raise",
+    "kettlebell-swing",
+    "kettlebell-goblet-squat",
+    "kettlebell-single-arm-press",
+    "kettlebell-single-arm-row",
+    "kettlebell-suitcase-carry",
+    "kettlebell-front-rack-lunge",
+    "kettlebell-turkish-get-up"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup bench-press",
+   "fn": "lookup",
+   "args": [
+    "bench-press"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup squat",
+   "fn": "lookup",
+   "args": [
+    "squat"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup plank",
+   "fn": "lookup",
+   "args": [
+    "plank"
+   ],
+   "output": {
+    "def": {
+     "id": "plank",
+     "name": "Plank",
+     "primaryMuscle": "Abs",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Plank",
+     "equipment": "None",
+     "weightType": "Bodyweight",
+     "unit": "seconds"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "seconds",
+    "timed": true,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abs",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Plank",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup side-plank",
+   "fn": "lookup",
+   "args": [
+    "side-plank"
+   ],
+   "output": {
+    "def": {
+     "id": "side-plank",
+     "name": "Side Plank",
+     "primaryMuscle": "Obliques",
+     "secondaryMuscles": [
+      "Abductors",
+      null,
+      null
+     ],
+     "workoutType": "Plank",
+     "equipment": "None",
+     "weightType": "Bodyweight",
+     "unit": "seconds"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "seconds",
+    "timed": true,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Obliques",
+     "secondaryMuscle1": "Abductors",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Plank",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup pull-ups",
+   "fn": "lookup",
+   "args": [
+    "pull-ups"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup romanian-deadlifts",
+   "fn": "lookup",
+   "args": [
+    "romanian-deadlifts"
+   ],
+   "output": {
+    "def": {
+     "id": "romanian-deadlifts",
+     "name": "Romanian Deadlifts",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      "Glutes",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Medial Hamstrings"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup conventional-deadlift",
+   "fn": "lookup",
+   "args": [
+    "conventional-deadlift"
+   ],
+   "output": {
+    "def": {
+     "id": "conventional-deadlift",
+     "name": "Conventional Deadlift",
+     "primaryMuscle": "Glutes",
+     "secondaryMuscles": [
+      "Hamstrings",
+      "Lower Back",
+      "Traps"
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "romanian-deadlifts",
+     "dumbbell-rdl"
+    ],
+    "heads": [
+     "Gluteus Maximus"
+    ],
+    "meta": {
+     "primaryMuscle": "Glutes",
+     "secondaryMuscle1": "Hamstrings",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": "Traps",
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup back-extensions-1782325116469",
+   "fn": "lookup",
+   "args": [
+    "back-extensions-1782325116469"
+   ],
+   "output": {
+    "def": {
+     "id": "back-extensions",
+     "name": "Back Extensions",
+     "primaryMuscle": "Lower Back",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lower Back",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup custom-landmine-1700000000000",
+   "fn": "lookup",
+   "args": [
+    "custom-landmine-1700000000000"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup not-a-real-id",
+   "fn": "lookup",
+   "args": [
+    "not-a-real-id"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup barbell-row-12",
+   "fn": "lookup",
+   "args": [
+    "barbell-row-12"
+   ],
+   "output": {
+    "def": null,
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup incline-barbell-press",
+   "fn": "lookup",
+   "args": [
+    "incline-barbell-press"
+   ],
+   "output": {
+    "def": {
+     "id": "incline-barbell-press",
+     "name": "Incline Barbell Press",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Upper Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-bench-press",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-bench-press"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-bench-press",
+     "name": "Dumbbell Bench Press",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lower Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-fly",
+   "fn": "lookup",
+   "args": [
+    "cable-fly"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-fly",
+     "name": "Cable Fly",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      null,
+      null
+     ],
+     "workoutType": "Fly",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Fly",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup seated-db-overhead-press",
+   "fn": "lookup",
+   "args": [
+    "seated-db-overhead-press"
+   ],
+   "output": {
+    "def": {
+     "id": "seated-db-overhead-press",
+     "name": "Seated Dumbbell Overhead Press",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Triceps",
+      null,
+      null
+     ],
+     "workoutType": "Vertical Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Front Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup barbell-overhead-press",
+   "fn": "lookup",
+   "args": [
+    "barbell-overhead-press"
+   ],
+   "output": {
+    "def": {
+     "id": "barbell-overhead-press",
+     "name": "Barbell Overhead Press",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Triceps",
+      null,
+      null
+     ],
+     "workoutType": "Vertical Press",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Front Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-lateral-raises",
+   "fn": "lookup",
+   "args": [
+    "cable-lateral-raises"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-lateral-raises",
+     "name": "Cable Lateral Raises",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Lateral Raise",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Side Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Lateral Raise",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-lateral-raises",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-lateral-raises"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-lateral-raises",
+     "name": "Dumbbell Lateral Raises",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Lateral Raise",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Side Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Lateral Raise",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup face-pulls",
+   "fn": "lookup",
+   "args": [
+    "face-pulls"
+   ],
+   "output": {
+    "def": {
+     "id": "face-pulls",
+     "name": "Face Pulls",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Traps",
+      null
+     ],
+     "workoutType": "Face Pull",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Rear Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Traps",
+     "secondaryMuscle3": null,
+     "workoutType": "Face Pull",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup bent-over-db-row",
+   "fn": "lookup",
+   "args": [
+    "bent-over-db-row"
+   ],
+   "output": {
+    "def": {
+     "id": "bent-over-db-row",
+     "name": "Bent Over One Arm Dumbbell Row",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Delts",
+      "Biceps"
+     ],
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Delts",
+     "secondaryMuscle3": "Biceps",
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup barbell-rows",
+   "fn": "lookup",
+   "args": [
+    "barbell-rows"
+   ],
+   "output": {
+    "def": {
+     "id": "barbell-rows",
+     "name": "Barbell Rows",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup lat-pull-down",
+   "fn": "lookup",
+   "args": [
+    "lat-pull-down"
+   ],
+   "output": {
+    "def": {
+     "id": "lat-pull-down",
+     "name": "Lat Pull Down",
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Pull Down",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Down",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup straight-arm-pulldowns",
+   "fn": "lookup",
+   "args": [
+    "straight-arm-pulldowns"
+   ],
+   "output": {
+    "def": {
+     "id": "straight-arm-pulldowns",
+     "name": "Straight Arm Pull Downs",
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Upper Back",
+      null,
+      null
+     ],
+     "workoutType": "Pull Over",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Over",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup weighted-pull-ups",
+   "fn": "lookup",
+   "args": [
+    "weighted-pull-ups"
+   ],
+   "output": {
+    "def": {
+     "id": "weighted-pull-ups",
+     "name": "Weighted Pull Ups",
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Pull Up",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "chin-ups",
+     "lat-pull-down"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Up",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup back-extensions",
+   "fn": "lookup",
+   "args": [
+    "back-extensions"
+   ],
+   "output": {
+    "def": {
+     "id": "back-extensions",
+     "name": "Back Extensions",
+     "primaryMuscle": "Lower Back",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lower Back",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup overhead-tricep-ext",
+   "fn": "lookup",
+   "args": [
+    "overhead-tricep-ext"
+   ],
+   "output": {
+    "def": {
+     "id": "overhead-tricep-ext",
+     "name": "Overhead Tricep Extension",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Long Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup tricep-cable-pushdown",
+   "fn": "lookup",
+   "args": [
+    "tricep-cable-pushdown"
+   ],
+   "output": {
+    "def": {
+     "id": "tricep-cable-pushdown",
+     "name": "Tricep Cable Pushdown",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lateral Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-pushdown",
+   "fn": "lookup",
+   "args": [
+    "cable-pushdown"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-pushdown",
+     "name": "Cable Pushdown",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lateral Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-kick-backs",
+   "fn": "lookup",
+   "args": [
+    "cable-kick-backs"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-kick-backs",
+     "name": "Cable Kick Backs",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Long Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Tricep Extension",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup incline-db-curls",
+   "fn": "lookup",
+   "args": [
+    "incline-db-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "incline-db-curls",
+     "name": "Incline Dumbbell Curls",
+     "primaryMuscle": "Biceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Long Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Biceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup hammer-curls",
+   "fn": "lookup",
+   "args": [
+    "hammer-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "hammer-curls",
+     "name": "Hammer Curls",
+     "primaryMuscle": "Biceps",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Brachialis"
+    ],
+    "meta": {
+     "primaryMuscle": "Biceps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup reverse-curls",
+   "fn": "lookup",
+   "args": [
+    "reverse-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "reverse-curls",
+     "name": "Reverse Curls",
+     "primaryMuscle": "Forearms",
+     "secondaryMuscles": [
+      "Biceps",
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "EZ Bar"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Forearms",
+     "secondaryMuscle1": "Biceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "EZ Bar"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup leg-press",
+   "fn": "lookup",
+   "args": [
+    "leg-press"
+   ],
+   "output": {
+    "def": {
+     "id": "leg-press",
+     "name": "Leg Press",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Leg Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Leg Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup leg-extension",
+   "fn": "lookup",
+   "args": [
+    "leg-extension"
+   ],
+   "output": {
+    "def": {
+     "id": "leg-extension",
+     "name": "Leg Extension",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Leg Extension",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Vastus Lateralis",
+     "Vastus Medialis"
+    ],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Leg Extension",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup hip-thrusts",
+   "fn": "lookup",
+   "args": [
+    "hip-thrusts"
+   ],
+   "output": {
+    "def": {
+     "id": "hip-thrusts",
+     "name": "Hip Thrusts",
+     "primaryMuscle": "Glutes",
+     "secondaryMuscles": [
+      "Hamstrings",
+      null,
+      null
+     ],
+     "workoutType": "Hip Thrust",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gluteus Maximus"
+    ],
+    "meta": {
+     "primaryMuscle": "Glutes",
+     "secondaryMuscle1": "Hamstrings",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Thrust",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup seated-calf-raises",
+   "fn": "lookup",
+   "args": [
+    "seated-calf-raises"
+   ],
+   "output": {
+    "def": {
+     "id": "seated-calf-raises",
+     "name": "Seated Calf Raises",
+     "primaryMuscle": "Calves",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Calf Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Soleus"
+    ],
+    "meta": {
+     "primaryMuscle": "Calves",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Calf Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup standing-calf-raises",
+   "fn": "lookup",
+   "args": [
+    "standing-calf-raises"
+   ],
+   "output": {
+    "def": {
+     "id": "standing-calf-raises",
+     "name": "Standing Calf Raises",
+     "primaryMuscle": "Calves",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Calf Raise",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gastrocnemius"
+    ],
+    "meta": {
+     "primaryMuscle": "Calves",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Calf Raise",
+     "equipment": "None",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup flat-barbell-bench-press",
+   "fn": "lookup",
+   "args": [
+    "flat-barbell-bench-press"
+   ],
+   "output": {
+    "def": {
+     "id": "flat-barbell-bench-press",
+     "name": "Flat Barbell Bench Press",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lower Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup incline-dumbbell-press",
+   "fn": "lookup",
+   "args": [
+    "incline-dumbbell-press"
+   ],
+   "output": {
+    "def": {
+     "id": "incline-dumbbell-press",
+     "name": "Incline Dumbbell Press",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Upper Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup machine-chest-press",
+   "fn": "lookup",
+   "args": [
+    "machine-chest-press"
+   ],
+   "output": {
+    "def": {
+     "id": "machine-chest-press",
+     "name": "Machine Chest Press",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup pec-deck-fly",
+   "fn": "lookup",
+   "args": [
+    "pec-deck-fly"
+   ],
+   "output": {
+    "def": {
+     "id": "pec-deck-fly",
+     "name": "Pec Deck Fly",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      null,
+      null
+     ],
+     "workoutType": "Fly",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Fly",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-fly",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-fly"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-fly",
+     "name": "Dumbbell Fly",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      null,
+      null
+     ],
+     "workoutType": "Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lower Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup weighted-dips",
+   "fn": "lookup",
+   "args": [
+    "weighted-dips"
+   ],
+   "output": {
+    "def": {
+     "id": "weighted-dips",
+     "name": "Weighted Dips",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Triceps",
+      "Delts",
+      null
+     ],
+     "workoutType": "Dip",
+     "equipment": "Dip Station",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lower Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": "Delts",
+     "secondaryMuscle3": null,
+     "workoutType": "Dip",
+     "equipment": "Dip Station",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup push-ups",
+   "fn": "lookup",
+   "args": [
+    "push-ups"
+   ],
+   "output": {
+    "def": {
+     "id": "push-ups",
+     "name": "Push Ups",
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lower Chest"
+    ],
+    "meta": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup machine-shoulder-press",
+   "fn": "lookup",
+   "args": [
+    "machine-shoulder-press"
+   ],
+   "output": {
+    "def": {
+     "id": "machine-shoulder-press",
+     "name": "Machine Shoulder Press",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Triceps",
+      null,
+      null
+     ],
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Front Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup machine-lateral-raise",
+   "fn": "lookup",
+   "args": [
+    "machine-lateral-raise"
+   ],
+   "output": {
+    "def": {
+     "id": "machine-lateral-raise",
+     "name": "Machine Lateral Raise",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Lateral Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Side Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Lateral Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup reverse-pec-deck",
+   "fn": "lookup",
+   "args": [
+    "reverse-pec-deck"
+   ],
+   "output": {
+    "def": {
+     "id": "reverse-pec-deck",
+     "name": "Reverse Pec Deck",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Traps",
+      null
+     ],
+     "workoutType": "Reverse Fly",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Rear Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Traps",
+     "secondaryMuscle3": null,
+     "workoutType": "Reverse Fly",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-rear-delt-fly",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-rear-delt-fly"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-rear-delt-fly",
+     "name": "Dumbbell Rear Delt Fly",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Traps",
+      null
+     ],
+     "workoutType": "Reverse Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Rear Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Traps",
+     "secondaryMuscle3": null,
+     "workoutType": "Reverse Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup barbell-shrugs",
+   "fn": "lookup",
+   "args": [
+    "barbell-shrugs"
+   ],
+   "output": {
+    "def": {
+     "id": "barbell-shrugs",
+     "name": "Barbell Shrugs",
+     "primaryMuscle": "Traps",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Shrug",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Upper Traps"
+    ],
+    "meta": {
+     "primaryMuscle": "Traps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Shrug",
+     "equipment": "None",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-shrugs",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-shrugs"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-shrugs",
+     "name": "Dumbbell Shrugs",
+     "primaryMuscle": "Traps",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Shrug",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Upper Traps"
+    ],
+    "meta": {
+     "primaryMuscle": "Traps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Shrug",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup seated-cable-row",
+   "fn": "lookup",
+   "args": [
+    "seated-cable-row"
+   ],
+   "output": {
+    "def": {
+     "id": "seated-cable-row",
+     "name": "Seated Cable Row",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Row",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Row",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup chest-supported-row",
+   "fn": "lookup",
+   "args": [
+    "chest-supported-row"
+   ],
+   "output": {
+    "def": {
+     "id": "chest-supported-row",
+     "name": "Chest Supported Row",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Row",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Row",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup t-bar-row",
+   "fn": "lookup",
+   "args": [
+    "t-bar-row"
+   ],
+   "output": {
+    "def": {
+     "id": "t-bar-row",
+     "name": "T-Bar Row",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Row",
+     "equipment": "Machine",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Row",
+     "equipment": "Machine",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup chin-ups",
+   "fn": "lookup",
+   "args": [
+    "chin-ups"
+   ],
+   "output": {
+    "def": {
+     "id": "chin-ups",
+     "name": "Chin Ups",
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Biceps",
+      "Upper Back",
+      null
+     ],
+     "workoutType": "Pull Up",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "lat-pull-down",
+     "straight-arm-pulldowns"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": "Biceps",
+     "secondaryMuscle2": "Upper Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Up",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-pullover",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-pullover"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-pullover",
+     "name": "Dumbbell Pullover",
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Chest",
+      null,
+      null
+     ],
+     "workoutType": "Pull Over",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": "Chest",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Over",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup good-mornings",
+   "fn": "lookup",
+   "args": [
+    "good-mornings"
+   ],
+   "output": {
+    "def": {
+     "id": "good-mornings",
+     "name": "Good Mornings",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      "Glutes",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "romanian-deadlifts",
+     "dumbbell-rdl"
+    ],
+    "heads": [
+     "Medial Hamstrings"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-rdl",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-rdl"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-rdl",
+     "name": "Dumbbell Romanian Deadlift",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      "Glutes",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Medial Hamstrings"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup seated-leg-curl",
+   "fn": "lookup",
+   "args": [
+    "seated-leg-curl"
+   ],
+   "output": {
+    "def": {
+     "id": "seated-leg-curl",
+     "name": "Seated Leg Curl",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Leg Curl",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Biceps Femoris"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Leg Curl",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup lying-leg-curl",
+   "fn": "lookup",
+   "args": [
+    "lying-leg-curl"
+   ],
+   "output": {
+    "def": {
+     "id": "lying-leg-curl",
+     "name": "Lying Leg Curl",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Leg Curl",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Biceps Femoris"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Leg Curl",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-pull-through",
+   "fn": "lookup",
+   "args": [
+    "cable-pull-through"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-pull-through",
+     "name": "Cable Pull Through",
+     "primaryMuscle": "Glutes",
+     "secondaryMuscles": [
+      "Hamstrings",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gluteus Maximus"
+    ],
+    "meta": {
+     "primaryMuscle": "Glutes",
+     "secondaryMuscle1": "Hamstrings",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup barbell-back-squat",
+   "fn": "lookup",
+   "args": [
+    "barbell-back-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "barbell-back-squat",
+     "name": "Barbell Back Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      "Lower Back"
+     ],
+     "workoutType": "Squat",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "goblet-squat",
+     "leg-press",
+     "hack-squat"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": "Lower Back",
+     "workoutType": "Squat",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup hack-squat",
+   "fn": "lookup",
+   "args": [
+    "hack-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "hack-squat",
+     "name": "Hack Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Squat",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup smith-machine-squat",
+   "fn": "lookup",
+   "args": [
+    "smith-machine-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "smith-machine-squat",
+     "name": "Smith Machine Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Squat",
+     "equipment": "Smith Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "Smith Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup goblet-squat",
+   "fn": "lookup",
+   "args": [
+    "goblet-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "goblet-squat",
+     "name": "Goblet Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Squat",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup bulgarian-split-squat",
+   "fn": "lookup",
+   "args": [
+    "bulgarian-split-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "bulgarian-split-squat",
+     "name": "Bulgarian Split Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Lunge",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Lunge",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup walking-lunges",
+   "fn": "lookup",
+   "args": [
+    "walking-lunges"
+   ],
+   "output": {
+    "def": {
+     "id": "walking-lunges",
+     "name": "Walking Lunges",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Lunge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Lunge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup leg-press-calf-raise",
+   "fn": "lookup",
+   "args": [
+    "leg-press-calf-raise"
+   ],
+   "output": {
+    "def": {
+     "id": "leg-press-calf-raise",
+     "name": "Leg Press Calf Raise",
+     "primaryMuscle": "Calves",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Calf Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gastrocnemius"
+    ],
+    "meta": {
+     "primaryMuscle": "Calves",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Calf Raise",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup ez-bar-curls",
+   "fn": "lookup",
+   "args": [
+    "ez-bar-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "ez-bar-curls",
+     "name": "EZ Bar Curls",
+     "primaryMuscle": "Biceps",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "EZ Bar"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Short Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Biceps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "None",
+     "weightType": "EZ Bar"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup preacher-curls",
+   "fn": "lookup",
+   "args": [
+    "preacher-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "preacher-curls",
+     "name": "Preacher Curls",
+     "primaryMuscle": "Biceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "Machine",
+     "weightType": "EZ Bar"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Short Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Biceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "Machine",
+     "weightType": "EZ Bar"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-curls",
+   "fn": "lookup",
+   "args": [
+    "cable-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-curls",
+     "name": "Cable Curls",
+     "primaryMuscle": "Biceps",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Long Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Biceps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup skull-crushers",
+   "fn": "lookup",
+   "args": [
+    "skull-crushers"
+   ],
+   "output": {
+    "def": {
+     "id": "skull-crushers",
+     "name": "Skull Crushers",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Tricep Extension",
+     "equipment": "Bench",
+     "weightType": "EZ Bar"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Long Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Tricep Extension",
+     "equipment": "Bench",
+     "weightType": "EZ Bar"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup close-grip-bench-press",
+   "fn": "lookup",
+   "args": [
+    "close-grip-bench-press"
+   ],
+   "output": {
+    "def": {
+     "id": "close-grip-bench-press",
+     "name": "Close Grip Bench Press",
+     "primaryMuscle": "Triceps",
+     "secondaryMuscles": [
+      "Chest",
+      "Delts",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Lateral Head",
+     "Medial Head"
+    ],
+    "meta": {
+     "primaryMuscle": "Triceps",
+     "secondaryMuscle1": "Chest",
+     "secondaryMuscle2": "Delts",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup cable-crunch",
+   "fn": "lookup",
+   "args": [
+    "cable-crunch"
+   ],
+   "output": {
+    "def": {
+     "id": "cable-crunch",
+     "name": "Cable Crunch",
+     "primaryMuscle": "Abs",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Crunch",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abs",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Crunch",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup hanging-leg-raise",
+   "fn": "lookup",
+   "args": [
+    "hanging-leg-raise"
+   ],
+   "output": {
+    "def": {
+     "id": "hanging-leg-raise",
+     "name": "Hanging Leg Raise",
+     "primaryMuscle": "Abs",
+     "secondaryMuscles": [
+      "Forearms",
+      null,
+      null
+     ],
+     "workoutType": "Crunch",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "machine-crunch",
+     "cable-crunch"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abs",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Crunch",
+     "equipment": "Pull Up Bar",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup machine-crunch",
+   "fn": "lookup",
+   "args": [
+    "machine-crunch"
+   ],
+   "output": {
+    "def": {
+     "id": "machine-crunch",
+     "name": "Machine Crunch",
+     "primaryMuscle": "Abs",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Crunch",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abs",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Crunch",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup wrist-curls",
+   "fn": "lookup",
+   "args": [
+    "wrist-curls"
+   ],
+   "output": {
+    "def": {
+     "id": "wrist-curls",
+     "name": "Wrist Curls",
+     "primaryMuscle": "Forearms",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Curl",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Forearms",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Curl",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dumbbell-step-up",
+   "fn": "lookup",
+   "args": [
+    "dumbbell-step-up"
+   ],
+   "output": {
+    "def": {
+     "id": "dumbbell-step-up",
+     "name": "Dumbbell Step Up",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Lunge",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Lunge",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup single-leg-rdl",
+   "fn": "lookup",
+   "args": [
+    "single-leg-rdl"
+   ],
+   "output": {
+    "def": {
+     "id": "single-leg-rdl",
+     "name": "Single Leg Romanian Deadlift",
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      "Glutes",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Medial Hamstrings"
+    ],
+    "meta": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup hip-abduction",
+   "fn": "lookup",
+   "args": [
+    "hip-abduction"
+   ],
+   "output": {
+    "def": {
+     "id": "hip-abduction",
+     "name": "Hip Abduction",
+     "primaryMuscle": "Abductors",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Abduction",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abductors",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Abduction",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup banded-hip-abduction",
+   "fn": "lookup",
+   "args": [
+    "banded-hip-abduction"
+   ],
+   "output": {
+    "def": {
+     "id": "banded-hip-abduction",
+     "name": "Banded Hip Abduction",
+     "primaryMuscle": "Abductors",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Abduction",
+     "equipment": "None",
+     "weightType": "Resistance Band"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Abductors",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Abduction",
+     "equipment": "None",
+     "weightType": "Resistance Band"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup single-leg-calf-raise",
+   "fn": "lookup",
+   "args": [
+    "single-leg-calf-raise"
+   ],
+   "output": {
+    "def": {
+     "id": "single-leg-calf-raise",
+     "name": "Single Leg Calf Raise",
+     "primaryMuscle": "Calves",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Calf Raise",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gastrocnemius"
+    ],
+    "meta": {
+     "primaryMuscle": "Calves",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Calf Raise",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup pogo-hops",
+   "fn": "lookup",
+   "args": [
+    "pogo-hops"
+   ],
+   "output": {
+    "def": {
+     "id": "pogo-hops",
+     "name": "Pogo Hops",
+     "primaryMuscle": "Calves",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Jump",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Gastrocnemius"
+    ],
+    "meta": {
+     "primaryMuscle": "Calves",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Jump",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup box-jump",
+   "fn": "lookup",
+   "args": [
+    "box-jump"
+   ],
+   "output": {
+    "def": {
+     "id": "box-jump",
+     "name": "Box Jump",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Calves",
+      null
+     ],
+     "workoutType": "Jump",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Calves",
+     "secondaryMuscle3": null,
+     "workoutType": "Jump",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup pallof-press",
+   "fn": "lookup",
+   "args": [
+    "pallof-press"
+   ],
+   "output": {
+    "def": {
+     "id": "pallof-press",
+     "name": "Pallof Press",
+     "primaryMuscle": "Obliques",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Anti-Rotation",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Obliques",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Anti-Rotation",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup dead-bug",
+   "fn": "lookup",
+   "args": [
+    "dead-bug"
+   ],
+   "output": {
+    "def": {
+     "id": "dead-bug",
+     "name": "Dead Bug",
+     "primaryMuscle": "Obliques",
+     "secondaryMuscles": [
+      "Abs",
+      null,
+      null
+     ],
+     "workoutType": "Anti-Rotation",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Obliques",
+     "secondaryMuscle1": "Abs",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Anti-Rotation",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup copenhagen-plank",
+   "fn": "lookup",
+   "args": [
+    "copenhagen-plank"
+   ],
+   "output": {
+    "def": {
+     "id": "copenhagen-plank",
+     "name": "Copenhagen Plank",
+     "primaryMuscle": "Adductors",
+     "secondaryMuscles": [
+      "Obliques",
+      null,
+      null
+     ],
+     "workoutType": "Plank",
+     "equipment": "Bench",
+     "weightType": "Bodyweight",
+     "unit": "seconds"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "seconds",
+    "timed": true,
+    "prereqs": [
+     "side-plank",
+     "plank"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Adductors",
+     "secondaryMuscle1": "Obliques",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Plank",
+     "equipment": "Bench",
+     "weightType": "Bodyweight"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup farmer-carry",
+   "fn": "lookup",
+   "args": [
+    "farmer-carry"
+   ],
+   "output": {
+    "def": {
+     "id": "farmer-carry",
+     "name": "Farmer Carry",
+     "primaryMuscle": "Traps",
+     "secondaryMuscles": [
+      "Forearms",
+      "Abs",
+      null
+     ],
+     "workoutType": "Carry",
+     "equipment": "None",
+     "weightType": "Dumbbell",
+     "unit": "seconds"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "seconds",
+    "timed": true,
+    "prereqs": [],
+    "heads": [
+     "Upper Traps"
+    ],
+    "meta": {
+     "primaryMuscle": "Traps",
+     "secondaryMuscle1": "Forearms",
+     "secondaryMuscle2": "Abs",
+     "secondaryMuscle3": null,
+     "workoutType": "Carry",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup db-external-rotation",
+   "fn": "lookup",
+   "args": [
+    "db-external-rotation"
+   ],
+   "output": {
+    "def": {
+     "id": "db-external-rotation",
+     "name": "Dumbbell External Rotation",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Rotation",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Rear Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Rotation",
+     "equipment": "None",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup db-y-raise",
+   "fn": "lookup",
+   "args": [
+    "db-y-raise"
+   ],
+   "output": {
+    "def": {
+     "id": "db-y-raise",
+     "name": "Prone Dumbbell Y Raise",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Traps",
+      null
+     ],
+     "workoutType": "Reverse Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Rear Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Upper Back",
+     "secondaryMuscle2": "Traps",
+     "secondaryMuscle3": null,
+     "workoutType": "Reverse Fly",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-swing",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-swing"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-swing",
+     "name": "Kettlebell Swing",
+     "primaryMuscle": "Glutes",
+     "secondaryMuscles": [
+      "Hamstrings",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "romanian-deadlifts",
+     "dumbbell-rdl"
+    ],
+    "heads": [
+     "Gluteus Maximus"
+    ],
+    "meta": {
+     "primaryMuscle": "Glutes",
+     "secondaryMuscle1": "Hamstrings",
+     "secondaryMuscle2": "Lower Back",
+     "secondaryMuscle3": null,
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-goblet-squat",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-goblet-squat"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-goblet-squat",
+     "name": "Kettlebell Goblet Squat",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      null,
+      null
+     ],
+     "workoutType": "Squat",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "beginner",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-single-arm-press",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-single-arm-press"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-single-arm-press",
+     "name": "Kettlebell Single-Arm Overhead Press",
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Triceps",
+      null,
+      null
+     ],
+     "workoutType": "Vertical Press",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [
+     "Front Delt"
+    ],
+    "meta": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-single-arm-row",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-single-arm-row"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-single-arm-row",
+     "name": "Kettlebell Single-Arm Row",
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscles": [
+      "Lats",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Upper Back",
+     "secondaryMuscle1": "Lats",
+     "secondaryMuscle2": "Biceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Row",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-suitcase-carry",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-suitcase-carry"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-suitcase-carry",
+     "name": "Kettlebell Suitcase Carry",
+     "primaryMuscle": "Obliques",
+     "secondaryMuscles": [
+      "Traps",
+      "Forearms",
+      null
+     ],
+     "workoutType": "Carry",
+     "equipment": "None",
+     "weightType": "Kettlebell",
+     "unit": "seconds"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "seconds",
+    "timed": true,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Obliques",
+     "secondaryMuscle1": "Traps",
+     "secondaryMuscle2": "Forearms",
+     "secondaryMuscle3": null,
+     "workoutType": "Carry",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-front-rack-lunge",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-front-rack-lunge"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-front-rack-lunge",
+     "name": "Kettlebell Front-Rack Reverse Lunge",
+     "primaryMuscle": "Quads",
+     "secondaryMuscles": [
+      "Glutes",
+      "Hamstrings",
+      null
+     ],
+     "workoutType": "Lunge",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "intermediate",
+    "hasDifficulty": false,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": "Hamstrings",
+     "secondaryMuscle3": null,
+     "workoutType": "Lunge",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "lookup kettlebell-turkish-get-up",
+   "fn": "lookup",
+   "args": [
+    "kettlebell-turkish-get-up"
+   ],
+   "output": {
+    "def": {
+     "id": "kettlebell-turkish-get-up",
+     "name": "Kettlebell Turkish Get-Up",
+     "primaryMuscle": "Obliques",
+     "secondaryMuscles": [
+      "Delts",
+      "Glutes",
+      null
+     ],
+     "workoutType": "Anti-Rotation",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    },
+    "difficulty": "advanced",
+    "hasDifficulty": true,
+    "unit": "reps",
+    "timed": false,
+    "prereqs": [
+     "side-plank",
+     "pallof-press"
+    ],
+    "heads": [],
+    "meta": {
+     "primaryMuscle": "Obliques",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Glutes",
+     "secondaryMuscle3": null,
+     "workoutType": "Anti-Rotation",
+     "equipment": "None",
+     "weightType": "Kettlebell"
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "region Abductors",
+   "fn": "regionFor",
+   "args": [
+    "Abductors"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Abs",
+   "fn": "regionFor",
+   "args": [
+    "Abs"
+   ],
+   "output": "Core",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Adductors",
+   "fn": "regionFor",
+   "args": [
+    "Adductors"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Biceps",
+   "fn": "regionFor",
+   "args": [
+    "Biceps"
+   ],
+   "output": "Arms",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Calves",
+   "fn": "regionFor",
+   "args": [
+    "Calves"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Chest",
+   "fn": "regionFor",
+   "args": [
+    "Chest"
+   ],
+   "output": "Chest",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Delts",
+   "fn": "regionFor",
+   "args": [
+    "Delts"
+   ],
+   "output": "Shoulders",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Forearms",
+   "fn": "regionFor",
+   "args": [
+    "Forearms"
+   ],
+   "output": "Arms",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Glutes",
+   "fn": "regionFor",
+   "args": [
+    "Glutes"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Hamstrings",
+   "fn": "regionFor",
+   "args": [
+    "Hamstrings"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Lats",
+   "fn": "regionFor",
+   "args": [
+    "Lats"
+   ],
+   "output": "Back",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Lower Back",
+   "fn": "regionFor",
+   "args": [
+    "Lower Back"
+   ],
+   "output": "Back",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Obliques",
+   "fn": "regionFor",
+   "args": [
+    "Obliques"
+   ],
+   "output": "Core",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Quads",
+   "fn": "regionFor",
+   "args": [
+    "Quads"
+   ],
+   "output": "Legs",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Traps",
+   "fn": "regionFor",
+   "args": [
+    "Traps"
+   ],
+   "output": "Back",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Triceps",
+   "fn": "regionFor",
+   "args": [
+    "Triceps"
+   ],
+   "output": "Arms",
+   "now": 1773846000000
+  },
+  {
+   "name": "region Upper Back",
+   "fn": "regionFor",
+   "args": [
+    "Upper Back"
+   ],
+   "output": "Back",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Abduction",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Abduction"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Anti-Rotation",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Anti-Rotation"
+   ],
+   "output": "Core",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Calf Raise",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Calf Raise"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Carry",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Carry"
+   ],
+   "output": "Carry",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Crunch",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Crunch"
+   ],
+   "output": "Core",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Curl",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Curl"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Dip",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Dip"
+   ],
+   "output": "Push",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Face Pull",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Face Pull"
+   ],
+   "output": "Pull",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Fly",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Fly"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Hip Hinge",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Hip Hinge"
+   ],
+   "output": "Hinge",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Hip Thrust",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Hip Thrust"
+   ],
+   "output": "Hinge",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Horizontal Press",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Horizontal Press"
+   ],
+   "output": "Push",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Jump",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Jump"
+   ],
+   "output": "Power",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Lateral Raise",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Lateral Raise"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Leg Curl",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Leg Curl"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Leg Extension",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Leg Extension"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Leg Press",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Leg Press"
+   ],
+   "output": "Squat",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Lunge",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Lunge"
+   ],
+   "output": "Squat",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Plank",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Plank"
+   ],
+   "output": "Core",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Pull Down",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Pull Down"
+   ],
+   "output": "Pull",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Pull Over",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Pull Over"
+   ],
+   "output": "Pull",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Pull Up",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Pull Up"
+   ],
+   "output": "Pull",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Reverse Fly",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Reverse Fly"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Rotation",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Rotation"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Row",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Row"
+   ],
+   "output": "Pull",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Shrug",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Shrug"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Squat",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Squat"
+   ],
+   "output": "Squat",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Tricep Extension",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Tricep Extension"
+   ],
+   "output": "Isolation",
+   "now": 1773846000000
+  },
+  {
+   "name": "category Vertical Press",
+   "fn": "patternCategoryFor",
+   "args": [
+    "Vertical Press"
+   ],
+   "output": "Push",
+   "now": 1773846000000
+  },
+  {
+   "name": "unitLabel",
+   "fn": "unitLabels",
+   "args": [],
+   "output": [
+    "reps",
+    "rep",
+    "sec",
+    "sec"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "meta layered bench-press",
+   "fn": "getExerciseMeta",
+   "args": [
+    "bench-press"
+   ],
+   "output": {
+    "primaryMuscle": "Chest",
+    "secondaryMuscle1": "Delts",
+    "secondaryMuscle2": "Triceps",
+    "secondaryMuscle3": null,
+    "workoutType": "Horizontal Press",
+    "equipment": "Bench",
+    "weightType": "Barbell",
+    "updatedAt": 5
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered custom-overhead-thing",
+   "fn": "getExerciseMeta",
+   "args": [
+    "custom-overhead-thing"
+   ],
+   "output": {
+    "primaryMuscle": "Delts",
+    "secondaryMuscle1": null,
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": "Vertical Press",
+    "equipment": "Machine",
+    "weightType": "Machine"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered custom-push",
+   "fn": "getExerciseMeta",
+   "args": [
+    "custom-push"
+   ],
+   "output": {
+    "primaryMuscle": "Chest",
+    "secondaryMuscle1": null,
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": "Horizontal Press",
+    "equipment": null,
+    "weightType": "Bodyweight"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered custom-ohp",
+   "fn": "getExerciseMeta",
+   "args": [
+    "custom-ohp"
+   ],
+   "output": {
+    "primaryMuscle": "Delts",
+    "secondaryMuscle1": "Triceps",
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": "Vertical Press",
+    "equipment": null,
+    "weightType": "Dumbbell"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered squat",
+   "fn": "getExerciseMeta",
+   "args": [
+    "squat"
+   ],
+   "output": {
+    "primaryMuscle": "Quads",
+    "secondaryMuscle1": "Glutes",
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": "Squat",
+    "equipment": "Squat Rack",
+    "weightType": "Barbell"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered custom-global",
+   "fn": "getExerciseMeta",
+   "args": [
+    "custom-global"
+   ],
+   "output": {
+    "primaryMuscle": "Lats",
+    "secondaryMuscle1": null,
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": "Pull Down",
+    "equipment": "Cable Machine",
+    "weightType": "Machine"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered deadlift",
+   "fn": "getExerciseMeta",
+   "args": [
+    "deadlift"
+   ],
+   "output": {
+    "primaryMuscle": null,
+    "secondaryMuscle1": null,
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": null,
+    "equipment": null,
+    "weightType": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta layered custom-none",
+   "fn": "getExerciseMeta",
+   "args": [
+    "custom-none"
+   ],
+   "output": {
+    "primaryMuscle": null,
+    "secondaryMuscle1": null,
+    "secondaryMuscle2": null,
+    "secondaryMuscle3": null,
+    "workoutType": null,
+    "equipment": null,
+    "weightType": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta all (normalized)",
+   "fn": "getAllExerciseMeta",
+   "args": [],
+   "output": {
+    "bench-press": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell",
+     "updatedAt": 5
+    },
+    "custom-overhead-thing": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "custom-push": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": null,
+     "weightType": "Bodyweight"
+    },
+    "custom-ohp": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": null,
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "meta corrupt json",
+   "fn": "getAllExerciseMeta",
+   "args": [],
+   "output": {},
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{not json"
+   }
+  },
+  {
+   "name": "save meta",
+   "fn": "saveExerciseMeta",
+   "args": [
+    "custom-push",
+    {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell"
+    },
+    99
+   ],
+   "output": {
+    "bench-press": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell",
+     "updatedAt": 5
+    },
+    "custom-overhead-thing": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "custom-push": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell",
+     "updatedAt": 99
+    },
+    "custom-ohp": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": null,
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "delete meta",
+   "fn": "deleteExerciseMeta",
+   "args": [
+    "bench-press"
+   ],
+   "output": {
+    "custom-overhead-thing": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "custom-push": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": null,
+     "weightType": "Bodyweight"
+    },
+    "custom-ohp": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": null,
+     "weightType": "Dumbbell"
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "merge meta",
+   "fn": "mergeExerciseMeta",
+   "args": [
+    {
+     "bench-press": {
+      "primaryMuscle": "Quads",
+      "secondaryMuscle1": "Glutes",
+      "secondaryMuscle2": null,
+      "secondaryMuscle3": null,
+      "workoutType": "Squat",
+      "equipment": "Squat Rack",
+      "weightType": "Barbell",
+      "updatedAt": 4
+     },
+     "custom-push": {
+      "primaryMuscle": "Quads",
+      "secondaryMuscle1": "Glutes",
+      "secondaryMuscle2": null,
+      "secondaryMuscle3": null,
+      "workoutType": "Squat",
+      "equipment": "Squat Rack",
+      "weightType": "Barbell",
+      "updatedAt": 1
+     },
+     "brand-new": {
+      "primaryMuscle": "Lats",
+      "secondaryMuscle1": null,
+      "secondaryMuscle2": null,
+      "secondaryMuscle3": null,
+      "workoutType": "Pull Down",
+      "equipment": "Cable Machine",
+      "weightType": "Machine"
+     }
+    }
+   ],
+   "output": {
+    "bench-press": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Delts",
+     "secondaryMuscle2": "Triceps",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell",
+     "updatedAt": 5
+    },
+    "custom-overhead-thing": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": "Machine",
+     "weightType": "Machine"
+    },
+    "custom-push": {
+     "primaryMuscle": "Quads",
+     "secondaryMuscle1": "Glutes",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Squat",
+     "equipment": "Squat Rack",
+     "weightType": "Barbell",
+     "updatedAt": 1
+    },
+    "custom-ohp": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Vertical Press",
+     "equipment": null,
+     "weightType": "Dumbbell"
+    },
+    "brand-new": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": "Pull Down",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercise_meta": "{\"bench-press\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":\"Front Delts\",\"secondaryMuscle2\":\"Triceps\",\"secondaryMuscle3\":\"Chest\",\"workoutType\":\"Press\",\"equipment\":\"Bench\",\"weightType\":\"Barbell\",\"updatedAt\":5},\"custom-overhead-thing\":{\"primaryMuscle\":\"Side Delts\",\"secondaryMuscle1\":\"Rear Delts\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Press\",\"equipment\":\"Leg Press Machine\",\"weightType\":\"Machine\"},\"custom-push\":{\"primaryMuscle\":\"Chest\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Push Up\",\"equipment\":null,\"weightType\":\"Bodyweight\"},\"custom-ohp\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Triceps\",\"secondaryMuscle2\":\"Delts\",\"secondaryMuscle3\":null,\"workoutType\":\"Overhead Press\",\"equipment\":null,\"weightType\":\"Dumbbell\"}}",
+    "liftlog_global_meta": "{\"squat\":{\"primaryMuscle\":\"Quads\",\"secondaryMuscle1\":\"Glutes\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Squat\",\"equipment\":\"Squat Rack\",\"weightType\":\"Barbell\"},\"custom-global\":{\"primaryMuscle\":\"Lats\",\"secondaryMuscle1\":null,\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Pull Down\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  }
+ ]
+}
