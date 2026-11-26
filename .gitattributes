@@ -1,0 +1,2 @@
+ios/parity/fixtures/*.json linguist-generated=true -diff
+ios/LiftLogCore/Sources/LiftLogCore/Generated/*.swift linguist-generated=true
