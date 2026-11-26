@@ -45,6 +45,7 @@ jobs:
         run: swift test
       - name: Build app for the Simulator (unsigned)
         working-directory: ios/LiftLog
+        shell: bash -eo pipefail {0}
         run: |
           xcodebuild -project LiftLog.xcodeproj -scheme LiftLog \
             -destination 'generic/platform=iOS Simulator' \
