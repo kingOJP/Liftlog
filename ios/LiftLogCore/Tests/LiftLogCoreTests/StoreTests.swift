@@ -15,6 +15,17 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(store.allKeys(), [StorageKey.weightUnit])
     }
 
+    func testTextWithNulAndUnicodeRoundTrips() throws {
+        let store = try LiftLogStore()
+        let note = "felt strong\u{0}then tweaked 💪 — é"
+        _ = try store.saveSession(Session(guid: "nul", dayId: 1, weekNumber: 1, startedAt: 1, note: note), sets: [])
+        XCTAssertEqual(try store.allSessions().first?.note, note)
+        store.setItem("k", "a\u{0}b")
+        XCTAssertEqual(store.getItem("k"), "a\u{0}b")
+        store.setItem("empty", "")
+        XCTAssertEqual(store.getItem("empty"), "")
+    }
+
     func testSessionsAndSetsAreAtomic() throws {
         let store = try LiftLogStore()
         let id = try store.saveSession(Session(guid: "g1", dayId: 1, weekNumber: 2, startedAt: 1000, completedAt: 2000, updatedAt: 2000, note: "n"),
