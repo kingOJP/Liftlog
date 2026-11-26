@@ -21,3 +21,31 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+
+  # Native iOS app (ios/): the Swift engine port must reproduce the TypeScript
+  # engines' outputs exactly. Fixtures are regenerated from the TS engines and
+  # must match what is committed; `swift test` then checks Swift against them.
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Parity fixtures are up to date
+        run: |
+          npm run parity:fixtures
+          git status --porcelain ios/parity/fixtures
+          git diff --exit-code ios/parity/fixtures
+          test -z "$(git status --porcelain ios/parity/fixtures)"
+      - name: swift test
+        working-directory: ios/LiftLogCore
+        run: swift test
+      - name: Build app for the Simulator (unsigned)
+        working-directory: ios/LiftLog
+        run: |
+          xcodebuild -project LiftLog.xcodeproj -scheme LiftLog \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -20
