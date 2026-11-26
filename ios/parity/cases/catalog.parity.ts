@@ -13,6 +13,7 @@ import {
 } from '../../../src/data/exercises';
 import type { ExerciseMetaOverride } from '../../../src/data/exercises';
 import { PROGRAM } from '../../../src/data/program';
+import { GOALS, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS, RACE_PROXIMITY, ENDURANCE_LOADS, DISCIPLINES, INJURY_AREAS, PHASE_INFO } from '../../../src/data/plan';
 import { regionFor, patternCategoryFor, unitLabel, MUSCLE_GROUPS, MOVEMENT_PATTERNS } from '../../../src/data/taxonomy';
 
 const q = (s: string | null | undefined): string => (s == null ? 'nil' : JSON.stringify(s));
@@ -46,6 +47,9 @@ function generateSwift(): string {
   lines.push('    ]', '');
   lines.push('    /// program.ts PROGRAM — the built-in sets/reps seed for the library.');
   lines.push(`    static let seedProgramJSON = #"""\n${JSON.stringify(PROGRAM)}\n"""#`);
+  const planTables = { GOALS, EXPERIENCE_LEVELS, EQUIPMENT_ACCESS, RACE_PROXIMITY, ENDURANCE_LOADS, DISCIPLINES, INJURY_AREAS, PHASE_INFO };
+  lines.push('    /// plan.ts label tables (GOALS, EXPERIENCE_LEVELS, …, PHASE_INFO).');
+  lines.push(`    static let planTablesJSON = #"""\n${JSON.stringify(planTables)}\n"""#`);
   lines.push('}', '');
   return lines.join('\n');
 }
