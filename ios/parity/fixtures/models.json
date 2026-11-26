@@ -1,0 +1,1025 @@
+{
+ "engine": "models",
+ "cases": [
+  {
+   "name": "program",
+   "fn": "WorkoutDay[]",
+   "args": [
+    [
+     {
+      "id": 1,
+      "label": "Day 1",
+      "muscleGroups": "Chest · Triceps",
+      "exercises": [
+       {
+        "id": "bench-press",
+        "name": "Bench Press",
+        "sets": 4,
+        "repLow": 5,
+        "repHigh": 8,
+        "main": true,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "incline-db-press",
+        "name": "Incline DB Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "technique": "paused",
+        "grip": "neutral",
+        "progression": "manual"
+       },
+       {
+        "id": "tricep-pushdown",
+        "name": "Tricep Pushdown",
+        "sets": 3,
+        "archived": true
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Day 2",
+      "muscleGroups": "Legs",
+      "exercises": [],
+      "phases": [
+       "accumulation",
+       "intensification"
+      ]
+     }
+    ]
+   ],
+   "output": [
+    {
+     "id": 1,
+     "label": "Day 1",
+     "muscleGroups": "Chest · Triceps",
+     "exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "sets": 4,
+       "repLow": 5,
+       "repHigh": 8,
+       "main": true,
+       "rangeSource": "plan"
+      },
+      {
+       "id": "incline-db-press",
+       "name": "Incline DB Press",
+       "sets": 3,
+       "repLow": 8,
+       "repHigh": 12,
+       "technique": "paused",
+       "grip": "neutral",
+       "progression": "manual"
+      },
+      {
+       "id": "tricep-pushdown",
+       "name": "Tricep Pushdown",
+       "sets": 3,
+       "archived": true
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "label": "Day 2",
+     "muscleGroups": "Legs",
+     "exercises": [],
+     "phases": [
+      "accumulation",
+      "intensification"
+     ]
+    }
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "library",
+   "fn": "LibraryExercise[]",
+   "args": [
+    [
+     {
+      "id": "bench-press",
+      "name": "Bench Press"
+     },
+     {
+      "id": "custom-1700000000000",
+      "name": "Landmine Press",
+      "updatedAt": 1700000000000,
+      "archived": true
+     },
+     {
+      "id": "legacy",
+      "name": "Legacy",
+      "sets": 3,
+      "repLow": 8,
+      "repHigh": 12
+     }
+    ]
+   ],
+   "output": [
+    {
+     "id": "bench-press",
+     "name": "Bench Press"
+    },
+    {
+     "id": "custom-1700000000000",
+     "name": "Landmine Press",
+     "updatedAt": 1700000000000,
+     "archived": true
+    },
+    {
+     "id": "legacy",
+     "name": "Legacy",
+     "sets": 3,
+     "repLow": 8,
+     "repHigh": 12
+    }
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "session",
+   "fn": "Session",
+   "args": [
+    {
+     "id": 7,
+     "guid": "g-7",
+     "dayId": 1,
+     "weekNumber": 3,
+     "startedAt": 1773846000000,
+     "completedAt": 1773849600000,
+     "updatedAt": 1773849600000,
+     "note": "felt strong"
+    }
+   ],
+   "output": {
+    "id": 7,
+    "guid": "g-7",
+    "dayId": 1,
+    "weekNumber": 3,
+    "startedAt": 1773846000000,
+    "completedAt": 1773849600000,
+    "updatedAt": 1773849600000,
+    "note": "felt strong"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "setLogs",
+   "fn": "SetLog[]",
+   "args": [
+    [
+     {
+      "id": 70,
+      "sessionId": 7,
+      "exerciseId": "bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8,
+      "order": 0,
+      "repLow": 5,
+      "repHigh": 8,
+      "technique": "paused",
+      "grip": "close"
+     },
+     {
+      "id": 71,
+      "sessionId": 7,
+      "exerciseId": "bench-press",
+      "setNumber": 0,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     }
+    ]
+   ],
+   "output": [
+    {
+     "id": 70,
+     "sessionId": 7,
+     "exerciseId": "bench-press",
+     "setNumber": 1,
+     "weight": 185,
+     "reps": 8,
+     "order": 0,
+     "repLow": 5,
+     "repHigh": 8,
+     "technique": "paused",
+     "grip": "close"
+    },
+    {
+     "id": 71,
+     "sessionId": 7,
+     "exerciseId": "bench-press",
+     "setNumber": 0,
+     "weight": 95,
+     "reps": 10,
+     "warmup": true
+    }
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "sessionDoc",
+   "fn": "SessionDoc",
+   "args": [
+    {
+     "guid": "g-7",
+     "dayId": 1,
+     "weekNumber": 3,
+     "startedAt": 1773846000000,
+     "updatedAt": 1773849600000,
+     "sets": [
+      {
+       "exerciseId": "bench-press",
+       "setNumber": 1,
+       "weight": 185,
+       "reps": 8,
+       "order": 0,
+       "repLow": 5,
+       "repHigh": 8
+      },
+      {
+       "exerciseId": "bench-press",
+       "setNumber": 2,
+       "weight": 165,
+       "reps": 6.5,
+       "technique": "drop"
+      }
+     ]
+    }
+   ],
+   "output": {
+    "guid": "g-7",
+    "dayId": 1,
+    "weekNumber": 3,
+    "startedAt": 1773846000000,
+    "updatedAt": 1773849600000,
+    "sets": [
+     {
+      "exerciseId": "bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8,
+      "order": 0,
+      "repLow": 5,
+      "repHigh": 8
+     },
+     {
+      "exerciseId": "bench-press",
+      "setNumber": 2,
+      "weight": 165,
+      "reps": 6.5,
+      "technique": "drop"
+     }
+    ]
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "draft",
+   "fn": "DraftSession",
+   "args": [
+    {
+     "dayId": 1,
+     "startedAt": 1773846000000,
+     "savedAt": 1773846600000,
+     "sets": {
+      "bench-press": [
+       {
+        "weight": 185,
+        "reps": 8
+       },
+       {
+        "weight": 185,
+        "reps": 7,
+        "technique": "rest-pause",
+        "grip": "wide"
+       }
+      ]
+     },
+     "order": [
+      "bench-press"
+     ],
+     "origin": "quick",
+     "note": "n",
+     "day": {
+      "id": 1,
+      "label": "Day 1",
+      "muscleGroups": "Chest · Triceps",
+      "exercises": [
+       {
+        "id": "bench-press",
+        "name": "Bench Press",
+        "sets": 4,
+        "repLow": 5,
+        "repHigh": 8,
+        "main": true,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "incline-db-press",
+        "name": "Incline DB Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "technique": "paused",
+        "grip": "neutral",
+        "progression": "manual"
+       },
+       {
+        "id": "tricep-pushdown",
+        "name": "Tricep Pushdown",
+        "sets": 3,
+        "archived": true
+       }
+      ]
+     },
+     "added": [
+      {
+       "id": "dips",
+       "name": "Dips",
+       "sets": 2
+      }
+     ]
+    }
+   ],
+   "output": {
+    "dayId": 1,
+    "startedAt": 1773846000000,
+    "savedAt": 1773846600000,
+    "sets": {
+     "bench-press": [
+      {
+       "weight": 185,
+       "reps": 8
+      },
+      {
+       "weight": 185,
+       "reps": 7,
+       "technique": "rest-pause",
+       "grip": "wide"
+      }
+     ]
+    },
+    "order": [
+     "bench-press"
+    ],
+    "origin": "quick",
+    "note": "n",
+    "day": {
+     "id": 1,
+     "label": "Day 1",
+     "muscleGroups": "Chest · Triceps",
+     "exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "sets": 4,
+       "repLow": 5,
+       "repHigh": 8,
+       "main": true,
+       "rangeSource": "plan"
+      },
+      {
+       "id": "incline-db-press",
+       "name": "Incline DB Press",
+       "sets": 3,
+       "repLow": 8,
+       "repHigh": 12,
+       "technique": "paused",
+       "grip": "neutral",
+       "progression": "manual"
+      },
+      {
+       "id": "tricep-pushdown",
+       "name": "Tricep Pushdown",
+       "sets": 3,
+       "archived": true
+      }
+     ]
+    },
+    "added": [
+     {
+      "id": "dips",
+      "name": "Dips",
+      "sets": 2
+     }
+    ]
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "planState",
+   "fn": "PlanState",
+   "args": [
+    {
+     "version": 1,
+     "updatedAt": 1773849600000,
+     "profile": {
+      "injuries": "left knee",
+      "equipment": "home-rack",
+      "daysPerWeek": 3,
+      "experience": "intermediate",
+      "trainingAgeMonths": 18,
+      "priorityMuscles": [
+       "Upper Back",
+       "Glutes"
+      ],
+      "injuryAreas": [
+       "knee",
+       "lower-back"
+      ],
+      "updatedAt": 1773800000000,
+      "sport": {
+       "sport": "running",
+       "event": "run-half",
+       "proximity": "mid",
+       "load": "very-high",
+       "weakLink": "run",
+       "niggles": [
+        "achilles"
+       ]
+      }
+     },
+     "strength": {
+      "maxes": [
+       {
+        "exerciseId": "bench-press",
+        "weight": 225,
+        "source": "tested",
+        "date": "2026-03-01",
+        "updatedAt": 1772400000000
+       }
+      ],
+      "goals": [
+       {
+        "exerciseId": "bench-press",
+        "targetWeight": 250,
+        "createdAt": 1772400000000
+       }
+      ]
+     },
+     "plans": [
+      {
+       "id": "plan-1",
+       "goal": "sport-support",
+       "goalNotes": "half marathon in June",
+       "origin": "planned",
+       "status": "active",
+       "createdAt": 1770000000000,
+       "blocks": [
+        {
+         "id": "block-0",
+         "name": "Foundation",
+         "focus": "general",
+         "startDate": "2026-01-05",
+         "phases": [],
+         "openEnded": true,
+         "program": [],
+         "intent": "i",
+         "progression": "p",
+         "status": "completed",
+         "activatedAt": 1767600000000,
+         "completedAt": 1770000000000,
+         "completedBy": "activation",
+         "retrospective": {
+          "blockId": "block-0",
+          "from": 1767600000000,
+          "to": 1770000000000,
+          "sessionsCompleted": 12,
+          "sessionsPlanned": null,
+          "adherencePct": null,
+          "avgSessionMinutes": 54.5,
+          "strength": [
+           {
+            "exerciseId": "bench-press",
+            "name": "Bench Press",
+            "startE1rm": 200,
+            "endE1rm": 215.3,
+            "changePct": 7.65,
+            "sessions": 8,
+            "status": "progressing",
+            "volumeChangePct": null,
+            "prCount": 2
+           },
+           {
+            "exerciseId": "squat",
+            "name": "Squat",
+            "startE1rm": 300,
+            "endE1rm": 300,
+            "changePct": 0,
+            "sessions": 6
+           }
+          ],
+          "muscles": [
+           {
+            "muscle": "Chest",
+            "weeklySets": 12.5,
+            "status": "optimal"
+           }
+          ],
+          "summary": [
+           "Bench Press up 8%"
+          ],
+          "carryover": {
+           "keepExerciseIds": [
+            "bench-press"
+           ],
+           "reviewExerciseIds": [
+            "squat"
+           ],
+           "underMuscles": [
+            "Lats"
+           ],
+           "overMuscles": []
+          }
+         }
+        },
+        {
+         "id": "block-1",
+         "name": "Build",
+         "focus": "sport-support",
+         "startDate": "2026-02-02",
+         "phases": [
+          "intro",
+          "accumulation",
+          "deload",
+          "race-week"
+         ],
+         "program": [
+          {
+           "id": 1,
+           "label": "Day 1",
+           "muscleGroups": "Chest · Triceps",
+           "exercises": [
+            {
+             "id": "bench-press",
+             "name": "Bench Press",
+             "sets": 4,
+             "repLow": 5,
+             "repHigh": 8,
+             "main": true,
+             "rangeSource": "plan"
+            },
+            {
+             "id": "incline-db-press",
+             "name": "Incline DB Press",
+             "sets": 3,
+             "repLow": 8,
+             "repHigh": 12,
+             "technique": "paused",
+             "grip": "neutral",
+             "progression": "manual"
+            },
+            {
+             "id": "tricep-pushdown",
+             "name": "Tricep Pushdown",
+             "sets": 3,
+             "archived": true
+            }
+           ]
+          },
+          {
+           "id": 2,
+           "label": "Day 2",
+           "muscleGroups": "Legs",
+           "exercises": [],
+           "phases": [
+            "accumulation",
+            "intensification"
+           ]
+          }
+         ],
+         "intent": "i",
+         "progression": "p",
+         "status": "active",
+         "activatedAt": 1770000000000,
+         "experience": "intermediate",
+         "replacedBlockId": "block-0",
+         "replacedProgram": [],
+         "coachDecisions": [
+          {
+           "key": "add-volume:Lats",
+           "accepted": true,
+           "at": 1771000000000
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "pendingActivation": {
+      "goal": "hypertrophy",
+      "createdAt": 1773849600000,
+      "block": {
+       "id": "block-2",
+       "name": "Next",
+       "focus": "hypertrophy",
+       "startDate": "2026-04-06",
+       "phases": [
+        "accumulation"
+       ],
+       "program": [
+        {
+         "id": 1,
+         "label": "Day 1",
+         "muscleGroups": "Chest · Triceps",
+         "exercises": [
+          {
+           "id": "bench-press",
+           "name": "Bench Press",
+           "sets": 4,
+           "repLow": 5,
+           "repHigh": 8,
+           "main": true,
+           "rangeSource": "plan"
+          },
+          {
+           "id": "incline-db-press",
+           "name": "Incline DB Press",
+           "sets": 3,
+           "repLow": 8,
+           "repHigh": 12,
+           "technique": "paused",
+           "grip": "neutral",
+           "progression": "manual"
+          },
+          {
+           "id": "tricep-pushdown",
+           "name": "Tricep Pushdown",
+           "sets": 3,
+           "archived": true
+          }
+         ]
+        },
+        {
+         "id": 2,
+         "label": "Day 2",
+         "muscleGroups": "Legs",
+         "exercises": [],
+         "phases": [
+          "accumulation",
+          "intensification"
+         ]
+        }
+       ],
+       "intent": "i",
+       "progression": "p",
+       "status": "pending",
+       "activatedAt": 0
+      }
+     }
+    }
+   ],
+   "output": {
+    "version": 1,
+    "updatedAt": 1773849600000,
+    "profile": {
+     "injuries": "left knee",
+     "equipment": "home-rack",
+     "daysPerWeek": 3,
+     "experience": "intermediate",
+     "trainingAgeMonths": 18,
+     "priorityMuscles": [
+      "Upper Back",
+      "Glutes"
+     ],
+     "injuryAreas": [
+      "knee",
+      "lower-back"
+     ],
+     "updatedAt": 1773800000000,
+     "sport": {
+      "sport": "running",
+      "event": "run-half",
+      "proximity": "mid",
+      "load": "very-high",
+      "weakLink": "run",
+      "niggles": [
+       "achilles"
+      ]
+     }
+    },
+    "strength": {
+     "maxes": [
+      {
+       "exerciseId": "bench-press",
+       "weight": 225,
+       "source": "tested",
+       "date": "2026-03-01",
+       "updatedAt": 1772400000000
+      }
+     ],
+     "goals": [
+      {
+       "exerciseId": "bench-press",
+       "targetWeight": 250,
+       "createdAt": 1772400000000
+      }
+     ]
+    },
+    "plans": [
+     {
+      "id": "plan-1",
+      "goal": "sport-support",
+      "goalNotes": "half marathon in June",
+      "origin": "planned",
+      "status": "active",
+      "createdAt": 1770000000000,
+      "blocks": [
+       {
+        "id": "block-0",
+        "name": "Foundation",
+        "focus": "general",
+        "startDate": "2026-01-05",
+        "phases": [],
+        "openEnded": true,
+        "program": [],
+        "intent": "i",
+        "progression": "p",
+        "status": "completed",
+        "activatedAt": 1767600000000,
+        "completedAt": 1770000000000,
+        "completedBy": "activation",
+        "retrospective": {
+         "blockId": "block-0",
+         "from": 1767600000000,
+         "to": 1770000000000,
+         "sessionsCompleted": 12,
+         "sessionsPlanned": null,
+         "adherencePct": null,
+         "avgSessionMinutes": 54.5,
+         "strength": [
+          {
+           "exerciseId": "bench-press",
+           "name": "Bench Press",
+           "startE1rm": 200,
+           "endE1rm": 215.3,
+           "changePct": 7.65,
+           "sessions": 8,
+           "status": "progressing",
+           "volumeChangePct": null,
+           "prCount": 2
+          },
+          {
+           "exerciseId": "squat",
+           "name": "Squat",
+           "startE1rm": 300,
+           "endE1rm": 300,
+           "changePct": 0,
+           "sessions": 6
+          }
+         ],
+         "muscles": [
+          {
+           "muscle": "Chest",
+           "weeklySets": 12.5,
+           "status": "optimal"
+          }
+         ],
+         "summary": [
+          "Bench Press up 8%"
+         ],
+         "carryover": {
+          "keepExerciseIds": [
+           "bench-press"
+          ],
+          "reviewExerciseIds": [
+           "squat"
+          ],
+          "underMuscles": [
+           "Lats"
+          ],
+          "overMuscles": []
+         }
+        }
+       },
+       {
+        "id": "block-1",
+        "name": "Build",
+        "focus": "sport-support",
+        "startDate": "2026-02-02",
+        "phases": [
+         "intro",
+         "accumulation",
+         "deload",
+         "race-week"
+        ],
+        "program": [
+         {
+          "id": 1,
+          "label": "Day 1",
+          "muscleGroups": "Chest · Triceps",
+          "exercises": [
+           {
+            "id": "bench-press",
+            "name": "Bench Press",
+            "sets": 4,
+            "repLow": 5,
+            "repHigh": 8,
+            "main": true,
+            "rangeSource": "plan"
+           },
+           {
+            "id": "incline-db-press",
+            "name": "Incline DB Press",
+            "sets": 3,
+            "repLow": 8,
+            "repHigh": 12,
+            "technique": "paused",
+            "grip": "neutral",
+            "progression": "manual"
+           },
+           {
+            "id": "tricep-pushdown",
+            "name": "Tricep Pushdown",
+            "sets": 3,
+            "archived": true
+           }
+          ]
+         },
+         {
+          "id": 2,
+          "label": "Day 2",
+          "muscleGroups": "Legs",
+          "exercises": [],
+          "phases": [
+           "accumulation",
+           "intensification"
+          ]
+         }
+        ],
+        "intent": "i",
+        "progression": "p",
+        "status": "active",
+        "activatedAt": 1770000000000,
+        "experience": "intermediate",
+        "replacedBlockId": "block-0",
+        "replacedProgram": [],
+        "coachDecisions": [
+         {
+          "key": "add-volume:Lats",
+          "accepted": true,
+          "at": 1771000000000
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "pendingActivation": {
+     "goal": "hypertrophy",
+     "createdAt": 1773849600000,
+     "block": {
+      "id": "block-2",
+      "name": "Next",
+      "focus": "hypertrophy",
+      "startDate": "2026-04-06",
+      "phases": [
+       "accumulation"
+      ],
+      "program": [
+       {
+        "id": 1,
+        "label": "Day 1",
+        "muscleGroups": "Chest · Triceps",
+        "exercises": [
+         {
+          "id": "bench-press",
+          "name": "Bench Press",
+          "sets": 4,
+          "repLow": 5,
+          "repHigh": 8,
+          "main": true,
+          "rangeSource": "plan"
+         },
+         {
+          "id": "incline-db-press",
+          "name": "Incline DB Press",
+          "sets": 3,
+          "repLow": 8,
+          "repHigh": 12,
+          "technique": "paused",
+          "grip": "neutral",
+          "progression": "manual"
+         },
+         {
+          "id": "tricep-pushdown",
+          "name": "Tricep Pushdown",
+          "sets": 3,
+          "archived": true
+         }
+        ]
+       },
+       {
+        "id": 2,
+        "label": "Day 2",
+        "muscleGroups": "Legs",
+        "exercises": [],
+        "phases": [
+         "accumulation",
+         "intensification"
+        ]
+       }
+      ],
+      "intent": "i",
+      "progression": "p",
+      "status": "pending",
+      "activatedAt": 0
+     }
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "exerciseMeta",
+   "fn": "Record<string, ExerciseMetaOverride>",
+   "args": [
+    {
+     "bench-press": {
+      "primaryMuscle": "Chest",
+      "secondaryMuscle1": "Triceps",
+      "secondaryMuscle2": "Delts",
+      "secondaryMuscle3": null,
+      "workoutType": "Horizontal Press",
+      "equipment": "Bench",
+      "weightType": "Barbell",
+      "updatedAt": 1773800000000
+     },
+     "custom-1": {
+      "primaryMuscle": null,
+      "secondaryMuscle1": null,
+      "secondaryMuscle2": null,
+      "secondaryMuscle3": null,
+      "workoutType": null,
+      "equipment": null,
+      "weightType": null
+     }
+    }
+   ],
+   "output": {
+    "bench-press": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscle1": "Triceps",
+     "secondaryMuscle2": "Delts",
+     "secondaryMuscle3": null,
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Barbell",
+     "updatedAt": 1773800000000
+    },
+    "custom-1": {
+     "primaryMuscle": null,
+     "secondaryMuscle1": null,
+     "secondaryMuscle2": null,
+     "secondaryMuscle3": null,
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "settings",
+   "fn": "Settings",
+   "args": [
+    {
+     "programStart": "2026-01-05"
+    }
+   ],
+   "output": {
+    "programStart": "2026-01-05"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "syncStatus",
+   "fn": "SyncStatus",
+   "args": [
+    {
+     "lastSuccessAt": 1773849600000,
+     "lastPullAt": null,
+     "lastError": "offline",
+     "lastErrorAt": 1773849700000,
+     "hasUnpushed": true,
+     "authExpired": false
+    }
+   ],
+   "output": {
+    "lastSuccessAt": 1773849600000,
+    "lastPullAt": null,
+    "lastError": "offline",
+    "lastErrorAt": 1773849700000,
+    "hasUnpushed": true,
+    "authExpired": false
+   },
+   "now": 1773846000000
+  }
+ ]
+}

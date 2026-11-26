@@ -1,0 +1,519 @@
+{
+ "engine": "units",
+ "cases": [
+  {
+   "name": "toDisplay 0 lb",
+   "fn": "toDisplay",
+   "args": [
+    0,
+    "lb"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 0 lb",
+   "fn": "fmtWeight",
+   "args": [
+    0,
+    "lb"
+   ],
+   "output": "0 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 2.5 lb",
+   "fn": "toDisplay",
+   "args": [
+    2.5,
+    "lb"
+   ],
+   "output": 2.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 2.5 lb",
+   "fn": "fmtWeight",
+   "args": [
+    2.5,
+    "lb"
+   ],
+   "output": "2.5 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 45 lb",
+   "fn": "toDisplay",
+   "args": [
+    45,
+    "lb"
+   ],
+   "output": 45,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 45 lb",
+   "fn": "fmtWeight",
+   "args": [
+    45,
+    "lb"
+   ],
+   "output": "45 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 135 lb",
+   "fn": "toDisplay",
+   "args": [
+    135,
+    "lb"
+   ],
+   "output": 135,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 135 lb",
+   "fn": "fmtWeight",
+   "args": [
+    135,
+    "lb"
+   ],
+   "output": "135 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 185.5 lb",
+   "fn": "toDisplay",
+   "args": [
+    185.5,
+    "lb"
+   ],
+   "output": 185.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 185.5 lb",
+   "fn": "fmtWeight",
+   "args": [
+    185.5,
+    "lb"
+   ],
+   "output": "185.5 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 225 lb",
+   "fn": "toDisplay",
+   "args": [
+    225,
+    "lb"
+   ],
+   "output": 225,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 225 lb",
+   "fn": "fmtWeight",
+   "args": [
+    225,
+    "lb"
+   ],
+   "output": "225 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 315.25 lb",
+   "fn": "toDisplay",
+   "args": [
+    315.25,
+    "lb"
+   ],
+   "output": 315.25,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 315.25 lb",
+   "fn": "fmtWeight",
+   "args": [
+    315.25,
+    "lb"
+   ],
+   "output": "315.25 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 1000 lb",
+   "fn": "toDisplay",
+   "args": [
+    1000,
+    "lb"
+   ],
+   "output": 1000,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 1000 lb",
+   "fn": "fmtWeight",
+   "args": [
+    1000,
+    "lb"
+   ],
+   "output": "1000 lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 0 lb",
+   "fn": "fromDisplay",
+   "args": [
+    0,
+    "lb"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 1 lb",
+   "fn": "fromDisplay",
+   "args": [
+    1,
+    "lb"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 20 lb",
+   "fn": "fromDisplay",
+   "args": [
+    20,
+    "lb"
+   ],
+   "output": 20,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 61.2 lb",
+   "fn": "fromDisplay",
+   "args": [
+    61.2,
+    "lb"
+   ],
+   "output": 61.2,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 84.1 lb",
+   "fn": "fromDisplay",
+   "args": [
+    84.1,
+    "lb"
+   ],
+   "output": 84.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 100 lb",
+   "fn": "fromDisplay",
+   "args": [
+    100,
+    "lb"
+   ],
+   "output": 100,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 142.5 lb",
+   "fn": "fromDisplay",
+   "args": [
+    142.5,
+    "lb"
+   ],
+   "output": 142.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "unitLabelFor lb",
+   "fn": "unitLabelFor",
+   "args": [
+    "lb"
+   ],
+   "output": "lbs",
+   "now": 1773846000000
+  },
+  {
+   "name": "stored lb",
+   "fn": "storedUnit",
+   "args": [],
+   "output": {
+    "unit": "lb",
+    "w": "185.5 lbs"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_weight_unit": "lb"
+   }
+  },
+  {
+   "name": "toDisplay 0 kg",
+   "fn": "toDisplay",
+   "args": [
+    0,
+    "kg"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 0 kg",
+   "fn": "fmtWeight",
+   "args": [
+    0,
+    "kg"
+   ],
+   "output": "0 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 2.5 kg",
+   "fn": "toDisplay",
+   "args": [
+    2.5,
+    "kg"
+   ],
+   "output": 1.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 2.5 kg",
+   "fn": "fmtWeight",
+   "args": [
+    2.5,
+    "kg"
+   ],
+   "output": "1.1 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 45 kg",
+   "fn": "toDisplay",
+   "args": [
+    45,
+    "kg"
+   ],
+   "output": 20.4,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 45 kg",
+   "fn": "fmtWeight",
+   "args": [
+    45,
+    "kg"
+   ],
+   "output": "20.4 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 135 kg",
+   "fn": "toDisplay",
+   "args": [
+    135,
+    "kg"
+   ],
+   "output": 61.2,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 135 kg",
+   "fn": "fmtWeight",
+   "args": [
+    135,
+    "kg"
+   ],
+   "output": "61.2 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 185.5 kg",
+   "fn": "toDisplay",
+   "args": [
+    185.5,
+    "kg"
+   ],
+   "output": 84.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 185.5 kg",
+   "fn": "fmtWeight",
+   "args": [
+    185.5,
+    "kg"
+   ],
+   "output": "84.1 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 225 kg",
+   "fn": "toDisplay",
+   "args": [
+    225,
+    "kg"
+   ],
+   "output": 102.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 225 kg",
+   "fn": "fmtWeight",
+   "args": [
+    225,
+    "kg"
+   ],
+   "output": "102.1 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 315.25 kg",
+   "fn": "toDisplay",
+   "args": [
+    315.25,
+    "kg"
+   ],
+   "output": 143,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 315.25 kg",
+   "fn": "fmtWeight",
+   "args": [
+    315.25,
+    "kg"
+   ],
+   "output": "143 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "toDisplay 1000 kg",
+   "fn": "toDisplay",
+   "args": [
+    1000,
+    "kg"
+   ],
+   "output": 453.6,
+   "now": 1773846000000
+  },
+  {
+   "name": "fmtWeight 1000 kg",
+   "fn": "fmtWeight",
+   "args": [
+    1000,
+    "kg"
+   ],
+   "output": "453.6 kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 0 kg",
+   "fn": "fromDisplay",
+   "args": [
+    0,
+    "kg"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 1 kg",
+   "fn": "fromDisplay",
+   "args": [
+    1,
+    "kg"
+   ],
+   "output": 2.25,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 20 kg",
+   "fn": "fromDisplay",
+   "args": [
+    20,
+    "kg"
+   ],
+   "output": 44,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 61.2 kg",
+   "fn": "fromDisplay",
+   "args": [
+    61.2,
+    "kg"
+   ],
+   "output": 135,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 84.1 kg",
+   "fn": "fromDisplay",
+   "args": [
+    84.1,
+    "kg"
+   ],
+   "output": 185.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 100 kg",
+   "fn": "fromDisplay",
+   "args": [
+    100,
+    "kg"
+   ],
+   "output": 220.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "fromDisplay 142.5 kg",
+   "fn": "fromDisplay",
+   "args": [
+    142.5,
+    "kg"
+   ],
+   "output": 314.25,
+   "now": 1773846000000
+  },
+  {
+   "name": "unitLabelFor kg",
+   "fn": "unitLabelFor",
+   "args": [
+    "kg"
+   ],
+   "output": "kg",
+   "now": 1773846000000
+  },
+  {
+   "name": "stored kg",
+   "fn": "storedUnit",
+   "args": [],
+   "output": {
+    "unit": "kg",
+    "w": "84.1 kg"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_weight_unit": "kg"
+   }
+  },
+  {
+   "name": "stored default",
+   "fn": "storedUnit",
+   "args": [],
+   "output": {
+    "unit": "lb",
+    "w": "185.5 lbs"
+   },
+   "now": 1773846000000
+  }
+ ]
+}
