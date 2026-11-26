@@ -1,10 +1,16 @@
 import type { Env, User } from './types';
 import { normalizeRole } from './roles';
+import { ensureSchema } from './migrate';
+import { createSession, googleIdentity, handleNativeAuth, resolveGoogleUser } from './identity';
 
 const COOKIE_SESSION = 'liftlog_session';
 const COOKIE_USER = 'liftlog_user';
 const COOKIE_STATE = 'oauth_state';
 const SESSION_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const NATIVE_PATHS = new Set([
+  '/api/auth/apple', '/api/auth/apple/create', '/api/auth/google/native',
+  '/api/auth/link', '/api/auth/identities', '/api/auth/native/logout',
+]);
 
 function getRedirectUri(url: URL): string {
   return `${url.protocol}//${url.host}/api/auth/google/callback`;
@@ -17,6 +23,10 @@ function redirectTo(url: URL, path: string): Response {
 }
 
 export async function handleAuth(request: Request, env: Env, url: URL): Promise<Response> {
+  if (NATIVE_PATHS.has(url.pathname)) {
+    await ensureSchema(env);
+    return (await handleNativeAuth(request, env, url))!;
+  }
   switch (url.pathname) {
     case '/api/auth/google':          return startOAuth(env, url);
     case '/api/auth/google/callback': return handleCallback(request, env, url);
@@ -85,28 +95,25 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
     return redirectTo(url, '/?error=auth_failed');
   }
 
-  const gUser = await userRes.json() as { sub: string; email: string; name: string };
+  const gUser = await userRes.json() as { sub: string; email: string; name: string; email_verified?: boolean | string };
 
-  // Upsert user record
-  await env.DB.prepare(
-    `INSERT INTO users (id, email, name) VALUES (?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name`,
-  ).bind(gUser.sub, gUser.email, gUser.name).run();
+  // Resolve through the identity table (a Google login linked to an account
+  // created with Apple lands on that account). If the identity layer is not
+  // available, fall back to the original upsert: web sign-in must never get
+  // worse than it was.
+  let userId = gUser.sub;
+  try {
+    await ensureSchema(env);
+    userId = (await resolveGoogleUser(env, googleIdentity({ ...gUser, iss: '', aud: '', exp: 0 }))).userId;
+  } catch (err) {
+    console.error('identity resolution failed, using legacy upsert:', err);
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, name) VALUES (?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name`,
+    ).bind(gUser.sub, gUser.email, gUser.name).run();
+  }
 
-  // Create session — and sweep out expired ones while we're here. Sign-in is
-  // the one event every account produces regularly, so it doubles as the
-  // purge schedule without a cron trigger (nothing reads an expired row; this
-  // only keeps the table from growing forever).
-  const token     = crypto.randomUUID();
-  const now       = Date.now();
-  const expiresAt = now + SESSION_SECONDS * 1000;
-
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`,
-    ).bind(token, gUser.sub, expiresAt),
-    env.DB.prepare(`DELETE FROM user_sessions WHERE expires_at < ?`).bind(now),
-  ]);
+  const { token } = await createSession(env, userId);
 
   // Non-sensitive user info readable by JS (no passwords, no session token)
   const userJson = encodeURIComponent(JSON.stringify({ email: gUser.email, name: gUser.name }));
@@ -150,7 +157,9 @@ async function logout(request: Request, env: Env): Promise<Response> {
 }
 
 export async function getAuthenticatedUser(request: Request, env: Env): Promise<User | null> {
-  const token = parseCookies(request.headers.get('Cookie') ?? '')[COOKIE_SESSION];
+  // Native clients send `Authorization: Bearer <token>`; the PWA keeps its cookie.
+  const bearer = /^Bearer\s+(\S+)$/i.exec(request.headers.get('Authorization') ?? '')?.[1];
+  const token = bearer ?? parseCookies(request.headers.get('Cookie') ?? '')[COOKIE_SESSION];
   if (!token) return null;
 
   // One query resolves the session, the account and its role — every API
