@@ -452,7 +452,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -857,7 +857,7 @@
     "hasData": true,
     "summary": {
      "totalWorkouts": 13,
-     "totalVolume": 107760,
+     "totalVolume": 106810,
      "thisWeekVolume": 5225,
      "lastWeekVolume": 16018,
      "deltaPct": -67
@@ -890,7 +890,7 @@
      {
       "weekStart": 1771826400000,
       "label": "2/23",
-      "value": 8545,
+      "value": 7595,
       "isCurrent": false
      },
      {
@@ -930,10 +930,6 @@
         "value": 253
        },
        {
-        "label": "3/1",
-        "value": 127
-       },
-       {
         "label": "3/9",
         "value": 244
        },
@@ -957,7 +953,7 @@
        },
        {
         "label": "3/1",
-        "value": 2570
+        "value": 1620
        },
        {
         "label": "3/9",
@@ -1679,7 +1675,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -2084,7 +2080,7 @@
     "hasData": true,
     "summary": {
      "totalWorkouts": 13,
-     "totalVolume": 107760,
+     "totalVolume": 106810,
      "thisWeekVolume": 5225,
      "lastWeekVolume": 16018,
      "deltaPct": -67
@@ -2117,7 +2113,7 @@
      {
       "weekStart": 1771826400000,
       "label": "2/23",
-      "value": 8545,
+      "value": 7595,
       "isCurrent": false
      },
      {
@@ -2157,10 +2153,6 @@
         "value": 253
        },
        {
-        "label": "3/1",
-        "value": 127
-       },
-       {
         "label": "3/9",
         "value": 244
        },
@@ -2184,7 +2176,7 @@
        },
        {
         "label": "3/1",
-        "value": 2570
+        "value": 1620
        },
        {
         "label": "3/9",
@@ -2906,7 +2898,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -3311,7 +3303,7 @@
     "hasData": true,
     "summary": {
      "totalWorkouts": 13,
-     "totalVolume": 107760,
+     "totalVolume": 106810,
      "thisWeekVolume": 0,
      "lastWeekVolume": 0,
      "deltaPct": null
@@ -3384,10 +3376,6 @@
         "value": 253
        },
        {
-        "label": "3/1",
-        "value": 127
-       },
-       {
         "label": "3/9",
         "value": 244
        },
@@ -3411,7 +3399,7 @@
        },
        {
         "label": "3/1",
-        "value": 2570
+        "value": 1620
        },
        {
         "label": "3/9",
@@ -4156,7 +4144,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -5017,7 +5005,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -5421,9 +5409,9 @@
    ],
    "output": {
     "workouts": 2,
-    "volume": 11830,
+    "volume": 10880,
     "prevVolume": 4740,
-    "deltaPct": 150
+    "deltaPct": 130
    },
    "now": 1773846000000
   },
@@ -5878,7 +5866,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -6283,8 +6271,8 @@
    "output": {
     "workouts": 5,
     "volume": 29268,
-    "prevVolume": 16795,
-    "deltaPct": 74
+    "prevVolume": 15845,
+    "deltaPct": 85
    },
    "now": 1773846000000
   },
@@ -6739,7 +6727,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -7143,9 +7131,9 @@
    ],
    "output": {
     "workouts": 3,
-    "volume": 16570,
+    "volume": 15620,
     "prevVolume": 9485,
-    "deltaPct": 75
+    "deltaPct": 65
    },
    "now": 1773846000000
   },
@@ -7600,7 +7588,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -8004,9 +7992,9 @@
    ],
    "output": {
     "workouts": 8,
-    "volume": 46063,
+    "volume": 45113,
     "prevVolume": 35008,
-    "deltaPct": 32
+    "deltaPct": 29
    },
    "now": 1773846000000
   },
@@ -8461,7 +8449,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -8865,9 +8853,9 @@
    ],
    "output": {
     "workouts": 5,
-    "volume": 26055,
+    "volume": 25105,
     "prevVolume": 45208,
-    "deltaPct": -42
+    "deltaPct": -44
    },
    "now": 1773846000000
   },
@@ -9322,7 +9310,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -9726,7 +9714,7 @@
    ],
    "output": {
     "workouts": 13,
-    "volume": 107760,
+    "volume": 106810,
     "prevVolume": 0,
     "deltaPct": null
    },
@@ -10183,7 +10171,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -10587,7 +10575,7 @@
    ],
    "output": {
     "workouts": 9,
-    "volume": 86518,
+    "volume": 85568,
     "prevVolume": 0,
     "deltaPct": null
    },
@@ -11044,7 +11032,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -11924,7 +11912,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -12798,7 +12786,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -13678,7 +13666,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -14554,7 +14542,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -15438,7 +15426,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -16312,7 +16300,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -17171,7 +17159,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -18031,7 +18019,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,
@@ -18915,7 +18903,7 @@
       "setNumber": 1,
       "weight": 95,
       "reps": 10,
-      "isWarmup": true
+      "warmup": true
      },
      {
       "id": 43,

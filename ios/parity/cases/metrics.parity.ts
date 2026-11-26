@@ -28,7 +28,7 @@ OFFSETS.forEach((d, i) => {
   if (i % 3 === 1) { add(id, 'barbell-squat', 275 + i * 5, [5, 5, 5]); add(id, 'romanian-deadlifts', 225, [8, 8], { grip: 'wide' }); }
   if (i % 3 === 2) { add(id, 'pull-ups', 0, [9, 8, 7]); add(id, 'barbell-curl', 65, [10, 9]); add(id, 'plank', 0, [60]); }
   if (i < 4) add(id, 'my-custom-thing-1', 40, [10, 10]);
-  if (i === 5) { add(id, 'barbell-bench-press', 135, [12], { technique: 'drop' }); add(id, 'barbell-bench-press', 95, [10], { isWarmup: true }); }
+  if (i === 5) { add(id, 'barbell-bench-press', 135, [12], { technique: 'drop' }); add(id, 'barbell-bench-press', 95, [10], { warmup: true }); }
   if (i > 8) add(id, 'leg-press', 300, [12, 12, 10]);
 });
 SESSIONS.sort((a, b) => b.completedAt! - a.completedAt!);

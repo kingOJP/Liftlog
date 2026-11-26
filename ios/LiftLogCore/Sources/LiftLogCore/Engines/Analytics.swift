@@ -32,6 +32,8 @@ public struct MuscleSetTotals: Sendable {
     public var totals: [MuscleGroup: Double]
     public var unmappedSets: Int
     public var unmappedExerciseIds: Set<String>
+    /// Muscles in first-credited order — TS Map insertion order, for tie-stable sorts.
+    public var order: [MuscleGroup] = []
 }
 
 public struct MuscleHeadTotals: Sendable {
@@ -156,6 +158,7 @@ public enum Analytics {
     public static func muscleSetTotals(_ snap: TrainingSnapshot, include: (Session) -> Bool = { _ in true }) -> MuscleSetTotals {
         var totals: [MuscleGroup: Double] = [:]
         var unmapped = 0, unmappedIds = Set<String>()
+        var order: [MuscleGroup] = []
         var cache: [String: [Involvement]] = [:]
         for session in snap.sessions where include(session) {
             for log in snap.setsBySession[session.id ?? -1] ?? [] {
@@ -167,10 +170,13 @@ public enum Analytics {
                     unmapped += 1; unmappedIds.insert(log.exerciseId); continue
                 }
                 let credit = Variations.setCredit(log.technique)
-                for m in involvement { totals[m.muscle, default: 0] += m.weight * credit }
+                for m in involvement {
+                    if totals[m.muscle] == nil { order.append(m.muscle) }
+                    totals[m.muscle, default: 0] += m.weight * credit
+                }
             }
         }
-        return MuscleSetTotals(totals: totals, unmappedSets: unmapped, unmappedExerciseIds: unmappedIds)
+        return MuscleSetTotals(totals: totals, unmappedSets: unmapped, unmappedExerciseIds: unmappedIds, order: order)
     }
 
     public static func headSetTotals(_ snap: TrainingSnapshot, include: (Session) -> Bool = { _ in true }) -> MuscleHeadTotals {
