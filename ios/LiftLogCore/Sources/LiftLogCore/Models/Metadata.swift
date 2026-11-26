@@ -22,18 +22,28 @@ public struct ExerciseMetaOverride: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey { case primaryMuscle, secondaryMuscle1, secondaryMuscle2, secondaryMuscle3, workoutType, equipment, weightType, updatedAt }
 
-    // Unknown/legacy taxonomy strings decode as null here; the TS reader
-    // normalizes legacy names (exercises.ts LEGACY_MUSCLES) — the engine port
-    // applies the same normalization on read.
+    // Legacy taxonomy names are mapped on decode the same way exercises.ts
+    // normalizeOverride does (Front Delts → Delts, Chest Press → Horizontal Press,
+    // Leg Press Machine → Machine), so an old row keeps its classification.
+    // The id-dependent legacy 'Press' plane is resolved by Catalog.readMetaMap.
+    static let legacyMuscles = ["Front Delts": "Delts", "Side Delts": "Delts", "Rear Delts": "Delts"]
+    static let legacyWorkoutTypes = ["Chest Press": "Horizontal Press", "Push Up": "Horizontal Press",
+                                     "Overhead Press": "Vertical Press"]
+    static let legacyEquipment = ["Leg Press Machine": "Machine"]
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        primaryMuscle = c.decodeLenient(MuscleGroup.self, forKey: .primaryMuscle)
-        secondaryMuscle1 = c.decodeLenient(MuscleGroup.self, forKey: .secondaryMuscle1)
-        secondaryMuscle2 = c.decodeLenient(MuscleGroup.self, forKey: .secondaryMuscle2)
-        secondaryMuscle3 = c.decodeLenient(MuscleGroup.self, forKey: .secondaryMuscle3)
-        workoutType = c.decodeLenient(MovementPattern.self, forKey: .workoutType)
-        equipment = c.decodeLenient(Equipment.self, forKey: .equipment)
-        weightType = c.decodeLenient(WeightType.self, forKey: .weightType)
+        func mapped<T: RawRepresentable>(_ key: CodingKeys, _ legacy: [String: String]) -> T? where T.RawValue == String {
+            guard let raw = try? c.decodeIfPresent(String.self, forKey: key) else { return nil }
+            return T(rawValue: legacy[raw] ?? raw)
+        }
+        primaryMuscle = mapped(.primaryMuscle, Self.legacyMuscles)
+        secondaryMuscle1 = mapped(.secondaryMuscle1, Self.legacyMuscles)
+        secondaryMuscle2 = mapped(.secondaryMuscle2, Self.legacyMuscles)
+        secondaryMuscle3 = mapped(.secondaryMuscle3, Self.legacyMuscles)
+        workoutType = mapped(.workoutType, Self.legacyWorkoutTypes)
+        equipment = mapped(.equipment, Self.legacyEquipment)
+        weightType = mapped(.weightType, [:])
         updatedAt = try c.decodeIfPresent(Double.self, forKey: .updatedAt)
     }
 

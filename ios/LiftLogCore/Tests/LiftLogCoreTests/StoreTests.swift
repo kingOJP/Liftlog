@@ -66,3 +66,14 @@ final class JSSemanticsTests: XCTestCase {
         XCTAssertEqual(JSDate.parts(JSDate.make(2026, 2, 16)).weekday, 1)
     }
 }
+
+final class LegacyMetaDecodeTests: XCTestCase {
+    func testLegacyNamesKeepClassification() throws {
+        let json = #"{"primaryMuscle":"Front Delts","secondaryMuscle1":"Rear Delts","secondaryMuscle2":null,"secondaryMuscle3":null,"workoutType":"Chest Press","equipment":"Leg Press Machine","weightType":"Machine"}"#
+        let o = try JSONDecoder().decode(ExerciseMetaOverride.self, from: Data(json.utf8))
+        XCTAssertEqual(o.primaryMuscle, .delts)
+        XCTAssertEqual(o.secondaryMuscle1, .delts)
+        XCTAssertEqual(o.workoutType, .horizontalPress)
+        XCTAssertEqual(o.equipment, .machine)
+    }
+}
