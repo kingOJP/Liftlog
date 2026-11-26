@@ -76,4 +76,16 @@ final class LegacyMetaDecodeTests: XCTestCase {
         XCTAssertEqual(o.workoutType, .horizontalPress)
         XCTAssertEqual(o.equipment, .machine)
     }
+
+    func testLegacyBarePressSurvivesMergeAndResolvesById() throws {
+        LiftLogEnv.store = InMemoryKeyValueStore([:])
+        let json = #"{"primaryMuscle":"Delts","workoutType":"Press","updatedAt":5}"#
+        let o = try JSONDecoder().decode(ExerciseMetaOverride.self, from: Data(json.utf8))
+        Catalog.mergeExerciseMeta(["barbell-overhead-press": o, "my-custom-incline-press-1": o])
+        XCTAssertEqual(Catalog.getExerciseMeta("barbell-overhead-press").workoutType, .verticalPress)
+        XCTAssertEqual(Catalog.getExerciseMeta("my-custom-incline-press-1").workoutType, .horizontalPress)
+        Catalog.saveGlobalExerciseMeta(["barbell-overhead-press": o])
+        Catalog.clearExerciseMeta()
+        XCTAssertEqual(Catalog.getExerciseMeta("barbell-overhead-press").workoutType, .verticalPress)
+    }
 }

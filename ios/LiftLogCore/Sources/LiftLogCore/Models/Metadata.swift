@@ -11,6 +11,9 @@ public struct ExerciseMetaOverride: Codable, Hashable, Sendable {
     public var equipment: Equipment?
     public var weightType: WeightType?
     public var updatedAt: Double?
+    /// A stored bare legacy 'Press' whose plane depends on the exercise id. It
+    /// round-trips as "Press" so Catalog.readMetaMap can resolve it by id.
+    public var legacyPress = false
 
     public init(primaryMuscle: MuscleGroup? = nil, secondaryMuscle1: MuscleGroup? = nil, secondaryMuscle2: MuscleGroup? = nil,
                 secondaryMuscle3: MuscleGroup? = nil, workoutType: MovementPattern? = nil, equipment: Equipment? = nil,
@@ -42,6 +45,7 @@ public struct ExerciseMetaOverride: Codable, Hashable, Sendable {
         secondaryMuscle2 = mapped(.secondaryMuscle2, Self.legacyMuscles)
         secondaryMuscle3 = mapped(.secondaryMuscle3, Self.legacyMuscles)
         workoutType = mapped(.workoutType, Self.legacyWorkoutTypes)
+        legacyPress = workoutType == nil && (try? c.decodeIfPresent(String.self, forKey: .workoutType)) == "Press"
         equipment = mapped(.equipment, Self.legacyEquipment)
         weightType = mapped(.weightType, [:])
         updatedAt = try c.decodeIfPresent(Double.self, forKey: .updatedAt)
@@ -53,7 +57,8 @@ public struct ExerciseMetaOverride: Codable, Hashable, Sendable {
         try c.encode(secondaryMuscle1, forKey: .secondaryMuscle1)
         try c.encode(secondaryMuscle2, forKey: .secondaryMuscle2)
         try c.encode(secondaryMuscle3, forKey: .secondaryMuscle3)
-        try c.encode(workoutType, forKey: .workoutType)
+        if workoutType == nil && legacyPress { try c.encode("Press", forKey: .workoutType) }
+        else { try c.encode(workoutType, forKey: .workoutType) }
         try c.encode(equipment, forKey: .equipment)
         try c.encode(weightType, forKey: .weightType)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
