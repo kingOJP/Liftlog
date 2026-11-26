@@ -35,7 +35,7 @@ it('sessionHistory fixture', () => {
   ];
   slots.forEach((ex, i) => {
     f.record(`expected ${i}`, 'expectedVariation', [ex, SESSIONS, LOGS], (e: Exercise, s: Session[], l: SetLog[]) => expectedVariation(e, buildSnapshot(s, l)));
-    f.record(`expected ${i} nosnap`, 'expectedVariation', [ex, null, null], (e: Exercise) => expectedVariation(e, null));
+    f.record(`expected ${i} nosnap`, 'expectedVariation', [ex, null, null], (...a: [Exercise, null, null]) => expectedVariation(a[0], null));
   });
   for (const id of ['bench', 'squat', 'row', 'nope']) {
     for (const v of VARS) {
