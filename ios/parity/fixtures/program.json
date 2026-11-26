@@ -1,0 +1,883 @@
+{
+ "engine": "program",
+ "cases": [
+  {
+   "name": "seed program",
+   "fn": "seedProgram",
+   "args": [],
+   "output": [
+    {
+     "id": 1,
+     "label": "Day 1",
+     "muscleGroups": "Chest, Tris, Shoulders",
+     "exercises": [
+      {
+       "id": "incline-barbell-press",
+       "name": "Incline Barbell Press",
+       "sets": 4,
+       "repLow": 6,
+       "repHigh": 8
+      },
+      {
+       "id": "dumbbell-bench-press",
+       "name": "Dumbbell Bench Press",
+       "sets": 3,
+       "repLow": 8,
+       "repHigh": 10
+      },
+      {
+       "id": "seated-db-overhead-press",
+       "name": "Seated Dumbbell Overhead Press",
+       "sets": 3,
+       "repLow": 8,
+       "repHigh": 10
+      },
+      {
+       "id": "cable-lateral-raises",
+       "name": "Cable Lateral Raises",
+       "sets": 4,
+       "repLow": 16,
+       "repHigh": 20
+      },
+      {
+       "id": "overhead-tricep-ext",
+       "name": "Overhead Tricep Extension",
+       "sets": 3,
+       "repLow": 10,
+       "repHigh": 12
+      },
+      {
+       "id": "tricep-cable-pushdown",
+       "name": "Tricep Cable Pushdown",
+       "sets": 3,
+       "repLow": 12,
+       "repHigh": 15
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "label": "Day 2",
+     "muscleGroups": "Back, Biceps, Delts",
+     "exercises": [
+      {
+       "id": "face-pulls",
+       "name": "Face Pulls",
+       "sets": 3,
+       "repLow": 15,
+       "repHigh": 20
+      },
+      {
+       "id": "straight-arm-pulldowns",
+       "name": "Straight Arm Pull Downs",
+       "sets": 3,
+       "repLow": 10,
+       "repHigh": 14
+      },
+      {
+       "id": "lat-pull-down",
+       "name": "Lat Pull Down",
+       "sets": 3,
+       "repLow": 10,
+       "repHigh": 12
+      },
+      {
+       "id": "bent-over-db-row",
+       "name": "Bent Over One Arm Dumbbell Row",
+       "sets": 4,
+       "repLow": 8,
+       "repHigh": 10
+      },
+      {
+       "id": "incline-db-curls",
+       "name": "Incline Dumbbell Curls",
+       "sets": 3,
+       "repLow": 10,
+       "repHigh": 12
+      },
+      {
+       "id": "hammer-curls",
+       "name": "Hammer Curls",
+       "sets": 3,
+       "repLow": 12,
+       "repHigh": 15
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "label": "Day 3",
+     "muscleGroups": "Legs",
+     "exercises": [
+      {
+       "id": "seated-calf-raises",
+       "name": "Seated Calf Raises",
+       "sets": 3,
+       "repLow": 20,
+       "repHigh": 25
+      },
+      {
+       "id": "romanian-deadlifts",
+       "name": "Romanian Deadlifts",
+       "sets": 4,
+       "repLow": 8,
+       "repHigh": 12
+      },
+      {
+       "id": "leg-press",
+       "name": "Leg Press",
+       "sets": 4,
+       "repLow": 8,
+       "repHigh": 12
+      },
+      {
+       "id": "leg-extension",
+       "name": "Leg Extension",
+       "sets": 3,
+       "repLow": 12,
+       "repHigh": 15
+      },
+      {
+       "id": "hip-thrusts",
+       "name": "Hip Thrusts",
+       "sets": 3,
+       "repLow": 10,
+       "repHigh": 12
+      },
+      {
+       "id": "standing-calf-raises",
+       "name": "Standing Calf Raises",
+       "sets": 4,
+       "repLow": 15,
+       "repHigh": 20
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "label": "Day 4",
+     "muscleGroups": "Upper Body",
+     "exercises": [
+      {
+       "id": "cable-fly",
+       "name": "Cable Fly",
+       "sets": 3,
+       "repLow": 12,
+       "repHigh": 15
+      },
+      {
+       "id": "weighted-pull-ups",
+       "name": "Weighted Pull Ups",
+       "sets": 4,
+       "repLow": 6,
+       "repHigh": 10
+      },
+      {
+       "id": "cable-lateral-raises",
+       "name": "Cable Lateral Raises",
+       "sets": 4,
+       "repLow": 16,
+       "repHigh": 20
+      },
+      {
+       "id": "tricep-cable-pushdown",
+       "name": "Tricep Cable Pushdown",
+       "sets": 3,
+       "repLow": 12,
+       "repHigh": 15
+      },
+      {
+       "id": "back-extensions",
+       "name": "Back Extensions",
+       "sets": 3,
+       "repLow": 15,
+       "repHigh": 20
+      },
+      {
+       "id": "reverse-curls",
+       "name": "Reverse Curls",
+       "sets": 2,
+       "repLow": 12,
+       "repHigh": 15
+      },
+      {
+       "id": "face-pulls",
+       "name": "Face Pulls",
+       "sets": 3,
+       "repLow": 15,
+       "repHigh": 20
+      }
+     ]
+    }
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1772906400000",
+   "fn": "weekMath",
+   "args": [
+    1772906400000
+   ],
+   "output": {
+    "sow": 1772431200000,
+    "plus1": 1773032400000,
+    "minus3": 1770616800000,
+    "plus30": 1790571600000,
+    "between": 9,
+    "date": "2026-03-07",
+    "short": "3/7",
+    "weekNo": 8,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1772955000000",
+   "fn": "weekMath",
+   "args": [
+    1772955000000
+   ],
+   "output": {
+    "sow": 1772431200000,
+    "plus1": 1773032400000,
+    "minus3": 1770616800000,
+    "plus30": 1790571600000,
+    "between": 9,
+    "date": "2026-03-08",
+    "short": "3/8",
+    "weekNo": 8,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1772960400000",
+   "fn": "weekMath",
+   "args": [
+    1772960400000
+   ],
+   "output": {
+    "sow": 1772431200000,
+    "plus1": 1773032400000,
+    "minus3": 1770616800000,
+    "plus30": 1790571600000,
+    "between": 9,
+    "date": "2026-03-08",
+    "short": "3/8",
+    "weekNo": 8,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1773035940000",
+   "fn": "weekMath",
+   "args": [
+    1773035940000
+   ],
+   "output": {
+    "sow": 1773032400000,
+    "plus1": 1773637200000,
+    "minus3": 1771221600000,
+    "plus30": 1791176400000,
+    "between": 9,
+    "date": "2026-03-09",
+    "short": "3/9",
+    "weekNo": 9,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1793487600000",
+   "fn": "weekMath",
+   "args": [
+    1793487600000
+   ],
+   "output": {
+    "sow": 1792990800000,
+    "plus1": 1793599200000,
+    "minus3": 1791176400000,
+    "plus30": 1811134800000,
+    "between": 9,
+    "date": "2026-10-31",
+    "short": "10/31",
+    "weekNo": 42,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1793514600000",
+   "fn": "weekMath",
+   "args": [
+    1793514600000
+   ],
+   "output": {
+    "sow": 1792990800000,
+    "plus1": 1793599200000,
+    "minus3": 1791176400000,
+    "plus30": 1811134800000,
+    "between": 9,
+    "date": "2026-11-01",
+    "short": "11/1",
+    "weekNo": 42,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1793518200000",
+   "fn": "weekMath",
+   "args": [
+    1793518200000
+   ],
+   "output": {
+    "sow": 1792990800000,
+    "plus1": 1793599200000,
+    "minus3": 1791176400000,
+    "plus30": 1811134800000,
+    "between": 9,
+    "date": "2026-11-01",
+    "short": "11/1",
+    "weekNo": 42,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1793595600000",
+   "fn": "weekMath",
+   "args": [
+    1793595600000
+   ],
+   "output": {
+    "sow": 1792990800000,
+    "plus1": 1793599200000,
+    "minus3": 1791176400000,
+    "plus30": 1811134800000,
+    "between": 9,
+    "date": "2026-11-01",
+    "short": "11/1",
+    "weekNo": 42,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1767182400000",
+   "fn": "weekMath",
+   "args": [
+    1767182400000
+   ],
+   "output": {
+    "sow": 1766988000000,
+    "plus1": 1767592800000,
+    "minus3": 1765173600000,
+    "plus30": 1785128400000,
+    "between": 9,
+    "date": "2025-12-31",
+    "short": "12/31",
+    "weekNo": 1,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1767247140000",
+   "fn": "weekMath",
+   "args": [
+    1767247140000
+   ],
+   "output": {
+    "sow": 1766988000000,
+    "plus1": 1767592800000,
+    "minus3": 1765173600000,
+    "plus30": 1785128400000,
+    "between": 9,
+    "date": "2025-12-31",
+    "short": "12/31",
+    "weekNo": 1,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1709218800000",
+   "fn": "weekMath",
+   "args": [
+    1709218800000
+   ],
+   "output": {
+    "sow": 1708927200000,
+    "plus1": 1709532000000,
+    "minus3": 1707112800000,
+    "plus30": 1727067600000,
+    "between": 9,
+    "date": "2024-02-29",
+    "short": "2/29",
+    "weekNo": 1,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 1773846000000",
+   "fn": "weekMath",
+   "args": [
+    1773846000000
+   ],
+   "output": {
+    "sow": 1773637200000,
+    "plus1": 1774242000000,
+    "minus3": 1771826400000,
+    "plus30": 1791781200000,
+    "between": 9,
+    "date": "2026-03-18",
+    "short": "3/18",
+    "weekNo": 10,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "week math 0",
+   "fn": "weekMath",
+   "args": [
+    0
+   ],
+   "output": {
+    "sow": -237600000,
+    "plus1": 367200000,
+    "minus3": -2052000000,
+    "plus30": 17902800000,
+    "between": 9,
+    "date": "1969-12-31",
+    "short": "12/31",
+    "weekNo": 1,
+    "weekNoBefore": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels a",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "a",
+     "name": "A",
+     "sets": 3,
+     "repLow": 8,
+     "repHigh": 12
+    }
+   ],
+   "output": {
+    "label": "3 × 8–12",
+    "detail": "3 sets · 8–12 reps"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels b",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "sets": 1
+    }
+   ],
+   "output": {
+    "label": "1 set",
+    "detail": "1 set"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels c",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "c",
+     "name": "C",
+     "sets": 4,
+     "repLow": 5,
+     "repHigh": 5
+    }
+   ],
+   "output": {
+    "label": "4 × 5",
+    "detail": "4 sets · 5 reps"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels d",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "d",
+     "name": "D",
+     "sets": 4,
+     "repLow": 3,
+     "repHigh": 5,
+     "technique": "paused",
+     "grip": "close"
+    }
+   ],
+   "output": {
+    "label": "4 × 3–5",
+    "detail": "4 sets · 3–5 reps · paused · close grip"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels e",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "e",
+     "name": "E",
+     "sets": 2,
+     "progression": "manual",
+     "grip": "wide"
+    }
+   ],
+   "output": {
+    "label": "2 sets",
+    "detail": "2 sets · wide grip · your own progression"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "labels f",
+   "fn": "labels",
+   "args": [
+    {
+     "id": "f",
+     "name": "F",
+     "sets": 1,
+     "repLow": 10,
+     "repHigh": 15,
+     "technique": "drop",
+     "progression": "coach"
+    }
+   ],
+   "output": {
+    "label": "1 × 10–15",
+    "detail": "1 set · 10–15 reps · drop"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "rangeLabel",
+   "fn": "rangeLabel",
+   "args": [
+    6,
+    6
+   ],
+   "output": "6",
+   "now": 1773846000000
+  },
+  {
+   "name": "dayInPhase undefined accumulation",
+   "fn": "dayInPhase",
+   "args": [
+    {
+     "id": 1,
+     "label": "D",
+     "muscleGroups": "",
+     "exercises": []
+    },
+    "accumulation"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "dayInPhase [] deload",
+   "fn": "dayInPhase",
+   "args": [
+    {
+     "id": 1,
+     "label": "D",
+     "muscleGroups": "",
+     "exercises": [],
+     "phases": []
+    },
+    "deload"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "dayInPhase [\"accumulation\",\"maintenance\"] null",
+   "fn": "dayInPhase",
+   "args": [
+    {
+     "id": 1,
+     "label": "D",
+     "muscleGroups": "",
+     "exercises": [],
+     "phases": [
+      "accumulation",
+      "maintenance"
+     ]
+    },
+    null
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "dayInPhase [\"accumulation\"] deload",
+   "fn": "dayInPhase",
+   "args": [
+    {
+     "id": 1,
+     "label": "D",
+     "muscleGroups": "",
+     "exercises": [],
+     "phases": [
+      "accumulation"
+     ]
+    },
+    "deload"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "dayInPhase [\"accumulation\",\"race-week\"] race-week",
+   "fn": "dayInPhase",
+   "args": [
+    {
+     "id": 1,
+     "label": "D",
+     "muscleGroups": "",
+     "exercises": [],
+     "phases": [
+      "accumulation",
+      "race-week"
+     ]
+    },
+    "race-week"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "range 1773846000000",
+   "fn": "nowWeek",
+   "args": [],
+   "output": {
+    "range": "March 16–22",
+    "week": 11,
+    "start": "2026-01-05"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-01-05\"}"
+   }
+  },
+  {
+   "name": "range 1796040000000",
+   "fn": "nowWeek",
+   "args": [],
+   "output": {
+    "range": "November 30–December 6",
+    "week": 48,
+    "start": "2026-01-05"
+   },
+   "now": 1796040000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-01-05\"}"
+   }
+  },
+  {
+   "name": "range 1798545600000",
+   "fn": "nowWeek",
+   "args": [],
+   "output": {
+    "range": "December 28–January 3",
+    "week": 52,
+    "start": "2026-01-05"
+   },
+   "now": 1798545600000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-01-05\"}"
+   }
+  },
+  {
+   "name": "range 1772971200000",
+   "fn": "nowWeek",
+   "args": [],
+   "output": {
+    "range": "March 2–8",
+    "week": 9,
+    "start": "2026-01-05"
+   },
+   "now": 1772971200000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-01-05\"}"
+   }
+  },
+  {
+   "name": "program start undefined",
+   "fn": "programStart",
+   "args": [],
+   "output": {
+    "value": "2026-03-18",
+    "week": 1
+   },
+   "now": 1773846000000,
+   "storage": {}
+  },
+  {
+   "name": "program start garbage",
+   "fn": "programStart",
+   "args": [],
+   "output": {
+    "value": "2026-03-18",
+    "week": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"garbage\"}"
+   }
+  },
+  {
+   "name": "program start 2026-02-30",
+   "fn": "programStart",
+   "args": [],
+   "output": {
+    "value": "2026-03-18",
+    "week": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-02-30\"}"
+   }
+  },
+  {
+   "name": "program start 2026-13-01",
+   "fn": "programStart",
+   "args": [],
+   "output": {
+    "value": "2026-03-18",
+    "week": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2026-13-01\"}"
+   }
+  },
+  {
+   "name": "program start 2025-12-31",
+   "fn": "programStart",
+   "args": [],
+   "output": {
+    "value": "2025-12-31",
+    "week": 12
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_settings": "{\"programStart\":\"2025-12-31\"}"
+   }
+  },
+  {
+   "name": "save start 2026-04-06",
+   "fn": "saveProgramStart",
+   "args": [
+    "2026-04-06"
+   ],
+   "output": [
+    true,
+    "2026-04-06"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "save start 2026-4-6",
+   "fn": "saveProgramStart",
+   "args": [
+    "2026-4-6"
+   ],
+   "output": [
+    false,
+    "2026-03-18"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "save start 2026-02-29",
+   "fn": "saveProgramStart",
+   "args": [
+    "2026-02-29"
+   ],
+   "output": [
+    false,
+    "2026-03-18"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "rest undefined",
+   "fn": "restDuration",
+   "args": [],
+   "output": 120,
+   "now": 1773846000000,
+   "storage": {}
+  },
+  {
+   "name": "rest 180",
+   "fn": "restDuration",
+   "args": [],
+   "output": 180,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_rest_seconds": "180"
+   }
+  },
+  {
+   "name": "rest 90",
+   "fn": "restDuration",
+   "args": [],
+   "output": 120,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_rest_seconds": "90"
+   }
+  },
+  {
+   "name": "rest abc",
+   "fn": "restDuration",
+   "args": [],
+   "output": 120,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_rest_seconds": "abc"
+   }
+  },
+  {
+   "name": "rest  300 ",
+   "fn": "restDuration",
+   "args": [],
+   "output": 300,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_rest_seconds": " 300 "
+   }
+  },
+  {
+   "name": "rest 60.0",
+   "fn": "restDuration",
+   "args": [],
+   "output": 60,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_rest_seconds": "60.0"
+   }
+  }
+ ]
+}

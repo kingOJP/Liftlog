@@ -12,6 +12,7 @@ import {
   saveExerciseMeta, deleteExerciseMeta, getAllExerciseMeta, mergeExerciseMeta,
 } from '../../../src/data/exercises';
 import type { ExerciseMetaOverride } from '../../../src/data/exercises';
+import { PROGRAM } from '../../../src/data/program';
 import { regionFor, patternCategoryFor, unitLabel, MUSCLE_GROUPS, MOVEMENT_PATTERNS } from '../../../src/data/taxonomy';
 
 const q = (s: string | null | undefined): string => (s == null ? 'nil' : JSON.stringify(s));
@@ -42,7 +43,10 @@ function generateSwift(): string {
   lines.push('    ]', '');
   lines.push('    static let primaryHeads: [String: [String]] = [');
   for (const [k, v] of Object.entries(PRIMARY_HEADS)) lines.push(`        ${q(k)}: [${v.map(q).join(', ')}],`);
-  lines.push('    ]', '}', '');
+  lines.push('    ]', '');
+  lines.push('    /// program.ts PROGRAM — the built-in sets/reps seed for the library.');
+  lines.push(`    static let seedProgramJSON = #"""\n${JSON.stringify(PROGRAM)}\n"""#`);
+  lines.push('}', '');
   return lines.join('\n');
 }
 

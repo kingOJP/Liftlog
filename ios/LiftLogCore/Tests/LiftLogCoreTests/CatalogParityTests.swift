@@ -1,11 +1,6 @@
 import XCTest
 @testable import LiftLogCore
 
-private func obj(_ pairs: KeyValuePairs<String, any Encodable>) -> [String: AnyEncodable] {
-    var d: [String: AnyEncodable] = [:]
-    for (k, v) in pairs { d[k] = AnyEncodable(v) }
-    return d
-}
 
 final class CatalogParityTests: XCTestCase {
     func testCatalogParity() throws {
