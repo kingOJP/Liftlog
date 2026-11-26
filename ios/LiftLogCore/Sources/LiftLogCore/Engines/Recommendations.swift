@@ -406,7 +406,7 @@ public static func calculateRecommendation(_ history: [ExerciseSession], _ exerc
             let bigMiss = goal != .fatLoss && judgedAvg <= lo - bigMissReps
             if repeated || bigMiss {
                 return withContext(WeightRec(weight: easeBack(weight, 0.95, step), direction: .down, kind: .decrease,
-                    reason: repeated ? "Two sessions under \(ex.repLow) reps — ease back and rebuild" : "Reps fell well under \(ex.repLow) reps — ease back and rebuild"))
+                    reason: repeated ? "Two sessions under \(ex.repLow) reps — ease back and rebuild" : "Reps fell well under \(ex.repLow) — ease back and rebuild"))
             }
             return withContext(WeightRec(weight: weight, direction: .hold, kind: .hold,
                 reason: "Short of \(ex.repLow) reps, but one session isn't a trend — repeat \(Units.fmtWeight(weight)) before dropping it"))
