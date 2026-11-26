@@ -1,0 +1,2885 @@
+{
+ "engine": "programStore",
+ "cases": [
+  {
+   "name": "empty program",
+   "fn": "getStoredProgram",
+   "args": [],
+   "output": {
+    "program": [],
+    "clock": 0,
+    "after": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": null,
+     "liftlog_deleted_exercises": null,
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": null
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "legacy program canonicalized",
+   "fn": "getStoredProgram",
+   "args": [],
+   "output": {
+    "program": [
+     {
+      "id": 1,
+      "label": "Push",
+      "muscleGroups": "Chest",
+      "exercises": [
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15
+       },
+       {
+        "id": "my-thing-1782325116469",
+        "name": "My Thing",
+        "sets": 3,
+        "technique": "paused"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Pull",
+      "muscleGroups": "Back",
+      "exercises": [
+       {
+        "id": "face-pulls",
+        "name": "Face Pulls",
+        "sets": 3,
+        "main": true
+       }
+      ],
+      "phases": [
+       "accumulation"
+      ]
+     }
+    ],
+    "clock": 1773846000000,
+    "after": {
+     "liftlog_program": [
+      {
+       "id": 1,
+       "label": "Push",
+       "muscleGroups": "Chest",
+       "exercises": [
+        {
+         "id": "cable-lateral-raises",
+         "name": "Cable Lateral Raises",
+         "sets": 3,
+         "repLow": 12,
+         "repHigh": 15
+        },
+        {
+         "id": "my-thing-1782325116469",
+         "name": "My Thing",
+         "sets": 3,
+         "technique": "paused"
+        }
+       ]
+      },
+      {
+       "id": 2,
+       "label": "Pull",
+       "muscleGroups": "Back",
+       "exercises": [
+        {
+         "id": "face-pulls",
+         "name": "Face Pulls",
+         "sets": 3,
+         "main": true
+        }
+       ],
+       "phases": [
+        "accumulation"
+       ]
+      }
+     ],
+     "liftlog_program_updated": 1773846000000,
+     "liftlog_exercises": null,
+     "liftlog_deleted_exercises": null,
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": null
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_program": "[{\"id\":1,\"label\":\"Push\",\"muscleGroups\":\"Chest\",\"exercises\":[{\"id\":\"cable-lateral-raises-d1\",\"name\":\"Old Name\",\"sets\":3,\"repLow\":12,\"repHigh\":15},{\"id\":\"cable-lateral-raises\",\"name\":\"Cable Lateral Raises\",\"sets\":2},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"sets\":3,\"technique\":\"paused\"}]},{\"id\":2,\"label\":\"Pull\",\"muscleGroups\":\"Back\",\"exercises\":[{\"id\":\"face-pulls-d4\",\"name\":\"FP\",\"sets\":3,\"main\":true}],\"phases\":[\"accumulation\"]}]",
+    "liftlog_program_updated": "123"
+   }
+  },
+  {
+   "name": "corrupt clock",
+   "fn": "getStoredProgram",
+   "args": [],
+   "output": {
+    "program": [],
+    "clock": 0,
+    "after": {
+     "liftlog_program": [],
+     "liftlog_program_updated": "nope",
+     "liftlog_exercises": null,
+     "liftlog_deleted_exercises": null,
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": null
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_program": "[]",
+    "liftlog_program_updated": "nope"
+   }
+  },
+  {
+   "name": "library migrate fresh",
+   "fn": "library",
+   "args": [],
+   "output": {
+    "lib": [
+     {
+      "id": "incline-barbell-press",
+      "name": "Incline Barbell Press"
+     },
+     {
+      "id": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press"
+     },
+     {
+      "id": "cable-fly",
+      "name": "Cable Fly"
+     },
+     {
+      "id": "seated-db-overhead-press",
+      "name": "Seated Dumbbell Overhead Press"
+     },
+     {
+      "id": "barbell-overhead-press",
+      "name": "Barbell Overhead Press"
+     },
+     {
+      "id": "cable-lateral-raises",
+      "name": "Cable Lateral Raises"
+     },
+     {
+      "id": "dumbbell-lateral-raises",
+      "name": "Dumbbell Lateral Raises"
+     },
+     {
+      "id": "face-pulls",
+      "name": "Face Pulls"
+     },
+     {
+      "id": "bent-over-db-row",
+      "name": "Bent Over One Arm Dumbbell Row"
+     },
+     {
+      "id": "barbell-rows",
+      "name": "Barbell Rows"
+     },
+     {
+      "id": "lat-pull-down",
+      "name": "Lat Pull Down"
+     },
+     {
+      "id": "straight-arm-pulldowns",
+      "name": "Straight Arm Pull Downs"
+     },
+     {
+      "id": "weighted-pull-ups",
+      "name": "Weighted Pull Ups"
+     },
+     {
+      "id": "back-extensions",
+      "name": "Back Extensions"
+     },
+     {
+      "id": "overhead-tricep-ext",
+      "name": "Overhead Tricep Extension"
+     },
+     {
+      "id": "tricep-cable-pushdown",
+      "name": "Tricep Cable Pushdown"
+     },
+     {
+      "id": "cable-pushdown",
+      "name": "Cable Pushdown"
+     },
+     {
+      "id": "cable-kick-backs",
+      "name": "Cable Kick Backs"
+     },
+     {
+      "id": "incline-db-curls",
+      "name": "Incline Dumbbell Curls"
+     },
+     {
+      "id": "hammer-curls",
+      "name": "Hammer Curls"
+     },
+     {
+      "id": "reverse-curls",
+      "name": "Reverse Curls"
+     },
+     {
+      "id": "leg-press",
+      "name": "Leg Press"
+     },
+     {
+      "id": "leg-extension",
+      "name": "Leg Extension"
+     },
+     {
+      "id": "romanian-deadlifts",
+      "name": "Romanian Deadlifts"
+     },
+     {
+      "id": "hip-thrusts",
+      "name": "Hip Thrusts"
+     },
+     {
+      "id": "seated-calf-raises",
+      "name": "Seated Calf Raises"
+     },
+     {
+      "id": "standing-calf-raises",
+      "name": "Standing Calf Raises"
+     },
+     {
+      "id": "flat-barbell-bench-press",
+      "name": "Flat Barbell Bench Press"
+     },
+     {
+      "id": "incline-dumbbell-press",
+      "name": "Incline Dumbbell Press"
+     },
+     {
+      "id": "machine-chest-press",
+      "name": "Machine Chest Press"
+     },
+     {
+      "id": "pec-deck-fly",
+      "name": "Pec Deck Fly"
+     },
+     {
+      "id": "dumbbell-fly",
+      "name": "Dumbbell Fly"
+     },
+     {
+      "id": "weighted-dips",
+      "name": "Weighted Dips"
+     },
+     {
+      "id": "push-ups",
+      "name": "Push Ups"
+     },
+     {
+      "id": "machine-shoulder-press",
+      "name": "Machine Shoulder Press"
+     },
+     {
+      "id": "machine-lateral-raise",
+      "name": "Machine Lateral Raise"
+     },
+     {
+      "id": "reverse-pec-deck",
+      "name": "Reverse Pec Deck"
+     },
+     {
+      "id": "dumbbell-rear-delt-fly",
+      "name": "Dumbbell Rear Delt Fly"
+     },
+     {
+      "id": "barbell-shrugs",
+      "name": "Barbell Shrugs"
+     },
+     {
+      "id": "dumbbell-shrugs",
+      "name": "Dumbbell Shrugs"
+     },
+     {
+      "id": "seated-cable-row",
+      "name": "Seated Cable Row"
+     },
+     {
+      "id": "chest-supported-row",
+      "name": "Chest Supported Row"
+     },
+     {
+      "id": "t-bar-row",
+      "name": "T-Bar Row"
+     },
+     {
+      "id": "chin-ups",
+      "name": "Chin Ups"
+     },
+     {
+      "id": "dumbbell-pullover",
+      "name": "Dumbbell Pullover"
+     },
+     {
+      "id": "conventional-deadlift",
+      "name": "Conventional Deadlift"
+     },
+     {
+      "id": "good-mornings",
+      "name": "Good Mornings"
+     },
+     {
+      "id": "dumbbell-rdl",
+      "name": "Dumbbell Romanian Deadlift"
+     },
+     {
+      "id": "seated-leg-curl",
+      "name": "Seated Leg Curl"
+     },
+     {
+      "id": "lying-leg-curl",
+      "name": "Lying Leg Curl"
+     },
+     {
+      "id": "cable-pull-through",
+      "name": "Cable Pull Through"
+     },
+     {
+      "id": "barbell-back-squat",
+      "name": "Barbell Back Squat"
+     },
+     {
+      "id": "hack-squat",
+      "name": "Hack Squat"
+     },
+     {
+      "id": "smith-machine-squat",
+      "name": "Smith Machine Squat"
+     },
+     {
+      "id": "goblet-squat",
+      "name": "Goblet Squat"
+     },
+     {
+      "id": "bulgarian-split-squat",
+      "name": "Bulgarian Split Squat"
+     },
+     {
+      "id": "walking-lunges",
+      "name": "Walking Lunges"
+     },
+     {
+      "id": "leg-press-calf-raise",
+      "name": "Leg Press Calf Raise"
+     },
+     {
+      "id": "ez-bar-curls",
+      "name": "EZ Bar Curls"
+     },
+     {
+      "id": "preacher-curls",
+      "name": "Preacher Curls"
+     },
+     {
+      "id": "cable-curls",
+      "name": "Cable Curls"
+     },
+     {
+      "id": "skull-crushers",
+      "name": "Skull Crushers"
+     },
+     {
+      "id": "close-grip-bench-press",
+      "name": "Close Grip Bench Press"
+     },
+     {
+      "id": "cable-crunch",
+      "name": "Cable Crunch"
+     },
+     {
+      "id": "hanging-leg-raise",
+      "name": "Hanging Leg Raise"
+     },
+     {
+      "id": "machine-crunch",
+      "name": "Machine Crunch"
+     },
+     {
+      "id": "wrist-curls",
+      "name": "Wrist Curls"
+     },
+     {
+      "id": "dumbbell-step-up",
+      "name": "Dumbbell Step Up"
+     },
+     {
+      "id": "single-leg-rdl",
+      "name": "Single Leg Romanian Deadlift"
+     },
+     {
+      "id": "hip-abduction",
+      "name": "Hip Abduction"
+     },
+     {
+      "id": "banded-hip-abduction",
+      "name": "Banded Hip Abduction"
+     },
+     {
+      "id": "single-leg-calf-raise",
+      "name": "Single Leg Calf Raise"
+     },
+     {
+      "id": "pogo-hops",
+      "name": "Pogo Hops"
+     },
+     {
+      "id": "box-jump",
+      "name": "Box Jump"
+     },
+     {
+      "id": "pallof-press",
+      "name": "Pallof Press"
+     },
+     {
+      "id": "dead-bug",
+      "name": "Dead Bug"
+     },
+     {
+      "id": "plank",
+      "name": "Plank"
+     },
+     {
+      "id": "side-plank",
+      "name": "Side Plank"
+     },
+     {
+      "id": "copenhagen-plank",
+      "name": "Copenhagen Plank"
+     },
+     {
+      "id": "farmer-carry",
+      "name": "Farmer Carry"
+     },
+     {
+      "id": "db-external-rotation",
+      "name": "Dumbbell External Rotation"
+     },
+     {
+      "id": "db-y-raise",
+      "name": "Prone Dumbbell Y Raise"
+     },
+     {
+      "id": "kettlebell-swing",
+      "name": "Kettlebell Swing"
+     },
+     {
+      "id": "kettlebell-goblet-squat",
+      "name": "Kettlebell Goblet Squat"
+     },
+     {
+      "id": "kettlebell-single-arm-press",
+      "name": "Kettlebell Single-Arm Overhead Press"
+     },
+     {
+      "id": "kettlebell-single-arm-row",
+      "name": "Kettlebell Single-Arm Row"
+     },
+     {
+      "id": "kettlebell-suitcase-carry",
+      "name": "Kettlebell Suitcase Carry"
+     },
+     {
+      "id": "kettlebell-front-rack-lunge",
+      "name": "Kettlebell Front-Rack Reverse Lunge"
+     },
+     {
+      "id": "kettlebell-turkish-get-up",
+      "name": "Kettlebell Turkish Get-Up"
+     }
+    ],
+    "deleted": [],
+    "after": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "incline-barbell-press",
+       "name": "Incline Barbell Press"
+      },
+      {
+       "id": "dumbbell-bench-press",
+       "name": "Dumbbell Bench Press"
+      },
+      {
+       "id": "cable-fly",
+       "name": "Cable Fly"
+      },
+      {
+       "id": "seated-db-overhead-press",
+       "name": "Seated Dumbbell Overhead Press"
+      },
+      {
+       "id": "barbell-overhead-press",
+       "name": "Barbell Overhead Press"
+      },
+      {
+       "id": "cable-lateral-raises",
+       "name": "Cable Lateral Raises"
+      },
+      {
+       "id": "dumbbell-lateral-raises",
+       "name": "Dumbbell Lateral Raises"
+      },
+      {
+       "id": "face-pulls",
+       "name": "Face Pulls"
+      },
+      {
+       "id": "bent-over-db-row",
+       "name": "Bent Over One Arm Dumbbell Row"
+      },
+      {
+       "id": "barbell-rows",
+       "name": "Barbell Rows"
+      },
+      {
+       "id": "lat-pull-down",
+       "name": "Lat Pull Down"
+      },
+      {
+       "id": "straight-arm-pulldowns",
+       "name": "Straight Arm Pull Downs"
+      },
+      {
+       "id": "weighted-pull-ups",
+       "name": "Weighted Pull Ups"
+      },
+      {
+       "id": "back-extensions",
+       "name": "Back Extensions"
+      },
+      {
+       "id": "overhead-tricep-ext",
+       "name": "Overhead Tricep Extension"
+      },
+      {
+       "id": "tricep-cable-pushdown",
+       "name": "Tricep Cable Pushdown"
+      },
+      {
+       "id": "cable-pushdown",
+       "name": "Cable Pushdown"
+      },
+      {
+       "id": "cable-kick-backs",
+       "name": "Cable Kick Backs"
+      },
+      {
+       "id": "incline-db-curls",
+       "name": "Incline Dumbbell Curls"
+      },
+      {
+       "id": "hammer-curls",
+       "name": "Hammer Curls"
+      },
+      {
+       "id": "reverse-curls",
+       "name": "Reverse Curls"
+      },
+      {
+       "id": "leg-press",
+       "name": "Leg Press"
+      },
+      {
+       "id": "leg-extension",
+       "name": "Leg Extension"
+      },
+      {
+       "id": "romanian-deadlifts",
+       "name": "Romanian Deadlifts"
+      },
+      {
+       "id": "hip-thrusts",
+       "name": "Hip Thrusts"
+      },
+      {
+       "id": "seated-calf-raises",
+       "name": "Seated Calf Raises"
+      },
+      {
+       "id": "standing-calf-raises",
+       "name": "Standing Calf Raises"
+      },
+      {
+       "id": "flat-barbell-bench-press",
+       "name": "Flat Barbell Bench Press"
+      },
+      {
+       "id": "incline-dumbbell-press",
+       "name": "Incline Dumbbell Press"
+      },
+      {
+       "id": "machine-chest-press",
+       "name": "Machine Chest Press"
+      },
+      {
+       "id": "pec-deck-fly",
+       "name": "Pec Deck Fly"
+      },
+      {
+       "id": "dumbbell-fly",
+       "name": "Dumbbell Fly"
+      },
+      {
+       "id": "weighted-dips",
+       "name": "Weighted Dips"
+      },
+      {
+       "id": "push-ups",
+       "name": "Push Ups"
+      },
+      {
+       "id": "machine-shoulder-press",
+       "name": "Machine Shoulder Press"
+      },
+      {
+       "id": "machine-lateral-raise",
+       "name": "Machine Lateral Raise"
+      },
+      {
+       "id": "reverse-pec-deck",
+       "name": "Reverse Pec Deck"
+      },
+      {
+       "id": "dumbbell-rear-delt-fly",
+       "name": "Dumbbell Rear Delt Fly"
+      },
+      {
+       "id": "barbell-shrugs",
+       "name": "Barbell Shrugs"
+      },
+      {
+       "id": "dumbbell-shrugs",
+       "name": "Dumbbell Shrugs"
+      },
+      {
+       "id": "seated-cable-row",
+       "name": "Seated Cable Row"
+      },
+      {
+       "id": "chest-supported-row",
+       "name": "Chest Supported Row"
+      },
+      {
+       "id": "t-bar-row",
+       "name": "T-Bar Row"
+      },
+      {
+       "id": "chin-ups",
+       "name": "Chin Ups"
+      },
+      {
+       "id": "dumbbell-pullover",
+       "name": "Dumbbell Pullover"
+      },
+      {
+       "id": "conventional-deadlift",
+       "name": "Conventional Deadlift"
+      },
+      {
+       "id": "good-mornings",
+       "name": "Good Mornings"
+      },
+      {
+       "id": "dumbbell-rdl",
+       "name": "Dumbbell Romanian Deadlift"
+      },
+      {
+       "id": "seated-leg-curl",
+       "name": "Seated Leg Curl"
+      },
+      {
+       "id": "lying-leg-curl",
+       "name": "Lying Leg Curl"
+      },
+      {
+       "id": "cable-pull-through",
+       "name": "Cable Pull Through"
+      },
+      {
+       "id": "barbell-back-squat",
+       "name": "Barbell Back Squat"
+      },
+      {
+       "id": "hack-squat",
+       "name": "Hack Squat"
+      },
+      {
+       "id": "smith-machine-squat",
+       "name": "Smith Machine Squat"
+      },
+      {
+       "id": "goblet-squat",
+       "name": "Goblet Squat"
+      },
+      {
+       "id": "bulgarian-split-squat",
+       "name": "Bulgarian Split Squat"
+      },
+      {
+       "id": "walking-lunges",
+       "name": "Walking Lunges"
+      },
+      {
+       "id": "leg-press-calf-raise",
+       "name": "Leg Press Calf Raise"
+      },
+      {
+       "id": "ez-bar-curls",
+       "name": "EZ Bar Curls"
+      },
+      {
+       "id": "preacher-curls",
+       "name": "Preacher Curls"
+      },
+      {
+       "id": "cable-curls",
+       "name": "Cable Curls"
+      },
+      {
+       "id": "skull-crushers",
+       "name": "Skull Crushers"
+      },
+      {
+       "id": "close-grip-bench-press",
+       "name": "Close Grip Bench Press"
+      },
+      {
+       "id": "cable-crunch",
+       "name": "Cable Crunch"
+      },
+      {
+       "id": "hanging-leg-raise",
+       "name": "Hanging Leg Raise"
+      },
+      {
+       "id": "machine-crunch",
+       "name": "Machine Crunch"
+      },
+      {
+       "id": "wrist-curls",
+       "name": "Wrist Curls"
+      },
+      {
+       "id": "dumbbell-step-up",
+       "name": "Dumbbell Step Up"
+      },
+      {
+       "id": "single-leg-rdl",
+       "name": "Single Leg Romanian Deadlift"
+      },
+      {
+       "id": "hip-abduction",
+       "name": "Hip Abduction"
+      },
+      {
+       "id": "banded-hip-abduction",
+       "name": "Banded Hip Abduction"
+      },
+      {
+       "id": "single-leg-calf-raise",
+       "name": "Single Leg Calf Raise"
+      },
+      {
+       "id": "pogo-hops",
+       "name": "Pogo Hops"
+      },
+      {
+       "id": "box-jump",
+       "name": "Box Jump"
+      },
+      {
+       "id": "pallof-press",
+       "name": "Pallof Press"
+      },
+      {
+       "id": "dead-bug",
+       "name": "Dead Bug"
+      },
+      {
+       "id": "plank",
+       "name": "Plank"
+      },
+      {
+       "id": "side-plank",
+       "name": "Side Plank"
+      },
+      {
+       "id": "copenhagen-plank",
+       "name": "Copenhagen Plank"
+      },
+      {
+       "id": "farmer-carry",
+       "name": "Farmer Carry"
+      },
+      {
+       "id": "db-external-rotation",
+       "name": "Dumbbell External Rotation"
+      },
+      {
+       "id": "db-y-raise",
+       "name": "Prone Dumbbell Y Raise"
+      },
+      {
+       "id": "kettlebell-swing",
+       "name": "Kettlebell Swing"
+      },
+      {
+       "id": "kettlebell-goblet-squat",
+       "name": "Kettlebell Goblet Squat"
+      },
+      {
+       "id": "kettlebell-single-arm-press",
+       "name": "Kettlebell Single-Arm Overhead Press"
+      },
+      {
+       "id": "kettlebell-single-arm-row",
+       "name": "Kettlebell Single-Arm Row"
+      },
+      {
+       "id": "kettlebell-suitcase-carry",
+       "name": "Kettlebell Suitcase Carry"
+      },
+      {
+       "id": "kettlebell-front-rack-lunge",
+       "name": "Kettlebell Front-Rack Reverse Lunge"
+      },
+      {
+       "id": "kettlebell-turkish-get-up",
+       "name": "Kettlebell Turkish Get-Up"
+      }
+     ],
+     "liftlog_deleted_exercises": null,
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": 1
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "library migrate legacy customs",
+   "fn": "library",
+   "args": [],
+   "output": {
+    "lib": [
+     {
+      "id": "incline-barbell-press",
+      "name": "Incline Barbell Press"
+     },
+     {
+      "id": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press"
+     },
+     {
+      "id": "cable-fly",
+      "name": "Cable Fly"
+     },
+     {
+      "id": "seated-db-overhead-press",
+      "name": "Seated Dumbbell Overhead Press"
+     },
+     {
+      "id": "barbell-overhead-press",
+      "name": "Barbell Overhead Press"
+     },
+     {
+      "id": "cable-lateral-raises",
+      "name": "Cable Lateral Raises"
+     },
+     {
+      "id": "dumbbell-lateral-raises",
+      "name": "Dumbbell Lateral Raises"
+     },
+     {
+      "id": "face-pulls",
+      "name": "Face Pulls"
+     },
+     {
+      "id": "bent-over-db-row",
+      "name": "Bent Over One Arm Dumbbell Row"
+     },
+     {
+      "id": "barbell-rows",
+      "name": "Barbell Rows"
+     },
+     {
+      "id": "lat-pull-down",
+      "name": "Lat Pull Down"
+     },
+     {
+      "id": "straight-arm-pulldowns",
+      "name": "Straight Arm Pull Downs"
+     },
+     {
+      "id": "weighted-pull-ups",
+      "name": "Weighted Pull Ups"
+     },
+     {
+      "id": "back-extensions",
+      "name": "Back Extensions"
+     },
+     {
+      "id": "overhead-tricep-ext",
+      "name": "Overhead Tricep Extension"
+     },
+     {
+      "id": "tricep-cable-pushdown",
+      "name": "Tricep Cable Pushdown"
+     },
+     {
+      "id": "cable-pushdown",
+      "name": "Cable Pushdown"
+     },
+     {
+      "id": "cable-kick-backs",
+      "name": "Cable Kick Backs"
+     },
+     {
+      "id": "incline-db-curls",
+      "name": "Incline Dumbbell Curls"
+     },
+     {
+      "id": "hammer-curls",
+      "name": "Hammer Curls"
+     },
+     {
+      "id": "reverse-curls",
+      "name": "Reverse Curls"
+     },
+     {
+      "id": "leg-press",
+      "name": "Leg Press"
+     },
+     {
+      "id": "leg-extension",
+      "name": "Leg Extension"
+     },
+     {
+      "id": "romanian-deadlifts",
+      "name": "Romanian Deadlifts"
+     },
+     {
+      "id": "hip-thrusts",
+      "name": "Hip Thrusts"
+     },
+     {
+      "id": "seated-calf-raises",
+      "name": "Seated Calf Raises"
+     },
+     {
+      "id": "standing-calf-raises",
+      "name": "Standing Calf Raises"
+     },
+     {
+      "id": "flat-barbell-bench-press",
+      "name": "Flat Barbell Bench Press"
+     },
+     {
+      "id": "incline-dumbbell-press",
+      "name": "Incline Dumbbell Press"
+     },
+     {
+      "id": "machine-chest-press",
+      "name": "Machine Chest Press"
+     },
+     {
+      "id": "pec-deck-fly",
+      "name": "Pec Deck Fly"
+     },
+     {
+      "id": "dumbbell-fly",
+      "name": "Dumbbell Fly"
+     },
+     {
+      "id": "weighted-dips",
+      "name": "Weighted Dips"
+     },
+     {
+      "id": "push-ups",
+      "name": "Push Ups"
+     },
+     {
+      "id": "machine-shoulder-press",
+      "name": "Machine Shoulder Press"
+     },
+     {
+      "id": "machine-lateral-raise",
+      "name": "Machine Lateral Raise"
+     },
+     {
+      "id": "reverse-pec-deck",
+      "name": "Reverse Pec Deck"
+     },
+     {
+      "id": "dumbbell-rear-delt-fly",
+      "name": "Dumbbell Rear Delt Fly"
+     },
+     {
+      "id": "barbell-shrugs",
+      "name": "Barbell Shrugs"
+     },
+     {
+      "id": "dumbbell-shrugs",
+      "name": "Dumbbell Shrugs"
+     },
+     {
+      "id": "seated-cable-row",
+      "name": "Seated Cable Row"
+     },
+     {
+      "id": "chest-supported-row",
+      "name": "Chest Supported Row"
+     },
+     {
+      "id": "t-bar-row",
+      "name": "T-Bar Row"
+     },
+     {
+      "id": "chin-ups",
+      "name": "Chin Ups"
+     },
+     {
+      "id": "dumbbell-pullover",
+      "name": "Dumbbell Pullover"
+     },
+     {
+      "id": "conventional-deadlift",
+      "name": "Conventional Deadlift"
+     },
+     {
+      "id": "good-mornings",
+      "name": "Good Mornings"
+     },
+     {
+      "id": "dumbbell-rdl",
+      "name": "Dumbbell Romanian Deadlift"
+     },
+     {
+      "id": "seated-leg-curl",
+      "name": "Seated Leg Curl"
+     },
+     {
+      "id": "lying-leg-curl",
+      "name": "Lying Leg Curl"
+     },
+     {
+      "id": "cable-pull-through",
+      "name": "Cable Pull Through"
+     },
+     {
+      "id": "barbell-back-squat",
+      "name": "Barbell Back Squat"
+     },
+     {
+      "id": "hack-squat",
+      "name": "Hack Squat"
+     },
+     {
+      "id": "smith-machine-squat",
+      "name": "Smith Machine Squat"
+     },
+     {
+      "id": "goblet-squat",
+      "name": "Goblet Squat"
+     },
+     {
+      "id": "bulgarian-split-squat",
+      "name": "Bulgarian Split Squat"
+     },
+     {
+      "id": "walking-lunges",
+      "name": "Walking Lunges"
+     },
+     {
+      "id": "leg-press-calf-raise",
+      "name": "Leg Press Calf Raise"
+     },
+     {
+      "id": "ez-bar-curls",
+      "name": "EZ Bar Curls"
+     },
+     {
+      "id": "preacher-curls",
+      "name": "Preacher Curls"
+     },
+     {
+      "id": "cable-curls",
+      "name": "Cable Curls"
+     },
+     {
+      "id": "skull-crushers",
+      "name": "Skull Crushers"
+     },
+     {
+      "id": "close-grip-bench-press",
+      "name": "Close Grip Bench Press"
+     },
+     {
+      "id": "cable-crunch",
+      "name": "Cable Crunch"
+     },
+     {
+      "id": "hanging-leg-raise",
+      "name": "Hanging Leg Raise"
+     },
+     {
+      "id": "machine-crunch",
+      "name": "Machine Crunch"
+     },
+     {
+      "id": "wrist-curls",
+      "name": "Wrist Curls"
+     },
+     {
+      "id": "dumbbell-step-up",
+      "name": "Dumbbell Step Up"
+     },
+     {
+      "id": "single-leg-rdl",
+      "name": "Single Leg Romanian Deadlift"
+     },
+     {
+      "id": "hip-abduction",
+      "name": "Hip Abduction"
+     },
+     {
+      "id": "banded-hip-abduction",
+      "name": "Banded Hip Abduction"
+     },
+     {
+      "id": "single-leg-calf-raise",
+      "name": "Single Leg Calf Raise"
+     },
+     {
+      "id": "pogo-hops",
+      "name": "Pogo Hops"
+     },
+     {
+      "id": "box-jump",
+      "name": "Box Jump"
+     },
+     {
+      "id": "pallof-press",
+      "name": "Pallof Press"
+     },
+     {
+      "id": "dead-bug",
+      "name": "Dead Bug"
+     },
+     {
+      "id": "plank",
+      "name": "Plank"
+     },
+     {
+      "id": "side-plank",
+      "name": "Side Plank"
+     },
+     {
+      "id": "copenhagen-plank",
+      "name": "Copenhagen Plank"
+     },
+     {
+      "id": "farmer-carry",
+      "name": "Farmer Carry"
+     },
+     {
+      "id": "db-external-rotation",
+      "name": "Dumbbell External Rotation"
+     },
+     {
+      "id": "db-y-raise",
+      "name": "Prone Dumbbell Y Raise"
+     },
+     {
+      "id": "kettlebell-swing",
+      "name": "Kettlebell Swing"
+     },
+     {
+      "id": "kettlebell-goblet-squat",
+      "name": "Kettlebell Goblet Squat"
+     },
+     {
+      "id": "kettlebell-single-arm-press",
+      "name": "Kettlebell Single-Arm Overhead Press"
+     },
+     {
+      "id": "kettlebell-single-arm-row",
+      "name": "Kettlebell Single-Arm Row"
+     },
+     {
+      "id": "kettlebell-suitcase-carry",
+      "name": "Kettlebell Suitcase Carry"
+     },
+     {
+      "id": "kettlebell-front-rack-lunge",
+      "name": "Kettlebell Front-Rack Reverse Lunge"
+     },
+     {
+      "id": "kettlebell-turkish-get-up",
+      "name": "Kettlebell Turkish Get-Up"
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "My Thing",
+      "updatedAt": 20
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     }
+    ],
+    "deleted": [
+     "bench-press"
+    ],
+    "after": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "incline-barbell-press",
+       "name": "Incline Barbell Press"
+      },
+      {
+       "id": "dumbbell-bench-press",
+       "name": "Dumbbell Bench Press"
+      },
+      {
+       "id": "cable-fly",
+       "name": "Cable Fly"
+      },
+      {
+       "id": "seated-db-overhead-press",
+       "name": "Seated Dumbbell Overhead Press"
+      },
+      {
+       "id": "barbell-overhead-press",
+       "name": "Barbell Overhead Press"
+      },
+      {
+       "id": "cable-lateral-raises",
+       "name": "Cable Lateral Raises"
+      },
+      {
+       "id": "dumbbell-lateral-raises",
+       "name": "Dumbbell Lateral Raises"
+      },
+      {
+       "id": "face-pulls",
+       "name": "Face Pulls"
+      },
+      {
+       "id": "bent-over-db-row",
+       "name": "Bent Over One Arm Dumbbell Row"
+      },
+      {
+       "id": "barbell-rows",
+       "name": "Barbell Rows"
+      },
+      {
+       "id": "lat-pull-down",
+       "name": "Lat Pull Down"
+      },
+      {
+       "id": "straight-arm-pulldowns",
+       "name": "Straight Arm Pull Downs"
+      },
+      {
+       "id": "weighted-pull-ups",
+       "name": "Weighted Pull Ups"
+      },
+      {
+       "id": "back-extensions",
+       "name": "Back Extensions"
+      },
+      {
+       "id": "overhead-tricep-ext",
+       "name": "Overhead Tricep Extension"
+      },
+      {
+       "id": "tricep-cable-pushdown",
+       "name": "Tricep Cable Pushdown"
+      },
+      {
+       "id": "cable-pushdown",
+       "name": "Cable Pushdown"
+      },
+      {
+       "id": "cable-kick-backs",
+       "name": "Cable Kick Backs"
+      },
+      {
+       "id": "incline-db-curls",
+       "name": "Incline Dumbbell Curls"
+      },
+      {
+       "id": "hammer-curls",
+       "name": "Hammer Curls"
+      },
+      {
+       "id": "reverse-curls",
+       "name": "Reverse Curls"
+      },
+      {
+       "id": "leg-press",
+       "name": "Leg Press"
+      },
+      {
+       "id": "leg-extension",
+       "name": "Leg Extension"
+      },
+      {
+       "id": "romanian-deadlifts",
+       "name": "Romanian Deadlifts"
+      },
+      {
+       "id": "hip-thrusts",
+       "name": "Hip Thrusts"
+      },
+      {
+       "id": "seated-calf-raises",
+       "name": "Seated Calf Raises"
+      },
+      {
+       "id": "standing-calf-raises",
+       "name": "Standing Calf Raises"
+      },
+      {
+       "id": "flat-barbell-bench-press",
+       "name": "Flat Barbell Bench Press"
+      },
+      {
+       "id": "incline-dumbbell-press",
+       "name": "Incline Dumbbell Press"
+      },
+      {
+       "id": "machine-chest-press",
+       "name": "Machine Chest Press"
+      },
+      {
+       "id": "pec-deck-fly",
+       "name": "Pec Deck Fly"
+      },
+      {
+       "id": "dumbbell-fly",
+       "name": "Dumbbell Fly"
+      },
+      {
+       "id": "weighted-dips",
+       "name": "Weighted Dips"
+      },
+      {
+       "id": "push-ups",
+       "name": "Push Ups"
+      },
+      {
+       "id": "machine-shoulder-press",
+       "name": "Machine Shoulder Press"
+      },
+      {
+       "id": "machine-lateral-raise",
+       "name": "Machine Lateral Raise"
+      },
+      {
+       "id": "reverse-pec-deck",
+       "name": "Reverse Pec Deck"
+      },
+      {
+       "id": "dumbbell-rear-delt-fly",
+       "name": "Dumbbell Rear Delt Fly"
+      },
+      {
+       "id": "barbell-shrugs",
+       "name": "Barbell Shrugs"
+      },
+      {
+       "id": "dumbbell-shrugs",
+       "name": "Dumbbell Shrugs"
+      },
+      {
+       "id": "seated-cable-row",
+       "name": "Seated Cable Row"
+      },
+      {
+       "id": "chest-supported-row",
+       "name": "Chest Supported Row"
+      },
+      {
+       "id": "t-bar-row",
+       "name": "T-Bar Row"
+      },
+      {
+       "id": "chin-ups",
+       "name": "Chin Ups"
+      },
+      {
+       "id": "dumbbell-pullover",
+       "name": "Dumbbell Pullover"
+      },
+      {
+       "id": "conventional-deadlift",
+       "name": "Conventional Deadlift"
+      },
+      {
+       "id": "good-mornings",
+       "name": "Good Mornings"
+      },
+      {
+       "id": "dumbbell-rdl",
+       "name": "Dumbbell Romanian Deadlift"
+      },
+      {
+       "id": "seated-leg-curl",
+       "name": "Seated Leg Curl"
+      },
+      {
+       "id": "lying-leg-curl",
+       "name": "Lying Leg Curl"
+      },
+      {
+       "id": "cable-pull-through",
+       "name": "Cable Pull Through"
+      },
+      {
+       "id": "barbell-back-squat",
+       "name": "Barbell Back Squat"
+      },
+      {
+       "id": "hack-squat",
+       "name": "Hack Squat"
+      },
+      {
+       "id": "smith-machine-squat",
+       "name": "Smith Machine Squat"
+      },
+      {
+       "id": "goblet-squat",
+       "name": "Goblet Squat"
+      },
+      {
+       "id": "bulgarian-split-squat",
+       "name": "Bulgarian Split Squat"
+      },
+      {
+       "id": "walking-lunges",
+       "name": "Walking Lunges"
+      },
+      {
+       "id": "leg-press-calf-raise",
+       "name": "Leg Press Calf Raise"
+      },
+      {
+       "id": "ez-bar-curls",
+       "name": "EZ Bar Curls"
+      },
+      {
+       "id": "preacher-curls",
+       "name": "Preacher Curls"
+      },
+      {
+       "id": "cable-curls",
+       "name": "Cable Curls"
+      },
+      {
+       "id": "skull-crushers",
+       "name": "Skull Crushers"
+      },
+      {
+       "id": "close-grip-bench-press",
+       "name": "Close Grip Bench Press"
+      },
+      {
+       "id": "cable-crunch",
+       "name": "Cable Crunch"
+      },
+      {
+       "id": "hanging-leg-raise",
+       "name": "Hanging Leg Raise"
+      },
+      {
+       "id": "machine-crunch",
+       "name": "Machine Crunch"
+      },
+      {
+       "id": "wrist-curls",
+       "name": "Wrist Curls"
+      },
+      {
+       "id": "dumbbell-step-up",
+       "name": "Dumbbell Step Up"
+      },
+      {
+       "id": "single-leg-rdl",
+       "name": "Single Leg Romanian Deadlift"
+      },
+      {
+       "id": "hip-abduction",
+       "name": "Hip Abduction"
+      },
+      {
+       "id": "banded-hip-abduction",
+       "name": "Banded Hip Abduction"
+      },
+      {
+       "id": "single-leg-calf-raise",
+       "name": "Single Leg Calf Raise"
+      },
+      {
+       "id": "pogo-hops",
+       "name": "Pogo Hops"
+      },
+      {
+       "id": "box-jump",
+       "name": "Box Jump"
+      },
+      {
+       "id": "pallof-press",
+       "name": "Pallof Press"
+      },
+      {
+       "id": "dead-bug",
+       "name": "Dead Bug"
+      },
+      {
+       "id": "plank",
+       "name": "Plank"
+      },
+      {
+       "id": "side-plank",
+       "name": "Side Plank"
+      },
+      {
+       "id": "copenhagen-plank",
+       "name": "Copenhagen Plank"
+      },
+      {
+       "id": "farmer-carry",
+       "name": "Farmer Carry"
+      },
+      {
+       "id": "db-external-rotation",
+       "name": "Dumbbell External Rotation"
+      },
+      {
+       "id": "db-y-raise",
+       "name": "Prone Dumbbell Y Raise"
+      },
+      {
+       "id": "kettlebell-swing",
+       "name": "Kettlebell Swing"
+      },
+      {
+       "id": "kettlebell-goblet-squat",
+       "name": "Kettlebell Goblet Squat"
+      },
+      {
+       "id": "kettlebell-single-arm-press",
+       "name": "Kettlebell Single-Arm Overhead Press"
+      },
+      {
+       "id": "kettlebell-single-arm-row",
+       "name": "Kettlebell Single-Arm Row"
+      },
+      {
+       "id": "kettlebell-suitcase-carry",
+       "name": "Kettlebell Suitcase Carry"
+      },
+      {
+       "id": "kettlebell-front-rack-lunge",
+       "name": "Kettlebell Front-Rack Reverse Lunge"
+      },
+      {
+       "id": "kettlebell-turkish-get-up",
+       "name": "Kettlebell Turkish Get-Up"
+      },
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "updatedAt": 10
+      },
+      {
+       "id": "my-thing-1782325116469",
+       "name": "My Thing",
+       "updatedAt": 20
+      },
+      {
+       "id": "zercher-squat-1782000000000",
+       "name": "Zercher Squat",
+       "archived": true,
+       "updatedAt": 30
+      }
+     ],
+     "liftlog_deleted_exercises": [
+      "bench-press"
+     ],
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": 1
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_deleted_exercises": "[\"bench-press\"]"
+   }
+  },
+  {
+   "name": "library migrated",
+   "fn": "library",
+   "args": [],
+   "output": {
+    "lib": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 10
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "My Thing",
+      "updatedAt": 20
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     }
+    ],
+    "deleted": [
+     "squat"
+    ],
+    "after": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "updatedAt": 10
+      },
+      {
+       "id": "my-thing-1782325116469",
+       "name": "My Thing",
+       "updatedAt": 20
+      },
+      {
+       "id": "zercher-squat-1782000000000",
+       "name": "Zercher Squat",
+       "archived": true,
+       "updatedAt": 30
+      },
+      {
+       "id": "face-pulls-d2",
+       "name": "Face Pulls (old)"
+      }
+     ],
+     "liftlog_deleted_exercises": [
+      "squat",
+      "squat"
+     ],
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": 1
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "merge library",
+   "fn": "mergeExerciseLibrary",
+   "args": [
+    [
+     {
+      "id": "bench-press",
+      "name": "Bench (server)",
+      "updatedAt": 5
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "Server Thing",
+      "updatedAt": 25
+     },
+     {
+      "id": "squat",
+      "name": "Squat"
+     },
+     {
+      "id": "new-one",
+      "name": "New One",
+      "updatedAt": 1
+     }
+    ]
+   ],
+   "output": {
+    "result": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 10
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "Server Thing",
+      "updatedAt": 25
+     },
+     {
+      "id": "new-one",
+      "name": "New One",
+      "updatedAt": 1
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     }
+    ],
+    "after": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "updatedAt": 10
+      },
+      {
+       "id": "my-thing-1782325116469",
+       "name": "Server Thing",
+       "updatedAt": 25
+      },
+      {
+       "id": "new-one",
+       "name": "New One",
+       "updatedAt": 1
+      },
+      {
+       "id": "zercher-squat-1782000000000",
+       "name": "Zercher Squat",
+       "archived": true,
+       "updatedAt": 30
+      },
+      {
+       "id": "face-pulls-d2",
+       "name": "Face Pulls (old)"
+      }
+     ],
+     "liftlog_deleted_exercises": [
+      "squat",
+      "squat"
+     ],
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": 1
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "pickable",
+   "fn": "pickableExercises",
+   "args": [],
+   "output": [
+    {
+     "id": "back-extensions",
+     "name": "Back Extensions"
+    },
+    {
+     "id": "banded-hip-abduction",
+     "name": "Banded Hip Abduction"
+    },
+    {
+     "id": "barbell-back-squat",
+     "name": "Barbell Back Squat"
+    },
+    {
+     "id": "barbell-overhead-press",
+     "name": "Barbell Overhead Press"
+    },
+    {
+     "id": "barbell-rows",
+     "name": "Barbell Rows"
+    },
+    {
+     "id": "barbell-shrugs",
+     "name": "Barbell Shrugs"
+    },
+    {
+     "id": "bench-press",
+     "name": "Bench Press"
+    },
+    {
+     "id": "bent-over-db-row",
+     "name": "Bent Over One Arm Dumbbell Row"
+    },
+    {
+     "id": "box-jump",
+     "name": "Box Jump"
+    },
+    {
+     "id": "bulgarian-split-squat",
+     "name": "Bulgarian Split Squat"
+    },
+    {
+     "id": "cable-crunch",
+     "name": "Cable Crunch"
+    },
+    {
+     "id": "cable-curls",
+     "name": "Cable Curls"
+    },
+    {
+     "id": "cable-fly",
+     "name": "Cable Fly"
+    },
+    {
+     "id": "cable-kick-backs",
+     "name": "Cable Kick Backs"
+    },
+    {
+     "id": "cable-lateral-raises",
+     "name": "Cable Lateral Raises"
+    },
+    {
+     "id": "cable-pull-through",
+     "name": "Cable Pull Through"
+    },
+    {
+     "id": "cable-pushdown",
+     "name": "Cable Pushdown"
+    },
+    {
+     "id": "chest-supported-row",
+     "name": "Chest Supported Row"
+    },
+    {
+     "id": "chin-ups",
+     "name": "Chin Ups"
+    },
+    {
+     "id": "close-grip-bench-press",
+     "name": "Close Grip Bench Press"
+    },
+    {
+     "id": "conventional-deadlift",
+     "name": "Conventional Deadlift"
+    },
+    {
+     "id": "copenhagen-plank",
+     "name": "Copenhagen Plank"
+    },
+    {
+     "id": "dead-bug",
+     "name": "Dead Bug"
+    },
+    {
+     "id": "dumbbell-bench-press",
+     "name": "Dumbbell Bench Press"
+    },
+    {
+     "id": "db-external-rotation",
+     "name": "Dumbbell External Rotation"
+    },
+    {
+     "id": "dumbbell-fly",
+     "name": "Dumbbell Fly"
+    },
+    {
+     "id": "dumbbell-lateral-raises",
+     "name": "Dumbbell Lateral Raises"
+    },
+    {
+     "id": "dumbbell-pullover",
+     "name": "Dumbbell Pullover"
+    },
+    {
+     "id": "dumbbell-rear-delt-fly",
+     "name": "Dumbbell Rear Delt Fly"
+    },
+    {
+     "id": "dumbbell-rdl",
+     "name": "Dumbbell Romanian Deadlift"
+    },
+    {
+     "id": "dumbbell-shrugs",
+     "name": "Dumbbell Shrugs"
+    },
+    {
+     "id": "dumbbell-step-up",
+     "name": "Dumbbell Step Up"
+    },
+    {
+     "id": "ez-bar-curls",
+     "name": "EZ Bar Curls"
+    },
+    {
+     "id": "face-pulls",
+     "name": "Face Pulls"
+    },
+    {
+     "id": "face-pulls-d2",
+     "name": "Face Pulls (old)"
+    },
+    {
+     "id": "farmer-carry",
+     "name": "Farmer Carry"
+    },
+    {
+     "id": "flat-barbell-bench-press",
+     "name": "Flat Barbell Bench Press"
+    },
+    {
+     "id": "goblet-squat",
+     "name": "Goblet Squat"
+    },
+    {
+     "id": "good-mornings",
+     "name": "Good Mornings"
+    },
+    {
+     "id": "hack-squat",
+     "name": "Hack Squat"
+    },
+    {
+     "id": "hammer-curls",
+     "name": "Hammer Curls"
+    },
+    {
+     "id": "hanging-leg-raise",
+     "name": "Hanging Leg Raise"
+    },
+    {
+     "id": "hip-abduction",
+     "name": "Hip Abduction"
+    },
+    {
+     "id": "hip-thrusts",
+     "name": "Hip Thrusts"
+    },
+    {
+     "id": "incline-barbell-press",
+     "name": "Incline Barbell Press"
+    },
+    {
+     "id": "incline-db-curls",
+     "name": "Incline Dumbbell Curls"
+    },
+    {
+     "id": "incline-dumbbell-press",
+     "name": "Incline Dumbbell Press"
+    },
+    {
+     "id": "kettlebell-front-rack-lunge",
+     "name": "Kettlebell Front-Rack Reverse Lunge"
+    },
+    {
+     "id": "kettlebell-goblet-squat",
+     "name": "Kettlebell Goblet Squat"
+    },
+    {
+     "id": "kettlebell-single-arm-press",
+     "name": "Kettlebell Single-Arm Overhead Press"
+    },
+    {
+     "id": "kettlebell-single-arm-row",
+     "name": "Kettlebell Single-Arm Row"
+    },
+    {
+     "id": "kettlebell-suitcase-carry",
+     "name": "Kettlebell Suitcase Carry"
+    },
+    {
+     "id": "kettlebell-swing",
+     "name": "Kettlebell Swing"
+    },
+    {
+     "id": "kettlebell-turkish-get-up",
+     "name": "Kettlebell Turkish Get-Up"
+    },
+    {
+     "id": "lat-pull-down",
+     "name": "Lat Pull Down"
+    },
+    {
+     "id": "leg-extension",
+     "name": "Leg Extension"
+    },
+    {
+     "id": "leg-press",
+     "name": "Leg Press"
+    },
+    {
+     "id": "leg-press-calf-raise",
+     "name": "Leg Press Calf Raise"
+    },
+    {
+     "id": "lying-leg-curl",
+     "name": "Lying Leg Curl"
+    },
+    {
+     "id": "machine-chest-press",
+     "name": "Machine Chest Press"
+    },
+    {
+     "id": "machine-crunch",
+     "name": "Machine Crunch"
+    },
+    {
+     "id": "machine-lateral-raise",
+     "name": "Machine Lateral Raise"
+    },
+    {
+     "id": "machine-shoulder-press",
+     "name": "Machine Shoulder Press"
+    },
+    {
+     "id": "my-thing-1782325116469",
+     "name": "My Thing"
+    },
+    {
+     "id": "overhead-tricep-ext",
+     "name": "Overhead Tricep Extension"
+    },
+    {
+     "id": "pallof-press",
+     "name": "Pallof Press"
+    },
+    {
+     "id": "pec-deck-fly",
+     "name": "Pec Deck Fly"
+    },
+    {
+     "id": "plank",
+     "name": "Plank"
+    },
+    {
+     "id": "pogo-hops",
+     "name": "Pogo Hops"
+    },
+    {
+     "id": "preacher-curls",
+     "name": "Preacher Curls"
+    },
+    {
+     "id": "db-y-raise",
+     "name": "Prone Dumbbell Y Raise"
+    },
+    {
+     "id": "push-ups",
+     "name": "Push Ups"
+    },
+    {
+     "id": "reverse-curls",
+     "name": "Reverse Curls"
+    },
+    {
+     "id": "reverse-pec-deck",
+     "name": "Reverse Pec Deck"
+    },
+    {
+     "id": "romanian-deadlifts",
+     "name": "Romanian Deadlifts"
+    },
+    {
+     "id": "seated-cable-row",
+     "name": "Seated Cable Row"
+    },
+    {
+     "id": "seated-calf-raises",
+     "name": "Seated Calf Raises"
+    },
+    {
+     "id": "seated-db-overhead-press",
+     "name": "Seated Dumbbell Overhead Press"
+    },
+    {
+     "id": "seated-leg-curl",
+     "name": "Seated Leg Curl"
+    },
+    {
+     "id": "side-plank",
+     "name": "Side Plank"
+    },
+    {
+     "id": "single-leg-calf-raise",
+     "name": "Single Leg Calf Raise"
+    },
+    {
+     "id": "single-leg-rdl",
+     "name": "Single Leg Romanian Deadlift"
+    },
+    {
+     "id": "skull-crushers",
+     "name": "Skull Crushers"
+    },
+    {
+     "id": "smith-machine-squat",
+     "name": "Smith Machine Squat"
+    },
+    {
+     "id": "standing-calf-raises",
+     "name": "Standing Calf Raises"
+    },
+    {
+     "id": "straight-arm-pulldowns",
+     "name": "Straight Arm Pull Downs"
+    },
+    {
+     "id": "t-bar-row",
+     "name": "T-Bar Row"
+    },
+    {
+     "id": "tricep-cable-pushdown",
+     "name": "Tricep Cable Pushdown"
+    },
+    {
+     "id": "walking-lunges",
+     "name": "Walking Lunges"
+    },
+    {
+     "id": "weighted-dips",
+     "name": "Weighted Dips"
+    },
+    {
+     "id": "weighted-pull-ups",
+     "name": "Weighted Pull Ups"
+    },
+    {
+     "id": "wrist-curls",
+     "name": "Wrist Curls"
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "ensure program in library",
+   "fn": "ensureProgramExercisesInLibrary",
+   "args": [
+    [
+     {
+      "id": 1,
+      "label": "Push",
+      "muscleGroups": "Chest",
+      "exercises": [
+       {
+        "id": "cable-lateral-raises-d1",
+        "name": "Old Name",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15
+       },
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 2
+       },
+       {
+        "id": "my-thing-1782325116469",
+        "name": "My Thing",
+        "sets": 3,
+        "technique": "paused"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Pull",
+      "muscleGroups": "Back",
+      "exercises": [
+       {
+        "id": "face-pulls-d4",
+        "name": "FP",
+        "sets": 3,
+        "main": true
+       }
+      ],
+      "phases": [
+       "accumulation"
+      ]
+     }
+    ]
+   ],
+   "output": {
+    "liftlog_program": null,
+    "liftlog_program_updated": null,
+    "liftlog_exercises": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 10
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "My Thing",
+      "updatedAt": 20
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     },
+     {
+      "id": "cable-lateral-raises-d1",
+      "name": "Old Name",
+      "updatedAt": 1773846000000
+     },
+     {
+      "id": "cable-lateral-raises",
+      "name": "Cable Lateral Raises",
+      "updatedAt": 1773846000000
+     },
+     {
+      "id": "face-pulls-d4",
+      "name": "FP",
+      "updatedAt": 1773846000000
+     }
+    ],
+    "liftlog_deleted_exercises": [
+     "squat",
+     "squat"
+    ],
+    "liftlog_restored_exercises": null,
+    "liftlog_library_v3": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name bench-press",
+   "fn": "getExerciseName",
+   "args": [
+    "bench-press"
+   ],
+   "output": "Bench Press",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name my-thing-1782325116469",
+   "fn": "getExerciseName",
+   "args": [
+    "my-thing-1782325116469"
+   ],
+   "output": "My Thing",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name back-extensions-1782325116469",
+   "fn": "getExerciseName",
+   "args": [
+    "back-extensions-1782325116469"
+   ],
+   "output": "Back Extensions",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name some-custom-lift-1782325116469",
+   "fn": "getExerciseName",
+   "args": [
+    "some-custom-lift-1782325116469"
+   ],
+   "output": "Some Custom Lift",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name x",
+   "fn": "getExerciseName",
+   "args": [
+    "x"
+   ],
+   "output": "X",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name -1782325116469",
+   "fn": "getExerciseName",
+   "args": [
+    "-1782325116469"
+   ],
+   "output": "-1782325116469",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "name zercher-squat-1782000000000",
+   "fn": "getExerciseName",
+   "args": [
+    "zercher-squat-1782000000000"
+   ],
+   "output": "Zercher Squat",
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find Bench Press",
+   "fn": "findExerciseByName",
+   "args": [
+    "Bench Press"
+   ],
+   "output": {
+    "id": "bench-press",
+    "name": "Bench Press",
+    "updatedAt": 10
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find my thing",
+   "fn": "findExerciseByName",
+   "args": [
+    "my thing"
+   ],
+   "output": {
+    "id": "my-thing-1782325116469",
+    "name": "My Thing",
+    "updatedAt": 20
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find BACK  extensions!",
+   "fn": "findExerciseByName",
+   "args": [
+    "BACK  extensions!"
+   ],
+   "output": {
+    "id": "back-extensions",
+    "name": "Back Extensions"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find ???",
+   "fn": "findExerciseByName",
+   "args": [
+    "???"
+   ],
+   "output": null,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find Unknown Lift",
+   "fn": "findExerciseByName",
+   "args": [
+    "Unknown Lift"
+   ],
+   "output": null,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "find squat",
+   "fn": "findExerciseByName",
+   "args": [
+    "squat"
+   ],
+   "output": null,
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "generate id",
+   "fn": "generateExerciseId",
+   "args": [
+    "Zercher Squat (heavy)"
+   ],
+   "output": "zercher-squat-heavy-1773846000000",
+   "now": 1773846000000
+  },
+  {
+   "name": "archive",
+   "fn": "archiveExercise",
+   "args": [
+    "bench-press",
+    77
+   ],
+   "output": {
+    "liftlog_program": null,
+    "liftlog_program_updated": null,
+    "liftlog_exercises": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 77,
+      "archived": true
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "My Thing",
+      "updatedAt": 20
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     }
+    ],
+    "liftlog_deleted_exercises": [
+     "squat",
+     "squat"
+    ],
+    "liftlog_restored_exercises": null,
+    "liftlog_library_v3": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "delete from library",
+   "fn": "deleteExerciseFromLibrary",
+   "args": [
+    "my-thing-1782325116469"
+   ],
+   "output": {
+    "liftlog_program": null,
+    "liftlog_program_updated": null,
+    "liftlog_exercises": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 10
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     }
+    ],
+    "liftlog_deleted_exercises": [
+     "squat",
+     "my-thing-1782325116469"
+    ],
+    "liftlog_restored_exercises": null,
+    "liftlog_library_v3": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "re-add lifts tombstone",
+   "fn": "addToExerciseLibrary",
+   "args": [
+    {
+     "id": "squat",
+     "name": "Squat"
+    },
+    88
+   ],
+   "output": {
+    "a": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "updatedAt": 10
+      },
+      {
+       "id": "my-thing-1782325116469",
+       "name": "My Thing",
+       "updatedAt": 20
+      },
+      {
+       "id": "zercher-squat-1782000000000",
+       "name": "Zercher Squat",
+       "archived": true,
+       "updatedAt": 30
+      },
+      {
+       "id": "face-pulls-d2",
+       "name": "Face Pulls (old)"
+      },
+      {
+       "id": "squat",
+       "name": "Squat",
+       "updatedAt": 88
+      }
+     ],
+     "liftlog_deleted_exercises": [],
+     "liftlog_restored_exercises": [
+      "squat"
+     ],
+     "liftlog_library_v3": 1
+    },
+    "b": {
+     "liftlog_program": null,
+     "liftlog_program_updated": null,
+     "liftlog_exercises": [
+      {
+       "id": "bench-press",
+       "name": "Bench Press",
+       "updatedAt": 10
+      },
+      {
+       "id": "my-thing-1782325116469",
+       "name": "My Thing",
+       "updatedAt": 20
+      },
+      {
+       "id": "zercher-squat-1782000000000",
+       "name": "Zercher Squat",
+       "archived": true,
+       "updatedAt": 30
+      },
+      {
+       "id": "face-pulls-d2",
+       "name": "Face Pulls (old)"
+      },
+      {
+       "id": "squat",
+       "name": "Squat",
+       "updatedAt": 88
+      }
+     ],
+     "liftlog_deleted_exercises": [],
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": 1
+    },
+    "restored": []
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "lift none",
+   "fn": "liftExerciseTombstones",
+   "args": [
+    [
+     "nope"
+    ]
+   ],
+   "output": {
+    "liftlog_program": null,
+    "liftlog_program_updated": null,
+    "liftlog_exercises": [
+     {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "updatedAt": 10
+     },
+     {
+      "id": "my-thing-1782325116469",
+      "name": "My Thing",
+      "updatedAt": 20
+     },
+     {
+      "id": "zercher-squat-1782000000000",
+      "name": "Zercher Squat",
+      "archived": true,
+      "updatedAt": 30
+     },
+     {
+      "id": "face-pulls-d2",
+      "name": "Face Pulls (old)"
+     }
+    ],
+    "liftlog_deleted_exercises": [
+     "squat",
+     "squat"
+    ],
+    "liftlog_restored_exercises": null,
+    "liftlog_library_v3": 1
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"bench-press\",\"name\":\"Bench Press\",\"updatedAt\":10},{\"id\":\"my-thing-1782325116469\",\"name\":\"My Thing\",\"updatedAt\":20},{\"id\":\"zercher-squat-1782000000000\",\"name\":\"Zercher Squat\",\"archived\":true,\"updatedAt\":30},{\"id\":\"face-pulls-d2\",\"name\":\"Face Pulls (old)\"}]",
+    "liftlog_library_v3": "1",
+    "liftlog_library_v2": "1",
+    "liftlog_deleted_exercises": "[\"squat\",\"squat\"]"
+   }
+  },
+  {
+   "name": "remove from program",
+   "fn": "removeExerciseFromProgram",
+   "args": [
+    "face-pulls",
+    [
+     {
+      "id": 1,
+      "label": "Push",
+      "muscleGroups": "Chest",
+      "exercises": [
+       {
+        "id": "cable-lateral-raises-d1",
+        "name": "Old Name",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15
+       },
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 2
+       },
+       {
+        "id": "my-thing-1782325116469",
+        "name": "My Thing",
+        "sets": 3,
+        "technique": "paused"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Pull",
+      "muscleGroups": "Back",
+      "exercises": [
+       {
+        "id": "face-pulls-d4",
+        "name": "FP",
+        "sets": 3,
+        "main": true
+       }
+      ],
+      "phases": [
+       "accumulation"
+      ]
+     }
+    ]
+   ],
+   "output": {
+    "out": [
+     {
+      "id": 1,
+      "label": "Push",
+      "muscleGroups": "Chest",
+      "exercises": [
+       {
+        "id": "cable-lateral-raises-d1",
+        "name": "Old Name",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15
+       },
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 2
+       },
+       {
+        "id": "my-thing-1782325116469",
+        "name": "My Thing",
+        "sets": 3,
+        "technique": "paused"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Pull",
+      "muscleGroups": "Back",
+      "exercises": [
+       {
+        "id": "face-pulls-d4",
+        "name": "FP",
+        "sets": 3,
+        "main": true
+       }
+      ],
+      "phases": [
+       "accumulation"
+      ]
+     }
+    ],
+    "after": {
+     "liftlog_program": [
+      {
+       "id": 1,
+       "label": "Push",
+       "muscleGroups": "Chest",
+       "exercises": [
+        {
+         "id": "cable-lateral-raises-d1",
+         "name": "Old Name",
+         "sets": 3,
+         "repLow": 12,
+         "repHigh": 15
+        },
+        {
+         "id": "cable-lateral-raises",
+         "name": "Cable Lateral Raises",
+         "sets": 2
+        },
+        {
+         "id": "my-thing-1782325116469",
+         "name": "My Thing",
+         "sets": 3,
+         "technique": "paused"
+        }
+       ]
+      },
+      {
+       "id": 2,
+       "label": "Pull",
+       "muscleGroups": "Back",
+       "exercises": [
+        {
+         "id": "face-pulls-d4",
+         "name": "FP",
+         "sets": 3,
+         "main": true
+        }
+       ],
+       "phases": [
+        "accumulation"
+       ]
+      }
+     ],
+     "liftlog_program_updated": 1773846000000,
+     "liftlog_exercises": null,
+     "liftlog_deleted_exercises": null,
+     "liftlog_restored_exercises": null,
+     "liftlog_library_v3": null
+    }
+   },
+   "now": 1773846000000
+  }
+ ]
+}
