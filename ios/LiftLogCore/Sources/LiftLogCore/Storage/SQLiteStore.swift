@@ -63,7 +63,10 @@ public final class SQLiteDatabase {
                 switch sqlite3_column_type(stmt, i) {
                 case SQLITE_INTEGER: row[name] = .int(sqlite3_column_int64(stmt, i))
                 case SQLITE_FLOAT: row[name] = .double(sqlite3_column_double(stmt, i))
-                case SQLITE_TEXT: row[name] = .text(String(cString: sqlite3_column_text(stmt, i)))
+                case SQLITE_TEXT:
+                    let text = sqlite3_column_text(stmt, i)
+                    let count = Int(sqlite3_column_bytes(stmt, i))
+                    row[name] = .text(text.map { String(decoding: UnsafeBufferPointer(start: $0, count: count), as: UTF8.self) } ?? "")
                 default: row[name] = .null
                 }
             }
@@ -89,7 +92,16 @@ public final class SQLiteDatabase {
             switch p {
             case .int(let v): sqlite3_bind_int64(stmt, idx, v)
             case .double(let v): sqlite3_bind_double(stmt, idx, v)
-            case .text(let v): sqlite3_bind_text(stmt, idx, v, -1, SQLITE_TRANSIENT)
+            case .text(let v):
+                // Explicit byte length: a -1 length stops at the first NUL and silently truncates.
+                let bytes = Array(v.utf8)
+                if bytes.isEmpty {
+                    sqlite3_bind_text(stmt, idx, "", 0, SQLITE_TRANSIENT)
+                } else {
+                    _ = bytes.withUnsafeBufferPointer { buf in
+                        buf.withMemoryRebound(to: CChar.self) { sqlite3_bind_text(stmt, idx, $0.baseAddress, Int32($0.count), SQLITE_TRANSIENT) }
+                    }
+                }
             case .null: sqlite3_bind_null(stmt, idx)
             }
         }
