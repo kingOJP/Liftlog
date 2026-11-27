@@ -223,6 +223,35 @@ Long-term milestones (roughly):
 
 ---
 
+## Native iOS app + engine parity — CRITICAL
+
+The native SwiftUI iPhone app lives in `ios/` (`ios/LiftLog.xcodeproj` app target, iOS 17+;
+`ios/LiftLogCore` Swift package with the models, SQLite store and the Swift port of the
+`src/data/` engines — no UI dependencies, so `swift test` covers it). The PWA keeps running
+unchanged; the TypeScript engines stay the reference implementation.
+
+**Every engine change must now be made in BOTH TypeScript (`src/data/`) and Swift
+(`ios/LiftLogCore/Sources/LiftLogCore/`), and the parity fixtures regenerated:**
+
+```sh
+npm run parity:fixtures                       # TS engines → ios/parity/fixtures/*.json
+(cd ios/LiftLogCore && swift test)            # Swift must reproduce every fixture exactly
+```
+
+- `ios/parity/cases/*.parity.ts` run the TS engines on shared sample inputs (TZ pinned to
+  America/Chicago, `Date.now()` frozen, localStorage seeded per case) and record outputs.
+  They are NOT part of `npm test`; they run under `ios/parity/vitest.config.ts`.
+- A new engine function or a changed signature needs a case in the matching `*.parity.ts`
+  and a handler in the Swift parity test — the Swift harness fails any fixture case that
+  has no handler, so nothing is silently skipped.
+- Storage/sync shapes are shared too: a change to a stored or synced document (program,
+  sessions, set logs, plan document, settings, …) must update the Swift models in
+  `ios/LiftLogCore/Sources/LiftLogCore/Models/` and the `models` parity fixture.
+- CI (`ios` job in `.github/workflows/ci.yml`, macOS runner) regenerates the fixtures and
+  fails on any diff, then runs `swift test` and builds the app for the Simulator.
+
+---
+
 ## TypeScript rule — CRITICAL
 
 `tsconfig.app.json` has `verbatimModuleSyntax: true`. This means **all interface/type-only imports must use `import type`**:

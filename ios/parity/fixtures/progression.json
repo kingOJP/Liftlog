@@ -1,0 +1,3432 @@
+{
+ "engine": "progression",
+ "cases": [
+  {
+   "name": "weights",
+   "fn": "weights",
+   "args": [],
+   "output": {
+    "strength": {
+     "e1rm": 0.55,
+     "volume": 0.2,
+     "prs": 0.25
+    },
+    "hypertrophy": {
+     "e1rm": 0.3,
+     "volume": 0.4,
+     "prs": 0.3
+    },
+    "fat-loss": {
+     "e1rm": 0.3,
+     "volume": 0.5,
+     "prs": 0.2
+    },
+    "athletic": {
+     "e1rm": 0.45,
+     "volume": 0.3,
+     "prs": 0.25
+    },
+    "general": {
+     "e1rm": 0.34,
+     "volume": 0.33,
+     "prs": 0.33
+    },
+    "sport-support": {
+     "e1rm": 0.5,
+     "volume": 0.15,
+     "prs": 0.35
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "marks null",
+   "fn": "fullMarksFor",
+   "args": [
+    null
+   ],
+   "output": {
+    "e1rmPct": 5,
+    "volumePct": 10,
+    "prEvents": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "marks beginner",
+   "fn": "fullMarksFor",
+   "args": [
+    "beginner"
+   ],
+   "output": {
+    "e1rmPct": 10,
+    "volumePct": 20,
+    "prEvents": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "marks intermediate",
+   "fn": "fullMarksFor",
+   "args": [
+    "intermediate"
+   ],
+   "output": {
+    "e1rmPct": 5,
+    "volumePct": 10,
+    "prEvents": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "marks advanced",
+   "fn": "fullMarksFor",
+   "args": [
+    "advanced"
+   ],
+   "output": {
+    "e1rmPct": 2.5,
+    "volumePct": 5,
+    "prEvents": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband null 3",
+   "fn": "deadband",
+   "args": [
+    null,
+    3
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband null 5",
+   "fn": "deadband",
+   "args": [
+    null,
+    5
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 0 3",
+   "fn": "deadband",
+   "args": [
+    0,
+    3
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 0 5",
+   "fn": "deadband",
+   "args": [
+    0,
+    5
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 2.9 3",
+   "fn": "deadband",
+   "args": [
+    2.9,
+    3
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 2.9 5",
+   "fn": "deadband",
+   "args": [
+    2.9,
+    5
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband -2.9 3",
+   "fn": "deadband",
+   "args": [
+    -2.9,
+    3
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband -2.9 5",
+   "fn": "deadband",
+   "args": [
+    -2.9,
+    5
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 3 3",
+   "fn": "deadband",
+   "args": [
+    3,
+    3
+   ],
+   "output": 3,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 3 5",
+   "fn": "deadband",
+   "args": [
+    3,
+    5
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband -3 3",
+   "fn": "deadband",
+   "args": [
+    -3,
+    3
+   ],
+   "output": -3,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband -3 5",
+   "fn": "deadband",
+   "args": [
+    -3,
+    5
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 10.5 3",
+   "fn": "deadband",
+   "args": [
+    10.5,
+    3
+   ],
+   "output": 10.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "deadband 10.5 5",
+   "fn": "deadband",
+   "args": [
+    10.5,
+    5
+   ],
+   "output": 10.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "pct 0 10",
+   "fn": "pctChange",
+   "args": [
+    0,
+    10
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "pct -5 10",
+   "fn": "pctChange",
+   "args": [
+    -5,
+    10
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "pct 100 105",
+   "fn": "pctChange",
+   "args": [
+    100,
+    105
+   ],
+   "output": 5,
+   "now": 1773846000000
+  },
+  {
+   "name": "pct 100 90",
+   "fn": "pctChange",
+   "args": [
+    100,
+    90
+   ],
+   "output": -10,
+   "now": 1773846000000
+  },
+  {
+   "name": "pct 3 3",
+   "fn": "pctChange",
+   "args": [
+    3,
+    3
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "strength",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "athletic",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "general",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 0 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": null,
+     "prEvents": 0
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0.72,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "strength",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0.7,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.6799999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "athletic",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0.7,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "general",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0.732,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "sport-support",
+    null
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.74,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 1 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 6,
+     "volumeChangePct": 12,
+     "prEvents": 3
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": -0.7,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": -0.54,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": -0.7,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": -0.7,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "strength",
+    null
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": -0.5900000000000001,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "fat-loss",
+    null
+   ],
+   "output": -0.8,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": -0.615,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": -0.8,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": -0.8,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "athletic",
+    null
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": -0.585,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": -0.75,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "general",
+    null
+   ],
+   "output": -0.67,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "general",
+    "beginner"
+   ],
+   "output": -0.5195000000000001,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": -0.67,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "general",
+    "advanced"
+   ],
+   "output": -0.67,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "sport-support",
+    null
+   ],
+   "output": -0.65,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": -0.5125,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": -0.65,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 2 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -8,
+     "volumeChangePct": -15,
+     "prEvents": 0
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": -0.65,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0.4,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0.325,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0.4,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 0.5499999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "strength",
+    null
+   ],
+   "output": 0.36250000000000004,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0.259375,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 0.36250000000000004,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 0.56875,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0.41000000000000003,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.41000000000000003,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0.41000000000000003,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 0.56,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "athletic",
+    null
+   ],
+   "output": 0.37142857142857144,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0.275,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 0.37142857142857144,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 0.5642857142857144,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "general",
+    null
+   ],
+   "output": 0.39850746268656717,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0.32238805970149254,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 0.39850746268656717,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 0.5507462686567164,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0.4117647058823529,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.4117647058823529,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0.4117647058823529,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 3 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 1.5,
+     "volumeChangePct": null,
+     "prEvents": 1
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 0.5588235294117647,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0.040000000000000036,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0.020000000000000018,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0.040000000000000036,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 0.08000000000000007,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "strength",
+    null
+   ],
+   "output": -0.14,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": -0.07,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": -0.14,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": -0.28,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0.305,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.20500000000000002,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0.305,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 0.505,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "athletic",
+    null
+   ],
+   "output": -0.060000000000000026,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": -0.030000000000000013,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": -0.060000000000000026,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": -0.12000000000000005,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "general",
+    null
+   ],
+   "output": -0.0040000000000000036,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "general",
+    "beginner"
+   ],
+   "output": -0.0020000000000000018,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": -0.0040000000000000036,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "general",
+    "advanced"
+   ],
+   "output": -0.008000000000000007,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0.235,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.205,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0.235,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 4 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": -2,
+     "volumeChangePct": 4,
+     "prEvents": 0
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 0.295,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0.8285714285714285,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0.6285714285714286,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0.8285714285714285,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "strength",
+    null
+   ],
+   "output": 0.8666666666666667,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0.7111111111111111,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 0.8666666666666667,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0.7857142857142858,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.5357142857142857,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0.7857142857142858,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "athletic",
+    null
+   ],
+   "output": 0.8363636363636362,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0.6454545454545454,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 0.8363636363636362,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "general",
+    null
+   ],
+   "output": 0.8499999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0.6749999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 0.8499999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0.9099999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.8049999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0.9099999999999999,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 5 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": null,
+     "volumeChangePct": 7,
+     "prEvents": 2
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0.18,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0.16499999999999998,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0.18,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 0.21,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "strength",
+    null
+   ],
+   "output": 0.34,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0.2325,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 0.34,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 0.555,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 0.1,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "athletic",
+    null
+   ],
+   "output": 0.26,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0.1925,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 0.26,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 0.395,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "general",
+    null
+   ],
+   "output": 0.23600000000000002,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0.2005,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 0.23600000000000002,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 0.30700000000000005,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0.38,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.27749999999999997,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0.38,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 6 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 2.5,
+     "volumeChangePct": -3,
+     "prEvents": 1
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 0.585,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 hypertrophy null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 hypertrophy beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 hypertrophy intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 hypertrophy advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 strength null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "strength",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 strength beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "strength",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 strength intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "strength",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 strength advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "strength",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 fat-loss null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "fat-loss",
+    null
+   ],
+   "output": 0.105,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 fat-loss beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "beginner"
+   ],
+   "output": 0.105,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 fat-loss intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": 0.105,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 fat-loss advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "fat-loss",
+    "advanced"
+   ],
+   "output": 0.105,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 athletic null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "athletic",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 athletic beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "athletic",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 athletic intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "athletic",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 athletic advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "athletic",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 general null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "general",
+    null
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 general beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "general",
+    "beginner"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 general intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "general",
+    "intermediate"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 general advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "general",
+    "advanced"
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 sport-support null",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "sport-support",
+    null
+   ],
+   "output": 0.175,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 sport-support beginner",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "sport-support",
+    "beginner"
+   ],
+   "output": 0.175,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 sport-support intermediate",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "sport-support",
+    "intermediate"
+   ],
+   "output": 0.175,
+   "now": 1773846000000
+  },
+  {
+   "name": "score 7 sport-support advanced",
+   "fn": "compositeScore",
+   "args": [
+    {
+     "e1rmChangePct": 0,
+     "volumeChangePct": 0,
+     "prEvents": 0
+    },
+    "sport-support",
+    "advanced"
+   ],
+   "output": 0.175,
+   "now": 1773846000000
+  },
+  {
+   "name": "stall beginner",
+   "fn": "stallWindowFor",
+   "args": [
+    "beginner"
+   ],
+   "output": 3,
+   "now": 1773846000000
+  },
+  {
+   "name": "stall intermediate",
+   "fn": "stallWindowFor",
+   "args": [
+    "intermediate"
+   ],
+   "output": 3,
+   "now": 1773846000000
+  },
+  {
+   "name": "stall advanced",
+   "fn": "stallWindowFor",
+   "args": [
+    "advanced"
+   ],
+   "output": 6,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds hypertrophy null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "hypertrophy",
+    null
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds hypertrophy beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds hypertrophy intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "hypertrophy",
+    "intermediate"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds hypertrophy advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds strength null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "strength",
+    null
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds strength beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "strength",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds strength intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "strength",
+    "intermediate"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds strength advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "strength",
+    "advanced"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds fat-loss null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "fat-loss",
+    null
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds fat-loss beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "fat-loss",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds fat-loss intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "fat-loss",
+    "intermediate"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds fat-loss advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "fat-loss",
+    "advanced"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds athletic null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "athletic",
+    null
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds athletic beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "athletic",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds athletic intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "athletic",
+    "intermediate"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds athletic advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "athletic",
+    "advanced"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds general null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "general",
+    null
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds general beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "general",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds general intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "general",
+    "intermediate"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds general advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "general",
+    "advanced"
+   ],
+   "output": false,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds sport-support null",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "sport-support",
+    null
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds sport-support beginner",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "sport-support",
+    "beginner"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds sport-support intermediate",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "sport-support",
+    "intermediate"
+   ],
+   "output": true,
+   "now": 1773846000000
+  },
+  {
+   "name": "holds sport-support advanced",
+   "fn": "holdsInsteadOfDeload",
+   "args": [
+    "sport-support",
+    "advanced"
+   ],
+   "output": true,
+   "now": 1773846000000
+  }
+ ]
+}

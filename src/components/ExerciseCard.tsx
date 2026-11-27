@@ -18,6 +18,11 @@ import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
+/** Reps (and seconds) are whole numbers: a field holding anything else can't be logged. */
+const isWholeCount = (v: string) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) > 0;
+/** A count prefilled from stored data (legacy rows may hold a fraction) is shown whole, so it stays loggable. */
+const wholeText = (n: number) => String(Math.round(n));
+
 /** One logged row: load, count, and how it was done. */
 export type LoggedEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
 
@@ -296,7 +301,7 @@ export default function ExerciseCard({
           kind: 'work',
           ...sticky,
           weight: prescribedWeight(activePrescription.weight),
-          reps: activePrescription.targetReps == null ? '' : String(activePrescription.targetReps),
+          reps: activePrescription.targetReps == null ? '' : wholeText(activePrescription.targetReps),
         }
       : plan
         ? null
@@ -343,9 +348,9 @@ export default function ExerciseCard({
   function handleLogSet() {
     if (!row) return;
     const w = timed ? 0 : fromDisplay(parseFloat(row.weight));
-    const r = parseInt(row.reps, 10);
-    // Weight of 0 is valid (bodyweight exercises); reps must be positive.
-    if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
+    const r = Number(row.reps);
+    // Weight of 0 is valid (bodyweight exercises); reps must be a positive whole number.
+    if (!isFinite(w) || w < 0 || !isWholeCount(row.reps)) return;
     const warmup = row.kind === 'warmup';
     onLogSet({
       weight: w, reps: r,
@@ -376,7 +381,7 @@ export default function ExerciseCard({
       kind: 'work',
       ...sticky,
       weight: workingWeight ?? (lastWork ? String(toDisplay(lastWork.weight)) : ''),
-      reps: lastWork ? String(lastWork.reps) : '',
+      reps: lastWork ? wholeText(lastWork.reps) : '',
     });
   }
 
@@ -393,8 +398,11 @@ export default function ExerciseCard({
   function confirmEdit() {
     if (editingIndex === null) return;
     const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
-    const r = parseInt(editReps, 10);
-    if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
+    const stored = sets[editingIndex].reps;
+    // An untouched count is kept as recorded (even a legacy fraction); a changed one must be whole.
+    const untouched = editReps === String(stored);
+    const r = untouched ? stored : Number(editReps);
+    if (isFinite(w) && w >= 0 && (untouched || isWholeCount(editReps))) {
       onEditSet(editingIndex, {
         weight: w, reps: r,
         ...(editWarmup ? { warmup: true } : {}),
@@ -419,7 +427,7 @@ export default function ExerciseCard({
     if (e.key === 'Escape') cancelEdit();
   }
 
-  const canLog = !!row && (timed || row.weight !== '') && row.reps !== '';
+  const canLog = !!row && (timed || row.weight !== '') && isWholeCount(row.reps);
   const planComplete = !!plan && remaining.length === 0;
   // Without a plan (editing a past session) "done" is simply "has sets".
   const done = plan ? planComplete : sets.length > 0;
@@ -595,6 +603,7 @@ export default function ExerciseCard({
                         className="inline-input"
                         type="number"
                         inputMode="numeric"
+                        step="1"
                         value={editReps}
                         onChange={e => setEditReps(e.target.value)}
                         onKeyDown={handleEditKeyDown}
@@ -692,6 +701,7 @@ export default function ExerciseCard({
                     className="num-input"
                     type="number"
                     inputMode="numeric"
+                    step="1"
                     placeholder={timed ? 'Seconds' : 'Reps'}
                     aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : row.kind === 'extension' ? TECHNIQUE_INFO[row.technique!].label.toLowerCase() : `set ${nextSetNum}`}`}
                     value={row.reps}
