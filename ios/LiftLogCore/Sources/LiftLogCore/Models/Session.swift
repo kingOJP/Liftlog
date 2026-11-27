@@ -53,8 +53,8 @@ public struct SetLog: Codable, Hashable, Sendable {
         reps = try c.decode(Double.self, forKey: .reps)
         order = try c.decodeIfPresent(Int.self, forKey: .order)
         warmup = try c.decodeIfPresent(Bool.self, forKey: .warmup)
-        repLow = try c.decodeIfPresent(Int.self, forKey: .repLow)
-        repHigh = try c.decodeIfPresent(Int.self, forKey: .repHigh)
+        repLow = try c.decodeWholeIfPresent(forKey: .repLow)
+        repHigh = try c.decodeWholeIfPresent(forKey: .repHigh)
         technique = c.decodeLenient(SetTechnique.self, forKey: .technique)
         grip = c.decodeLenient(Grip.self, forKey: .grip)
     }
@@ -83,8 +83,8 @@ public struct SessionDocSet: Codable, Hashable, Sendable {
         reps = try c.decode(Double.self, forKey: .reps)
         order = try c.decodeIfPresent(Int.self, forKey: .order)
         warmup = try c.decodeIfPresent(Bool.self, forKey: .warmup)
-        repLow = try c.decodeIfPresent(Int.self, forKey: .repLow)
-        repHigh = try c.decodeIfPresent(Int.self, forKey: .repHigh)
+        repLow = try c.decodeWholeIfPresent(forKey: .repLow)
+        repHigh = try c.decodeWholeIfPresent(forKey: .repHigh)
         technique = c.decodeLenient(SetTechnique.self, forKey: .technique)
         grip = c.decodeLenient(Grip.self, forKey: .grip)
     }

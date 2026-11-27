@@ -66,4 +66,19 @@ extension KeyedDecodingContainer {
         guard let raw = try? decodeIfPresent(String.self, forKey: key) else { return nil }
         return T(rawValue: raw)
     }
+
+    /// A count the PWA may have stored fractional (legacy rep ranges came
+    /// from a median): rounded to a whole number rather than failing the
+    /// whole document — a program or session must never be dropped over it.
+    func decodeWholeIfPresent(forKey key: Key) throws -> Int? {
+        if let i = try? decodeIfPresent(Int.self, forKey: key) { return i }
+        return try decodeIfPresent(Double.self, forKey: key).map { Int(JS.round($0)) }
+    }
+
+    func decodeWhole(forKey key: Key) throws -> Int {
+        guard let v = try decodeWholeIfPresent(forKey: key) else {
+            throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "missing \(key.stringValue)"))
+        }
+        return v
+    }
 }
