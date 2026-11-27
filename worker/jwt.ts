@@ -27,6 +27,8 @@ export class IdTokenError extends Error {}
 
 const CLOCK_SKEW_S = 60;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+/** An unknown kid forces a refetch at most this often, so unauthenticated tokens can't hammer the provider. */
+const JWKS_MIN_REFRESH_MS = 5 * 60 * 1000;
 const jwksCache = new Map<string, { keys: (JsonWebKey & { kid?: string })[]; fetchedAt: number }>();
 
 /** Test hook: forget cached key sets. */
@@ -52,7 +54,7 @@ function b64urlJson<T>(s: string): T {
 
 async function loadKeys(url: string, force: boolean): Promise<(JsonWebKey & { kid?: string })[]> {
   const hit = jwksCache.get(url);
-  if (hit && !force && Date.now() - hit.fetchedAt < JWKS_TTL_MS) return hit.keys;
+  if (hit && Date.now() - hit.fetchedAt < (force ? JWKS_MIN_REFRESH_MS : JWKS_TTL_MS)) return hit.keys;
   const res = await fetch(url);
   if (!res.ok) throw new IdTokenError(`JWKS fetch failed (${res.status})`);
   const { keys } = await res.json() as { keys: (JsonWebKey & { kid?: string })[] };

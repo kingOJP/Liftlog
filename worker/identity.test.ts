@@ -99,6 +99,13 @@ describe('ID-token verification', () => {
     ];
     for (const idToken of bad) expect((await post('/api/auth/google/native', { idToken })).status).toBe(401);
   });
+  it('an unknown key forces at most one JWKS refetch per window', async () => {
+    const forged = await sign({ iss: 'https://accounts.google.com', aud: 'ios-client', sub: 'x', exp: now() + 600 }, 'k-unknown');
+    for (let i = 0; i < 5; i++) expect((await post('/api/auth/google/native', { idToken: forged })).status).toBe(401);
+    const calls = (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(c => c[0] === GOOGLE_JWKS);
+    expect(calls.length).toBeLessThanOrEqual(2);
+  });
+
   it('checks the Apple nonce when the token carries one', async () => {
     const identityToken = await apple('a-1', { nonce: await sha256Hex('raw-nonce'), email: 'owen@example.com', email_verified: 'true' });
     expect((await post('/api/auth/apple', { identityToken, rawNonce: 'wrong' })).status).toBe(401);
