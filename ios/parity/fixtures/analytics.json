@@ -1,0 +1,4272 @@
+{
+ "engine": "analytics",
+ "cases": [
+  {
+   "name": "target null null",
+   "fn": "volumeTargetFor",
+   "args": [
+    null,
+    null
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target null beginner",
+   "fn": "volumeTargetFor",
+   "args": [
+    null,
+    "beginner"
+   ],
+   "output": {
+    "low": 6,
+    "high": 12
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target null advanced",
+   "fn": "volumeTargetFor",
+   "args": [
+    null,
+    "advanced"
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target hypertrophy null",
+   "fn": "volumeTargetFor",
+   "args": [
+    "hypertrophy",
+    null
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target hypertrophy beginner",
+   "fn": "volumeTargetFor",
+   "args": [
+    "hypertrophy",
+    "beginner"
+   ],
+   "output": {
+    "low": 6,
+    "high": 12
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target hypertrophy advanced",
+   "fn": "volumeTargetFor",
+   "args": [
+    "hypertrophy",
+    "advanced"
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target sport-support null",
+   "fn": "volumeTargetFor",
+   "args": [
+    "sport-support",
+    null
+   ],
+   "output": {
+    "low": 4,
+    "high": 10
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target sport-support beginner",
+   "fn": "volumeTargetFor",
+   "args": [
+    "sport-support",
+    "beginner"
+   ],
+   "output": {
+    "low": 4,
+    "high": 10
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target sport-support advanced",
+   "fn": "volumeTargetFor",
+   "args": [
+    "sport-support",
+    "advanced"
+   ],
+   "output": {
+    "low": 4,
+    "high": 10
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target strength null",
+   "fn": "volumeTargetFor",
+   "args": [
+    "strength",
+    null
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target strength beginner",
+   "fn": "volumeTargetFor",
+   "args": [
+    "strength",
+    "beginner"
+   ],
+   "output": {
+    "low": 6,
+    "high": 12
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "target strength advanced",
+   "fn": "volumeTargetFor",
+   "args": [
+    "strength",
+    "advanced"
+   ],
+   "output": {
+    "low": 10,
+    "high": 20
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "snapshot",
+   "fn": "buildSnapshot",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ]
+   ],
+   "output": {
+    "sessions": [
+     8,
+     6,
+     5,
+     4,
+     3,
+     2,
+     1,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "working": {
+     "1": [
+      2,
+      3,
+      4,
+      5
+     ],
+     "3": [
+      6,
+      7,
+      8,
+      9
+     ],
+     "5": [
+      10,
+      11,
+      12,
+      13
+     ],
+     "6": [
+      14,
+      15
+     ],
+     "7": [
+      16
+     ],
+     "8": [
+      17,
+      18
+     ],
+     "99": [
+      19
+     ]
+    },
+    "all": {
+     "1": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "3": [
+      6,
+      7,
+      8,
+      9
+     ],
+     "4": [
+      20
+     ],
+     "5": [
+      10,
+      11,
+      12,
+      13
+     ],
+     "6": [
+      14,
+      15
+     ],
+     "7": [
+      16
+     ],
+     "8": [
+      17,
+      18
+     ],
+     "99": [
+      19
+     ]
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 1",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 1,
+     "guid": "g1",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1772118000000,
+     "completedAt": 1772121300000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1772121300000,
+    "week": 1771826400000,
+    "dur": 3300000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 2",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 2,
+     "guid": "g2",
+     "dayId": 2,
+     "weekNumber": 1,
+     "startedAt": 1772290800000,
+     "completedAt": 1772291100000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1772291100000,
+    "week": 1771826400000,
+    "dur": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 3",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 3,
+     "guid": "g3",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1772722800000,
+     "completedAt": 1772726520000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1772726520000,
+    "week": 1772431200000,
+    "dur": 3720000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 4",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 4,
+     "guid": "g4",
+     "dayId": 2,
+     "weekNumber": 1,
+     "startedAt": 1772895600000,
+     "completedAt": 1772913600000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1772913600000,
+    "week": 1772431200000,
+    "dur": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 5",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 5,
+     "guid": "g5",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1773327600000,
+     "completedAt": 1773330480000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1773330480000,
+    "week": 1773032400000,
+    "dur": 2880000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 6",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 6,
+     "guid": "g6",
+     "dayId": 2,
+     "weekNumber": 1,
+     "startedAt": 1773500400000,
+     "completedAt": 1773504600000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1773504600000,
+    "week": 1773032400000,
+    "dur": 4200000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 7",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 7,
+     "guid": "g7",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1773759600000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1773759600000,
+    "week": 1773637200000,
+    "dur": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 8",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 8,
+     "guid": "g8",
+     "dayId": 3,
+     "weekNumber": 1,
+     "startedAt": 1773846000000,
+     "completedAt": 1773848400000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1773848400000,
+    "week": 1773637200000,
+    "dur": 2400000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 9",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 9,
+     "guid": "g9",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1771513200000,
+     "completedAt": 1771516200000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1771516200000,
+    "week": 1771221600000,
+    "dur": 3000000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 10",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 10,
+     "guid": "g10",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1770908400000,
+     "completedAt": 1770911460000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1770911460000,
+    "week": 1770616800000,
+    "dur": 3060000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 11",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 11,
+     "guid": "g11",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1770303600000,
+     "completedAt": 1770306720000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1770306720000,
+    "week": 1770012000000,
+    "dur": 3120000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 12",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 12,
+     "guid": "g12",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1769698800000,
+     "completedAt": 1769701980000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1769701980000,
+    "week": 1769407200000,
+    "dur": 3180000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 13",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 13,
+     "guid": "g13",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1769094000000,
+     "completedAt": 1769097240000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1769097240000,
+    "week": 1768802400000,
+    "dur": 3240000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 14",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 14,
+     "guid": "g14",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1768489200000,
+     "completedAt": 1768492560000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1768492560000,
+    "week": 1768197600000,
+    "dur": 3360000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "session 15",
+   "fn": "sessionTime",
+   "args": [
+    {
+     "id": 15,
+     "guid": "g15",
+     "dayId": 1,
+     "weekNumber": 1,
+     "startedAt": 1767884400000,
+     "completedAt": 1767887820000,
+     "updatedAt": 1
+    }
+   ],
+   "output": {
+    "ts": 1767887820000,
+    "week": 1767592800000,
+    "dur": 3420000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "avg duration",
+   "fn": "avgDurationByDay",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ]
+   ],
+   "output": {
+    "1": 3187500,
+    "2": 4200000,
+    "3": 2400000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "epley 100x10",
+   "fn": "epley1RM",
+   "args": [
+    100,
+    10
+   ],
+   "output": 133.33333333333331,
+   "now": 1773846000000
+  },
+  {
+   "name": "epley 225x5",
+   "fn": "epley1RM",
+   "args": [
+    225,
+    5
+   ],
+   "output": 262.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "epley 0x12",
+   "fn": "epley1RM",
+   "args": [
+    0,
+    12
+   ],
+   "output": 0,
+   "now": 1773846000000
+  },
+  {
+   "name": "epley 135.5x1",
+   "fn": "epley1RM",
+   "args": [
+    135.5,
+    1
+   ],
+   "output": 140.01666666666668,
+   "now": 1773846000000
+  },
+  {
+   "name": "epley 60x0",
+   "fn": "epley1RM",
+   "args": [
+    60,
+    0
+   ],
+   "output": 60,
+   "now": 1773846000000
+  },
+  {
+   "name": "e1rm series",
+   "fn": "e1rmSeries",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ]
+   ],
+   "output": {
+    "leg-press": [
+     {
+      "ts": 1773504600000,
+      "value": 560
+     }
+    ],
+    "barbell-bench-press": [
+     {
+      "ts": 1772121300000,
+      "value": 234.33333333333331
+     },
+     {
+      "ts": 1772726520000,
+      "value": 240.66666666666666
+     },
+     {
+      "ts": 1773330480000,
+      "value": 234
+     }
+    ],
+    "cable-lateral-raises": [
+     {
+      "ts": 1773330480000,
+      "value": 30
+     }
+    ],
+    "barbell-squat": [
+     {
+      "ts": 1773330480000,
+      "value": 320.83333333333337
+     }
+    ],
+    "romanian-deadlifts": [
+     {
+      "ts": 1772726520000,
+      "value": 285
+     }
+    ],
+    "my-custom-1782325116469": [
+     {
+      "ts": 1772726520000,
+      "value": 66.66666666666666
+     }
+    ],
+    "incline-db-press-1782325116469": [
+     {
+      "ts": 1772726520000,
+      "value": 80
+     }
+    ],
+    "lat-pull-down": [
+     {
+      "ts": 1772121300000,
+      "value": 186.66666666666666
+     }
+    ]
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "norm Barbell Bench-Press!",
+   "fn": "normalizeName",
+   "args": [
+    "Barbell Bench-Press!"
+   ],
+   "output": "barbell bench press",
+   "now": 1773846000000
+  },
+  {
+   "name": "norm   Incline DB  press ",
+   "fn": "normalizeName",
+   "args": [
+    "  Incline DB  press "
+   ],
+   "output": "incline db press",
+   "now": 1773846000000
+  },
+  {
+   "name": "norm ÄBC 123",
+   "fn": "normalizeName",
+   "args": [
+    "ÄBC 123"
+   ],
+   "output": "bc 123",
+   "now": 1773846000000
+  },
+  {
+   "name": "norm ",
+   "fn": "normalizeName",
+   "args": [
+    ""
+   ],
+   "output": "",
+   "now": 1773846000000
+  },
+  {
+   "name": "identity barbell-bench-press",
+   "fn": "identity",
+   "args": [
+    "barbell-bench-press"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": null,
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    },
+    "muscles": [],
+    "primary": null,
+    "pattern": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity cable-lateral-raises",
+   "fn": "identity",
+   "args": [
+    "cable-lateral-raises"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": "Delts",
+     "secondaryMuscles": [
+      "Traps",
+      null,
+      null
+     ],
+     "workoutType": "Lateral Raise",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "muscles": [
+     {
+      "muscle": "Delts",
+      "weight": 1
+     },
+     {
+      "muscle": "Traps",
+      "weight": 0.5
+     }
+    ],
+    "primary": "Delts",
+    "pattern": "Lateral Raise"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity incline-db-press-1782325116469",
+   "fn": "identity",
+   "args": [
+    "incline-db-press-1782325116469"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": "Chest",
+     "secondaryMuscles": [
+      "Delts",
+      "Triceps",
+      null
+     ],
+     "workoutType": "Horizontal Press",
+     "equipment": "Bench",
+     "weightType": "Dumbbell"
+    },
+    "muscles": [
+     {
+      "muscle": "Chest",
+      "weight": 1
+     },
+     {
+      "muscle": "Delts",
+      "weight": 0.5
+     },
+     {
+      "muscle": "Triceps",
+      "weight": 0.5
+     }
+    ],
+    "primary": "Chest",
+    "pattern": "Horizontal Press"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity my-custom-1782325116469",
+   "fn": "identity",
+   "args": [
+    "my-custom-1782325116469"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": null,
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    },
+    "muscles": [],
+    "primary": null,
+    "pattern": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity unknown-thing",
+   "fn": "identity",
+   "args": [
+    "unknown-thing"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": null,
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": null,
+     "equipment": null,
+     "weightType": null
+    },
+    "muscles": [],
+    "primary": null,
+    "pattern": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity romanian-deadlifts",
+   "fn": "identity",
+   "args": [
+    "romanian-deadlifts"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": "Hamstrings",
+     "secondaryMuscles": [
+      "Glutes",
+      "Lower Back",
+      null
+     ],
+     "workoutType": "Hip Hinge",
+     "equipment": "None",
+     "weightType": "Barbell"
+    },
+    "muscles": [
+     {
+      "muscle": "Hamstrings",
+      "weight": 1
+     },
+     {
+      "muscle": "Glutes",
+      "weight": 0.5
+     },
+     {
+      "muscle": "Lower Back",
+      "weight": 0.5
+     }
+    ],
+    "primary": "Hamstrings",
+    "pattern": "Hip Hinge"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity plank",
+   "fn": "identity",
+   "args": [
+    "plank"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": "Abs",
+     "secondaryMuscles": [
+      null,
+      null,
+      null
+     ],
+     "workoutType": "Plank",
+     "equipment": "None",
+     "weightType": "Bodyweight"
+    },
+    "muscles": [
+     {
+      "muscle": "Abs",
+      "weight": 1
+     }
+    ],
+    "primary": "Abs",
+    "pattern": "Plank"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity lat-pull-down",
+   "fn": "identity",
+   "args": [
+    "lat-pull-down"
+   ],
+   "output": {
+    "identity": {
+     "primaryMuscle": "Lats",
+     "secondaryMuscles": [
+      "Upper Back",
+      "Biceps",
+      null
+     ],
+     "workoutType": "Pull Down",
+     "equipment": "Cable Machine",
+     "weightType": "Machine"
+    },
+    "muscles": [
+     {
+      "muscle": "Lats",
+      "weight": 1
+     },
+     {
+      "muscle": "Upper Back",
+      "weight": 0.5
+     },
+     {
+      "muscle": "Biceps",
+      "weight": 0.5
+     }
+    ],
+    "primary": "Lats",
+    "pattern": "Pull Down"
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "identity fallback name",
+   "fn": "identityNamed",
+   "args": [
+    "some-id-1782325116469",
+    "Barbell Squat"
+   ],
+   "output": {
+    "primaryMuscle": null,
+    "secondaryMuscles": [
+     null,
+     null,
+     null
+    ],
+    "workoutType": null,
+    "equipment": null,
+    "weightType": null
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set barbell-bench-press null",
+   "fn": "musclesForSet",
+   "args": [
+    "barbell-bench-press",
+    null
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set barbell-bench-press {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "barbell-bench-press",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set barbell-bench-press {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "barbell-bench-press",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set barbell-bench-press {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "barbell-bench-press",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set barbell-bench-press {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "barbell-bench-press",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set cable-lateral-raises null",
+   "fn": "musclesForSet",
+   "args": [
+    "cable-lateral-raises",
+    null
+   ],
+   "output": [
+    {
+     "muscle": "Delts",
+     "weight": 1
+    },
+    {
+     "muscle": "Traps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set cable-lateral-raises {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "cable-lateral-raises",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Delts",
+     "weight": 1
+    },
+    {
+     "muscle": "Traps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set cable-lateral-raises {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "cable-lateral-raises",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Delts",
+     "weight": 1
+    },
+    {
+     "muscle": "Traps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set cable-lateral-raises {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "cable-lateral-raises",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Delts",
+     "weight": 1
+    },
+    {
+     "muscle": "Traps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set cable-lateral-raises {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "cable-lateral-raises",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Delts",
+     "weight": 1
+    },
+    {
+     "muscle": "Traps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set incline-db-press-1782325116469 null",
+   "fn": "musclesForSet",
+   "args": [
+    "incline-db-press-1782325116469",
+    null
+   ],
+   "output": [
+    {
+     "muscle": "Chest",
+     "weight": 1
+    },
+    {
+     "muscle": "Delts",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Triceps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set incline-db-press-1782325116469 {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "incline-db-press-1782325116469",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Chest",
+     "weight": 1
+    },
+    {
+     "muscle": "Delts",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Triceps",
+     "weight": 0.75
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set incline-db-press-1782325116469 {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "incline-db-press-1782325116469",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Chest",
+     "weight": 1
+    },
+    {
+     "muscle": "Delts",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Triceps",
+     "weight": 0.25
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set incline-db-press-1782325116469 {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "incline-db-press-1782325116469",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Chest",
+     "weight": 1
+    },
+    {
+     "muscle": "Delts",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Triceps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set incline-db-press-1782325116469 {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "incline-db-press-1782325116469",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Chest",
+     "weight": 1
+    },
+    {
+     "muscle": "Delts",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Triceps",
+     "weight": 0.75
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set my-custom-1782325116469 null",
+   "fn": "musclesForSet",
+   "args": [
+    "my-custom-1782325116469",
+    null
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set my-custom-1782325116469 {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "my-custom-1782325116469",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set my-custom-1782325116469 {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "my-custom-1782325116469",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set my-custom-1782325116469 {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "my-custom-1782325116469",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set my-custom-1782325116469 {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "my-custom-1782325116469",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set unknown-thing null",
+   "fn": "musclesForSet",
+   "args": [
+    "unknown-thing",
+    null
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set unknown-thing {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "unknown-thing",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set unknown-thing {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "unknown-thing",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set unknown-thing {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "unknown-thing",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set unknown-thing {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "unknown-thing",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set romanian-deadlifts null",
+   "fn": "musclesForSet",
+   "args": [
+    "romanian-deadlifts",
+    null
+   ],
+   "output": [
+    {
+     "muscle": "Hamstrings",
+     "weight": 1
+    },
+    {
+     "muscle": "Glutes",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Lower Back",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set romanian-deadlifts {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "romanian-deadlifts",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Hamstrings",
+     "weight": 1
+    },
+    {
+     "muscle": "Glutes",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Lower Back",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set romanian-deadlifts {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "romanian-deadlifts",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Hamstrings",
+     "weight": 1
+    },
+    {
+     "muscle": "Glutes",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Lower Back",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set romanian-deadlifts {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "romanian-deadlifts",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Hamstrings",
+     "weight": 1
+    },
+    {
+     "muscle": "Glutes",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Lower Back",
+     "weight": 0.75
+    },
+    {
+     "muscle": "Quads",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set romanian-deadlifts {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "romanian-deadlifts",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Hamstrings",
+     "weight": 1
+    },
+    {
+     "muscle": "Glutes",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Lower Back",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set plank null",
+   "fn": "musclesForSet",
+   "args": [
+    "plank",
+    null
+   ],
+   "output": [
+    {
+     "muscle": "Abs",
+     "weight": 1
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set plank {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "plank",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Abs",
+     "weight": 1
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set plank {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "plank",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Abs",
+     "weight": 1
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set plank {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "plank",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Abs",
+     "weight": 1
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set plank {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "plank",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Abs",
+     "weight": 1
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set lat-pull-down null",
+   "fn": "musclesForSet",
+   "args": [
+    "lat-pull-down",
+    null
+   ],
+   "output": [
+    {
+     "muscle": "Lats",
+     "weight": 1
+    },
+    {
+     "muscle": "Upper Back",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Biceps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set lat-pull-down {\"grip\":\"close\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "lat-pull-down",
+    {
+     "grip": "close"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Lats",
+     "weight": 1
+    },
+    {
+     "muscle": "Upper Back",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Biceps",
+     "weight": 0.75
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set lat-pull-down {\"grip\":\"wide\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "lat-pull-down",
+    {
+     "grip": "wide"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Lats",
+     "weight": 1
+    },
+    {
+     "muscle": "Upper Back",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Biceps",
+     "weight": 0.25
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set lat-pull-down {\"technique\":\"deficit\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "lat-pull-down",
+    {
+     "technique": "deficit"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Lats",
+     "weight": 1
+    },
+    {
+     "muscle": "Upper Back",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Biceps",
+     "weight": 0.5
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "set lat-pull-down {\"technique\":\"paused\",\"grip\":\"neutral\"}",
+   "fn": "musclesForSet",
+   "args": [
+    "lat-pull-down",
+    {
+     "technique": "paused",
+     "grip": "neutral"
+    }
+   ],
+   "output": [
+    {
+     "muscle": "Lats",
+     "weight": 1
+    },
+    {
+     "muscle": "Upper Back",
+     "weight": 0.5
+    },
+    {
+     "muscle": "Biceps",
+     "weight": 0.75
+    }
+   ],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "slot",
+   "fn": "musclesForSlot",
+   "args": [
+    {
+     "id": "barbell-bench-press",
+     "name": "B",
+     "sets": 3,
+     "grip": "close"
+    }
+   ],
+   "output": [],
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "muscle totals all",
+   "fn": "muscleSetTotals",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ],
+    null
+   ],
+   "output": {
+    "totals": {
+     "Abs": 1,
+     "Quads": 2,
+     "Glutes": 1.25,
+     "Hamstrings": 1.75,
+     "Delts": 2,
+     "Traps": 0.75,
+     "Upper Back": 0.75,
+     "Lower Back": 0.75,
+     "Chest": 1,
+     "Triceps": 0.5,
+     "Lats": 1,
+     "Biceps": 0.25
+    },
+    "unmappedSets": 8,
+    "unmapped": [
+     "barbell-bench-press",
+     "barbell-squat",
+     "my-custom-1782325116469"
+    ]
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "muscle totals recent",
+   "fn": "muscleSetTotals",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ],
+    1772982000000
+   ],
+   "output": {
+    "totals": {
+     "Abs": 1,
+     "Quads": 1.5,
+     "Glutes": 0.75,
+     "Hamstrings": 0.75,
+     "Delts": 1.5,
+     "Traps": 0.75,
+     "Upper Back": 0.25
+    },
+    "unmappedSets": 3,
+    "unmapped": [
+     "barbell-bench-press",
+     "barbell-squat"
+    ]
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "head totals all",
+   "fn": "headSetTotals",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ],
+    null
+   ],
+   "output": {
+    "byHead": {
+     "Delts::Side Delt": 1,
+     "Delts::Rear Delt": 0.5,
+     "Hamstrings::Medial Hamstrings": 1
+    },
+    "unspecified": {
+     "Abs": 1,
+     "Quads": 1.5,
+     "Chest": 1,
+     "Lats": 1
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  },
+  {
+   "name": "head totals recent",
+   "fn": "headSetTotals",
+   "args": [
+    [
+     {
+      "id": 1,
+      "guid": "g1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772118000000,
+      "completedAt": 1772121300000,
+      "updatedAt": 1
+     },
+     {
+      "id": 2,
+      "guid": "g2",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772290800000,
+      "completedAt": 1772291100000,
+      "updatedAt": 1
+     },
+     {
+      "id": 3,
+      "guid": "g3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772722800000,
+      "completedAt": 1772726520000,
+      "updatedAt": 1
+     },
+     {
+      "id": 4,
+      "guid": "g4",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1772895600000,
+      "completedAt": 1772913600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 5,
+      "guid": "g5",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773327600000,
+      "completedAt": 1773330480000,
+      "updatedAt": 1
+     },
+     {
+      "id": 6,
+      "guid": "g6",
+      "dayId": 2,
+      "weekNumber": 1,
+      "startedAt": 1773500400000,
+      "completedAt": 1773504600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 7,
+      "guid": "g7",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773759600000,
+      "updatedAt": 1
+     },
+     {
+      "id": 8,
+      "guid": "g8",
+      "dayId": 3,
+      "weekNumber": 1,
+      "startedAt": 1773846000000,
+      "completedAt": 1773848400000,
+      "updatedAt": 1
+     },
+     {
+      "id": 9,
+      "guid": "g9",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1771513200000,
+      "completedAt": 1771516200000,
+      "updatedAt": 1
+     },
+     {
+      "id": 10,
+      "guid": "g10",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770908400000,
+      "completedAt": 1770911460000,
+      "updatedAt": 1
+     },
+     {
+      "id": 11,
+      "guid": "g11",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1770303600000,
+      "completedAt": 1770306720000,
+      "updatedAt": 1
+     },
+     {
+      "id": 12,
+      "guid": "g12",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769698800000,
+      "completedAt": 1769701980000,
+      "updatedAt": 1
+     },
+     {
+      "id": 13,
+      "guid": "g13",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1769094000000,
+      "completedAt": 1769097240000,
+      "updatedAt": 1
+     },
+     {
+      "id": 14,
+      "guid": "g14",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1768489200000,
+      "completedAt": 1768492560000,
+      "updatedAt": 1
+     },
+     {
+      "id": 15,
+      "guid": "g15",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1767884400000,
+      "completedAt": 1767887820000,
+      "updatedAt": 1
+     }
+    ],
+    [
+     {
+      "id": 1,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 10,
+      "warmup": true
+     },
+     {
+      "id": 2,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 8
+     },
+     {
+      "id": 3,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 185,
+      "reps": 7,
+      "grip": "close"
+     },
+     {
+      "id": 4,
+      "sessionId": 1,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 135,
+      "reps": 12,
+      "technique": "drop"
+     },
+     {
+      "id": 5,
+      "sessionId": 1,
+      "exerciseId": "lat-pull-down",
+      "setNumber": 1,
+      "weight": 140,
+      "reps": 10,
+      "grip": "wide"
+     },
+     {
+      "id": 6,
+      "sessionId": 3,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 190,
+      "reps": 8
+     },
+     {
+      "id": 7,
+      "sessionId": 3,
+      "exerciseId": "romanian-deadlifts",
+      "setNumber": 1,
+      "weight": 225,
+      "reps": 8,
+      "technique": "deficit"
+     },
+     {
+      "id": 8,
+      "sessionId": 3,
+      "exerciseId": "my-custom-1782325116469",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 9,
+      "sessionId": 3,
+      "exerciseId": "incline-db-press-1782325116469",
+      "setNumber": 1,
+      "weight": 60,
+      "reps": 10
+     },
+     {
+      "id": 10,
+      "sessionId": 5,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 195,
+      "reps": 6,
+      "technique": "paused"
+     },
+     {
+      "id": 11,
+      "sessionId": 5,
+      "exerciseId": "cable-lateral-raises",
+      "setNumber": 1,
+      "weight": 20,
+      "reps": 15
+     },
+     {
+      "id": 12,
+      "sessionId": 5,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 275,
+      "reps": 5
+     },
+     {
+      "id": 13,
+      "sessionId": 5,
+      "exerciseId": "face-pulls",
+      "setNumber": 1,
+      "weight": 40,
+      "reps": 15,
+      "technique": "partials"
+     },
+     {
+      "id": 14,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 12
+     },
+     {
+      "id": 15,
+      "sessionId": 6,
+      "exerciseId": "leg-press",
+      "setNumber": 1,
+      "weight": 400,
+      "reps": 10,
+      "technique": "rest-pause"
+     },
+     {
+      "id": 16,
+      "sessionId": 7,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 200,
+      "reps": 5
+     },
+     {
+      "id": 17,
+      "sessionId": 8,
+      "exerciseId": "plank",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 60
+     },
+     {
+      "id": 18,
+      "sessionId": 8,
+      "exerciseId": "barbell-bench-press",
+      "setNumber": 1,
+      "weight": 0,
+      "reps": 0
+     },
+     {
+      "id": 19,
+      "sessionId": 99,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 300,
+      "reps": 3
+     },
+     {
+      "id": 20,
+      "sessionId": 4,
+      "exerciseId": "barbell-squat",
+      "setNumber": 1,
+      "weight": 285,
+      "reps": 4,
+      "warmup": true
+     }
+    ],
+    1772982000000
+   ],
+   "output": {
+    "byHead": {
+     "Delts::Side Delt": 1,
+     "Delts::Rear Delt": 0.5
+    },
+    "unspecified": {
+     "Abs": 1,
+     "Quads": 1.5
+    }
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_library_v3": "1",
+    "liftlog_exercises": "[{\"id\":\"incline-db-press-1782325116469\",\"name\":\"Incline Dumbbell Press\"},{\"id\":\"my-custom-1782325116469\",\"name\":\"My Custom Lift\"}]",
+    "liftlog_exercise_meta": "{\"cable-lateral-raises\":{\"primaryMuscle\":\"Delts\",\"secondaryMuscle1\":\"Traps\",\"secondaryMuscle2\":null,\"secondaryMuscle3\":null,\"workoutType\":\"Lateral Raise\",\"equipment\":\"Cable Machine\",\"weightType\":\"Machine\"}}"
+   }
+  }
+ ]
+}

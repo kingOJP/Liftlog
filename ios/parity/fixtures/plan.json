@@ -1,0 +1,4039 @@
+{
+ "engine": "plan",
+ "cases": [
+  {
+   "name": "tables",
+   "fn": "tables",
+   "args": [],
+   "output": {
+    "GOALS": [
+     {
+      "id": "hypertrophy",
+      "label": "Muscle Growth",
+      "blurb": "Build size with high-quality volume and double progression"
+     },
+     {
+      "id": "strength",
+      "label": "Strength",
+      "blurb": "Move more weight on the big lifts — lower reps, longer rests"
+     },
+     {
+      "id": "fat-loss",
+      "label": "Fat Loss",
+      "blurb": "Hold onto muscle while dieting — training defends what you built"
+     },
+     {
+      "id": "sport-support",
+      "label": "Support Another Sport",
+      "blurb": "Lifting that makes you better at your sport — without stealing its recovery"
+     },
+     {
+      "id": "general",
+      "label": "General Fitness",
+      "blurb": "Balanced full-body training you can sustain for years"
+     }
+    ],
+    "EXPERIENCE_LEVELS": [
+     {
+      "id": "beginner",
+      "label": "Beginner",
+      "blurb": "New to lifting, or back after a long time off — learning the movements"
+     },
+     {
+      "id": "intermediate",
+      "label": "Intermediate",
+      "blurb": "A year or two of consistent training — the big lifts feel familiar"
+     },
+     {
+      "id": "advanced",
+      "label": "Advanced",
+      "blurb": "Years under the bar — you know your body and progress is hard-won"
+     }
+    ],
+    "EQUIPMENT_ACCESS": [
+     {
+      "id": "full-gym",
+      "label": "Full gym",
+      "blurb": "Barbells, machines, cables, dumbbells — the works"
+     },
+     {
+      "id": "home-rack",
+      "label": "Home gym",
+      "blurb": "A rack, barbell and some plates; maybe a few dumbbells"
+     },
+     {
+      "id": "dumbbells-only",
+      "label": "Dumbbells only",
+      "blurb": "A pair (or a set) of dumbbells and a bench"
+     },
+     {
+      "id": "minimal",
+      "label": "Minimal / bands",
+      "blurb": "Bodyweight, bands, the odd dumbbell — travel or home light"
+     }
+    ],
+    "RACE_PROXIMITY": [
+     {
+      "id": "none",
+      "label": "No date yet",
+      "blurb": "Base training — the best window for heavier strength work"
+     },
+     {
+      "id": "soon",
+      "label": "Within 8 weeks",
+      "blurb": "Race-specific: strength holds, volume comes down, the block ends easy"
+     },
+     {
+      "id": "mid",
+      "label": "3–4 months",
+      "blurb": "Build first, then hold while your sport takes priority"
+     },
+     {
+      "id": "far",
+      "label": "5–6 months",
+      "blurb": "Plenty of runway — this block is all build"
+     }
+    ],
+    "ENDURANCE_LOADS": [
+     {
+      "id": "low",
+      "label": "Under 4 hours",
+      "blurb": "Low interference — room for 2–3 lifting days and heavier loading",
+      "hours": 3
+     },
+     {
+      "id": "moderate",
+      "label": "4–7 hours",
+      "blurb": "Moderate — two lifting days at a controlled dose is the sweet spot",
+      "hours": 5.5
+     },
+     {
+      "id": "high",
+      "label": "8–11 hours",
+      "blurb": "High — lifting caps at two short sessions and stops growing",
+      "hours": 9.5
+     },
+     {
+      "id": "very-high",
+      "label": "12+ hours",
+      "blurb": "Very high — minimum effective dose purely to hold what you have",
+      "hours": 13
+     }
+    ],
+    "DISCIPLINES": [
+     {
+      "id": "swim",
+      "label": "Swim",
+      "blurb": "Biases toward lat/upper-back pulling strength and posterior-shoulder balance"
+     },
+     {
+      "id": "bike",
+      "label": "Bike",
+      "blurb": "Biases toward hip-extension force — heavier squat/hinge and single-leg work"
+     },
+     {
+      "id": "run",
+      "label": "Run",
+      "blurb": "Biases toward tendon stiffness, pelvic stability and eccentric control"
+     },
+     {
+      "id": "even",
+      "label": "Fairly even",
+      "blurb": "Balanced template — no discipline gets extra slots"
+     }
+    ],
+    "INJURY_AREAS": [
+     {
+      "id": "knee",
+      "label": "Knee",
+      "blurb": "No squats, lunges or leg extensions; pressing and hinging carry the legs"
+     },
+     {
+      "id": "shoulder",
+      "label": "Shoulder",
+      "blurb": "No overhead pressing or dips; horizontal pressing and raises stay"
+     },
+     {
+      "id": "lower-back",
+      "label": "Lower back",
+      "blurb": "No barbell hinges or squats; supported machine work covers the posterior chain"
+     },
+     {
+      "id": "hip",
+      "label": "Hip",
+      "blurb": "No deep lunging or heavy hinging; machines and hip thrusts carry it"
+     },
+     {
+      "id": "elbow",
+      "label": "Elbow",
+      "blurb": "No skull-crushers or dips; cable pressdowns and neutral-grip pulls stay"
+     },
+     {
+      "id": "wrist",
+      "label": "Wrist",
+      "blurb": "No barbell pressing or wrist curls; neutral-grip and machine work instead"
+     }
+    ],
+    "PHASE_INFO": {
+     "intro": {
+      "label": "Intro",
+      "blurb": "Learn the movements at easy loads — this week is practice, not a test"
+     },
+     "recovery": {
+      "label": "Recovery",
+      "blurb": "Easy re-entry week — lighter loads, groove the movements"
+     },
+     "accumulation": {
+      "label": "Build",
+      "blurb": "Add reps and sets — accumulate productive volume"
+     },
+     "intensification": {
+      "label": "Push",
+      "blurb": "Loads climb, effort climbs — chase the top of every rep range"
+     },
+     "peak": {
+      "label": "Peak",
+      "blurb": "Heaviest work of the block — low reps, full recovery between sets"
+     },
+     "deload": {
+      "label": "Deload",
+      "blurb": "Planned easy week — ~10% lighter so you rebound stronger"
+     },
+     "maintenance": {
+      "label": "Maintain",
+      "blurb": "Loads held, volume trimmed — your sport takes priority this week"
+     },
+     "race-week": {
+      "label": "Race week",
+      "blurb": "One short session early in the week, then nothing. Show up fresh"
+     }
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "goal hypertrophy",
+   "fn": "goalLabel",
+   "args": [
+    "hypertrophy"
+   ],
+   "output": "Muscle Growth",
+   "now": 1773846000000
+  },
+  {
+   "name": "goal strength",
+   "fn": "goalLabel",
+   "args": [
+    "strength"
+   ],
+   "output": "Strength",
+   "now": 1773846000000
+  },
+  {
+   "name": "goal fat-loss",
+   "fn": "goalLabel",
+   "args": [
+    "fat-loss"
+   ],
+   "output": "Fat Loss",
+   "now": 1773846000000
+  },
+  {
+   "name": "goal athletic",
+   "fn": "goalLabel",
+   "args": [
+    "athletic"
+   ],
+   "output": "athletic",
+   "now": 1773846000000
+  },
+  {
+   "name": "goal general",
+   "fn": "goalLabel",
+   "args": [
+    "general"
+   ],
+   "output": "General Fitness",
+   "now": 1773846000000
+  },
+  {
+   "name": "goal sport-support",
+   "fn": "goalLabel",
+   "args": [
+    "sport-support"
+   ],
+   "output": "Support Another Sport",
+   "now": 1773846000000
+  },
+  {
+   "name": "exp beginner",
+   "fn": "experienceLabel",
+   "args": [
+    "beginner"
+   ],
+   "output": "Beginner",
+   "now": 1773846000000
+  },
+  {
+   "name": "exp intermediate",
+   "fn": "experienceLabel",
+   "args": [
+    "intermediate"
+   ],
+   "output": "Intermediate",
+   "now": 1773846000000
+  },
+  {
+   "name": "exp advanced",
+   "fn": "experienceLabel",
+   "args": [
+    "advanced"
+   ],
+   "output": "Advanced",
+   "now": 1773846000000
+  },
+  {
+   "name": "prox none",
+   "fn": "proximityLabel",
+   "args": [
+    "none"
+   ],
+   "output": "No date yet",
+   "now": 1773846000000
+  },
+  {
+   "name": "prox soon",
+   "fn": "proximityLabel",
+   "args": [
+    "soon"
+   ],
+   "output": "Within 8 weeks",
+   "now": 1773846000000
+  },
+  {
+   "name": "prox mid",
+   "fn": "proximityLabel",
+   "args": [
+    "mid"
+   ],
+   "output": "3–4 months",
+   "now": 1773846000000
+  },
+  {
+   "name": "prox far",
+   "fn": "proximityLabel",
+   "args": [
+    "far"
+   ],
+   "output": "5–6 months",
+   "now": 1773846000000
+  },
+  {
+   "name": "load low",
+   "fn": "enduranceHours",
+   "args": [
+    "low"
+   ],
+   "output": 3,
+   "now": 1773846000000
+  },
+  {
+   "name": "load moderate",
+   "fn": "enduranceHours",
+   "args": [
+    "moderate"
+   ],
+   "output": 5.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "load high",
+   "fn": "enduranceHours",
+   "args": [
+    "high"
+   ],
+   "output": 9.5,
+   "now": 1773846000000
+  },
+  {
+   "name": "load very-high",
+   "fn": "enduranceHours",
+   "args": [
+    "very-high"
+   ],
+   "output": 13,
+   "now": 1773846000000
+  },
+  {
+   "name": "easy intro",
+   "fn": "phaseFlags",
+   "args": [
+    "intro"
+   ],
+   "output": {
+    "easy": true,
+    "opener": true
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy recovery",
+   "fn": "phaseFlags",
+   "args": [
+    "recovery"
+   ],
+   "output": {
+    "easy": true,
+    "opener": true
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy accumulation",
+   "fn": "phaseFlags",
+   "args": [
+    "accumulation"
+   ],
+   "output": {
+    "easy": false,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy intensification",
+   "fn": "phaseFlags",
+   "args": [
+    "intensification"
+   ],
+   "output": {
+    "easy": false,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy peak",
+   "fn": "phaseFlags",
+   "args": [
+    "peak"
+   ],
+   "output": {
+    "easy": false,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy deload",
+   "fn": "phaseFlags",
+   "args": [
+    "deload"
+   ],
+   "output": {
+    "easy": true,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy maintenance",
+   "fn": "phaseFlags",
+   "args": [
+    "maintenance"
+   ],
+   "output": {
+    "easy": false,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy race-week",
+   "fn": "phaseFlags",
+   "args": [
+    "race-week"
+   ],
+   "output": {
+    "easy": true,
+    "opener": false
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "easy null",
+   "fn": "phaseFlags",
+   "args": [
+    null
+   ],
+   "output": {
+    "easy": false,
+    "opener": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2026-03-09",
+   "fn": "parsePlanDate",
+   "args": [
+    "2026-03-09"
+   ],
+   "output": 1773032400000,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2026-02-29",
+   "fn": "parsePlanDate",
+   "args": [
+    "2026-02-29"
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2024-02-29",
+   "fn": "parsePlanDate",
+   "args": [
+    "2024-02-29"
+   ],
+   "output": 1709186400000,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2026-13-01",
+   "fn": "parsePlanDate",
+   "args": [
+    "2026-13-01"
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 26-03-09",
+   "fn": "parsePlanDate",
+   "args": [
+    "26-03-09"
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2026-3-9",
+   "fn": "parsePlanDate",
+   "args": [
+    "2026-3-9"
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse ",
+   "fn": "parsePlanDate",
+   "args": [
+    ""
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "parse 2026-11-01",
+   "fn": "parsePlanDate",
+   "args": [
+    "2026-11-01"
+   ],
+   "output": 1793509200000,
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1771254000000",
+   "fn": "dates",
+   "args": [
+    1771254000000
+   ],
+   "output": {
+    "plan": "2026-02-16",
+    "monday": 1771221600000,
+    "next": "2026-02-23"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1772550000000",
+   "fn": "dates",
+   "args": [
+    1772550000000
+   ],
+   "output": {
+    "plan": "2026-03-03",
+    "monday": 1772431200000,
+    "next": "2026-03-09"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1773759600000",
+   "fn": "dates",
+   "args": [
+    1773759600000
+   ],
+   "output": {
+    "plan": "2026-03-17",
+    "monday": 1773637200000,
+    "next": "2026-03-23"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1773846000000",
+   "fn": "dates",
+   "args": [
+    1773846000000
+   ],
+   "output": {
+    "plan": "2026-03-18",
+    "monday": 1773637200000,
+    "next": "2026-03-23"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1773932400000",
+   "fn": "dates",
+   "args": [
+    1773932400000
+   ],
+   "output": {
+    "plan": "2026-03-19",
+    "monday": 1773637200000,
+    "next": "2026-03-23"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1774364400000",
+   "fn": "dates",
+   "args": [
+    1774364400000
+   ],
+   "output": {
+    "plan": "2026-03-24",
+    "monday": 1774242000000,
+    "next": "2026-03-30"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1774969200000",
+   "fn": "dates",
+   "args": [
+    1774969200000
+   ],
+   "output": {
+    "plan": "2026-03-31",
+    "monday": 1774846800000,
+    "next": "2026-04-06"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1775574000000",
+   "fn": "dates",
+   "args": [
+    1775574000000
+   ],
+   "output": {
+    "plan": "2026-04-07",
+    "monday": 1775451600000,
+    "next": "2026-04-13"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1776178800000",
+   "fn": "dates",
+   "args": [
+    1776178800000
+   ],
+   "output": {
+    "plan": "2026-04-14",
+    "monday": 1776056400000,
+    "next": "2026-04-20"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1776265200000",
+   "fn": "dates",
+   "args": [
+    1776265200000
+   ],
+   "output": {
+    "plan": "2026-04-15",
+    "monday": 1776056400000,
+    "next": "2026-04-20"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1779030000000",
+   "fn": "dates",
+   "args": [
+    1779030000000
+   ],
+   "output": {
+    "plan": "2026-05-17",
+    "monday": 1778475600000,
+    "next": "2026-05-18"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1793597400000",
+   "fn": "dates",
+   "args": [
+    1793597400000
+   ],
+   "output": {
+    "plan": "2026-11-01",
+    "monday": 1792990800000,
+    "next": "2026-11-02"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "dates 1773032340000",
+   "fn": "dates",
+   "args": [
+    1773032340000
+   ],
+   "output": {
+    "plan": "2026-03-08",
+    "monday": 1772431200000,
+    "next": "2026-03-09"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static scheduled",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    }
+   ],
+   "output": {
+    "len": 4,
+    "end": 1774846800000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": -2,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "intensification",
+    "current": "intensification"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "intensification",
+    "current": "intensification"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "intensification",
+    "current": "intensification"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 3,
+    "ended": false,
+    "phase": "deload",
+    "current": "deload"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 4,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 5,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 6,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 6,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 10,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 34,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at scheduled 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-04",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static dst",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    }
+   ],
+   "output": {
+    "len": 3,
+    "end": 1774242000000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": -2,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "peak",
+    "current": "peak"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "peak",
+    "current": "peak"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "peak",
+    "current": "peak"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 3,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 4,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 5,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 6,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 6,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 10,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 34,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at dst 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-02",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "peak"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static fall",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    }
+   ],
+   "output": {
+    "len": 5,
+    "end": 1796018400000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": -36,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": -34,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": -32,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": -32,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": -32,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": -31,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": -30,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": -29,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": -28,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": -28,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": -24,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "intro",
+    "current": "intro"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at fall 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-10-28",
+     "phases": [
+      "intro",
+      "accumulation",
+      "accumulation",
+      "accumulation",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": -34,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static openEnded",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    }
+   ],
+   "output": {
+    "len": null,
+    "end": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": 7,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": 9,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 12,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 13,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 14,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 15,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 15,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 19,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 43,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openEnded 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1,
+     "openEnded": true
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": 9,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static openClosed",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    }
+   ],
+   "output": {
+    "len": null,
+    "end": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": 7,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": 9,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": 11,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 12,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 13,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 14,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 15,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 15,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 19,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 43,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at openClosed 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2025-12-31",
+     "phases": [],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "completed",
+     "activatedAt": 1,
+     "openEnded": true,
+     "completedAt": 1772982000000
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": 9,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static pending",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    }
+   ],
+   "output": {
+    "len": 4,
+    "end": 1776661200000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": -5,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": -3,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": -1,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": -1,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": -1,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 1,
+    "ended": false,
+    "phase": null,
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": null,
+    "current": "intensification"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 3,
+    "ended": false,
+    "phase": null,
+    "current": "deload"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 3,
+    "ended": false,
+    "phase": null,
+    "current": "deload"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 7,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 31,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at pending 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-03-23",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "pending",
+     "activatedAt": 1
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": -3,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "static badDate",
+   "fn": "blockStatic",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    }
+   ],
+   "output": {
+    "len": 4,
+    "end": 1776056400000
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1771254000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1771254000000
+   ],
+   "output": {
+    "week": -4,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1772550000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1772550000000
+   ],
+   "output": {
+    "week": -2,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1773759600000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773759600000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1773846000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773846000000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1773932400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773932400000
+   ],
+   "output": {
+    "week": 0,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1774364400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774364400000
+   ],
+   "output": {
+    "week": 1,
+    "ended": false,
+    "phase": "accumulation",
+    "current": "accumulation"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1774969200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1774969200000
+   ],
+   "output": {
+    "week": 2,
+    "ended": false,
+    "phase": "intensification",
+    "current": "intensification"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1775574000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1775574000000
+   ],
+   "output": {
+    "week": 3,
+    "ended": false,
+    "phase": "deload",
+    "current": "deload"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1776178800000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776178800000
+   ],
+   "output": {
+    "week": 4,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1776265200000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1776265200000
+   ],
+   "output": {
+    "week": 4,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1779030000000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1779030000000
+   ],
+   "output": {
+    "week": 8,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1793597400000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1793597400000
+   ],
+   "output": {
+    "week": 32,
+    "ended": true,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "at badDate 1773032340000",
+   "fn": "blockAt",
+   "args": [
+    {
+     "id": "b",
+     "name": "B",
+     "focus": "hypertrophy",
+     "startDate": "2026-02-30",
+     "phases": [
+      "accumulation",
+      "accumulation",
+      "intensification",
+      "deload"
+     ],
+     "program": [],
+     "intent": "",
+     "progression": "",
+     "status": "active",
+     "activatedAt": 1
+    },
+    1773032340000
+   ],
+   "output": {
+    "week": -2,
+    "ended": false,
+    "phase": null,
+    "current": null
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "resolver",
+   "fn": "phaseResolverFor",
+   "args": [
+    [
+     {
+      "id": "p1",
+      "goal": "general",
+      "origin": "migrated",
+      "status": "completed",
+      "createdAt": 1,
+      "blocks": [
+       {
+        "id": "b",
+        "name": "B",
+        "focus": "hypertrophy",
+        "startDate": "2025-12-31",
+        "phases": [],
+        "program": [],
+        "intent": "",
+        "progression": "",
+        "status": "completed",
+        "activatedAt": 1,
+        "openEnded": true,
+        "completedAt": 1772982000000
+       }
+      ]
+     },
+     {
+      "id": "p2",
+      "goal": "hypertrophy",
+      "origin": "planned",
+      "status": "active",
+      "createdAt": 2,
+      "blocks": [
+       {
+        "id": "b",
+        "name": "B",
+        "focus": "hypertrophy",
+        "startDate": "2026-03-02",
+        "phases": [
+         "accumulation",
+         "accumulation",
+         "peak"
+        ],
+        "program": [],
+        "intent": "",
+        "progression": "",
+        "status": "active",
+        "activatedAt": 1
+       },
+       {
+        "id": "b",
+        "name": "B",
+        "focus": "hypertrophy",
+        "startDate": "2026-03-04",
+        "phases": [
+         "accumulation",
+         "accumulation",
+         "intensification",
+         "deload"
+        ],
+        "program": [],
+        "intent": "",
+        "progression": "",
+        "status": "active",
+        "activatedAt": 1
+       },
+       {
+        "id": "b",
+        "name": "B",
+        "focus": "hypertrophy",
+        "startDate": "2026-03-23",
+        "phases": [
+         "accumulation",
+         "accumulation",
+         "intensification",
+         "deload"
+        ],
+        "program": [],
+        "intent": "",
+        "progression": "",
+        "status": "pending",
+        "activatedAt": 1
+       }
+      ]
+     }
+    ],
+    [
+     1771254000000,
+     1772550000000,
+     1773759600000,
+     1773846000000,
+     1773932400000,
+     1774364400000,
+     1774969200000,
+     1775574000000,
+     1776178800000,
+     1776265200000,
+     1779030000000,
+     1793597400000,
+     1773032340000
+    ]
+   ],
+   "output": [
+    "accumulation",
+    "accumulation",
+    "peak",
+    "peak",
+    "peak",
+    "deload",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "accumulation"
+   ],
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 0",
+   "fn": "validatePhases",
+   "args": [
+    []
+   ],
+   "output": {
+    "err": "A block needs at least one week.",
+    "productive": 0
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 1",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "accumulation"
+    ]
+   ],
+   "output": {
+    "err": "Blocks longer than 12 weeks outrun any plan — split this into two blocks.",
+    "productive": 13
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 2",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "intro",
+     "recovery"
+    ]
+   ],
+   "output": {
+    "err": "A block needs at least one week of real training.",
+    "productive": 0
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 3",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "intro"
+    ]
+   ],
+   "output": {
+    "err": "Intro and recovery weeks only make sense at the start of a block, before the training proper.",
+    "productive": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 4",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "intro",
+     "intro",
+     "intro",
+     "accumulation"
+    ]
+   ],
+   "output": {
+    "err": "More than 2 easy opening weeks stops being an introduction and starts being the block.",
+    "productive": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 5",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "race-week",
+     "race-week"
+    ]
+   ],
+   "output": {
+    "err": "One race week per block — a second race needs its own block.",
+    "productive": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 6",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "race-week",
+     "accumulation"
+    ]
+   ],
+   "output": {
+    "err": "Race week is the last week of the block — nothing gets programmed past the start line.",
+    "productive": 1
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 7",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "deload",
+     "deload",
+     "deload"
+    ]
+   ],
+   "output": {
+    "err": "More than 2 easy weeks in a row stops being a taper and starts being detraining.",
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 8",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "deload",
+     "accumulation"
+    ]
+   ],
+   "output": {
+    "err": "Deload weeks close the block — training on tired legs after an easy week wastes both.",
+    "productive": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 9",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "accumulation",
+     "deload"
+    ]
+   ],
+   "output": {
+    "err": "A deload needs at least 3 productive weeks before it — there's no fatigue to shed yet.",
+    "productive": 2
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 10",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "intro",
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "deload"
+    ]
+   ],
+   "output": {
+    "err": null,
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 11",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "intensification",
+     "peak",
+     "deload",
+     "deload",
+     "race-week"
+    ]
+   ],
+   "output": {
+    "err": null,
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 12",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "maintenance",
+     "maintenance",
+     "race-week"
+    ]
+   ],
+   "output": {
+    "err": null,
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 13",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "recovery",
+     "intro",
+     "accumulation",
+     "peak",
+     "peak",
+     "deload"
+    ]
+   ],
+   "output": {
+    "err": null,
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "validate 14",
+   "fn": "validatePhases",
+   "args": [
+    [
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "deload",
+     "race-week"
+    ]
+   ],
+   "output": {
+    "err": null,
+    "productive": 3
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "defaults",
+   "fn": "defaults",
+   "args": [],
+   "output": {
+    "sport": {
+     "sport": "triathlon",
+     "event": "tri-olympic",
+     "proximity": "none",
+     "load": "moderate",
+     "weakLink": "even",
+     "niggles": []
+    },
+    "profile": {
+     "injuries": "",
+     "equipment": "full-gym",
+     "daysPerWeek": 3,
+     "experience": "beginner",
+     "priorityMuscles": [],
+     "updatedAt": 0
+    }
+   },
+   "now": 1773846000000
+  }
+ ]
+}
