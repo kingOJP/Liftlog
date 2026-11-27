@@ -18,6 +18,9 @@ import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
+/** Reps are whole numbers: the field keeps the leading digits ("6.5" → "6"). */
+const wholeReps = (v: string) => /^\d*/.exec(v)![0];
+
 /** One logged row: load, count, and how it was done. */
 export type LoggedEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
 
@@ -596,7 +599,7 @@ export default function ExerciseCard({
                         type="number"
                         inputMode="numeric"
                         value={editReps}
-                        onChange={e => setEditReps(e.target.value)}
+                        onChange={e => setEditReps(wholeReps(e.target.value))}
                         onKeyDown={handleEditKeyDown}
                         autoFocus={timed}
                       />
@@ -695,7 +698,7 @@ export default function ExerciseCard({
                     placeholder={timed ? 'Seconds' : 'Reps'}
                     aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : row.kind === 'extension' ? TECHNIQUE_INFO[row.technique!].label.toLowerCase() : `set ${nextSetNum}`}`}
                     value={row.reps}
-                    onChange={e => updateRow({ reps: e.target.value })}
+                    onChange={e => updateRow({ reps: wholeReps(e.target.value) })}
                     onKeyDown={handleKeyDown}
                   />
                   <span className="input-unit">{countLabel}</span>

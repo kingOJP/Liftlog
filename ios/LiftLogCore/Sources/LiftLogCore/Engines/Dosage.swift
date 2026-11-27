@@ -122,7 +122,7 @@ public enum Dosage {
     public static func rangeFromHistory(_ history: [DosageHistorySession]) -> RepPrescription? {
         let recent = Array(history.filter { !$0.sets.isEmpty }.prefix(historySampleSessions))
         if recent.isEmpty { return nil }
-        let reps = median(recent.flatMap { $0.sets.map(\.reps) })
+        let reps = JS.round(median(recent.flatMap { $0.sets.map(\.reps) }))
         let sets = median(recent.map { Double($0.sets.count) })
         return RepPrescription(sets: min(maxSets, max(minSets, Int(JS.round(sets)))),
                                repLow: Int(max(1, reps - Double(derivedRangeSpread))),
