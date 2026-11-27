@@ -116,7 +116,7 @@ async function handleCallback(request: Request, env: Env, url: URL): Promise<Res
   const { token } = await createSession(env, userId);
 
   // Non-sensitive user info readable by JS (no passwords, no session token)
-  const userJson = encodeURIComponent(JSON.stringify({ email: gUser.email, name: gUser.name }));
+  const userJson = encodeURIComponent(JSON.stringify({ id: userId, email: gUser.email, name: gUser.name }));
 
   const headers = new Headers({ Location: '/' });
   headers.append('Set-Cookie',
