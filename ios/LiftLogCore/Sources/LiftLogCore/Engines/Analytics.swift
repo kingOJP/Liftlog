@@ -107,6 +107,18 @@ public enum Analytics {
         return series.mapValues { $0.jsSorted { $0.ts - $1.ts } }
     }
 
+    /// Exercise ids in the order `e1rmSeries`'s TS Map inserts them: first
+    /// session (in snapshot order) where a strength-counting set beats 0.
+    public static func e1rmSeriesOrder(_ snap: TrainingSnapshot) -> [String] {
+        var order: [String] = [], seen = Set<String>()
+        for session in snap.sessions {
+            for s in snap.setsBySession[session.id ?? -1] ?? [] where Variations.countsForStrength(s.technique) {
+                if epley1RM(s.weight, s.reps) > 0, seen.insert(s.exerciseId).inserted { order.append(s.exerciseId) }
+            }
+        }
+        return order
+    }
+
     public static func normalizeName(_ name: String) -> String {
         name.lowercased().replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)

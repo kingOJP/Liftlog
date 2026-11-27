@@ -54,6 +54,25 @@ it('metrics fixture', () => {
         alone: splitInsight(computeMuscleHeat(snap, a, b), null), split: volumeSplit(computeMuscleHeat(snap, a, b)) };
     });
   }
+  // Ties: equal counts must keep first-seen (Map insertion) order, not fall to name/id order.
+  {
+    const tie = (id: number, start: number, ex: Array<[string, number]>) => {
+      const sess: Session = { id, guid: `t${id}`, dayId: 1, weekNumber: 1, startedAt: start, completedAt: start + 3_000_000 };
+      const logs: SetLog[] = ex.flatMap(([exerciseId, sets], j) => Array.from({ length: sets }, (_, k) =>
+        ({ id: id * 100 + j * 10 + k, sessionId: id, exerciseId, setNumber: k + 1, weight: 50, reps: 10 })));
+      return [sess, logs] as const;
+    };
+    const [a, al] = tie(1, DEFAULT_NOW - 10 * DAY, [['seated-leg-curl', 3], ['hammer-curls', 3]]);
+    const [b, bl] = tie(2, DEFAULT_NOW - 2 * DAY, [['flat-barbell-bench-press', 3]]);
+    f.record('split tie order', 'splitInsight', [[b, a], [...al, ...bl], DEFAULT_NOW - 7 * DAY, DEFAULT_NOW], (s: Session[], l: SetLog[], x: number, y: number) => {
+      const snap = buildSnapshot(s, l), prev = previousWindow({ from: x, to: y });
+      return { insight: splitInsight(computeMuscleHeat(snap, x, y), computeMuscleHeat(snap, prev.from, prev.to)),
+        alone: splitInsight(computeMuscleHeat(snap, x, y), null), split: volumeSplit(computeMuscleHeat(snap, x, y)) };
+    });
+    const [c, cl] = tie(3, DEFAULT_NOW - 3 * DAY, [['zz-custom-curl', 2], ['aa-custom-curl', 2]]);
+    f.record('metrics tie order', 'computeMetrics', [[c], cl, DEFAULT_NOW], (s: Session[], l: SetLog[], t: number) => computeMetrics(buildSnapshot(s, l), t),
+      { storage: { liftlog_exercises: [{ id: 'zz-custom-curl', name: 'Curl' }, { id: 'aa-custom-curl', name: 'Curl' }] } });
+  }
   const BANDS = [undefined, { low: 4, high: 10 }, { low: 8, high: 16 }];
   BANDS.forEach((band, bi) => {
     for (const r of [-1, 0, 2, 4, 8.5, 10, 13, 16, 20, 22, 26, 30, 40]) {
