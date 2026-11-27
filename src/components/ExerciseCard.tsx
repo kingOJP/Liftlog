@@ -19,7 +19,9 @@ import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
 /** Reps (and seconds) are whole numbers: a field holding anything else can't be logged. */
-const isWholeCount = (v: string) => /^\d+$/.test(v.trim()) && parseInt(v, 10) > 0;
+const isWholeCount = (v: string) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) > 0;
+/** A count prefilled from stored data (legacy rows may hold a fraction) is shown whole, so it stays loggable. */
+const wholeText = (n: number) => String(Math.round(n));
 
 /** One logged row: load, count, and how it was done. */
 export type LoggedEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
@@ -299,7 +301,7 @@ export default function ExerciseCard({
           kind: 'work',
           ...sticky,
           weight: prescribedWeight(activePrescription.weight),
-          reps: activePrescription.targetReps == null ? '' : String(activePrescription.targetReps),
+          reps: activePrescription.targetReps == null ? '' : wholeText(activePrescription.targetReps),
         }
       : plan
         ? null
@@ -346,7 +348,7 @@ export default function ExerciseCard({
   function handleLogSet() {
     if (!row) return;
     const w = timed ? 0 : fromDisplay(parseFloat(row.weight));
-    const r = parseInt(row.reps, 10);
+    const r = Number(row.reps);
     // Weight of 0 is valid (bodyweight exercises); reps must be a positive whole number.
     if (!isFinite(w) || w < 0 || !isWholeCount(row.reps)) return;
     const warmup = row.kind === 'warmup';
@@ -379,7 +381,7 @@ export default function ExerciseCard({
       kind: 'work',
       ...sticky,
       weight: workingWeight ?? (lastWork ? String(toDisplay(lastWork.weight)) : ''),
-      reps: lastWork ? String(lastWork.reps) : '',
+      reps: lastWork ? wholeText(lastWork.reps) : '',
     });
   }
 
@@ -387,7 +389,7 @@ export default function ExerciseCard({
     const s = sets[index];
     setEditingIndex(index);
     setEditWeight(String(toDisplay(s.weight)));
-    setEditReps(String(s.reps));
+    setEditReps(wholeText(s.reps));
     setEditWarmup(!!s.warmup);
     setEditVariation({ ...(s.technique ? { technique: s.technique } : {}), ...(s.grip ? { grip: s.grip } : {}) });
     setEditShowVariation(false);
@@ -396,7 +398,7 @@ export default function ExerciseCard({
   function confirmEdit() {
     if (editingIndex === null) return;
     const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
-    const r = parseInt(editReps, 10);
+    const r = Number(editReps);
     if (isFinite(w) && w >= 0 && isWholeCount(editReps)) {
       onEditSet(editingIndex, {
         weight: w, reps: r,
