@@ -518,6 +518,55 @@
    "now": 1773846000000
   },
   {
+   "name": "guidance 23",
+   "fn": "parseGuidance",
+   "args": [
+    "knee is fine\r\nshoulder pain when pressing\r\nno back issues"
+   ],
+   "output": {
+    "bannedWeightTypes": [],
+    "bannedEquipment": [],
+    "avoidPatterns": [
+     "Dip",
+     "Vertical Press"
+    ],
+    "avoidNameParts": [],
+    "notes": [
+     "Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay."
+    ]
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "guidance 24",
+   "fn": "parseGuidance",
+   "args": [
+    "sore hip\rand bad elbow\n"
+   ],
+   "output": {
+    "bannedWeightTypes": [],
+    "bannedEquipment": [],
+    "avoidPatterns": [
+     "Dip",
+     "Hip Hinge",
+     "Lunge"
+    ],
+    "avoidNameParts": [
+     "bulgarian",
+     "pistol",
+     "skull",
+     "close-grip",
+     "close grip",
+     "preacher"
+    ],
+    "notes": [
+     "Hip issue noted — no deep lunging or heavy hinging; machines and hip thrusts carry the lower body.",
+     "Elbow issue noted — no skull-crushers, dips or close-grip pressing; cable pressdowns and neutral-grip pulls stay."
+    ]
+   },
+   "now": 1773846000000
+  },
+  {
    "name": "injury area knee",
    "fn": "applyInjuryArea",
    "args": [
@@ -146032,6 +146081,740 @@
      {
       "muscle": "Lower Back",
       "sets": 3
+     },
+     {
+      "muscle": "Calves",
+      "sets": 3
+     },
+     {
+      "muscle": "Abs",
+      "sets": 3
+     },
+     {
+      "muscle": "Forearms",
+      "sets": 1.5
+     }
+    ],
+    "intent": "6 weeks of balanced, sustainable training: Full Body ×3 covers every muscle at an effective dose without any marathon sessions. The plan is to build for 5 weeks, then deload and reassess.",
+    "progression": "Loading runs on double progression: hit the top of the rep range on every set and the coach adds weight next session; miss the bottom and it eases you back. Set counts stay adaptive week to week within the block's guardrails. Week 6 is a planned deload — roughly 10% lighter across the board — so the rebound lands inside this block, not after it. General Fitness stays the destination — the in-workout coach optimizes the route.",
+    "warnings": []
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "notes 23",
+   "fn": "buildPlanProposal",
+   "args": [
+    {
+     "goal": "general",
+     "daysPerWeek": 3,
+     "weeks": 6,
+     "includeDeload": true,
+     "openWithRecovery": false,
+     "startDate": "2026-03-02",
+     "notes": "knee is fine\r\nshoulder pain when pressing\r\nno back issues",
+     "experience": "intermediate"
+    },
+    [],
+    null,
+    null,
+    null
+   ],
+   "output": {
+    "input": {
+     "goal": "general",
+     "daysPerWeek": 3,
+     "weeks": 6,
+     "includeDeload": true,
+     "openWithRecovery": false,
+     "startDate": "2026-03-02",
+     "notes": "knee is fine\r\nshoulder pain when pressing\r\nno back issues",
+     "experience": "intermediate"
+    },
+    "confidence": {
+     "level": "low",
+     "sessions": 0,
+     "detail": "No training history yet, so this plan leans on established exercise science, calibrated for an intermediate lifter. It gets personal fast — every workout you log sharpens the next block."
+    },
+    "splitName": "Full Body ×3",
+    "splitReason": "Three full-body days train everything ~1.5–2× a week with a rest day between sessions — the highest-return schedule per gym hour.",
+    "phases": [
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "intensification",
+     "intensification",
+     "deload"
+    ],
+    "phaseNotes": [
+     "The deload lands in week 6 — after 5 hard weeks, fatigue starts masking fitness; one planned easy week lets it show."
+    ],
+    "days": [
+     {
+      "id": 1,
+      "label": "Day 1",
+      "muscleGroups": "Full Body A",
+      "exercises": [
+       {
+        "id": "barbell-back-squat",
+        "name": "Barbell Back Squat",
+        "sets": 3,
+        "repLow": 5,
+        "repHigh": 8,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "dumbbell-bench-press",
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "barbell-rows",
+        "name": "Barbell Rows",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "leg-press-calf-raise",
+        "name": "Leg Press Calf Raise",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Day 2",
+      "muscleGroups": "Full Body B",
+      "exercises": [
+       {
+        "id": "dumbbell-rdl",
+        "name": "Dumbbell Romanian Deadlift",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "lat-pull-down",
+        "name": "Lat Pull Down",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "dumbbell-lateral-raises",
+        "name": "Dumbbell Lateral Raises",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-curls",
+        "name": "Cable Curls",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-crunch",
+        "name": "Cable Crunch",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       }
+      ]
+     },
+     {
+      "id": 3,
+      "label": "Day 3",
+      "muscleGroups": "Full Body C",
+      "exercises": [
+       {
+        "id": "barbell-back-squat",
+        "name": "Barbell Back Squat",
+        "sets": 3,
+        "repLow": 5,
+        "repHigh": 8,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "dumbbell-bench-press",
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "barbell-rows",
+        "name": "Barbell Rows",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "hip-thrusts",
+        "name": "Hip Thrusts",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-kick-backs",
+        "name": "Cable Kick Backs",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15,
+        "rangeSource": "plan"
+       }
+      ]
+     }
+    ],
+    "decisions": [
+     {
+      "exerciseId": "barbell-back-squat",
+      "name": "Barbell Back Squat",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Quads work (squat) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Chest work (horizontal press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-rows",
+      "name": "Barbell Rows",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Upper Back work (row) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-lateral-raises",
+      "name": "Cable Lateral Raises",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Delts work (lateral raise) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "leg-press-calf-raise",
+      "name": "Leg Press Calf Raise",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Calves work (calf raise) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-rdl",
+      "name": "Dumbbell Romanian Deadlift",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Hamstrings work (hip hinge) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "lat-pull-down",
+      "name": "Lat Pull Down",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Lats work (pull down) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-lateral-raises",
+      "name": "Dumbbell Lateral Raises",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Delts work (lateral raise) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-curls",
+      "name": "Cable Curls",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Biceps work (curl) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-crunch",
+      "name": "Cable Crunch",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Abs work (crunch) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-back-squat",
+      "name": "Barbell Back Squat",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Quads work (squat) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Chest work (horizontal press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-rows",
+      "name": "Barbell Rows",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Upper Back work (row) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "hip-thrusts",
+      "name": "Hip Thrusts",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Glutes work (hip thrust) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-kick-backs",
+      "name": "Cable Kick Backs",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Triceps work (tricep extension) — an evidence-based pick for this slot."
+     }
+    ],
+    "guidanceNotes": [
+     "Shoulder issue noted — no overhead pressing or dips; horizontal pressing and raises stay."
+    ],
+    "muscleWeeklySets": [
+     {
+      "muscle": "Delts",
+      "sets": 9
+     },
+     {
+      "muscle": "Glutes",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Hamstrings",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Upper Back",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Biceps",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Quads",
+      "sets": 6
+     },
+     {
+      "muscle": "Chest",
+      "sets": 6
+     },
+     {
+      "muscle": "Triceps",
+      "sets": 6
+     },
+     {
+      "muscle": "Lats",
+      "sets": 6
+     },
+     {
+      "muscle": "Lower Back",
+      "sets": 4.5
+     },
+     {
+      "muscle": "Calves",
+      "sets": 3
+     },
+     {
+      "muscle": "Abs",
+      "sets": 3
+     },
+     {
+      "muscle": "Forearms",
+      "sets": 1.5
+     }
+    ],
+    "intent": "6 weeks of balanced, sustainable training: Full Body ×3 covers every muscle at an effective dose without any marathon sessions. The plan is to build for 5 weeks, then deload and reassess.",
+    "progression": "Loading runs on double progression: hit the top of the rep range on every set and the coach adds weight next session; miss the bottom and it eases you back. Set counts stay adaptive week to week within the block's guardrails. Week 6 is a planned deload — roughly 10% lighter across the board — so the rebound lands inside this block, not after it. General Fitness stays the destination — the in-workout coach optimizes the route.",
+    "warnings": []
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "notes 24",
+   "fn": "buildPlanProposal",
+   "args": [
+    {
+     "goal": "general",
+     "daysPerWeek": 3,
+     "weeks": 6,
+     "includeDeload": true,
+     "openWithRecovery": false,
+     "startDate": "2026-03-02",
+     "notes": "sore hip\rand bad elbow\n",
+     "experience": "intermediate",
+     "injuries": "sore knee"
+    },
+    [],
+    null,
+    null,
+    null
+   ],
+   "output": {
+    "input": {
+     "goal": "general",
+     "daysPerWeek": 3,
+     "weeks": 6,
+     "includeDeload": true,
+     "openWithRecovery": false,
+     "startDate": "2026-03-02",
+     "notes": "sore hip\rand bad elbow\n",
+     "experience": "intermediate",
+     "injuries": "sore knee"
+    },
+    "confidence": {
+     "level": "low",
+     "sessions": 0,
+     "detail": "No training history yet, so this plan leans on established exercise science, calibrated for an intermediate lifter. It gets personal fast — every workout you log sharpens the next block."
+    },
+    "splitName": "Full Body ×3",
+    "splitReason": "Three full-body days train everything ~1.5–2× a week with a rest day between sessions — the highest-return schedule per gym hour.",
+    "phases": [
+     "accumulation",
+     "accumulation",
+     "accumulation",
+     "intensification",
+     "intensification",
+     "deload"
+    ],
+    "phaseNotes": [
+     "The deload lands in week 6 — after 5 hard weeks, fatigue starts masking fitness; one planned easy week lets it show."
+    ],
+    "days": [
+     {
+      "id": 1,
+      "label": "Day 1",
+      "muscleGroups": "Full Body A",
+      "exercises": [
+       {
+        "id": "leg-press",
+        "name": "Leg Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "dumbbell-bench-press",
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "barbell-rows",
+        "name": "Barbell Rows",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-lateral-raises",
+        "name": "Cable Lateral Raises",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "leg-press-calf-raise",
+        "name": "Leg Press Calf Raise",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       }
+      ]
+     },
+     {
+      "id": 2,
+      "label": "Day 2",
+      "muscleGroups": "Full Body B",
+      "exercises": [
+       {
+        "id": "lying-leg-curl",
+        "name": "Lying Leg Curl",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "lat-pull-down",
+        "name": "Lat Pull Down",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "barbell-overhead-press",
+        "name": "Barbell Overhead Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-curls",
+        "name": "Cable Curls",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-crunch",
+        "name": "Cable Crunch",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 20,
+        "rangeSource": "plan"
+       }
+      ]
+     },
+     {
+      "id": 3,
+      "label": "Day 3",
+      "muscleGroups": "Full Body C",
+      "exercises": [
+       {
+        "id": "leg-press",
+        "name": "Leg Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "dumbbell-bench-press",
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan",
+        "main": true
+       },
+       {
+        "id": "barbell-rows",
+        "name": "Barbell Rows",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "hip-thrusts",
+        "name": "Hip Thrusts",
+        "sets": 3,
+        "repLow": 8,
+        "repHigh": 12,
+        "rangeSource": "plan"
+       },
+       {
+        "id": "cable-kick-backs",
+        "name": "Cable Kick Backs",
+        "sets": 3,
+        "repLow": 12,
+        "repHigh": 15,
+        "rangeSource": "plan"
+       }
+      ]
+     }
+    ],
+    "decisions": [
+     {
+      "exerciseId": "leg-press",
+      "name": "Leg Press",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Quads work (leg press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Chest work (horizontal press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-rows",
+      "name": "Barbell Rows",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Upper Back work (row) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-lateral-raises",
+      "name": "Cable Lateral Raises",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Delts work (lateral raise) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "leg-press-calf-raise",
+      "name": "Leg Press Calf Raise",
+      "dayId": 1,
+      "status": "new",
+      "reason": "Direct Calves work (calf raise) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "lying-leg-curl",
+      "name": "Lying Leg Curl",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Hamstrings work (leg curl) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "lat-pull-down",
+      "name": "Lat Pull Down",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Lats work (pull down) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-overhead-press",
+      "name": "Barbell Overhead Press",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Delts work (vertical press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-curls",
+      "name": "Cable Curls",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Biceps work (curl) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-crunch",
+      "name": "Cable Crunch",
+      "dayId": 2,
+      "status": "new",
+      "reason": "Direct Abs work (crunch) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "leg-press",
+      "name": "Leg Press",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Quads work (leg press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Chest work (horizontal press) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "barbell-rows",
+      "name": "Barbell Rows",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Upper Back work (row) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "hip-thrusts",
+      "name": "Hip Thrusts",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Glutes work (hip thrust) — an evidence-based pick for this slot."
+     },
+     {
+      "exerciseId": "cable-kick-backs",
+      "name": "Cable Kick Backs",
+      "dayId": 3,
+      "status": "new",
+      "reason": "Direct Triceps work (tricep extension) — an evidence-based pick for this slot."
+     }
+    ],
+    "guidanceNotes": [
+     "Knee issue noted — squats, lunges, jumps and leg extensions are out; pressing and hinging carry the legs. Start lighter than feels necessary.",
+     "Hip issue noted — no deep lunging or heavy hinging; machines and hip thrusts carry the lower body.",
+     "Elbow issue noted — no skull-crushers, dips or close-grip pressing; cable pressdowns and neutral-grip pulls stay."
+    ],
+    "muscleWeeklySets": [
+     {
+      "muscle": "Delts",
+      "sets": 9
+     },
+     {
+      "muscle": "Hamstrings",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Triceps",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Upper Back",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Biceps",
+      "sets": 7.5
+     },
+     {
+      "muscle": "Quads",
+      "sets": 6
+     },
+     {
+      "muscle": "Glutes",
+      "sets": 6
+     },
+     {
+      "muscle": "Chest",
+      "sets": 6
+     },
+     {
+      "muscle": "Lats",
+      "sets": 6
      },
      {
       "muscle": "Calves",

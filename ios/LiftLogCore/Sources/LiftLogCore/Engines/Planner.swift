@@ -92,22 +92,22 @@ private enum Rx {
     static func test(_ r: NSRegularExpression, _ s: String) -> Bool {
         r.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil
     }
+    // UTF-16 offsets, like JS: a match may start inside a Swift Character ("\r\n" is one grapheme).
     static func replace(_ r: NSRegularExpression, _ s: String, _ f: (String) -> String) -> String {
-        var out = s
-        for m in r.matches(in: s, range: NSRange(s.startIndex..., in: s)).reversed() {
-            let range = Range(m.range, in: s)!
-            out.replaceSubrange(Range(m.range, in: out)!, with: f(String(s[range])))
+        let ns = s as NSString, out = NSMutableString(string: ns)
+        for m in r.matches(in: s, range: NSRange(location: 0, length: ns.length)).reversed() {
+            out.replaceCharacters(in: m.range, with: f(ns.substring(with: m.range)))
         }
-        return out
+        return out as String
     }
     static func split(_ r: NSRegularExpression, _ s: String) -> [String] {
-        var parts: [String] = [], last = s.startIndex
-        for m in r.matches(in: s, range: NSRange(s.startIndex..., in: s)) {
-            let range = Range(m.range, in: s)!
-            parts.append(String(s[last..<range.lowerBound]))
-            last = range.upperBound
+        let ns = s as NSString
+        var parts: [String] = [], last = 0
+        for m in r.matches(in: s, range: NSRange(location: 0, length: ns.length)) {
+            parts.append(ns.substring(with: NSRange(location: last, length: m.range.location - last)))
+            last = m.range.location + m.range.length
         }
-        parts.append(String(s[last...]))
+        parts.append(ns.substring(from: last))
         return parts
     }
 

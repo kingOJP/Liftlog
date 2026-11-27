@@ -27,6 +27,7 @@ const NOTES = [
   'bad wrists; carpal tunnel', "golfer's elbow flares up", 'ITB issues on long runs', 'sciatica bothers me sometimes',
   'Bulgarian split squats hurt my knee', 'I love hip thrusts and shoulder press', 'my knees ache. also my back is weak',
   'wrist injury however shoulders are fine now', 'want to get stronger', 'Dumbbells Only! Knee Pain!', 'groin strain last month',
+  'knee is fine\r\nshoulder pain when pressing\r\nno back issues', 'sore hip\rand bad elbow\n',
 ];
 const GOALS: Goal[] = ['hypertrophy', 'strength', 'fat-loss', 'athletic', 'general', 'sport-support'];
 const EXP: ExperienceLevel[] = ['beginner', 'intermediate', 'advanced'];
