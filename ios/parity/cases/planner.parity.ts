@@ -77,7 +77,7 @@ it('planner fixture', () => {
 
   for (const goal of GOALS) for (const weeks of [2, 3, 4, 5, 6, 7.4, 8, 10, 12, 13]) for (const deload of [true, false]) for (const rec of [false, true]) for (const x of ['beginner', 'intermediate'] as ExperienceLevel[]) {
     const i = input(goal, 3, x, { weeks, includeDeload: deload, openWithRecovery: rec });
-    f.record(`phases ${goal} ${weeks} ${deload} ${rec} ${x}`, 'buildPhases', [i, null, null], (ii: PlannerInput, _r: null, _c: null) => buildPhases(ii));
+    f.record(`phases ${goal} ${weeks} ${deload} ${rec} ${x}`, 'buildPhases', [i, null, null], (ii: PlannerInput, r: null, c: null) => buildPhases(ii, r, c ?? undefined));
   }
   for (const [ci, c] of changes.entries()) for (const r of [null, retro([], [], [], ['a', 'b'])]) for (const goal of ['strength', 'sport-support'] as Goal[])
     f.record(`phases retro ${ci} ${!!r} ${goal}`, 'buildPhases', [input(goal, 3, 'advanced', { weeks: 8, sport: SPORT_RUN }), r, c],

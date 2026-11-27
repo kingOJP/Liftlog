@@ -37,11 +37,11 @@ it('sports fixture', () => {
 
   for (const e of SPORT_EVENTS) for (const load of LOADS) for (const days of [1, 2, 3, 4]) for (const x of ['beginner', 'intermediate'] as ExperienceLevel[])
     f.record(`plan ${e.id} ${load} ${days} ${x}`, 'buildSportPlan', [ctx(e, load), days, x, null],
-      (c: SportContext, d: number, xx: ExperienceLevel, _b: null) => buildSportPlan(c, d, xx));
+      (c: SportContext, d: number, xx: ExperienceLevel, b: null) => buildSportPlan(c, d, xx, b ?? undefined));
   for (const e of SPORT_EVENTS.filter(ev => ['tri-olympic', 'tri-full', 'run-5k', 'run-half'].includes(ev.id)))
     for (const [ni, niggles] of NIGGLE_SETS.entries()) for (const weak of e.sport === 'triathlon' ? WEAK : ['even' as Discipline]) for (const load of ['low', 'high'] as EnduranceLoad[])
       f.record(`plan niggles ${e.id} ${ni} ${weak} ${load}`, 'buildSportPlan', [ctx(e, load, weak, niggles), 3, 'intermediate', null],
-        (c: SportContext, d: number, xx: ExperienceLevel, _b: null) => buildSportPlan(c, d, xx));
+        (c: SportContext, d: number, xx: ExperienceLevel, b: null) => buildSportPlan(c, d, xx, b ?? undefined));
   const tight: VolumeTarget = { low: 2, high: 5 };
   for (const e of SPORT_EVENTS) for (const weak of WEAK)
     f.record(`plan tight band ${e.id} ${weak}`, 'buildSportPlan', [ctx(e, 'very-high', weak, ['achilles']), 3, 'advanced', tight],
