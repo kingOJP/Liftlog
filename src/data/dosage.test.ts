@@ -95,6 +95,10 @@ describe('rangeFromHistory', () => {
     expect(rangeFromHistory([sess(...Array(9).fill(10))])!.sets).toBe(5);
   });
 
+  it('never derives a fractional range, even from a legacy fractional log', () => {
+    expect(rangeFromHistory([sess(6.5, 6.5, 6.5)])).toMatchObject({ repLow: 5, repHigh: 9 });
+  });
+
   it('returns null with nothing logged', () => {
     expect(rangeFromHistory([])).toBeNull();
     expect(rangeFromHistory([{ sets: [] }])).toBeNull();

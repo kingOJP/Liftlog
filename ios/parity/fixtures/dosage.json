@@ -75939,6 +75939,15 @@
    "now": 1773846000000
   },
   {
+   "name": "history 0 fractional",
+   "fn": "rangeFromHistory",
+   "args": [
+    []
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
    "name": "resolve 0 null",
    "fn": "resolvePrescription",
    "args": [
@@ -75991,6 +76000,19 @@
   },
   {
    "name": "history 1",
+   "fn": "rangeFromHistory",
+   "args": [
+    [
+     {
+      "sets": []
+     }
+    ]
+   ],
+   "output": null,
+   "now": 1773846000000
+  },
+  {
+   "name": "history 1 fractional",
    "fn": "rangeFromHistory",
    "args": [
     [
@@ -76085,6 +76107,34 @@
     "sets": 3,
     "repLow": 7,
     "repHigh": 11,
+    "source": "history"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "history 2 fractional",
+   "fn": "rangeFromHistory",
+   "args": [
+    [
+     {
+      "sets": [
+       {
+        "reps": 10.5
+       },
+       {
+        "reps": 9.5
+       },
+       {
+        "reps": 8.5
+       }
+      ]
+     }
+    ]
+   ],
+   "output": {
+    "sets": 3,
+    "repLow": 8,
+    "repHigh": 12,
     "source": "history"
    },
    "now": 1773846000000
@@ -76233,6 +76283,70 @@
     "sets": 2,
     "repLow": 3,
     "repHigh": 7,
+    "source": "history"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "history 3 fractional",
+   "fn": "rangeFromHistory",
+   "args": [
+    [
+     {
+      "sets": [
+       {
+        "reps": 5.5
+       }
+      ]
+     },
+     {
+      "sets": []
+     },
+     {
+      "sets": [
+       {
+        "reps": 6.5
+       },
+       {
+        "reps": 6.5
+       },
+       {
+        "reps": 5.5
+       },
+       {
+        "reps": 5.5
+       },
+       {
+        "reps": 5.5
+       },
+       {
+        "reps": 4.5
+       },
+       {
+        "reps": 4.5
+       }
+      ]
+     },
+     {
+      "sets": [
+       {
+        "reps": 12.5
+       }
+      ]
+     },
+     {
+      "sets": [
+       {
+        "reps": 30.5
+       }
+      ]
+     }
+    ]
+   ],
+   "output": {
+    "sets": 2,
+    "repLow": 4,
+    "repHigh": 8,
     "source": "history"
    },
    "now": 1773846000000
@@ -76424,6 +76538,41 @@
     "sets": 2,
     "repLow": 1,
     "repHigh": 4,
+    "source": "history"
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "history 4 fractional",
+   "fn": "rangeFromHistory",
+   "args": [
+    [
+     {
+      "sets": [
+       {
+        "reps": 1.5
+       },
+       {
+        "reps": 2.5
+       }
+      ]
+     },
+     {
+      "sets": [
+       {
+        "reps": 2.5
+       },
+       {
+        "reps": 1.5
+       }
+      ]
+     }
+    ]
+   ],
+   "output": {
+    "sets": 2,
+    "repLow": 1,
+    "repHigh": 5,
     "source": "history"
    },
    "now": 1773846000000

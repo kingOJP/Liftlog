@@ -205,7 +205,8 @@ export function rangeFromHistory(history: DosageHistorySession[]): RepPrescripti
   const recent = history.filter(h => h.sets.length > 0).slice(0, HISTORY_SAMPLE_SESSIONS);
   if (recent.length === 0) return null;
 
-  const typicalReps = median(recent.flatMap(h => h.sets.map(s => s.reps)));
+  // Reps are whole numbers; a legacy fractional log must not yield a fractional range.
+  const typicalReps = Math.round(median(recent.flatMap(h => h.sets.map(s => s.reps))));
   const typicalSets = median(recent.map(h => h.sets.length));
 
   return {
