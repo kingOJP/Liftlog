@@ -8,6 +8,8 @@ public struct MuscleHeat: Codable, Hashable, Sendable { public var sets: Double;
 public struct HeatmapData: Sendable {
     public var byMuscle: [MuscleGroup: MuscleHeat]
     public var weeks: Double
+    /// Muscles in first-credited order (the TS Map's insertion order), for tie-stable sorts.
+    public var order: [MuscleGroup] = []
 }
 
 public struct TimeWindow: Codable, Hashable, Sendable { public var from: Double; public var to: Double }
@@ -39,10 +41,10 @@ public enum Heatmap {
 
     public static func computeMuscleHeat(_ snap: TrainingSnapshot, _ fromTs: Double, _ toTs: Double) -> HeatmapData {
         let weeks = Swift.max((toTs - fromTs) / (7 * dayMs), 1.0 / 7)
-        let totals = Analytics.muscleSetTotals(snap) { s in
+        let t = Analytics.muscleSetTotals(snap) { s in
             let ts = Analytics.sessionTimestamp(s); return ts >= fromTs && ts <= toTs
-        }.totals
-        return HeatmapData(byMuscle: totals.mapValues { MuscleHeat(sets: $0, weeklyRate: $0 / weeks) }, weeks: weeks)
+        }
+        return HeatmapData(byMuscle: t.totals.mapValues { MuscleHeat(sets: $0, weeklyRate: $0 / weeks) }, weeks: weeks, order: t.order)
     }
 
     public static func mesocycleWindow(_ now: Double = LiftLogEnv.now()) -> TimeWindow {
@@ -105,15 +107,22 @@ public enum Heatmap {
         return sets.mapValues { $0 / total }
     }
 
-    /// Ties in `untrained` break by muscle name (TS breaks them by Map insertion order).
+    /// `byMuscle` in first-credited order; muscles missing from `order` (hand-built data) follow by name.
+    static func orderedMuscles(_ heat: HeatmapData) -> [(MuscleGroup, MuscleHeat)] {
+        let known = heat.order.filter { heat.byMuscle[$0] != nil }
+        let rest = heat.byMuscle.keys.filter { !known.contains($0) }.sorted { $0.rawValue < $1.rawValue }
+        return (known + rest).map { ($0, heat.byMuscle[$0]!) }
+    }
+
     public static func splitInsight(_ current: HeatmapData, _ previous: HeatmapData?) -> SplitInsight? {
         guard let now = volumeSplit(current) else { return nil }
         let half: BodyHalf = now[.lower]! >= now[.upper]! ? .lower : .upper
         let before = previous.flatMap(volumeSplit)
-        let untrained = (previous?.byMuscle ?? [:])
+        // Stable sort over first-credited order: ties keep the order TS's Map would.
+        let untrained = (previous.map(orderedMuscles) ?? [])
             .filter { m, h in h.sets > 0 && (current.byMuscle[m]?.sets ?? 0) <= 0 }
-            .sorted { $0.value.sets != $1.value.sets ? $0.value.sets > $1.value.sets : $0.key.rawValue < $1.key.rawValue }
-            .map(\.key)
+            .jsSorted { $1.1.sets - $0.1.sets }
+            .map(\.0)
         let pct = JS.round(now[half]! * 100)
         return SplitInsight(half: half, pct: pct, deltaPts: before.map { pct - JS.round($0[half]! * 100) }, untrained: untrained)
     }
