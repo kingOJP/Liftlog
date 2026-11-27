@@ -5,7 +5,7 @@ import { planSessionMerge, sessionGuid, sessionUpdatedAt } from '../../../src/da
 import type { SessionDoc } from '../../../src/data/syncMerge';
 import { mergePlanDocs, planDocClock } from '../../../worker/planMerge';
 import { defaultTrainingProfile } from '../../../src/data/plan';
-import type { PlanState } from '../../../src/data/plan';
+import type { PlanState } from '../../../src/data/planStore';
 import type { Session } from '../../../src/db/database';
 
 let seed = 7;
