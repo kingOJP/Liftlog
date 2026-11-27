@@ -102,13 +102,16 @@ public enum Metrics {
             for id in byEx.keys { volumeSeries[id, default: []].append((ts, byEx[id]!)) }
         }
         for k in volumeSeries.keys { volumeSeries[k] = JS.sorted(volumeSeries[k]!) { $0.ts - $1.ts } }
-        let exercises = Analytics.e1rmSeries(snap).map { id, pts in
+        let series = Analytics.e1rmSeries(snap)
+        // Stable sort over first-seen order: ties keep the order TS's Map would.
+        let exercises = Analytics.e1rmSeriesOrder(snap).map { id -> ExerciseSeries in
+            let pts = series[id]!
+            return
             ExerciseSeries(exerciseId: id, name: ProgramStore.getExerciseName(id),
                            points: pts.map { SeriesPoint(label: ProgramMath.shortDateLabel($0.ts), value: JS.round($0.value)) },
                            volumePoints: (volumeSeries[id] ?? []).map { SeriesPoint(label: ProgramMath.shortDateLabel($0.ts), value: JS.round($0.value)) })
-        }.sorted { a, b in
-            a.points.count != b.points.count ? a.points.count > b.points.count
-                : JS.localeCompare(a.name, b.name) != 0 ? JS.localeCompare(a.name, b.name) < 0 : a.exerciseId < b.exerciseId
+        }.jsSorted { a, b in
+            a.points.count != b.points.count ? Double(b.points.count - a.points.count) : Double(JS.localeCompare(a.name, b.name))
         }
         let unclassified = Analytics.muscleSetTotals(snap).unmappedExerciseIds.map(ProgramStore.getExerciseName).jsSorted(JS.localeCompare)
         return MetricsData(hasData: true,

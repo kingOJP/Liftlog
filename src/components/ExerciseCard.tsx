@@ -18,8 +18,8 @@ import type { ReplacementSuggestion } from '../data/substitution';
 import { useInstructionSheet } from './useInstructionSheet';
 import './ExerciseCard.css';
 
-/** Reps are whole numbers: the field keeps the leading digits ("6.5" → "6"). */
-const wholeReps = (v: string) => /^\d*/.exec(v)![0];
+/** Reps (and seconds) are whole numbers: a field holding anything else can't be logged. */
+const isWholeCount = (v: string) => /^\d+$/.test(v.trim()) && parseInt(v, 10) > 0;
 
 /** One logged row: load, count, and how it was done. */
 export type LoggedEntry = { weight: number; reps: number; warmup?: boolean } & SetVariation;
@@ -347,8 +347,8 @@ export default function ExerciseCard({
     if (!row) return;
     const w = timed ? 0 : fromDisplay(parseFloat(row.weight));
     const r = parseInt(row.reps, 10);
-    // Weight of 0 is valid (bodyweight exercises); reps must be positive.
-    if (!isFinite(w) || !isFinite(r) || w < 0 || r <= 0) return;
+    // Weight of 0 is valid (bodyweight exercises); reps must be a positive whole number.
+    if (!isFinite(w) || w < 0 || !isWholeCount(row.reps)) return;
     const warmup = row.kind === 'warmup';
     onLogSet({
       weight: w, reps: r,
@@ -397,7 +397,7 @@ export default function ExerciseCard({
     if (editingIndex === null) return;
     const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
     const r = parseInt(editReps, 10);
-    if (isFinite(w) && isFinite(r) && w >= 0 && r > 0) {
+    if (isFinite(w) && w >= 0 && isWholeCount(editReps)) {
       onEditSet(editingIndex, {
         weight: w, reps: r,
         ...(editWarmup ? { warmup: true } : {}),
@@ -422,7 +422,7 @@ export default function ExerciseCard({
     if (e.key === 'Escape') cancelEdit();
   }
 
-  const canLog = !!row && (timed || row.weight !== '') && row.reps !== '';
+  const canLog = !!row && (timed || row.weight !== '') && isWholeCount(row.reps);
   const planComplete = !!plan && remaining.length === 0;
   // Without a plan (editing a past session) "done" is simply "has sets".
   const done = plan ? planComplete : sets.length > 0;
@@ -598,8 +598,9 @@ export default function ExerciseCard({
                         className="inline-input"
                         type="number"
                         inputMode="numeric"
+                        step="1"
                         value={editReps}
-                        onChange={e => setEditReps(wholeReps(e.target.value))}
+                        onChange={e => setEditReps(e.target.value)}
                         onKeyDown={handleEditKeyDown}
                         autoFocus={timed}
                       />
@@ -695,10 +696,11 @@ export default function ExerciseCard({
                     className="num-input"
                     type="number"
                     inputMode="numeric"
+                    step="1"
                     placeholder={timed ? 'Seconds' : 'Reps'}
                     aria-label={`${timed ? 'Seconds' : 'Reps'} for ${row.kind === 'warmup' ? 'warm-up' : row.kind === 'extension' ? TECHNIQUE_INFO[row.technique!].label.toLowerCase() : `set ${nextSetNum}`}`}
                     value={row.reps}
-                    onChange={e => updateRow({ reps: wholeReps(e.target.value) })}
+                    onChange={e => updateRow({ reps: e.target.value })}
                     onKeyDown={handleKeyDown}
                   />
                   <span className="input-unit">{countLabel}</span>

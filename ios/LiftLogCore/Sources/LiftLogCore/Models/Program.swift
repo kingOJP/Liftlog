@@ -32,9 +32,9 @@ public struct Exercise: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
-        sets = try c.decode(Int.self, forKey: .sets)
-        repLow = try c.decodeIfPresent(Int.self, forKey: .repLow)
-        repHigh = try c.decodeIfPresent(Int.self, forKey: .repHigh)
+        sets = try c.decodeWhole(forKey: .sets)
+        repLow = try c.decodeWholeIfPresent(forKey: .repLow)
+        repHigh = try c.decodeWholeIfPresent(forKey: .repHigh)
         main = try c.decodeIfPresent(Bool.self, forKey: .main)
         rangeSource = c.decodeLenient(RangeSource.self, forKey: .rangeSource)
         progression = c.decodeLenient(ProgressionMode.self, forKey: .progression)
@@ -70,5 +70,20 @@ public struct WorkoutDay: Codable, Hashable, Sendable {
 
     public init(id: Int, label: String, muscleGroups: String, exercises: [Exercise], phases: [PhaseKind]? = nil) {
         self.id = id; self.label = label; self.muscleGroups = muscleGroups; self.exercises = exercises; self.phases = phases
+    }
+}
+
+extension LibraryExercise {
+    enum CodingKeys: String, CodingKey { case id, name, archived, updatedAt, sets, repLow, repHigh }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        archived = try c.decodeIfPresent(Bool.self, forKey: .archived)
+        updatedAt = try c.decodeIfPresent(Double.self, forKey: .updatedAt)
+        sets = try c.decodeWholeIfPresent(forKey: .sets)
+        repLow = try c.decodeWholeIfPresent(forKey: .repLow)
+        repHigh = try c.decodeWholeIfPresent(forKey: .repHigh)
     }
 }

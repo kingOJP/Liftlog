@@ -19327,6 +19327,247 @@
    "now": 1773846000000
   },
   {
+   "name": "split tie order",
+   "fn": "splitInsight",
+   "args": [
+    [
+     {
+      "id": 2,
+      "guid": "t2",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773673200000,
+      "completedAt": 1773676200000
+     },
+     {
+      "id": 1,
+      "guid": "t1",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1772982000000,
+      "completedAt": 1772985000000
+     }
+    ],
+    [
+     {
+      "id": 100,
+      "sessionId": 1,
+      "exerciseId": "seated-leg-curl",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 101,
+      "sessionId": 1,
+      "exerciseId": "seated-leg-curl",
+      "setNumber": 2,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 102,
+      "sessionId": 1,
+      "exerciseId": "seated-leg-curl",
+      "setNumber": 3,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 110,
+      "sessionId": 1,
+      "exerciseId": "hammer-curls",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 111,
+      "sessionId": 1,
+      "exerciseId": "hammer-curls",
+      "setNumber": 2,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 112,
+      "sessionId": 1,
+      "exerciseId": "hammer-curls",
+      "setNumber": 3,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 200,
+      "sessionId": 2,
+      "exerciseId": "flat-barbell-bench-press",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 201,
+      "sessionId": 2,
+      "exerciseId": "flat-barbell-bench-press",
+      "setNumber": 2,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 202,
+      "sessionId": 2,
+      "exerciseId": "flat-barbell-bench-press",
+      "setNumber": 3,
+      "weight": 50,
+      "reps": 10
+     }
+    ],
+    1773241200000,
+    1773846000000
+   ],
+   "output": {
+    "insight": {
+     "half": "upper",
+     "pct": 100,
+     "deltaPts": 40,
+     "untrained": [
+      "Hamstrings",
+      "Biceps",
+      "Forearms"
+     ]
+    },
+    "alone": {
+     "half": "upper",
+     "pct": 100,
+     "deltaPts": null,
+     "untrained": []
+    },
+    "split": {
+     "lower": 0,
+     "upper": 1,
+     "core": 0
+    }
+   },
+   "now": 1773846000000
+  },
+  {
+   "name": "metrics tie order",
+   "fn": "computeMetrics",
+   "args": [
+    [
+     {
+      "id": 3,
+      "guid": "t3",
+      "dayId": 1,
+      "weekNumber": 1,
+      "startedAt": 1773586800000,
+      "completedAt": 1773589800000
+     }
+    ],
+    [
+     {
+      "id": 300,
+      "sessionId": 3,
+      "exerciseId": "zz-custom-curl",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 301,
+      "sessionId": 3,
+      "exerciseId": "zz-custom-curl",
+      "setNumber": 2,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 310,
+      "sessionId": 3,
+      "exerciseId": "aa-custom-curl",
+      "setNumber": 1,
+      "weight": 50,
+      "reps": 10
+     },
+     {
+      "id": 311,
+      "sessionId": 3,
+      "exerciseId": "aa-custom-curl",
+      "setNumber": 2,
+      "weight": 50,
+      "reps": 10
+     }
+    ],
+    1773846000000
+   ],
+   "output": {
+    "hasData": true,
+    "summary": {
+     "totalWorkouts": 1,
+     "totalVolume": 2000,
+     "thisWeekVolume": 0,
+     "lastWeekVolume": 2000,
+     "deltaPct": -100
+    },
+    "weeklyVolume": [
+     {
+      "weekStart": 1773032400000,
+      "label": "3/9",
+      "value": 2000,
+      "isCurrent": false
+     },
+     {
+      "weekStart": 1773637200000,
+      "label": "3/16",
+      "value": 0,
+      "isCurrent": true
+     }
+    ],
+    "exercises": [
+     {
+      "exerciseId": "zz-custom-curl",
+      "name": "Curl",
+      "points": [
+       {
+        "label": "3/15",
+        "value": 67
+       }
+      ],
+      "volumePoints": [
+       {
+        "label": "3/15",
+        "value": 1000
+       }
+      ]
+     },
+     {
+      "exerciseId": "aa-custom-curl",
+      "name": "Curl",
+      "points": [
+       {
+        "label": "3/15",
+        "value": 67
+       }
+      ],
+      "volumePoints": [
+       {
+        "label": "3/15",
+        "value": 1000
+       }
+      ]
+     }
+    ],
+    "unclassifiedExercises": [
+     "Curl",
+     "Curl"
+    ]
+   },
+   "now": 1773846000000,
+   "storage": {
+    "liftlog_exercises": "[{\"id\":\"zz-custom-curl\",\"name\":\"Curl\"},{\"id\":\"aa-custom-curl\",\"name\":\"Curl\"}]"
+   }
+  },
+  {
    "name": "color 0 -1",
    "fn": "heatColor",
    "args": [
