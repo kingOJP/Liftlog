@@ -413,6 +413,20 @@ describe('ensureLocalDataOwner — the account switch', () => {
     expect(getStoredProgram()).toHaveLength(1);
   });
 
+  it('keeps everything when a linked identity with another email opens the same account', async () => {
+    const cookie = signIn(env, 'acct-1', 'a@example.com');
+    document.cookie = `${cookie}; path=/`;
+    document.cookie = `liftlog_user=${encodeURIComponent(JSON.stringify({ id: 'acct-1', email: 'a@example.com', name: 'T' }))}; path=/`;
+    saveStoredProgram([day(1)]);
+    await logWorkout(1_000, 2);
+    await ensureLocalDataOwner();
+    document.cookie = `liftlog_user=${encodeURIComponent(JSON.stringify({ id: 'acct-1', email: 'work@example.com', name: 'T' }))}; path=/`;
+    await ensureLocalDataOwner();
+    expect((await dumpIDB()).sessions).toHaveLength(1);
+    expect(getStoredProgram()).toHaveLength(1);
+    expect(localStorage.getItem('liftlog_data_owner')).toBe('acct-1');
+  });
+
   it('claims ownership on first sign-in without wiping', async () => {
     saveStoredProgram([day(1)]); // data from before the owner key existed
     signInBrowser('a@example.com');

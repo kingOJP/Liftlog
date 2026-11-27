@@ -83,7 +83,7 @@ describe('a database that missed a migration', () => {
     expect(versions).toEqual([
       '0002_app_exercises', '0003_session_docs', '0004_training_plans', '0005_ownership',
       '0006_exercise_merges', '0007_nullable_prescription_columns',
-      '0008_sync_clocks', '0009_session_notes',
+      '0008_sync_clocks', '0009_session_notes', '0010_user_identities',
     ]);
   });
 

@@ -250,6 +250,49 @@ npm run parity:fixtures                       # TS engines → ios/parity/fixtur
 - CI (`ios` job in `.github/workflows/ci.yml`, macOS runner) regenerates the fixtures and
   fails on any diff, then runs `swift test` and builds the app for the Simulator.
 
+### No lost data — the top invariant (web, iPhone, every device)
+
+Owen: "The most import rule of this app should be no lost data." Every change to storage,
+sync, auth or migrations is judged against it first:
+
+- D1 migrations are **additive only** and preserve every existing row (`worker/migrate.ts`
+  runs idempotent statements; `0010_user_identities` backfills Google identities with
+  `INSERT OR IGNORE`). Never drop/rename a column or table holding user data.
+- Sync merges, never replaces: sessions per GUID by `updatedAt` (equal clock keeps the local
+  copy), tombstones stick, plan document plans/profile win independently, local-only data
+  always survives a pull and uploads on the next push. Swift `SyncMerge` mirrors
+  `syncMerge.ts`/`planMerge.ts` (parity fixture `sync`).
+- A new device (Swift `SyncClient.hasCompletedInitialPull`) pulls the full history before its
+  first push. A pull that fails (401, network) never leads to a push.
+- Drafts are persisted on every change (`liftlog_draft_session`, Swift `DraftStore`) and a
+  draft holding sets is never silently replaced.
+- Legacy shapes are tolerated, not rejected: a fractional count in a stored document rounds
+  to a whole number (reps are whole numbers) instead of failing the whole program/session.
+- Account deletion (`DELETE /api/account`, body `{"confirm":"delete-account"}`) is explicit and
+  user-initiated only; accounts are never merged by deleting data.
+- Tests that prove it: `worker/identity.test.ts` (migration backfill, linking, deletion) and
+  `SyncClientTests.swift` (new iPhone, device switch, two-device offline edits, tombstones).
+
+### Native auth + account linking (worker/identity.ts, worker/jwt.ts)
+
+One LiftLog user, many identities (`user_identities`, keyed by provider + subject). Native
+clients send `Authorization: Bearer <token>`; the PWA keeps its cookie — `getAuthenticatedUser`
+accepts either.
+
+- `POST /api/auth/apple` `{identityToken, rawNonce?, name?}` — verified against Apple's JWKS
+  (aud = `APPLE_BUNDLE_ID`). A verified Apple email matching a verified Google user's email
+  **auto-links**. Otherwise (hide-my-email / no match) → `409 {status:"link_required",
+  linkToken, prompt:"Already use LiftLog? Sign in with Google to link"}`; nothing is created.
+- `POST /api/auth/google/native` `{idToken, linkToken?}` — Google ID token (aud =
+  `GOOGLE_IOS_CLIENT_ID`); with `linkToken` it attaches the pending Apple identity.
+- `POST /api/auth/apple/create` `{linkToken}` — the explicit "I'm new" answer.
+- `POST /api/auth/link` (signed in) — link another provider; refuses an identity owned by
+  another account (409) rather than moving or merging it.
+- Swift: `AuthService` (sign-in/link/delete), `KeychainTokenStore`, `AppleSignIn` (iOS only).
+  **Sign in with Apple can't be tested end to end until a paid Apple Developer account exists**
+  (the capability needs a signing team; set `APPLE_BUNDLE_ID` + `GOOGLE_IOS_CLIENT_ID` worker
+  vars then). Everything else is covered by worker tests and `swift test`.
+
 ---
 
 ## TypeScript rule — CRITICAL

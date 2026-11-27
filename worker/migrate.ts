@@ -33,6 +33,8 @@ interface ColumnStep {
 interface Migration {
   version: string;
   columns: ColumnStep[];
+  /** idempotent statements (CREATE ... IF NOT EXISTS, INSERT OR IGNORE), run after the columns */
+  statements?: string[];
 }
 
 const MIGRATIONS: Migration[] = [
@@ -48,6 +50,24 @@ const MIGRATIONS: Migration[] = [
     version: '0009_session_notes',
     columns: [
       { table: 'session_docs', column: 'note', ddl: 'TEXT' },
+    ],
+  },
+  {
+    version: '0010_user_identities',
+    columns: [],
+    statements: [
+      `CREATE TABLE IF NOT EXISTS user_identities (
+         provider TEXT NOT NULL, subject TEXT NOT NULL, user_id TEXT NOT NULL, email TEXT,
+         email_verified INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
+         PRIMARY KEY (provider, subject), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`,
+      'CREATE INDEX IF NOT EXISTS idx_user_identities_user ON user_identities(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_user_identities_email ON user_identities(email)',
+      `CREATE TABLE IF NOT EXISTS link_tokens (
+         token TEXT PRIMARY KEY, provider TEXT NOT NULL, subject TEXT NOT NULL, email TEXT,
+         email_verified INTEGER NOT NULL DEFAULT 0, name TEXT, expires_at INTEGER NOT NULL)`,
+      // Every pre-existing account is a Google account keyed by its Google sub.
+      `INSERT OR IGNORE INTO user_identities (provider, subject, user_id, email, email_verified, created_at)
+         SELECT 'google', id, id, email, 1, 0 FROM users`,
     ],
   },
 ];
@@ -123,6 +143,7 @@ async function migrate(env: Env): Promise<void> {
         if (!(await hasColumn(env, step.table, step.column))) throw err;
       }
     }
+    for (const sql of m.statements ?? []) await env.DB.prepare(sql).run();
     await env.DB.prepare(
       'INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)',
     ).bind(m.version, Date.now()).run();

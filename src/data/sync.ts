@@ -28,6 +28,8 @@ import {
 } from './syncStatus';
 
 export interface SyncUser {
+  /** LiftLog account id — stable across linked identities with different emails (absent on older cookies) */
+  id?: string;
   email: string;
   name: string;
 }
@@ -150,7 +152,10 @@ export async function ensureLocalDataOwner(): Promise<void> {
   const user = getLoggedInUser();
   if (!user) return;
   const owner = localStorage.getItem(OWNER_KEY);
-  if (owner && owner !== user.email) {
+  // Keyed by account id: linked Google identities with different emails are
+  // one account, not a switch. A legacy email-valued key still matches.
+  const key = user.id ?? user.email;
+  if (owner && owner !== key && owner !== user.email) {
     // Account switch: wipe user-scoped data (workout history, program, session
     // tombstones, training journey, drafts — and, under the ownership model,
     // the exercise library, metadata overrides and deletion tombstones, which
@@ -167,7 +172,7 @@ export async function ensureLocalDataOwner(): Promise<void> {
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(ETAG_KEY);
   }
-  localStorage.setItem(OWNER_KEY, user.email);
+  localStorage.setItem(OWNER_KEY, key);
 }
 
 /**

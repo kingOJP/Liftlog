@@ -3,6 +3,7 @@ import { handleAuth } from './auth';
 import { handleSync } from './sync';
 import { handleAdmin } from './admin';
 import { ensureSchema } from './migrate';
+import { handleAccount } from './identity';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -18,6 +19,10 @@ export default {
       if (url.pathname === '/api/sync') {
         await ensureSchema(env);
         return await handleSync(request, env);
+      }
+      if (url.pathname === '/api/account') {
+        await ensureSchema(env);
+        return await handleAccount(request, env);
       }
       if (url.pathname.startsWith('/api/admin')) {
         await ensureSchema(env);
