@@ -389,7 +389,7 @@ export default function ExerciseCard({
     const s = sets[index];
     setEditingIndex(index);
     setEditWeight(String(toDisplay(s.weight)));
-    setEditReps(wholeText(s.reps));
+    setEditReps(String(s.reps));
     setEditWarmup(!!s.warmup);
     setEditVariation({ ...(s.technique ? { technique: s.technique } : {}), ...(s.grip ? { grip: s.grip } : {}) });
     setEditShowVariation(false);
@@ -398,8 +398,11 @@ export default function ExerciseCard({
   function confirmEdit() {
     if (editingIndex === null) return;
     const w = timed ? 0 : fromDisplay(parseFloat(editWeight));
-    const r = Number(editReps);
-    if (isFinite(w) && w >= 0 && isWholeCount(editReps)) {
+    const stored = sets[editingIndex].reps;
+    // An untouched count is kept as recorded (even a legacy fraction); a changed one must be whole.
+    const untouched = editReps === String(stored);
+    const r = untouched ? stored : Number(editReps);
+    if (isFinite(w) && w >= 0 && (untouched || isWholeCount(editReps))) {
       onEditSet(editingIndex, {
         weight: w, reps: r,
         ...(editWarmup ? { warmup: true } : {}),
