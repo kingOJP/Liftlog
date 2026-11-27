@@ -50,6 +50,7 @@ it('dosage fixture', () => {
   ];
   H.forEach((h, i) => {
     f.record(`history ${i}`, 'rangeFromHistory', [h], rangeFromHistory);
+    f.record(`history ${i} fractional`, 'rangeFromHistory', [h.map(x => ({ ...x, sets: x.sets.map(st => ({ ...st, reps: st.reps + 0.5 })) }))], rangeFromHistory);
     for (const g of [null, 'strength'] as (Goal | null)[]) {
       f.record(`resolve ${i} ${g}`, 'resolvePrescription', [profileFor('barbell-bench-press'), g, h], (p: ExerciseProfile, goal: Goal | null, hh: DosageHistorySession[]) =>
         resolvePrescription({ profile: p, goal, experience: 'intermediate', history: hh }));
