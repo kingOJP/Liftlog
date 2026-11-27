@@ -233,7 +233,7 @@ public final class LiftLogStore: KeyValueStore {
         }
     }
 
-    private func insertSet(_ s: SetLog, sessionId: Int) throws {
+    func insertSet(_ s: SetLog, sessionId: Int) throws {
         try db.run("""
             INSERT INTO set_logs(sessionId, exerciseId, setNumber, weight, reps, "order", warmup, repLow, repHigh, technique, grip)
             VALUES(?,?,?,?,?,?,?,?,?,?,?)
