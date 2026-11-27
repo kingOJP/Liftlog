@@ -29,6 +29,7 @@ async function post(path: string, body: unknown, token?: string, method = 'POST'
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await worker.fetch(new Request(`https://liftlog.test${path}`, { method, headers, body: JSON.stringify(body) }), env);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response shapes vary per endpoint
   return { status: res.status, body: await res.json() as Record<string, any> };
 }
 async function pull(token: string) {
